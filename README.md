@@ -8,7 +8,7 @@
 - **Safe Extraction & Caching**: Validates tarball structures against path traversal attacks (zip-slip prevention) and maintains SHA256-verified release caches.
 - **Model Assignments & Profiles**: Set models per agent slot (`sdd-explore`, `sdd-design`, etc.) and take append-only snapshot profiles.
 - **Diff & Reconcile (Sync)**: Inspect drift, preview planned updates with `--dry-run`, and repair modified or deleted managed assets.
-- **Atomic Rollback & Backups**: Pre-mutation state is automatically backed up (`~/.ce-ai/backups/`) and clean uninstallation restores pre-install configuration.
+- **Automatic Backups & Clean Uninstallation**: Pre-mutation configuration is backed up automatically (`~/.ce-ai/backups/`) and `ce-ai uninstall` restores the original pre-install configuration cleanly.
 - **Health Doctor**: Diagnose configuration errors, drift, and state inconsistency.
 
 ## Installation
@@ -96,13 +96,55 @@ ce-ai models profile save my-profile
 ce-ai models profile load my-profile
 ```
 
-### 5. Uninstall
+### 5. Uninstall & Restore Original State
 
-Restore original configuration and remove managed plugin files:
+Restore original pre-install configuration and remove all managed plugin files:
 
 ```bash
 ce-ai uninstall --harness opencode
 ```
+
+---
+
+## Backup, Restore & Uninstallation Architecture
+
+`ce-ai` is built with a zero-data-loss guarantee for host harness configurations.
+
+### 1. Automatic Pre-Mutation Backups
+- Before any file write or configuration update during `install` or `models set`, `ce-ai` checks if a pre-existing harness config (`~/.config/opencode/opencode.json`) exists.
+- If present, `ce-ai` creates a timestamped backup copy inside `~/.ce-ai/backups/<utc-timestamp>/opencode.json`.
+- The backup path is registered in the managed manifest (`install-manifest.json`).
+
+### 2. Atomic Uninstallation (`uninstall`)
+Running `ce-ai uninstall --harness opencode`:
+1. **Restores Original Config**: Locates the latest backup in `~/.ce-ai/backups/` and atomically restores `opencode.json` to its exact pre-install content.
+2. **Removes Created Files**: If `opencode.json` did not exist before `ce-ai install`, it is cleanly deleted rather than left behind.
+3. **Purges Managed Directory**: Deletes `<harness-config>/compound-engineering/` containing loaders, installed skills, and `install-manifest.json`.
+4. **Cleans State**: Updates `~/.ce-ai/state.json` to reflect that the harness is uninstalled.
+
+### 3. Install Manifest (`install-manifest.json`)
+Every managed harness directory contains `install-manifest.json` recording:
+- Installed plugin version and source (release tag or local path)
+- Per-file SHA256 hashes for drift detection
+- Config mutation log linking to the exact pre-install backup path
+
+### 4. Model Profile Snapshots
+- When saving model assignment profiles (`ce-ai models profile save <name>`), an append-only snapshot is written under `~/.ce-ai/profiles/versions/<name>-<timestamp>.json`.
+- Loading a profile (`ce-ai models profile load <name>`) restores previous model assignments while preserving historical snapshots.
+
+---
+
+## Documentation & OpenSpec Specifications
+
+For complete technical specifications, architecture decisions, and requirement matrices, see the OpenSpec documentation:
+
+- [**Design Architecture (`design.md`)**](openspec/changes/ce-ai/design.md): System architecture, data flow, interfaces, and threat matrix.
+- [**Specification Requirements (`spec.md`)**](openspec/changes/ce-ai/spec.md): OpenSpec user requirements, acceptance criteria (OI-1..OI-5, SU-1..SU-5, MM-1..MM-4, CC-1..CC-3, DG-1..DG-3).
+- [**Proposal & Scope (`proposal.md`)**](openspec/changes/ce-ai/proposal.md): Project proposal, goals, non-goals, and open items.
+- [**Exploration Analysis (`exploration.md`)**](openspec/changes/ce-ai/exploration.md): Harness exploration and direct file write decision rationales.
+- [**Implementation Roadmap (`tasks.md`)**](openspec/changes/ce-ai/tasks.md): Complete TDD task list across all 8 development phases.
+
+---
 
 ## Testing
 
