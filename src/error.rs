@@ -54,14 +54,20 @@ impl From<serde_json::Error> for CeError {
 impl CeError {
     /// Maps this error to a process exit code: 1 = runtime, 2 = usage.
     pub fn exit_code(&self) -> i32 {
-        unimplemented!("exit_code mapping not implemented yet")
+        match self {
+            CeError::Usage(_) => 2,
+            CeError::Runtime(_) | CeError::Io(_) | CeError::Json(_) => 1,
+        }
     }
 }
 
 /// Maps a command result to a process exit code: 0 = ok, 1 = runtime,
 /// 2 = usage.
 pub fn result_exit_code(result: &Result<(), CeError>) -> i32 {
-    unimplemented!("result_exit_code mapping not implemented yet")
+    match result {
+        Ok(()) => 0,
+        Err(err) => err.exit_code(),
+    }
 }
 
 #[cfg(test)]
