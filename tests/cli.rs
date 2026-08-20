@@ -163,3 +163,271 @@ fn uninstall_without_backup_removes_created_config_and_state() {
     ceai(&config_dir, &home).arg("status").assert().success()
         .stdout(predicate::str::contains("installed: none"));
 }
+
+// ---- helpers for the PR 5 command suites ----
+
+fn managed_dir(home: &Path) -> PathBuf {
+    home.join(".config/opencode/compound-engineering")
+}
+
+fn manifest_path(home: &Path) -> PathBuf {
+    managed_dir(home).join("install-manifest.json")
+}
+
+fn loader_path(home: &Path) -> PathBuf {
+    managed_dir(home).join("plugins/compound-engineering.js")
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+/// Builds a v9 CE tarball (gzip) with a top-level dir, a changed loader, and an
+/// extra skill; used to seed the upgrade cache (SU-5).
+fn ce_tarball_v9(dir: &Path) -> PathBuf {
+    use flate2::write::GzEncoder;
+    use flate2::Compression;
+    use std::io::Write;
+    use tar::Builder;
+
+    fn add_entry(builder: &mut Builder<Vec<u8>>, path: &str, content: &str) {
+        let mut header = tar::Header::new_gnu();
+        header.set_size(content.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder.append_data(&mut header, path, content.as_bytes()).unwrap();
+    }
+
+    let mut builder = Builder::new(Vec::new());
+    add_entry(&mut builder, "ce-v9/.opencode/plugins/compound-engineering.js", "export default function ceLoaderV9() {}\n");
+    add_entry(&mut builder, "ce-v9/.opencode/skills/ce-brainstorm/SKILL.md", "# ce-brainstorm\n");
+    add_entry(&mut builder, "ce-v9/.opencode/skills/ce-foo/SKILL.md", "# ce-foo\n");
+    builder.finish().unwrap();
+    let raw = builder.into_inner().unwrap();
+
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(&raw).unwrap();
+    let path = dir.join("ce-v9.tar.gz");
+    fs::write(&path, encoder.finish().unwrap()).unwrap();
+    path
+}
+
+// ---- sync (SU-1..SU-4) ----
+
+#[test]
+fn sync_restores_deleted_managed_file_and_updates_manifest() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // SU-1: a managed file goes missing on disk.
+    let skill = managed_dir(&home).join("skills/ce-brainstorm/SKILL.md");
+    fs::remove_file(&skill).unwrap();
+
+    ceai(&config_dir, &home).arg("sync").assert().success();
+
+    // SU-2: the file is restored from the source tree and the manifest updated.
+    assert_eq!(fs::read_to_string(&skill).unwrap(), "# ce-brainstorm\n");
+    let manifest = read_json(&manifest_path(&home));
+    let files: Vec<&str> = manifest["files"].as_array().unwrap().iter().map(|f| f["path"].as_str().unwrap()).collect();
+    assert_eq!(files, vec!["plugins/compound-engineering.js", "skills/ce-brainstorm/SKILL.md"]);
+    for file in manifest["files"].as_array().unwrap() {
+        let disk = fs::read(managed_dir(&home).join(file["path"].as_str().unwrap())).unwrap();
+        assert_eq!(file["sha256"].as_str().unwrap(), sha256_hex(&disk), "manifest hash matches disk");
+    }
+}
+
+#[test]
+fn sync_dry_run_lists_changes_without_writing() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // SU-3: drift — tamper with a managed file.
+    fs::write(loader_path(&home), "tampered").unwrap();
+    let manifest_before = fs::read(&manifest_path(&home)).unwrap();
+    let state_before = fs::read(config_dir.join("state.json")).unwrap();
+
+    // SU-4: dry-run lists the change and writes nothing.
+    ceai(&config_dir, &home).arg("sync").arg("--dry-run").assert().success()
+        .stdout(predicate::str::contains("plan: restore plugins/compound-engineering.js"));
+
+    assert_eq!(fs::read(&loader_path(&home)).unwrap(), b"tampered", "managed file untouched");
+    assert_eq!(fs::read(&manifest_path(&home)).unwrap(), manifest_before, "manifest untouched");
+    assert_eq!(fs::read(config_dir.join("state.json")).unwrap(), state_before, "state untouched");
+}
+
+// ---- models (MM-1..MM-4) ----
+
+#[test]
+fn models_set_reflects_in_state_and_opencode_config() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let user = r#"{"plugin":["user-plugin"],"agent":{"sdd-explore":{"model":"user-model","temperature":0.7}}}"#;
+    user_config(&home, user);
+    install(&config_dir, &home, &source);
+
+    ceai(&config_dir, &home).args(["models", "set", "sdd-explore", "opencode-go/kimi-k2.6"]).assert().success();
+
+    // MM-1: persisted in state.json.
+    let state = read_json(&config_dir.join("state.json"));
+    assert_eq!(state["model_assignments"]["sdd-explore"]["provider_id"], "opencode-go");
+    assert_eq!(state["model_assignments"]["sdd-explore"]["model_id"], "kimi-k2.6");
+    // MM-2: applied to opencode.json agent.<slot>.model/variant without clobbering user keys.
+    let config = read_json(&home.join(".config/opencode/opencode.json"));
+    assert_eq!(config["agent"]["sdd-explore"]["model"], "opencode-go/kimi-k2.6");
+    assert_eq!(config["agent"]["sdd-explore"]["variant"], "");
+    assert_eq!(config["agent"]["sdd-explore"]["temperature"], 0.7, "user agent keys preserved");
+    assert_eq!(config["plugin"].as_array().unwrap().len(), 2, "plugin merge intact");
+}
+
+#[test]
+fn models_set_unknown_slot_persists_with_warning() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    ceai(&config_dir, &home).args(["models", "set", "definitely-unknown", "opencode-go/kimi-k2.6"])
+        .assert().success().stderr(predicate::str::contains("warning"));
+
+    let state = read_json(&config_dir.join("state.json"));
+    assert_eq!(state["model_assignments"]["definitely-unknown"]["model_id"], "kimi-k2.6", "assignment persisted");
+    let config = read_json(&home.join(".config/opencode/opencode.json"));
+    assert_eq!(config["agent"]["definitely-unknown"]["model"], "opencode-go/kimi-k2.6");
+}
+
+#[test]
+fn models_profile_save_load_round_trip_restores_snapshot() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    ceai(&config_dir, &home).args(["models", "set", "sdd-explore", "opencode-go/kimi-k2.6"]).assert().success();
+    ceai(&config_dir, &home).args(["models", "set", "sdd-spec", "opencode-go/claude-sonnet-4"]).assert().success();
+
+    // MM-3/MM-4: named profile + append-only snapshot.
+    ceai(&config_dir, &home).args(["models", "profile", "save", "fast"]).assert().success();
+    assert!(config_dir.join("profiles/fast.json").exists(), "profile file written");
+    let versions = fs::read_dir(config_dir.join("profiles/versions")).unwrap();
+    assert!(versions.into_iter().any(|e| e.unwrap().file_name().to_string_lossy().starts_with("fast-")), "snapshot written");
+
+    // Change the assignment, then load the profile back.
+    ceai(&config_dir, &home).args(["models", "set", "sdd-explore", "opencode-go/gemini-3-pro"]).assert().success();
+    let opencode_json = home.join(".config/opencode/opencode.json");
+    assert_eq!(read_json(&opencode_json)["agent"]["sdd-explore"]["model"], "opencode-go/gemini-3-pro");
+
+    ceai(&config_dir, &home).args(["models", "profile", "load", "fast"]).assert().success();
+
+    let config = read_json(&opencode_json);
+    assert_eq!(config["agent"]["sdd-explore"]["model"], "opencode-go/kimi-k2.6", "opencode.json matches snapshot");
+    assert_eq!(config["agent"]["sdd-spec"]["model"], "opencode-go/claude-sonnet-4");
+    let state = read_json(&config_dir.join("state.json"));
+    assert_eq!(state["model_assignments"]["sdd-explore"]["provider_id"], "opencode-go");
+    assert_eq!(state["model_assignments"]["sdd-spec"]["model_id"], "claude-sonnet-4");
+}
+
+// ---- upgrade (SU-5) ----
+
+#[test]
+fn upgrade_to_tag_resolves_from_cache_and_runs_sync() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Seed the cache with a v9 tarball and record its digest in state.json.
+    let tarball = ce_tarball_v9(tmp.path());
+    let bytes = fs::read(&tarball).unwrap();
+    let hex = sha256_hex(&bytes);
+    let cache_dir = config_dir.join("cache");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(cache_dir.join(format!("ce-{hex}.tar.gz")), &bytes).unwrap();
+    let mut state = read_json(&config_dir.join("state.json"));
+    state["managed_asset_digest"]["tarball"] = serde_json::json!(format!("sha256:{hex}"));
+    fs::write(config_dir.join("state.json"), serde_json::to_vec_pretty(&state).unwrap()).unwrap();
+
+    // SU-5 asserted via the dry-run plan; zero writes on the managed surface.
+    let manifest_before = fs::read(&manifest_path(&home)).unwrap();
+    let state_before = fs::read(config_dir.join("state.json")).unwrap();
+    ceai(&config_dir, &home).args(["upgrade", "--to", "compound-engineering-v9.9.9", "--dry-run"]).assert().success()
+        .stdout(predicate::str::contains("plan: restore plugins/compound-engineering.js"))
+        .stdout(predicate::str::contains("plan: copy skills/ce-foo/SKILL.md"));
+    assert_eq!(fs::read_to_string(loader_path(&home)).unwrap(), "export default function ceLoader() {}\n", "managed file untouched");
+    assert_eq!(fs::read(&manifest_path(&home)).unwrap(), manifest_before, "manifest untouched");
+    assert_eq!(fs::read(config_dir.join("state.json")).unwrap(), state_before, "state untouched");
+
+    // Real run: applies the sync and records the new tag as the version.
+    ceai(&config_dir, &home).args(["upgrade", "--to", "compound-engineering-v9.9.9"]).assert().success();
+    assert_eq!(fs::read_to_string(loader_path(&home)).unwrap(), "export default function ceLoaderV9() {}\n");
+    assert_eq!(fs::read_to_string(managed_dir(&home).join("skills/ce-foo/SKILL.md")).unwrap(), "# ce-foo\n");
+    let manifest = read_json(&manifest_path(&home));
+    assert_eq!(manifest["version"], "compound-engineering-v9.9.9");
+    assert_eq!(manifest["source"]["kind"], "github-release");
+    assert_eq!(manifest["source"]["tag"], "compound-engineering-v9.9.9");
+    let state = read_json(&config_dir.join("state.json"));
+    assert_eq!(state["installed_harnesses"][0]["version"], "compound-engineering-v9.9.9");
+}
+
+// ---- doctor ----
+
+#[test]
+fn doctor_clean_install_reports_ok() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    ceai(&config_dir, &home).arg("doctor").assert().success()
+        .stdout(predicate::str::contains("doctor: ok"));
+}
+
+#[test]
+fn doctor_reports_diff_finding_with_non_zero_exit() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+    fs::write(loader_path(&home), "tampered").unwrap();
+
+    ceai(&config_dir, &home).arg("doctor").assert().failure().code(1)
+        .stdout(predicate::str::contains("diff: modified plugins/compound-engineering.js"));
+}
+
+#[test]
+fn doctor_reports_config_invalid_finding() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+    fs::write(home.join(".config/opencode/opencode.json"), "{ this is not json").unwrap();
+
+    ceai(&config_dir, &home).arg("doctor").assert().failure().code(1)
+        .stdout(predicate::str::contains("config-invalid"));
+}
+
+#[test]
+fn doctor_reports_state_inconsistency_finding() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+    fs::remove_file(manifest_path(&home)).unwrap();
+
+    ceai(&config_dir, &home).arg("doctor").assert().failure().code(1)
+        .stdout(predicate::str::contains("state-inconsistent"));
+}
+
+// ---- CLI completion (CC-1) ----
+
+#[test]
+fn cli_without_subcommand_exits_usage_code_2() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    ceai(&config_dir, &home).assert().failure().code(2);
+}
