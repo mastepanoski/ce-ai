@@ -36,8 +36,8 @@ test -f "$HOME/.config/opencode/compound-engineering/install-manifest.json" || {
 
 echo "== [E2E 3] Running ce-ai sync --dry-run =="
 SYNC_OUT=$(ce-ai sync --dry-run)
-echo "$SYNC_OUT" | grep -q "up-to-date" || {
-  echo "FAIL: sync --dry-run output did not report up-to-date: $SYNC_OUT"
+echo "$SYNC_OUT" | grep -q -E "(plan: no changes|up-to-date)" || {
+  echo "FAIL: sync --dry-run output did not report no changes: $SYNC_OUT"
   exit 1
 }
 
