@@ -12,7 +12,11 @@ use crate::opencode::manifest::{InstallManifest, ManifestFile};
 use crate::opencode::plugins::{
     install_loader, plugin_entry, skills_path, LOADER_REL_PATH, MANAGED_DIR,
 };
-use crate::source::cache::read_local_tree;
+use crate::source::archive::extract_to_source;
+use crate::source::cache::{read_local_tree, Cache};
+use crate::source::release::{
+    github_token_from_env, main_tarball_url, resolve_latest_release, tag_tarball_url,
+};
 use crate::state::backups::backup_file;
 use crate::state::state::State;
 use crate::state::write_atomic;
@@ -27,7 +31,7 @@ pub struct Args {
     pub harness: String,
     /// Local CE source tree; bypasses GitHub release fetching.
     #[arg(long)]
-    pub source: PathBuf,
+    pub source: Option<PathBuf>,
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
@@ -37,9 +41,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             args.harness
         )));
     }
-    let source = args.source.to_string_lossy().into_owned();
-    // Desired managed files: managed-rel path -> (source-rel path, sha256).
-    let managed: BTreeMap<String, (String, String)> = read_local_tree(&args.source)?
+
+    let (source_path, version, source_json, tmp_dir) = resolve_source(ctx, &args.source)?;
+
+    let managed: BTreeMap<String, (String, String)> = read_local_tree(&source_path)?
         .into_iter()
         .filter(|(rel, _)| MANAGED_PREFIXES.iter().any(|p| rel.starts_with(p)))
         .map(|(rel, hash)| {
@@ -48,10 +53,14 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         })
         .collect();
     if !managed.contains_key(LOADER_REL_PATH) {
-        return Err(CeError::Runtime(format!(
+        let err = Err(CeError::Runtime(format!(
             "CE loader not found at {}/.opencode/plugins/compound-engineering.js",
-            args.source.display()
+            source_path.display()
         )));
+        if let Some(tmp) = tmp_dir {
+            let _ = std::fs::remove_dir_all(tmp);
+        }
+        return err;
     }
 
     let config_dir = &ctx.opencode_config_dir;
@@ -74,6 +83,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
         println!("plan: write install-manifest.json");
         println!("plan: update state.json");
+        if let Some(tmp) = tmp_dir {
+            let _ = std::fs::remove_dir_all(tmp);
+        }
         return Ok(());
     }
 
@@ -86,14 +98,14 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     } else {
         None
     };
-    let mut files = vec![install_loader(&args.source, config_dir)?];
+    let mut files = vec![install_loader(&source_path, config_dir)?];
     for (rel, (source_rel, hash)) in &managed {
         if rel == LOADER_REL_PATH {
             continue;
         }
         write_atomic(
             &managed_dir.join(rel),
-            &std::fs::read(args.source.join(source_rel))?,
+            &std::fs::read(source_path.join(source_rel))?,
         )?;
         files.push(ManifestFile {
             path: rel.clone(),
@@ -111,10 +123,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     // Record managed files and the config mutation (OI-5).
     InstallManifest {
-        version: "local".into(),
+        version: version.clone(),
         plugin_name: "compound-engineering".into(),
         installed_at: Utc::now().to_rfc3339(),
-        source: serde_json::json!({ "kind": "local", "path": source }),
+        source: source_json.clone(),
         files,
         config_mutations: vec![mutation],
     }
@@ -128,15 +140,81 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         .retain(|h| h["name"].as_str() != Some("opencode"));
     state.installed_harnesses.push(serde_json::json!({
         "name": "opencode",
-        "version": "local",
-        "source": { "kind": "local", "path": source },
+        "version": version,
+        "source": source_json,
         "installed_at": Utc::now().to_rfc3339(),
         "last_synced_at": Utc::now().to_rfc3339(),
     }));
     state.save(&state_path)?;
 
+    if let Some(tmp) = tmp_dir {
+        let _ = std::fs::remove_dir_all(tmp);
+    }
+
     if !ctx.quiet {
-        println!("installed compound-engineering for opencode (source: {source})");
+        let source_disp = if args.source.is_some() {
+            source_path.display().to_string()
+        } else {
+            source_json["tag"].as_str().unwrap_or("release").to_string()
+        };
+        println!("installed compound-engineering for opencode (source: {source_disp})");
     }
     Ok(())
+}
+
+fn resolve_source(
+    ctx: &Context,
+    source_arg: &Option<PathBuf>,
+) -> Result<(PathBuf, String, serde_json::Value, Option<PathBuf>), CeError> {
+    if let Some(path) = source_arg {
+        let version = "local".to_string();
+        let source_json = serde_json::json!({ "kind": "local", "path": path });
+        return Ok((path.clone(), version, source_json, None));
+    }
+
+    // Try using cached tarball if present in state
+    let state_path = ctx.config_dir.join("state.json");
+    if state_path.exists() {
+        if let Ok(state) = State::load(&state_path) {
+            if let Some(digest) = state.managed_asset_digest.get("tarball") {
+                if let Some(hex) = digest.strip_prefix("sha256:") {
+                    let cached_tarball = ctx
+                        .config_dir
+                        .join("cache")
+                        .join(format!("ce-{hex}.tar.gz"));
+                    if cached_tarball.exists() {
+                        let (root, tmp) = extract_to_source(
+                            &ctx.config_dir,
+                            ctx.dry_run,
+                            &cached_tarball,
+                            "cached",
+                        )?;
+                        let source_json = serde_json::json!({ "kind": "github-release", "tag": "cached", "tree": root });
+                        return Ok((root, "cached".to_string(), source_json, tmp));
+                    }
+                }
+            }
+        }
+    }
+
+    // Default: fetch latest release from GitHub
+    let client = reqwest::blocking::Client::new();
+    let token = github_token_from_env();
+    let tag = resolve_latest_release(&client, token.as_deref())?;
+    let (version, url) = match tag {
+        Some(tag) => (tag.clone(), tag_tarball_url(&tag)),
+        None => ("main".to_string(), main_tarball_url()),
+    };
+    let bytes = client
+        .get(&url)
+        .header(reqwest::header::USER_AGENT, "ce-ai/0.1.0")
+        .send()
+        .map_err(|err| CeError::Runtime(format!("release download failed: {err}")))?
+        .bytes()
+        .map_err(|err| CeError::Runtime(err.to_string()))?;
+    let tarball = Cache::new(ctx.config_dir.join("cache"))
+        .cache_tarball(&bytes, &ctx.config_dir.join("state.json"))?;
+    let (root, tmp) = extract_to_source(&ctx.config_dir, ctx.dry_run, &tarball, &version)?;
+    let source_json = serde_json::json!({ "kind": "github-release", "tag": version, "tree": root });
+    Ok((root, version, source_json, tmp))
 }

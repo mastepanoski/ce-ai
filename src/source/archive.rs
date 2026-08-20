@@ -90,6 +90,52 @@ pub fn extract_safe(archive: &Path, dest: &Path) -> Result<(), CeError> {
     Ok(())
 }
 
+/// Real runs persist the extracted tree under `<config-dir>/cache/trees/<tag>`
+/// so later `sync` runs resolve it from the manifest; dry-runs extract to a
+/// system temp dir that is removed afterwards.
+pub fn extract_to_source(
+    config_dir: &Path,
+    dry_run: bool,
+    tarball: &Path,
+    tag: &str,
+) -> Result<(std::path::PathBuf, Option<std::path::PathBuf>), CeError> {
+    let safe_tag: String = tag
+        .chars()
+        .filter(|c| c.is_alphanumeric() || matches!(c, '.' | '-' | '_'))
+        .collect();
+    let dest = if dry_run {
+        std::env::temp_dir().join(format!("ce-ai-extracted-{}", std::process::id()))
+    } else {
+        config_dir.join("cache/trees").join(&safe_tag)
+    };
+    let _ = std::fs::remove_dir_all(&dest);
+    extract_safe(tarball, &dest)?;
+    let root = find_source_root(&dest)?;
+    let tmp = if dry_run { Some(dest) } else { None };
+    Ok((root, tmp))
+}
+
+/// GitHub tarballs nest the tree under a `<repo>-<ref>/` top dir; the source
+/// root is the extracted dir itself when it holds `.opencode`, else its single
+/// subdirectory.
+pub fn find_source_root(dir: &Path) -> Result<std::path::PathBuf, CeError> {
+    if dir.join(".opencode").is_dir() {
+        return Ok(dir.to_path_buf());
+    }
+    let mut dirs: Vec<std::path::PathBuf> = std::fs::read_dir(dir)?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .collect();
+    if dirs.len() == 1 {
+        return Ok(dirs.remove(0));
+    }
+    Err(CeError::Runtime(format!(
+        "cannot locate .opencode source tree under {}",
+        dir.display()
+    )))
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::commands::{sync, Context};
 use crate::error::CeError;
-use crate::source::archive::extract_safe;
+use crate::source::archive::extract_to_source;
 use crate::source::cache::Cache;
 use crate::source::release::{
     github_token_from_env, main_tarball_url, resolve_latest_release, tag_tarball_url,
@@ -86,56 +86,11 @@ fn sync_from_extracted(
     tag: &str,
     version: &str,
 ) -> Result<(), CeError> {
-    let (root, tmp) = extract_to_source(ctx, tarball, tag)?;
+    let (root, tmp) = extract_to_source(&ctx.config_dir, ctx.dry_run, tarball, tag)?;
     let source_json = serde_json::json!({ "kind": "github-release", "tag": version, "tree": root });
     let result = sync::sync_with(ctx, &root, version, source_json);
     if let Some(tmp) = tmp {
         let _ = std::fs::remove_dir_all(tmp);
     }
     result
-}
-
-/// Real runs persist the extracted tree under `<config-dir>/cache/trees/<tag>`
-/// so later `sync` runs resolve it from the manifest; dry-runs extract to a
-/// system temp dir that is removed afterwards.
-fn extract_to_source(
-    ctx: &Context,
-    tarball: &Path,
-    tag: &str,
-) -> Result<(PathBuf, Option<PathBuf>), CeError> {
-    let safe_tag: String = tag
-        .chars()
-        .filter(|c| c.is_alphanumeric() || matches!(c, '.' | '-' | '_'))
-        .collect();
-    let dest = if ctx.dry_run {
-        std::env::temp_dir().join(format!("ce-ai-upgrade-{}", std::process::id()))
-    } else {
-        ctx.config_dir.join("cache/trees").join(&safe_tag)
-    };
-    let _ = std::fs::remove_dir_all(&dest);
-    extract_safe(tarball, &dest)?;
-    let root = find_source_root(&dest)?;
-    let tmp = if ctx.dry_run { Some(dest) } else { None };
-    Ok((root, tmp))
-}
-
-/// GitHub tarballs nest the tree under a `<repo>-<ref>/` top dir; the source
-/// root is the extracted dir itself when it holds `.opencode`, else its single
-/// subdirectory.
-fn find_source_root(dir: &Path) -> Result<PathBuf, CeError> {
-    if dir.join(".opencode").is_dir() {
-        return Ok(dir.to_path_buf());
-    }
-    let mut dirs: Vec<PathBuf> = std::fs::read_dir(dir)?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_dir())
-        .collect();
-    if dirs.len() == 1 {
-        return Ok(dirs.remove(0));
-    }
-    Err(CeError::Runtime(format!(
-        "cannot locate .opencode source tree under {}",
-        dir.display()
-    )))
 }
