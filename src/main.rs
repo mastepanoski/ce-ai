@@ -1,4 +1,5 @@
 mod error;
+mod state;
 
 fn main() {
     println!("ce-ai: compound-engineering plugin manager");
