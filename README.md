@@ -151,6 +151,22 @@ Every managed harness directory contains `install-manifest.json` recording:
 
 ---
 
+## Installation Scope: Global (User-Wide) vs Isolated
+
+### Global (User-Wide) by Default
+By default, `ce-ai` installs plugins and skills at the **user/harness level** (`~/.config/opencode/opencode.json` and `~/.config/opencode/compound-engineering/`).
+
+- **Universal Availability**: Any project opened in OpenCode automatically gains access to all 200+ Compound Engineering skills and agent model configurations without per-repository setup.
+- **Centralized Maintenance**: A single `ce-ai upgrade` or `ce-ai sync` updates the plugin globally across all sessions.
+
+### Custom / Environment Overrides
+To isolate configuration for testing or specific directory trees, you can override paths:
+
+- **`CE_AI_OPENCODE_CONFIG`**: Environment variable pointing to a custom OpenCode config directory (e.g., `CE_AI_OPENCODE_CONFIG=/custom/path/opencode ce-ai install --harness opencode`).
+- **`--config-dir <DIR>`**: Global CLI flag specifying a custom directory for `ce-ai` internal state, profiles, and backups (defaults to `~/.ce-ai`).
+
+---
+
 ## Documentation & OpenSpec Specifications
 
 For complete technical specifications, architecture decisions, and requirement matrices, see the OpenSpec documentation:
