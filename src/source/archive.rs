@@ -1,7 +1,82 @@
-//! Safe tarball extraction (RED — tests only; implementation lands in task 3.3).
-//!
-//! Security contract (design threat note, task 3.1): absolute and `..` entry
-//! paths MUST be rejected BEFORE any file is written (zip-slip).
+//! Safe tarball extraction — rejects absolute and `..` entry paths BEFORE any
+//! file is written (zip-slip; design threat note, tasks 3.1/3.3).
+
+use std::io::Read;
+use std::path::{Component, Path};
+
+use crate::error::CeError;
+
+/// True when `path` is safe to extract: relative, no parent (`..`)
+/// components, and no Windows drive-letter prefix.
+fn is_safe_relative_path(path: &Path) -> bool {
+    if path.is_absolute() {
+        return false;
+    }
+    let raw = path.to_string_lossy();
+    let bytes = raw.as_bytes();
+    if bytes.len() >= 2
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes.len() == 2 || bytes[2] == b'/' || bytes[2] == b'\\')
+    {
+        return false; // drive-letter absolute, e.g. `C:\x` or `C:/x`
+    }
+    !path.components().any(|c| matches!(c, Component::ParentDir))
+}
+
+/// Opens archive bytes as a tar reader, transparently handling gzip (GitHub
+/// `*.tar.gz`) and plain tar (tests) via gzip magic bytes.
+fn tar_reader(bytes: &[u8]) -> Box<dyn Read + '_> {
+    if bytes.starts_with(&[0x1f, 0x8b]) {
+        Box::new(flate2::read::GzDecoder::new(bytes))
+    } else {
+        Box::new(bytes)
+    }
+}
+
+/// Validates every entry path in the archive without writing anything.
+fn validate_all_paths(bytes: &[u8]) -> Result<(), CeError> {
+    let mut archive = tar::Archive::new(tar_reader(bytes));
+    for entry in archive.entries().map_err(|e| CeError::Runtime(format!("tar error: {e}")))? {
+        let entry = entry.map_err(|e| CeError::Runtime(format!("tar error: {e}")))?;
+        let path = entry.path()?.into_owned();
+        if !is_safe_relative_path(&path) {
+            return Err(CeError::Runtime(format!("unsafe archive entry path: {}", path.display())));
+        }
+    }
+    Ok(())
+}
+
+/// Extracts a (possibly gzipped) tar archive into `dest`. All entry paths are
+/// validated first; the archive is rejected before ANY file is written when an
+/// absolute or `..` path is present. Safe entries are extracted; directory
+/// entries create directories; symlinks/specials are never materialized.
+pub fn extract_safe(archive: &Path, dest: &Path) -> Result<(), CeError> {
+    let bytes = std::fs::read(archive)?;
+    validate_all_paths(&bytes)?; // reject-before-any-write security gate
+    std::fs::create_dir_all(dest)?;
+    let mut archive = tar::Archive::new(tar_reader(&bytes));
+    for entry in archive.entries().map_err(|e| CeError::Runtime(format!("tar error: {e}")))? {
+        let mut entry = entry.map_err(|e| CeError::Runtime(format!("tar error: {e}")))?;
+        let entry_path = entry.path()?.into_owned();
+        if !is_safe_relative_path(&entry_path) {
+            return Err(CeError::Runtime(format!("unsafe archive entry path: {}", entry_path.display())));
+        }
+        let target = dest.join(&entry_path);
+        match entry.header().entry_type() {
+            tar::EntryType::Directory => std::fs::create_dir_all(&target)?,
+            tar::EntryType::Regular => {
+                if let Some(parent) = target.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                let mut out = std::fs::File::create(&target)?;
+                std::io::copy(&mut entry, &mut out)?;
+            }
+            _ => {} // symlinks and specials are never written
+        }
+    }
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {
