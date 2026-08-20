@@ -1,8 +1,12 @@
-//! CLI subcommands: install, status, uninstall wired in PR 4; the rest land in PR 5.
+//! CLI subcommands: install, sync, upgrade, models, status, uninstall, doctor.
 
+pub mod doctor;
 pub mod install;
+pub mod models;
 pub mod status;
+pub mod sync;
 pub mod uninstall;
+pub mod upgrade;
 
 use std::path::PathBuf;
 

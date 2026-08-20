@@ -1,0 +1,38 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Rust CLI (cargo, edition 2021)
+  Architecture: Single-binary CLI managing CE plugin installs across AI harnesses
+  Testing: cargo test + cargo clippy + rustfmt
+  E2E: REQUIRED - functional end-to-end test in isolated Docker container with opencode
+       installed, proving install/sync/upgrade/model-config against a real harness
+  Style: Gentle AI pattern; per-harness state.json model_assignments
+  Persistence: OpenSpec files under openspec/
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for cross-harness flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase; use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow Rust idioms and existing module structure
+      - Add or update tests before changing behavior
+    tdd: true
+    test_command: "cargo test"
+  verify:
+    test_command: "cargo test"
+    build_command: "cargo build --release"
+    lint_command: "cargo clippy --all-targets --all-features -- -D warnings"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+
+strict_tdd: true

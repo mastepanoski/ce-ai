@@ -21,6 +21,11 @@ pub fn main_tarball_url() -> String {
     format!("https://github.com/{PLUGIN_REPO}/archive/refs/heads/main.tar.gz")
 }
 
+/// Tarball URL for a specific release tag (upgrade).
+pub fn tag_tarball_url(tag: &str) -> String {
+    format!("https://github.com/{PLUGIN_REPO}/archive/refs/tags/{tag}.tar.gz")
+}
+
 /// Splits a version like `3.4.2` into comparable numeric components.
 fn version_components(version: &str) -> Option<Vec<u64>> {
     version.split('.').map(|part| part.parse::<u64>().ok()).collect()
@@ -99,7 +104,7 @@ pub fn resolve_latest_release(
 
 #[cfg(test)]
 mod tests {
-    use crate::source::release::{auth_header, github_token_from_env, latest_ce_release, main_tarball_url};
+    use crate::source::release::{auth_header, github_token_from_env, latest_ce_release, main_tarball_url, tag_tarball_url};
 
     #[test]
     fn picks_latest_compound_engineering_release_tag() {
@@ -126,6 +131,12 @@ mod tests {
     fn main_tarball_fallback_url_points_at_main_branch() {
         let url = main_tarball_url();
         assert!(url.ends_with("/everyinc/compound-engineering-plugin/archive/refs/heads/main.tar.gz"));
+    }
+
+    #[test]
+    fn tag_tarball_url_points_at_release_tag() {
+        let url = tag_tarball_url("compound-engineering-v3.4.2");
+        assert!(url.ends_with("/archive/refs/tags/compound-engineering-v3.4.2.tar.gz"));
     }
 
     #[test]

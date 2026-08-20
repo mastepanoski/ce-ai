@@ -248,15 +248,15 @@ fn sync_dry_run_lists_changes_without_writing() {
 
     // SU-3: drift — tamper with a managed file.
     fs::write(loader_path(&home), "tampered").unwrap();
-    let manifest_before = fs::read(&manifest_path(&home)).unwrap();
+    let manifest_before = fs::read(manifest_path(&home)).unwrap();
     let state_before = fs::read(config_dir.join("state.json")).unwrap();
 
     // SU-4: dry-run lists the change and writes nothing.
     ceai(&config_dir, &home).arg("sync").arg("--dry-run").assert().success()
         .stdout(predicate::str::contains("plan: restore plugins/compound-engineering.js"));
 
-    assert_eq!(fs::read(&loader_path(&home)).unwrap(), b"tampered", "managed file untouched");
-    assert_eq!(fs::read(&manifest_path(&home)).unwrap(), manifest_before, "manifest untouched");
+    assert_eq!(fs::read(loader_path(&home)).unwrap(), b"tampered", "managed file untouched");
+    assert_eq!(fs::read(manifest_path(&home)).unwrap(), manifest_before, "manifest untouched");
     assert_eq!(fs::read(config_dir.join("state.json")).unwrap(), state_before, "state untouched");
 }
 
@@ -353,13 +353,13 @@ fn upgrade_to_tag_resolves_from_cache_and_runs_sync() {
     fs::write(config_dir.join("state.json"), serde_json::to_vec_pretty(&state).unwrap()).unwrap();
 
     // SU-5 asserted via the dry-run plan; zero writes on the managed surface.
-    let manifest_before = fs::read(&manifest_path(&home)).unwrap();
+    let manifest_before = fs::read(manifest_path(&home)).unwrap();
     let state_before = fs::read(config_dir.join("state.json")).unwrap();
     ceai(&config_dir, &home).args(["upgrade", "--to", "compound-engineering-v9.9.9", "--dry-run"]).assert().success()
         .stdout(predicate::str::contains("plan: restore plugins/compound-engineering.js"))
         .stdout(predicate::str::contains("plan: copy skills/ce-foo/SKILL.md"));
     assert_eq!(fs::read_to_string(loader_path(&home)).unwrap(), "export default function ceLoader() {}\n", "managed file untouched");
-    assert_eq!(fs::read(&manifest_path(&home)).unwrap(), manifest_before, "manifest untouched");
+    assert_eq!(fs::read(manifest_path(&home)).unwrap(), manifest_before, "manifest untouched");
     assert_eq!(fs::read(config_dir.join("state.json")).unwrap(), state_before, "state untouched");
 
     // Real run: applies the sync and records the new tag as the version.

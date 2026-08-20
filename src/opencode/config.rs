@@ -83,6 +83,39 @@ fn merge_skills_path(config: &mut serde_json::Value, skills_path: &str) -> Resul
     Ok(())
 }
 
+/// Applies a model assignment to `agent.<slot>.model`/`variant` (MM-2),
+/// preserving every other key on the slot and every other agent entry.
+/// `model_value` is the full `provider/model` string; `variant` always mirrors
+/// the gentle-ai convention. Hard-fails instead of clobbering a non-object
+/// `agent` map or a non-object slot entry (D4).
+pub fn apply_model_assignment(config_path: &Path, slot: &str, model_value: &str) -> Result<(), CeError> {
+    let mut config = read_config(config_path)?;
+    match config.get_mut("agent") {
+        None => {
+            config["agent"] = serde_json::json!({});
+            let agents = config["agent"].as_object_mut().expect("agent is an object");
+            agents.insert(slot.to_string(), serde_json::json!({ "model": model_value, "variant": "" }));
+        }
+        Some(serde_json::Value::Object(agents)) => {
+            let entry = agents.entry(slot.to_string()).or_insert_with(|| serde_json::json!({}));
+            if !entry.is_object() {
+                return Err(CeError::Runtime(format!(
+                    "`agent.{slot}` in opencode.json must be an object; refusing to overwrite it. Fix the file manually, then re-run."
+                )));
+            }
+            entry["model"] = serde_json::Value::String(model_value.to_string());
+            entry["variant"] = serde_json::Value::String(String::new());
+        }
+        Some(_) => {
+            return Err(CeError::Runtime(
+                "`agent` in opencode.json must be an object; refusing to overwrite it. Fix the file manually, then re-run."
+                    .into(),
+            ))
+        }
+    }
+    write_atomic(config_path, &serde_json::to_vec_pretty(&config)?)
+}
+
 /// Read → merge (dedup) → atomic write; hard-fails on invalid JSON (D4).
 /// Returns the mutation record for the install manifest (OI-5).
 pub fn ensure_plugin_and_skills(
