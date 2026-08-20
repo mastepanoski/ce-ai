@@ -6,6 +6,8 @@
 pub mod backups;
 pub mod diff;
 pub mod profiles;
+// `state::state` holds the State type; module_inception is intentional.
+#[allow(clippy::module_inception)]
 pub mod state;
 
 use std::io::Write;

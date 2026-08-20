@@ -82,7 +82,7 @@ mod tests {
     #[test]
     fn runtime_errors_map_to_exit_one() {
         assert_eq!(CeError::Runtime("boom".into()).exit_code(), 1);
-        let io = std::io::Error::new(std::io::ErrorKind::Other, "disk full");
+        let io = std::io::Error::other("disk full");
         assert_eq!(CeError::Io(io).exit_code(), 1);
         let json = serde_json::from_str::<serde_json::Value>("{").unwrap_err();
         assert_eq!(CeError::Json(json).exit_code(), 1);
