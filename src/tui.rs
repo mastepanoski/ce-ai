@@ -59,6 +59,18 @@ impl fmt::Display for ModelsSubAction {
     }
 }
 
+pub const LOGO: &str = r#"
+       █████████████
+    ███
+   ██        █████
+   ██        █████
+    ███
+      █████████████
+
+       C O M P O U N D
+        ─ ENGINEERING ─
+"#;
+
 pub fn run_interactive(ctx: &Context) -> Result<(), CeError> {
     if !std::io::stdin().is_terminal() {
         return Err(CeError::Usage(
@@ -66,7 +78,8 @@ pub fn run_interactive(ctx: &Context) -> Result<(), CeError> {
         ));
     }
 
-    println!("\n✨ Welcome to ce-ai — Compound Engineering Plugin Manager TUI ✨\n");
+    println!("{LOGO}");
+    println!("✨ Welcome to ce-ai — Compound Engineering Plugin Manager TUI ✨\n");
 
     loop {
         let options = vec![
