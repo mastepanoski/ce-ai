@@ -1,3 +1,80 @@
+//! Named model profiles (MM-3) and append-only versioned snapshots (MM-4).
+
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use crate::error::CeError;
+use crate::state::write_atomic;
+
+/// Named profile: `~/.ce-ai/profiles/<name>.json`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Profile {
+    pub name: String,
+    pub created_at: String,
+    pub models: BTreeMap<String, String>,
+}
+
+/// Append-only snapshot: `profiles/versions/<name>-<utc-ts>.json`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Snapshot {
+    pub name: String,
+    pub created_at: String,
+    pub before_raw: BTreeMap<String, String>,
+    pub preview: BTreeMap<String, String>,
+}
+
+fn profile_path(root: &Path, name: &str) -> Result<PathBuf, CeError> {
+    if name.is_empty() || name.contains('/') || name.contains('\\') || name.contains("..") {
+        return Err(CeError::Usage(format!("invalid profile name: {name:?}")));
+    }
+    Ok(root.join(format!("{name}.json")))
+}
+
+fn snapshot_ts() -> String { Utc::now().format("%Y%m%dT%H%M%S%.6fZ").to_string() }
+
+pub fn save_profile(root: &Path, profile: &Profile) -> Result<(), CeError> {
+    write_atomic(&profile_path(root, &profile.name)?, &serde_json::to_vec(profile)?)
+}
+
+pub fn load_profile(root: &Path, name: &str) -> Result<Profile, CeError> {
+    Ok(serde_json::from_slice(&std::fs::read(profile_path(root, name)?)?)?)
+}
+
+/// Writes an append-only snapshot and returns its filename.
+pub fn save_snapshot(
+    root: &Path,
+    name: &str,
+    before_raw: &BTreeMap<String, String>,
+    preview: &BTreeMap<String, String>,
+) -> Result<String, CeError> {
+    let snapshot = Snapshot {
+        name: name.to_string(),
+        created_at: Utc::now().to_rfc3339(),
+        before_raw: before_raw.clone(),
+        preview: preview.clone(),
+    };
+    let filename = format!("{name}-{}.json", snapshot_ts());
+    write_atomic(&root.join("versions").join(&filename), &serde_json::to_vec(&snapshot)?)?;
+    Ok(filename)
+}
+
+/// Lists snapshot filenames for a profile, oldest first.
+pub fn list_snapshots(root: &Path, name: &str) -> Result<Vec<String>, CeError> {
+    let prefix = format!("{name}-");
+    let mut names = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(root.join("versions")) {
+        for entry in entries {
+            let file_name = entry?.file_name().to_string_lossy().into_owned();
+            if file_name.starts_with(&prefix) && file_name.ends_with(".json") {
+                names.push(file_name);
+            }
+        }
+    }
+    names.sort();
+    Ok(names)
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -12,14 +89,9 @@ mod tests {
     #[test]
     fn named_profile_round_trip() {
         let dir = tempdir().unwrap();
-        let profile = Profile {
-            name: "fast".to_string(),
-            created_at: "2026-08-20T00:00:00Z".to_string(),
-            models: models(),
-        };
+        let profile = Profile { name: "fast".into(), created_at: "2026-08-20T00:00:00Z".into(), models: models() };
         save_profile(dir.path(), &profile).unwrap();
-        let loaded = load_profile(dir.path(), "fast").unwrap();
-        assert_eq!(loaded, profile);
+        assert_eq!(load_profile(dir.path(), "fast").unwrap(), profile);
     }
 
     #[test]
@@ -39,7 +111,8 @@ mod tests {
         let snapshots = list_snapshots(dir.path(), "fast").unwrap();
         assert_eq!(snapshots.len(), 2);
         assert!(snapshots[0].starts_with("fast-") && snapshots[0].ends_with(".json"));
-        let first_content = std::fs::read_to_string(dir.path().join("versions").join(first)).unwrap();
-        assert!(first_content.contains("\"name\": \"fast\""));
+        let kept: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(dir.path().join("versions").join(first)).unwrap()).unwrap();
+        assert_eq!(kept["name"], "fast");
     }
 }
