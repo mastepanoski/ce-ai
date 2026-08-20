@@ -96,12 +96,29 @@ ce-ai models profile save my-profile
 ce-ai models profile load my-profile
 ```
 
-### 5. Uninstall & Restore Original State
+### 5. Complete Uninstallation Guide
 
-Restore original pre-install configuration and remove all managed plugin files:
+To completely remove `ce-ai` and restore your system:
+
+#### Step 1: Restore Harness Config & Remove Plugin
+Restore your original harness configuration (`opencode.json`) and remove managed plugin files:
 
 ```bash
 ce-ai uninstall --harness opencode
+```
+
+#### Step 2: Uninstall `ce-ai` Binary
+If you installed `ce-ai` globally via Cargo:
+
+```bash
+cargo uninstall ce-ai
+```
+
+#### Step 3: Clean Local State & Backups (Optional)
+To purge all cached release tarballs, model profile snapshots, and backups:
+
+```bash
+rm -rf ~/.ce-ai
 ```
 
 ---
