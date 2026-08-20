@@ -1,8 +1,105 @@
 //! opencode.json read → merge (dedup) → atomic write; hard-fails on invalid
 //! existing JSON instead of clobbering user config (OI-2, D4).
-//!
-//! RED: tests reference `ensure_plugin_and_skills` / `ConfigMutation`, which do
-//! not exist yet — this file fails to compile until the GREEN implementation.
+
+use std::path::Path;
+
+use serde::{Deserialize, Serialize};
+
+use crate::error::CeError;
+use crate::state::write_atomic;
+
+/// A config mutation recorded in the install manifest (OI-5, design §Interfaces).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConfigMutation {
+    pub file: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backup: Option<String>,
+    pub keys: Vec<String>,
+}
+
+/// Reads `opencode.json`. Missing file → empty object; invalid JSON → hard-fail
+/// with fix guidance (D4) — never silently overwrite broken config.
+pub fn read_config(path: &Path) -> Result<serde_json::Value, CeError> {
+    match std::fs::read_to_string(path) {
+        Ok(text) => serde_json::from_str(&text).map_err(|err| {
+            CeError::Runtime(format!(
+                "{} is not valid JSON: {err}. Refusing to overwrite it. Fix the file manually, then re-run.",
+                path.display()
+            ))
+        }),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(serde_json::json!({})),
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// Appends `plugin_entry` to `plugin` unless already present (OI-2). Fails
+/// instead of clobbering when `plugin` exists but is not an array.
+fn merge_plugin(config: &mut serde_json::Value, plugin_entry: &str) -> Result<(), CeError> {
+    match config.get_mut("plugin") {
+        None => config["plugin"] = serde_json::json!([plugin_entry]),
+        Some(serde_json::Value::Array(arr)) => {
+            if !arr.iter().any(|v| v.as_str() == Some(plugin_entry)) {
+                arr.push(serde_json::Value::String(plugin_entry.to_string()));
+            }
+        }
+        Some(_) => {
+            return Err(CeError::Runtime(
+                "`plugin` in opencode.json must be an array; refusing to overwrite it. Fix the file manually, then re-run."
+                    .into(),
+            ))
+        }
+    }
+    Ok(())
+}
+
+/// Appends `skills_path` to `skills.paths` unless already present (OI-4). Fails
+/// instead of clobbering malformed `skills`/`skills.paths` values.
+fn merge_skills_path(config: &mut serde_json::Value, skills_path: &str) -> Result<(), CeError> {
+    match config.get_mut("skills") {
+        None => config["skills"] = serde_json::json!({ "paths": [skills_path] }),
+        Some(serde_json::Value::Object(skills)) => match skills.get_mut("paths") {
+            None => {
+                skills.insert("paths".into(), serde_json::json!([skills_path]));
+            }
+            Some(serde_json::Value::Array(paths)) => {
+                if !paths.iter().any(|v| v.as_str() == Some(skills_path)) {
+                    paths.push(serde_json::Value::String(skills_path.to_string()));
+                }
+            }
+            Some(_) => {
+                return Err(CeError::Runtime(
+                    "`skills.paths` in opencode.json must be an array; refusing to overwrite it. Fix the file manually, then re-run."
+                        .into(),
+                ))
+            }
+        },
+        Some(_) => {
+            return Err(CeError::Runtime(
+                "`skills` in opencode.json must be an object; refusing to overwrite it. Fix the file manually, then re-run."
+                    .into(),
+            ))
+        }
+    }
+    Ok(())
+}
+
+/// Read → merge (dedup) → atomic write; hard-fails on invalid JSON (D4).
+/// Returns the mutation record for the install manifest (OI-5).
+pub fn ensure_plugin_and_skills(
+    config_path: &Path,
+    plugin_entry: &str,
+    skills_path: &str,
+) -> Result<ConfigMutation, CeError> {
+    let mut config = read_config(config_path)?;
+    merge_plugin(&mut config, plugin_entry)?;
+    merge_skills_path(&mut config, skills_path)?;
+    write_atomic(config_path, &serde_json::to_vec_pretty(&config)?)?;
+    Ok(ConfigMutation {
+        file: config_path.display().to_string(),
+        backup: None,
+        keys: vec!["plugin".into(), "skills.paths".into()],
+    })
+}
 
 #[cfg(test)]
 mod tests {
@@ -94,8 +191,8 @@ mod tests {
         ensure_plugin_and_skills(&path, &entry, &skills).unwrap();
 
         let config = read_json(&path);
-        assert_eq!(config["plugin"].as_array().unwrap(), &serde_json::json!([entry]));
-        assert_eq!(config["skills"]["paths"].as_array().unwrap(), &serde_json::json!([skills]));
+        assert_eq!(config["plugin"], serde_json::json!([entry]));
+        assert_eq!(config["skills"]["paths"], serde_json::json!([skills]));
     }
 
     #[test]
