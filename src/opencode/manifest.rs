@@ -34,7 +34,10 @@ impl InstallManifest {
 
     /// Atomically writes the manifest under the managed dir (OI-5).
     pub fn write(&self, config_dir: &Path) -> Result<(), CeError> {
-        write_atomic(&Self::path_for(config_dir), &serde_json::to_vec_pretty(self)?)
+        write_atomic(
+            &Self::path_for(config_dir),
+            &serde_json::to_vec_pretty(self)?,
+        )
     }
 
     /// Loads the manifest; errors when absent or malformed.
@@ -90,7 +93,10 @@ mod tests {
     fn manifest_written_under_managed_dir() {
         let dir = tempdir().unwrap();
         sample_manifest().write(dir.path()).unwrap();
-        assert!(dir.path().join("compound-engineering/install-manifest.json").exists());
+        assert!(dir
+            .path()
+            .join("compound-engineering/install-manifest.json")
+            .exists());
     }
 
     #[test]

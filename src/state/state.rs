@@ -1,10 +1,10 @@
 //! `state.json` I/O with atomic temp-file+rename writes (MM-1).
 
-use std::collections::BTreeMap;
-use std::path::Path;
-use serde::{Deserialize, Serialize};
 use crate::error::CeError;
 use crate::state::write_atomic;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModelAssignment {
@@ -29,11 +29,16 @@ pub struct State {
     pub last_update_check: Option<String>,
 }
 
-fn default_version() -> u32 { 1 }
+fn default_version() -> u32 {
+    1
+}
 
 impl State {
     pub fn new() -> Self {
-        Self { version: 1, ..Self::default() }
+        Self {
+            version: 1,
+            ..Self::default()
+        }
     }
 
     pub fn load(path: &Path) -> Result<Self, CeError> {
@@ -51,7 +56,11 @@ impl State {
 
     /// Records a model assignment for a slot (MM-1).
     pub fn set_model_assignment(&mut self, slot: &str, provider_id: &str, model_id: &str) {
-        let assignment = ModelAssignment { provider_id: provider_id.into(), model_id: model_id.into(), effort: None };
+        let assignment = ModelAssignment {
+            provider_id: provider_id.into(),
+            model_id: model_id.into(),
+            effort: None,
+        };
         self.model_assignments.insert(slot.into(), assignment);
     }
 }
@@ -70,7 +79,11 @@ mod tests {
             managed_asset_digest: BTreeMap::new(),
             model_assignments: BTreeMap::from([(
                 slot.to_string(),
-                ModelAssignment { provider_id: "opencode-go".into(), model_id: "kimi-k2.6".into(), effort: None },
+                ModelAssignment {
+                    provider_id: "opencode-go".into(),
+                    model_id: "kimi-k2.6".into(),
+                    effort: None,
+                },
             )]),
             last_update_check: None,
         }

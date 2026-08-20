@@ -33,8 +33,11 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
     let managed = ctx.opencode_config_dir.join(MANAGED_DIR);
     match InstallManifest::load(&ctx.opencode_config_dir) {
         Ok(manifest) => {
-            let desired: BTreeMap<String, String> =
-                manifest.files.iter().map(|f| (f.path.clone(), f.sha256.clone())).collect();
+            let desired: BTreeMap<String, String> = manifest
+                .files
+                .iter()
+                .map(|f| (f.path.clone(), f.sha256.clone()))
+                .collect();
             let drift = diff::diff(&desired, &desired, &managed);
             if drift.actions.is_empty() {
                 println!("drift: none");

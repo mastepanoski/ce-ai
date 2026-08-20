@@ -10,9 +10,9 @@ pub mod profiles;
 #[allow(clippy::module_inception)]
 pub mod state;
 
+use crate::error::CeError;
 use std::io::Write;
 use std::path::Path;
-use crate::error::CeError;
 
 /// Atomic write via a temp file + rename in the same directory.
 pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CeError> {

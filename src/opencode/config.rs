@@ -88,7 +88,11 @@ fn merge_skills_path(config: &mut serde_json::Value, skills_path: &str) -> Resul
 /// `model_value` is the full `provider/model` string; `variant` always mirrors
 /// the gentle-ai convention. Hard-fails instead of clobbering a non-object
 /// `agent` map or a non-object slot entry (D4).
-pub fn apply_model_assignment(config_path: &Path, slot: &str, model_value: &str) -> Result<(), CeError> {
+pub fn apply_model_assignment(
+    config_path: &Path,
+    slot: &str,
+    model_value: &str,
+) -> Result<(), CeError> {
     let mut config = read_config(config_path)?;
     match config.get_mut("agent") {
         None => {
@@ -158,7 +162,10 @@ mod tests {
     }
 
     fn skills_path(config_dir: &Path) -> String {
-        config_dir.join("compound-engineering/skills").to_string_lossy().into_owned()
+        config_dir
+            .join("compound-engineering/skills")
+            .to_string_lossy()
+            .into_owned()
     }
 
     #[test]
@@ -211,7 +218,9 @@ mod tests {
         let config = read_json(&path);
         let paths = config["skills"]["paths"].as_array().unwrap();
         assert_eq!(paths.len(), 2);
-        assert!(paths.iter().any(|v| v.as_str() == Some("/home/user/custom-skills")));
+        assert!(paths
+            .iter()
+            .any(|v| v.as_str() == Some("/home/user/custom-skills")));
         assert!(paths.iter().any(|v| v.as_str() == Some(&skills)));
     }
 
@@ -254,6 +263,10 @@ mod tests {
 
         let err = ensure_plugin_and_skills(&path, "plugin-entry", "skills-path").unwrap_err();
         assert!(err.to_string().contains("plugin"));
-        assert_eq!(read_json(&path)["plugin"], "not-an-array", "user config preserved");
+        assert_eq!(
+            read_json(&path)["plugin"],
+            "not-an-array",
+            "user config preserved"
+        );
     }
 }

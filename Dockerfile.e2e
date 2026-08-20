@@ -1,0 +1,22 @@
+# Stage 1: Build Rust binary on Linux
+FROM rust:1.85-slim AS builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release
+
+# Stage 2: E2E Runtime container with Node 22 & opencode-ai
+FROM node:22-bookworm-slim
+
+RUN npm install -g opencode-ai
+
+WORKDIR /e2e
+
+COPY --from=builder /app/target/release/ce-ai /usr/local/bin/ce-ai
+COPY e2e_runner.sh /usr/local/bin/e2e_runner.sh
+RUN chmod +x /usr/local/bin/ce-ai /usr/local/bin/e2e_runner.sh
+
+RUN mkdir -p /tmp/ce-source/.opencode/plugins /tmp/ce-source/.opencode/skills/ce-brainstorm && \
+    echo 'export default function ceLoader() {}' > /tmp/ce-source/.opencode/plugins/compound-engineering.js && \
+    echo '# ce-brainstorm' > /tmp/ce-source/.opencode/skills/ce-brainstorm/SKILL.md
+
+ENTRYPOINT ["/usr/local/bin/e2e_runner.sh"]

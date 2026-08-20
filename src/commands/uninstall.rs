@@ -44,7 +44,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
-    state.installed_harnesses.retain(|h| h["name"].as_str() != Some(args.harness.as_str()));
+    state
+        .installed_harnesses
+        .retain(|h| h["name"].as_str() != Some(args.harness.as_str()));
     state.save(&state_path)?;
 
     if !ctx.quiet {

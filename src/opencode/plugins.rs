@@ -44,8 +44,8 @@ pub fn install_loader(source_root: &Path, config_dir: &Path) -> Result<ManifestF
 mod tests {
     use tempfile::tempdir;
 
-    use crate::state::diff::sha256_hex;
     use super::*;
+    use crate::state::diff::sha256_hex;
 
     #[test]
     fn copies_loader_into_managed_plugins_dir() {
@@ -69,6 +69,9 @@ mod tests {
     fn skills_path_points_at_managed_skills_dir() {
         let dir = tempdir().unwrap();
         let config_dir = dir.path().join("opencode-config");
-        assert_eq!(skills_path(&config_dir), config_dir.join("compound-engineering/skills"));
+        assert_eq!(
+            skills_path(&config_dir),
+            config_dir.join("compound-engineering/skills")
+        );
     }
 }

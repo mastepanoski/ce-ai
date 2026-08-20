@@ -71,7 +71,12 @@ fn assignments_map(state: &State) -> BTreeMap<String, String> {
     state
         .model_assignments
         .iter()
-        .map(|(slot, assignment)| (slot.clone(), format!("{}/{}", assignment.provider_id, assignment.model_id)))
+        .map(|(slot, assignment)| {
+            (
+                slot.clone(),
+                format!("{}/{}", assignment.provider_id, assignment.model_id),
+            )
+        })
         .collect()
 }
 
@@ -88,7 +93,11 @@ fn set(ctx: &Context, slot: &str, model: &str) -> Result<(), CeError> {
     // Merge into opencode.json first so a config failure leaves state untouched.
     let opencode_json = ctx.opencode_config_dir.join("opencode.json");
     let config = read_config(&opencode_json)?;
-    if !config.get("agent").and_then(|agents| agents.get(slot)).is_some_and(serde_json::Value::is_object) {
+    if !config
+        .get("agent")
+        .and_then(|agents| agents.get(slot))
+        .is_some_and(serde_json::Value::is_object)
+    {
         eprintln!("warning: unknown agent slot {slot:?}; assignment persisted");
     }
     apply_model_assignment(&opencode_json, slot, model)?;
@@ -121,7 +130,14 @@ fn save(ctx: &Context, name: &str) -> Result<(), CeError> {
     let state = State::load(&ctx.config_dir.join("state.json"))?;
     let models = assignments_map(&state);
     let root = ctx.config_dir.join("profiles");
-    save_profile(&root, &Profile { name: name.into(), created_at: Utc::now().to_rfc3339(), models: models.clone() })?;
+    save_profile(
+        &root,
+        &Profile {
+            name: name.into(),
+            created_at: Utc::now().to_rfc3339(),
+            models: models.clone(),
+        },
+    )?;
     save_snapshot(&root, name, &models, &models)?;
     if !ctx.quiet {
         println!("models: profile {name} saved");

@@ -45,6 +45,12 @@ impl Context {
                 PathBuf::from(home).join(".config/opencode")
             }
         };
-        Ok(Self { config_dir, opencode_config_dir, dry_run, verbose, quiet })
+        Ok(Self {
+            config_dir,
+            opencode_config_dir,
+            dry_run,
+            verbose,
+            quiet,
+        })
     }
 }

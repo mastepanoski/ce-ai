@@ -24,7 +24,12 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
     let manifest = InstallManifest::load(&ctx.opencode_config_dir)
         .map_err(|_| CeError::Runtime("no install-manifest.json — run install first".into()))?;
     let source_root = resolve_source_root(&manifest.source)?;
-    sync_with(ctx, &source_root, &manifest.version, manifest.source.clone())
+    sync_with(
+        ctx,
+        &source_root,
+        &manifest.version,
+        manifest.source.clone(),
+    )
 }
 
 /// Resolves the source tree recorded in the manifest (local path or the
@@ -67,8 +72,11 @@ pub(crate) fn sync_with(
             source_rel.insert(managed_rel, rel);
         }
     }
-    let installed: BTreeMap<String, String> =
-        manifest.files.iter().map(|f| (f.path.clone(), f.sha256.clone())).collect();
+    let installed: BTreeMap<String, String> = manifest
+        .files
+        .iter()
+        .map(|f| (f.path.clone(), f.sha256.clone()))
+        .collect();
 
     let plan = diff::diff(&desired, &installed, &managed_dir);
 
@@ -86,7 +94,11 @@ pub(crate) fn sync_with(
     for action in &plan.actions {
         match action {
             Action::Copy { path } | Action::Restore { path } => {
-                let verb = if matches!(action, Action::Copy { .. }) { "copy" } else { "restore" };
+                let verb = if matches!(action, Action::Copy { .. }) {
+                    "copy"
+                } else {
+                    "restore"
+                };
                 let src = source_root.join(&source_rel[path]);
                 write_atomic(&managed_dir.join(path), &std::fs::read(&src)?)?;
                 println!("sync: {verb} {path}");
@@ -104,7 +116,10 @@ pub(crate) fn sync_with(
     // Rewrite the manifest with refreshed hashes and version/source (SU-2).
     let files: Vec<ManifestFile> = desired
         .iter()
-        .map(|(path, sha256)| ManifestFile { path: path.clone(), sha256: sha256.clone() })
+        .map(|(path, sha256)| ManifestFile {
+            path: path.clone(),
+            sha256: sha256.clone(),
+        })
         .collect();
     InstallManifest {
         version: version.to_string(),
@@ -119,7 +134,11 @@ pub(crate) fn sync_with(
     // Refresh the opencode harness entry in state.json (SU-2, SU-5).
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
-    if let Some(harness) = state.installed_harnesses.iter_mut().find(|h| h["name"].as_str() == Some("opencode")) {
+    if let Some(harness) = state
+        .installed_harnesses
+        .iter_mut()
+        .find(|h| h["name"].as_str() == Some("opencode"))
+    {
         harness["version"] = serde_json::Value::String(version.to_string());
         harness["source"] = source_json;
         harness["last_synced_at"] = serde_json::Value::String(Utc::now().to_rfc3339());

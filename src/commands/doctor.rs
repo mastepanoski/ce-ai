@@ -23,8 +23,11 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
     // Diff: managed files vs the install manifest (SU-3).
     let manifest = InstallManifest::load(&ctx.opencode_config_dir);
     if let Ok(manifest) = &manifest {
-        let desired: BTreeMap<String, String> =
-            manifest.files.iter().map(|f| (f.path.clone(), f.sha256.clone())).collect();
+        let desired: BTreeMap<String, String> = manifest
+            .files
+            .iter()
+            .map(|f| (f.path.clone(), f.sha256.clone()))
+            .collect();
         let managed = ctx.opencode_config_dir.join(MANAGED_DIR);
         for action in diff::diff(&desired, &desired, &managed).actions {
             let (kind, path) = match action {
@@ -38,9 +41,13 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
 
     // State consistency: the opencode state entry and the manifest must agree.
     let state = State::load(&ctx.config_dir.join("state.json"))?;
-    let has_entry = state.installed_harnesses.iter().any(|h| h["name"].as_str() == Some("opencode"));
+    let has_entry = state
+        .installed_harnesses
+        .iter()
+        .any(|h| h["name"].as_str() == Some("opencode"));
     if has_entry != manifest.is_ok() {
-        findings.push("state-inconsistent: opencode state entry and install manifest disagree".into());
+        findings
+            .push("state-inconsistent: opencode state entry and install manifest disagree".into());
     }
 
     for finding in &findings {
@@ -50,5 +57,8 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
         println!("doctor: ok");
         return Ok(());
     }
-    Err(CeError::Runtime(format!("doctor found {} finding(s)", findings.len())))
+    Err(CeError::Runtime(format!(
+        "doctor found {} finding(s)",
+        findings.len()
+    )))
 }

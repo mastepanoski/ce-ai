@@ -28,7 +28,9 @@ impl Cache {
         let dest = self.dir.join(format!("ce-{hex}.tar.gz"));
         write_atomic(&dest, bytes)?;
         let mut state = State::load(state_path)?;
-        state.managed_asset_digest.insert("tarball".to_string(), format!("sha256:{hex}"));
+        state
+            .managed_asset_digest
+            .insert("tarball".to_string(), format!("sha256:{hex}"));
         state.save(state_path)?;
         Ok(dest)
     }
@@ -74,8 +76,9 @@ mod tests {
     fn caches_tarball_under_cache_dir() {
         let dir = tempdir().unwrap();
         let bytes = b"fake-tarball-bytes";
-        let cached =
-            Cache::new(dir.path().join("cache")).cache_tarball(bytes, &dir.path().join("state.json")).unwrap();
+        let cached = Cache::new(dir.path().join("cache"))
+            .cache_tarball(bytes, &dir.path().join("state.json"))
+            .unwrap();
         assert!(cached.starts_with(dir.path().join("cache")));
         assert_eq!(std::fs::read(&cached).unwrap(), bytes);
     }
@@ -85,9 +88,14 @@ mod tests {
         let dir = tempdir().unwrap();
         let state_path = dir.path().join("state.json");
         let bytes = b"fake-tarball-bytes";
-        Cache::new(dir.path().join("cache")).cache_tarball(bytes, &state_path).unwrap();
+        Cache::new(dir.path().join("cache"))
+            .cache_tarball(bytes, &state_path)
+            .unwrap();
         let state = State::load(&state_path).unwrap();
-        let digest = state.managed_asset_digest.get("tarball").expect("tarball digest recorded");
+        let digest = state
+            .managed_asset_digest
+            .get("tarball")
+            .expect("tarball digest recorded");
         assert_eq!(digest, &format!("sha256:{}", sha256_hex(bytes)));
     }
 
@@ -105,8 +113,14 @@ mod tests {
         assert_eq!(
             tree,
             BTreeMap::from([
-                ("plugins/compound-engineering.js".to_string(), sha256_hex(b"loader")),
-                ("skills/ce-brainstorm/SKILL.md".to_string(), sha256_hex(b"# skill")),
+                (
+                    "plugins/compound-engineering.js".to_string(),
+                    sha256_hex(b"loader")
+                ),
+                (
+                    "skills/ce-brainstorm/SKILL.md".to_string(),
+                    sha256_hex(b"# skill")
+                ),
                 ("empty.tmp".to_string(), sha256_hex(b"")),
             ])
         );

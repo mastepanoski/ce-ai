@@ -37,11 +37,17 @@ fn tar_reader(bytes: &[u8]) -> Box<dyn Read + '_> {
 /// Validates every entry path in the archive without writing anything.
 fn validate_all_paths(bytes: &[u8]) -> Result<(), CeError> {
     let mut archive = tar::Archive::new(tar_reader(bytes));
-    for entry in archive.entries().map_err(|e| CeError::Runtime(format!("tar error: {e}")))? {
+    for entry in archive
+        .entries()
+        .map_err(|e| CeError::Runtime(format!("tar error: {e}")))?
+    {
         let entry = entry.map_err(|e| CeError::Runtime(format!("tar error: {e}")))?;
         let path = entry.path()?.into_owned();
         if !is_safe_relative_path(&path) {
-            return Err(CeError::Runtime(format!("unsafe archive entry path: {}", path.display())));
+            return Err(CeError::Runtime(format!(
+                "unsafe archive entry path: {}",
+                path.display()
+            )));
         }
     }
     Ok(())
@@ -56,11 +62,17 @@ pub fn extract_safe(archive: &Path, dest: &Path) -> Result<(), CeError> {
     validate_all_paths(&bytes)?; // reject-before-any-write security gate
     std::fs::create_dir_all(dest)?;
     let mut archive = tar::Archive::new(tar_reader(&bytes));
-    for entry in archive.entries().map_err(|e| CeError::Runtime(format!("tar error: {e}")))? {
+    for entry in archive
+        .entries()
+        .map_err(|e| CeError::Runtime(format!("tar error: {e}")))?
+    {
         let mut entry = entry.map_err(|e| CeError::Runtime(format!("tar error: {e}")))?;
         let entry_path = entry.path()?.into_owned();
         if !is_safe_relative_path(&entry_path) {
-            return Err(CeError::Runtime(format!("unsafe archive entry path: {}", entry_path.display())));
+            return Err(CeError::Runtime(format!(
+                "unsafe archive entry path: {}",
+                entry_path.display()
+            )));
         }
         let target = dest.join(&entry_path);
         match entry.header().entry_type() {
@@ -125,20 +137,32 @@ mod tests {
     fn absolute_path_entry_rejected_before_any_write() {
         let dir = tempdir().unwrap();
         let dest = dir.path().join("out");
-        let archive =
-            write_archive(dir.path(), "abs.tar", &tar_with(&[("safe.txt", "benign"), ("/etc/evil.txt", "evil")]));
+        let archive = write_archive(
+            dir.path(),
+            "abs.tar",
+            &tar_with(&[("safe.txt", "benign"), ("/etc/evil.txt", "evil")]),
+        );
         assert!(extract_safe(&archive, &dest).is_err());
-        assert!(dir_has_no_files(&dest), "no entry may be written before rejection");
+        assert!(
+            dir_has_no_files(&dest),
+            "no entry may be written before rejection"
+        );
     }
 
     #[test]
     fn parent_traversal_entry_rejected_before_any_write() {
         let dir = tempdir().unwrap();
         let dest = dir.path().join("out");
-        let archive =
-            write_archive(dir.path(), "dotdot.tar", &tar_with(&[("safe.txt", "benign"), ("../evil.txt", "evil")]));
+        let archive = write_archive(
+            dir.path(),
+            "dotdot.tar",
+            &tar_with(&[("safe.txt", "benign"), ("../evil.txt", "evil")]),
+        );
         assert!(extract_safe(&archive, &dest).is_err());
-        assert!(dir_has_no_files(&dest), "no entry may be written before rejection");
+        assert!(
+            dir_has_no_files(&dest),
+            "no entry may be written before rejection"
+        );
     }
 
     #[test]
@@ -151,7 +175,10 @@ mod tests {
             &tar_with(&[("safe.txt", "benign"), ("a/../../evil.txt", "evil")]),
         );
         assert!(extract_safe(&archive, &dest).is_err());
-        assert!(dir_has_no_files(&dest), "no entry may be written before rejection");
+        assert!(
+            dir_has_no_files(&dest),
+            "no entry may be written before rejection"
+        );
     }
 
     #[test]
@@ -161,10 +188,16 @@ mod tests {
         let archive = write_archive(
             dir.path(),
             "safe.tar",
-            &tar_with(&[("ce.js", "loader"), ("skills/ce-brainstorm/SKILL.md", "# skill")]),
+            &tar_with(&[
+                ("ce.js", "loader"),
+                ("skills/ce-brainstorm/SKILL.md", "# skill"),
+            ]),
         );
         extract_safe(&archive, &dest).unwrap();
-        assert_eq!(std::fs::read_to_string(dest.join("ce.js")).unwrap(), "loader");
+        assert_eq!(
+            std::fs::read_to_string(dest.join("ce.js")).unwrap(),
+            "loader"
+        );
         assert_eq!(
             std::fs::read_to_string(dest.join("skills/ce-brainstorm/SKILL.md")).unwrap(),
             "# skill"

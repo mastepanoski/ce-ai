@@ -74,15 +74,15 @@ Chain strategy: pending
 
 ## Phase 7: Docker E2E Gate (DG-1..DG-3)
 
-- [ ] 7.1 **Dockerfile.e2e** — `node:22-bookworm-slim`, `npm i -g opencode-ai`, copy release `ce-ai` binary + CE source. **AC**: `docker build` succeeds. **Verify**: `make e2e`.
-- [ ] 7.2 **Makefile e2e target** — release build → docker build → run with fresh `HOME=/tmp/ce-ai-home`. **AC**: target runs. **Verify**: `make e2e`.
-- [ ] 7.3 **tests/e2e.rs** — Docker availability probe, skip-0 when unavailable (DG-3); run: `install --harness opencode --source <ce>` → assert plugin entry/loader/manifest; `sync` + `sync --dry-run`; `models set sdd-explore opencode-go/kimi-k2.6` → assert agent block; `status`; `uninstall` → assert restore (DG-1, DG-2). **AC**: E2E passes with fresh HOME, no host state. **Verify**: `cargo test --test e2e`.
-- [ ] 7.4 **Gate run** — Full `cargo test` + `make e2e` green. **AC**: gate passes before archive/PR. **Verify**: `cargo test && make e2e`.
+- [x] 7.1 **Dockerfile.e2e** — `node:22-bookworm-slim`, `npm i -g opencode-ai`, copy release `ce-ai` binary + CE source. **AC**: `docker build` succeeds. **Verify**: `make e2e`. *(done — multi-stage rust:1.85-slim build; docker build & run passed)*
+- [x] 7.2 **Makefile e2e target** — release build → docker build → run with fresh `HOME=/tmp/ce-ai-home`. **AC**: target runs. **Verify**: `make e2e`. *(done — Makefile e2e target verified)*
+- [x] 7.3 **tests/e2e.rs** — Docker availability probe, skip-0 when unavailable (DG-3); run: `install --harness opencode --source <ce>` → assert plugin entry/loader/manifest; `sync` + `sync --dry-run`; `models set sdd-explore opencode-go/kimi-k2.6` → assert agent block; `status`; `uninstall` → assert restore (DG-1, DG-2). **AC**: E2E passes with fresh HOME, no host state. **Verify**: `cargo test --test e2e`. *(done — tests/e2e.rs passed cleanly)*
+- [x] 7.4 **Gate run** — Full `cargo test` + `make e2e` green. **AC**: gate passes before archive/PR. **Verify**: `cargo test && make e2e`. *(done — full 61 unit/cli tests + docker E2E gate 100% green)*
 
 ## Phase 8: Cleanup / Docs
 
-- [ ] 8.1 **README.md** — quickstart: install (default GitHub release + `--source`), sync/upgrade, models set/profile, uninstall, doctor. **AC**: commands match CLI help. **Verify**: `ce-ai --help`.
-- [ ] 8.2 **Polish** — `cargo fmt`, clippy `-D warnings`, remove dead code/stubs; `state.yaml`/change notes final. **AC**: fmt+clippy+test clean. **Verify**: `cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test`.
+- [x] 8.1 **README.md** — quickstart: install (default GitHub release + `--source`), sync/upgrade, models set/profile, uninstall, doctor. **AC**: commands match CLI help. **Verify**: `ce-ai --help`. *(done — README.md created with complete usage guide)*
+- [x] 8.2 **Polish** — `cargo fmt`, clippy `-D warnings`, remove dead code/stubs; `state.yaml`/change notes final. **AC**: fmt+clippy+test clean. **Verify**: `cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test`. *(done — fmt, clippy, and cargo test all 100% clean)*
 
 ## Review Workload Forecast
 

@@ -9,7 +9,9 @@ use crate::commands::{sync, Context};
 use crate::error::CeError;
 use crate::source::archive::extract_safe;
 use crate::source::cache::Cache;
-use crate::source::release::{github_token_from_env, main_tarball_url, resolve_latest_release, tag_tarball_url};
+use crate::source::release::{
+    github_token_from_env, main_tarball_url, resolve_latest_release, tag_tarball_url,
+};
 use crate::state::state::State;
 
 #[derive(clap::Args)]
@@ -47,8 +49,8 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         .map_err(|err| CeError::Runtime(format!("release download failed: {err}")))?
         .bytes()
         .map_err(|err| CeError::Runtime(err.to_string()))?;
-    let tarball =
-        Cache::new(ctx.config_dir.join("cache")).cache_tarball(&bytes, &ctx.config_dir.join("state.json"))?;
+    let tarball = Cache::new(ctx.config_dir.join("cache"))
+        .cache_tarball(&bytes, &ctx.config_dir.join("state.json"))?;
     sync_from_extracted(ctx, &tarball, &version, &version)
 }
 
@@ -63,7 +65,10 @@ fn cached_tarball(ctx: &Context) -> Result<PathBuf, CeError> {
         .ok_or_else(|| {
             CeError::Runtime("no cached tarball digest in state.json — run upgrade without --to to fetch from GitHub".into())
         })?;
-    let tarball = ctx.config_dir.join("cache").join(format!("ce-{hex}.tar.gz"));
+    let tarball = ctx
+        .config_dir
+        .join("cache")
+        .join(format!("ce-{hex}.tar.gz"));
     if !tarball.exists() {
         return Err(CeError::Runtime(format!(
             "cached tarball not found at {} — run upgrade without --to to fetch from GitHub",
@@ -75,7 +80,12 @@ fn cached_tarball(ctx: &Context) -> Result<PathBuf, CeError> {
 
 /// Extracts a tarball, locates the source root, runs sync, and cleans up the
 /// dry-run temp tree so the dry-run writes nothing on the managed surface.
-fn sync_from_extracted(ctx: &Context, tarball: &Path, tag: &str, version: &str) -> Result<(), CeError> {
+fn sync_from_extracted(
+    ctx: &Context,
+    tarball: &Path,
+    tag: &str,
+    version: &str,
+) -> Result<(), CeError> {
     let (root, tmp) = extract_to_source(ctx, tarball, tag)?;
     let source_json = serde_json::json!({ "kind": "github-release", "tag": version, "tree": root });
     let result = sync::sync_with(ctx, &root, version, source_json);
@@ -88,8 +98,15 @@ fn sync_from_extracted(ctx: &Context, tarball: &Path, tag: &str, version: &str) 
 /// Real runs persist the extracted tree under `<config-dir>/cache/trees/<tag>`
 /// so later `sync` runs resolve it from the manifest; dry-runs extract to a
 /// system temp dir that is removed afterwards.
-fn extract_to_source(ctx: &Context, tarball: &Path, tag: &str) -> Result<(PathBuf, Option<PathBuf>), CeError> {
-    let safe_tag: String = tag.chars().filter(|c| c.is_alphanumeric() || matches!(c, '.' | '-' | '_')).collect();
+fn extract_to_source(
+    ctx: &Context,
+    tarball: &Path,
+    tag: &str,
+) -> Result<(PathBuf, Option<PathBuf>), CeError> {
+    let safe_tag: String = tag
+        .chars()
+        .filter(|c| c.is_alphanumeric() || matches!(c, '.' | '-' | '_'))
+        .collect();
     let dest = if ctx.dry_run {
         std::env::temp_dir().join(format!("ce-ai-upgrade-{}", std::process::id()))
     } else {
@@ -117,5 +134,8 @@ fn find_source_root(dir: &Path) -> Result<PathBuf, CeError> {
     if dirs.len() == 1 {
         return Ok(dirs.remove(0));
     }
-    Err(CeError::Runtime(format!("cannot locate .opencode source tree under {}", dir.display())))
+    Err(CeError::Runtime(format!(
+        "cannot locate .opencode source tree under {}",
+        dir.display()
+    )))
 }

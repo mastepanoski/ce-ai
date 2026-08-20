@@ -1,8 +1,8 @@
 //! Sync diff engine: plan copy/restore/remove actions without writing (SU-1..SU-4).
 
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::Path;
-use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
@@ -26,7 +26,11 @@ pub fn sha256_hex(data: &[u8]) -> String {
 }
 
 /// Plans actions to reconcile desired against manifest and disk; never writes.
-pub fn diff(desired: &BTreeMap<String, String>, manifest: &BTreeMap<String, String>, fs_root: &Path) -> Diff {
+pub fn diff(
+    desired: &BTreeMap<String, String>,
+    manifest: &BTreeMap<String, String>,
+    fs_root: &Path,
+) -> Diff {
     let mut actions = Vec::new();
     for (path, want_hash) in desired {
         match std::fs::read(fs_root.join(path)) {
@@ -35,7 +39,11 @@ pub fn diff(desired: &BTreeMap<String, String>, manifest: &BTreeMap<String, Stri
             Err(_) => actions.push(Action::Copy { path: path.clone() }),
         }
     }
-    for path in manifest.keys().filter(|p| !desired.contains_key(p.as_str())).filter(|p| fs_root.join(p).exists()) {
+    for path in manifest
+        .keys()
+        .filter(|p| !desired.contains_key(p.as_str()))
+        .filter(|p| fs_root.join(p).exists())
+    {
         actions.push(Action::Remove { path: path.clone() });
     }
     Diff { actions }
@@ -43,11 +51,11 @@ pub fn diff(desired: &BTreeMap<String, String>, manifest: &BTreeMap<String, Stri
 
 #[cfg(test)]
 mod tests {
-use std::collections::BTreeMap;
-use std::fs;
-use std::path::Path;
-use tempfile::tempdir;
-use crate::state::diff::{diff, sha256_hex, Action};
+    use crate::state::diff::{diff, sha256_hex, Action};
+    use std::collections::BTreeMap;
+    use std::fs;
+    use std::path::Path;
+    use tempfile::tempdir;
 
     fn write_file(root: &Path, rel: &str, content: &[u8]) {
         let path = root.join(rel);
@@ -60,7 +68,12 @@ use crate::state::diff::{diff, sha256_hex, Action};
         let dir = tempdir().unwrap();
         let desired = BTreeMap::from([("plugins/ce.js".to_string(), sha256_hex(b"loader"))]);
         let plan = diff(&desired, &BTreeMap::new(), dir.path());
-        assert_eq!(plan.actions, vec![Action::Copy { path: "plugins/ce.js".into() }]);
+        assert_eq!(
+            plan.actions,
+            vec![Action::Copy {
+                path: "plugins/ce.js".into()
+            }]
+        );
     }
 
     #[test]
@@ -69,7 +82,12 @@ use crate::state::diff::{diff, sha256_hex, Action};
         write_file(dir.path(), "plugins/ce.js", b"tampered");
         let desired = BTreeMap::from([("plugins/ce.js".to_string(), sha256_hex(b"loader"))]);
         let plan = diff(&desired, &desired, dir.path());
-        assert_eq!(plan.actions, vec![Action::Restore { path: "plugins/ce.js".into() }]);
+        assert_eq!(
+            plan.actions,
+            vec![Action::Restore {
+                path: "plugins/ce.js".into()
+            }]
+        );
     }
 
     #[test]
@@ -78,7 +96,12 @@ use crate::state::diff::{diff, sha256_hex, Action};
         write_file(dir.path(), "plugins/old.js", b"old");
         let manifest = BTreeMap::from([("plugins/old.js".to_string(), sha256_hex(b"old"))]);
         let plan = diff(&BTreeMap::new(), &manifest, dir.path());
-        assert_eq!(plan.actions, vec![Action::Remove { path: "plugins/old.js".into() }]);
+        assert_eq!(
+            plan.actions,
+            vec![Action::Remove {
+                path: "plugins/old.js".into()
+            }]
+        );
     }
 
     #[test]

@@ -9,7 +9,9 @@ use crate::commands::Context;
 use crate::error::CeError;
 use crate::opencode::config::ensure_plugin_and_skills;
 use crate::opencode::manifest::{InstallManifest, ManifestFile};
-use crate::opencode::plugins::{install_loader, plugin_entry, skills_path, LOADER_REL_PATH, MANAGED_DIR};
+use crate::opencode::plugins::{
+    install_loader, plugin_entry, skills_path, LOADER_REL_PATH, MANAGED_DIR,
+};
 use crate::source::cache::read_local_tree;
 use crate::state::backups::backup_file;
 use crate::state::state::State;
@@ -59,7 +61,14 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     // Dry-run plans only; SU-4 guarantees zero writes.
     if ctx.dry_run {
-        println!("plan: {}", if needs_backup { "backup opencode.json" } else { "create opencode.json" });
+        println!(
+            "plan: {}",
+            if needs_backup {
+                "backup opencode.json"
+            } else {
+                "create opencode.json"
+            }
+        );
         for rel in managed.keys() {
             println!("plan: copy {rel}");
         }
@@ -70,7 +79,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     // Apply: back up the existing config, then copy managed files (OI-1, OI-3).
     let backup = if needs_backup {
-        Some(backup_file(&ctx.config_dir.join("backups"), &opencode_json)?)
+        Some(backup_file(
+            &ctx.config_dir.join("backups"),
+            &opencode_json,
+        )?)
     } else {
         None
     };
@@ -79,8 +91,14 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         if rel == LOADER_REL_PATH {
             continue;
         }
-        write_atomic(&managed_dir.join(rel), &std::fs::read(args.source.join(source_rel))?)?;
-        files.push(ManifestFile { path: rel.clone(), sha256: hash.clone() });
+        write_atomic(
+            &managed_dir.join(rel),
+            &std::fs::read(args.source.join(source_rel))?,
+        )?;
+        files.push(ManifestFile {
+            path: rel.clone(),
+            sha256: hash.clone(),
+        });
     }
 
     // Merge plugin entry + skills path into opencode.json (OI-2, OI-4).
@@ -105,7 +123,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     // Update state.json; replace any prior opencode entry (idempotent).
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
-    state.installed_harnesses.retain(|h| h["name"].as_str() != Some("opencode"));
+    state
+        .installed_harnesses
+        .retain(|h| h["name"].as_str() != Some("opencode"));
     state.installed_harnesses.push(serde_json::json!({
         "name": "opencode",
         "version": "local",

@@ -28,7 +28,10 @@ pub fn tag_tarball_url(tag: &str) -> String {
 
 /// Splits a version like `3.4.2` into comparable numeric components.
 fn version_components(version: &str) -> Option<Vec<u64>> {
-    version.split('.').map(|part| part.parse::<u64>().ok()).collect()
+    version
+        .split('.')
+        .map(|part| part.parse::<u64>().ok())
+        .collect()
 }
 
 /// Numeric (semver-style) comparison; falls back to lexical when either side
@@ -49,7 +52,8 @@ fn compare_versions(a: &str, b: &str) -> Ordering {
 
 /// Extracts `X.Y.Z` from a release tag, if it matches `compound-engineering-v*`.
 fn ce_version(tag: &str) -> Option<&str> {
-    tag.strip_prefix("compound-engineering-v").filter(|v| !v.is_empty())
+    tag.strip_prefix("compound-engineering-v")
+        .filter(|v| !v.is_empty())
 }
 
 /// Returns the latest release tag matching `compound-engineering-v*` from a
@@ -72,12 +76,16 @@ pub fn latest_ce_release(payload: &[u8]) -> Result<Option<String>, CeError> {
 
 /// Builds the GitHub API bearer header from the `CE_AI_GITHUB_TOKEN` value.
 pub fn auth_header(token: Option<&str>) -> Option<String> {
-    token.filter(|t| !t.is_empty()).map(|t| format!("Bearer {t}"))
+    token
+        .filter(|t| !t.is_empty())
+        .map(|t| format!("Bearer {t}"))
 }
 
 /// Reads the optional `CE_AI_GITHUB_TOKEN` environment variable.
 pub fn github_token_from_env() -> Option<String> {
-    std::env::var("CE_AI_GITHUB_TOKEN").ok().filter(|t| !t.is_empty())
+    std::env::var("CE_AI_GITHUB_TOKEN")
+        .ok()
+        .filter(|t| !t.is_empty())
 }
 
 /// Resolves the latest CE release tag via the GitHub API (SF-1); network call,
@@ -96,15 +104,22 @@ pub fn resolve_latest_release(
         .send()
         .map_err(|err| CeError::Runtime(format!("github releases request failed: {err}")))?;
     if !response.status().is_success() {
-        return Err(CeError::Runtime(format!("github releases returned {}", response.status())));
+        return Err(CeError::Runtime(format!(
+            "github releases returned {}",
+            response.status()
+        )));
     }
-    let body = response.bytes().map_err(|err| CeError::Runtime(err.to_string()))?;
+    let body = response
+        .bytes()
+        .map_err(|err| CeError::Runtime(err.to_string()))?;
     latest_ce_release(&body)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::source::release::{auth_header, github_token_from_env, latest_ce_release, main_tarball_url, tag_tarball_url};
+    use crate::source::release::{
+        auth_header, github_token_from_env, latest_ce_release, main_tarball_url, tag_tarball_url,
+    };
 
     #[test]
     fn picks_latest_compound_engineering_release_tag() {
@@ -130,7 +145,9 @@ mod tests {
     #[test]
     fn main_tarball_fallback_url_points_at_main_branch() {
         let url = main_tarball_url();
-        assert!(url.ends_with("/everyinc/compound-engineering-plugin/archive/refs/heads/main.tar.gz"));
+        assert!(
+            url.ends_with("/everyinc/compound-engineering-plugin/archive/refs/heads/main.tar.gz")
+        );
     }
 
     #[test]
@@ -141,7 +158,10 @@ mod tests {
 
     #[test]
     fn github_token_builds_bearer_header() {
-        assert_eq!(auth_header(Some("secret")), Some("Bearer secret".to_string()));
+        assert_eq!(
+            auth_header(Some("secret")),
+            Some("Bearer secret".to_string())
+        );
         assert_eq!(auth_header(None), None);
     }
 
