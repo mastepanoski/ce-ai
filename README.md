@@ -179,9 +179,34 @@ For complete technical specifications, architecture decisions, and requirement m
 
 ---
 
+## 🛡️ Security, AI Governance & Standards Compliance
+
+`ce-ai` adheres strictly to international cybersecurity, AI management, and operational frameworks:
+
+| Document | Description & Framework Compliance |
+| -------- | ---------------------------------- |
+| [**`SECURITY.md`**](./SECURITY.md) | Information Security Management System (**ISO/IEC 27001**, **ISO/IEC 27002**, **NIST CSF 2.0**, **NIST SP 800-53**). Cryptographic checksums, supply chain auditing, and vulnerability disclosure protocol. |
+| [**`AI_POLICY.md`**](./AI_POLICY.md) | Artificial Intelligence Management System (**ISO/IEC 42001**) & **NIST AI Risk Management Framework (AI RMF 1.0)**. Govern, Map, Measure, and Manage AI agent integrations. |
+| [**`AGENTS.md`**](./AGENTS.md) | AI Agent Guidelines, structural boundaries, and mandatory constraints for autonomous LLM coding assistants. |
+| [**`CONTRIBUTING.md`**](./CONTRIBUTING.md) | Development workflow, code review criteria, and security compliance guidelines for contributors. |
+| [**`CODE_OF_CONDUCT.md`**](./CODE_OF_CONDUCT.md) | Contributor Covenant Code of Conduct (v2.1). |
+| [**`CONTRIBUTORS.md`**](./CONTRIBUTORS.md) | Project maintainers and community contributors. |
+| [**`LICENSE`**](./LICENSE) | Official **MIT License**. |
+
+---
+
+## 🧪 CI/CD & Automated Quality Gates
+
+`ce-ai` uses GitHub Actions ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)) to run automated compliance gates on every push and pull request:
+- **Build & Test Matrix**: Validates compilation, formatting (`cargo fmt`), clippy (`cargo clippy -D warnings`), and test suite across Linux & macOS.
+- **Supply Chain Audit**: Scans dependencies with `cargo audit` (ISO 27001 / ISO 27002).
+- **Docker E2E Gate**: Runs `make e2e` in an isolated Linux container (`Dockerfile.e2e`) (NIST AI RMF & ISO 42001).
+
+---
+
 ## Testing
 
-Run unit and CLI integration tests:
+Run unit and CLI integration tests locally:
 
 ```bash
 cargo test
@@ -195,4 +220,5 @@ make e2e
 
 ## License
 
-MIT / Apache-2.0
+Distributed under the [MIT License](./LICENSE).
+
