@@ -1,4 +1,7 @@
+mod commands;
 mod error;
+mod opencode;
+mod source;
 mod state;
 
 fn main() {
