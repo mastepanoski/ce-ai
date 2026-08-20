@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use crate::error::CeError;
 
 /// Shared command context: resolved dirs + global flag state (CC-2).
+#[derive(Clone)]
 pub struct Context {
     pub config_dir: PathBuf,
     pub opencode_config_dir: PathBuf,

@@ -5,6 +5,7 @@ mod error;
 mod opencode;
 mod source;
 mod state;
+mod tui;
 
 use std::path::PathBuf;
 
@@ -29,7 +30,7 @@ struct Cli {
     #[arg(short = 'q', long, global = true)]
     quiet: bool,
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -60,13 +61,14 @@ fn main() {
         }
     };
     let result = match cli.command {
-        Commands::Install(args) => install::run(&ctx, &args),
-        Commands::Sync => sync::run(&ctx),
-        Commands::Upgrade(args) => upgrade::run(&ctx, &args),
-        Commands::Models(args) => models::run(&ctx, &args),
-        Commands::Status => status::run(&ctx),
-        Commands::Uninstall(args) => uninstall::run(&ctx, &args),
-        Commands::Doctor => doctor::run(&ctx),
+        Some(Commands::Install(args)) => install::run(&ctx, &args),
+        Some(Commands::Sync) => sync::run(&ctx),
+        Some(Commands::Upgrade(args)) => upgrade::run(&ctx, &args),
+        Some(Commands::Models(args)) => models::run(&ctx, &args),
+        Some(Commands::Status) => status::run(&ctx),
+        Some(Commands::Uninstall(args)) => uninstall::run(&ctx, &args),
+        Some(Commands::Doctor) => doctor::run(&ctx),
+        None => tui::run_interactive(&ctx),
     };
     if let Err(err) = &result {
         eprintln!("error: {err}");

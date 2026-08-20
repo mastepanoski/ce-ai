@@ -1,5 +1,5 @@
 # Stage 1: Build Rust binary on Linux
-FROM rust:latest AS builder
+FROM rust:bookworm AS builder
 WORKDIR /app
 COPY . .
 RUN cargo build --release
