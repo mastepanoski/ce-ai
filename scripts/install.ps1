@@ -22,7 +22,13 @@ if (!(Test-Path $InstallDir)) {
 $TempZip = Join-Path $env:TEMP $AssetName
 
 Write-Host "📦 Downloading $AssetName..." -ForegroundColor Yellow
-Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempZip
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempZip -UseBasicParsing
+
+if (!(Test-Path $TempZip)) {
+    Write-Error "❌ Failed to download release asset from $DownloadUrl"
+    exit 1
+}
 
 Write-Host "📂 Extracting to $InstallDir..." -ForegroundColor Yellow
 Expand-Archive -Path $TempZip -DestinationPath $InstallDir -Force
