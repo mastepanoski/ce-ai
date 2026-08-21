@@ -21,11 +21,15 @@ if (!(Test-Path $InstallDir)) {
 
 $TempZip = Join-Path $env:TEMP $AssetName
 
-Write-Host "📦 Downloading $AssetName..." -ForegroundColor Yellow
-if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-    curl.exe -fsSL -o $TempZip $DownloadUrl
-} else {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Write-Host "📦 Downloading $AssetName from $DownloadUrl..." -ForegroundColor Yellow
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+
+try {
+    $WebClient = New-Object System.Net.WebClient
+    $WebClient.Headers.Add("User-Agent", "ce-ai-installer")
+    $WebClient.DownloadFile($DownloadUrl, $TempZip)
+} catch {
+    Write-Host "  Falling back to Invoke-WebRequest..." -ForegroundColor Gray
     Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempZip -UseBasicParsing -MaximumRedirection 10
 }
 
