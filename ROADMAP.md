@@ -18,9 +18,9 @@ This document outlines the version milestones, feature criteria, and release pip
 ## 🗺️ Version Milestones to `v1.0.0`
 
 ```
-  v0.5.0 (Released) ──► v0.6.0 (Released) ──► v0.7.0 (Upcoming)
+  v0.6.0 (Released) ──► v0.7.0 (Released) ──► v0.8.0 (Upcoming)
                                                      │
-  v1.0.0 (Stable Release) ◄── v0.9.0 (Hardening) ◄── v0.8.0 (CI/CD Releases)
+  v1.0.0 (Stable Release) ◄── v0.9.0 (Hardening) ◄───┘
 ```
 
 ### ✅ `v0.3.0` & `v0.4.0` (Completed) — Multi-Harness Architecture & TUI
@@ -49,9 +49,10 @@ This document outlines the version milestones, feature criteria, and release pip
 
 ---
 
-### 📁 `v0.7.0` — Workspace & Project-Level Isolation
-- [ ] **Per-Project Overrides**: Support `.ce-ai.json` or `.ce-ai/` in current directory for repo-local skills and role assignments.
-- [ ] **Hierarchy Precedence**: Project-level config takes precedence over global `~/.ce-ai/` state.
+### ✅ `v0.7.0` (Released) — Workspace Overrides & Multi-Harness Uninstall Parity ([#64](https://github.com/mastepanoski/ce-ai/issues/64))
+- [x] **Workspace Configuration Overrides (`.ce-ai.json`)**: Local repository overrides with key-level precedence resolution over global `~/.config/ce-ai/state.json`.
+- [x] **Complete Multi-Harness Uninstall Parity**: Extended `ce-ai uninstall` with `--harness <name|all>`, `--all`, and `--yes` / `-y` flags for complete removal of managed loaders and skills across all installed harnesses cleanly.
+- [x] **Teacher-Style Documentation**: Updated masterclass user guide with local cockpit settings vs master flight plan analogies.
 
 ---
 
