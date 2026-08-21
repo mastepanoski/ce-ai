@@ -4,6 +4,29 @@ This guide explains step-by-step how `ce-ai` installs the **Compound Engineering
 
 ---
 
+## 💡 Key Concepts & Terminology (Read This First!)
+
+Before reading the installation steps, here are simple explanations for key terms and files used throughout this guide:
+
+### What is `install-manifest.json` and Where Does it Come From?
+**`install-manifest.json`** is a digital fingerprint ledger automatically created by `ce-ai` inside each harness's managed folder during installation (`ce-ai install`).
+- *Where it lives*: `~/.config/opencode/compound-engineering/install-manifest.json` (or target harness managed directory).
+- *What it contains*:
+  1. **Version & Source Tag**: Records whether the plugin was installed from GitHub release `vX.Y.Z` or a local development directory.
+  2. **SHA256 File Hashes**: An index of cryptographic checksums for every installed skill and loader script.
+  3. **Backup Pointer**: A record pointing to the exact timestamped backup of your original pre-install configuration file (e.g., `~/.ce-ai/backups/2026-08-21T12-00-00/claude.json`).
+
+### What is `state.json`?
+**`state.json`** is `ce-ai`'s central management state file located at `~/.ce-ai/state.json`. It keeps track of all installed harnesses on your machine, their active versions, last sync timestamps, and agent model assignments (`ce-brainstorm`, `ce-plan`, etc.).
+
+### What is an Automatic Pre-Mutation Backup?
+Before `ce-ai` makes any changes to your AI tools' configuration files (like `.claude.json` or `opencode.json`), it creates an exact, timestamped copy of your existing file under `~/.ce-ai/backups/`. If you ever uninstall or need to revert, `ce-ai` uses this backup to restore your system to its exact pre-installation state.
+
+### What is Non-Destructive Config Merging?
+"Non-destructive" means `ce-ai` **never deletes or overwrites** your custom settings, API keys, MCP servers, or official application plugins. Instead, it reads your existing JSON configuration file, adds or updates *only* the `compound-engineering` plugin and skill entries, and re-saves the file cleanly.
+
+---
+
 ## 1. Step-by-Step Installation Pipeline (`ce-ai install`)
 
 When executing `ce-ai install --harness claude` (or `--all`), `ce-ai` executes a strict 6-step pipeline ensuring **zero data loss**.
@@ -14,7 +37,7 @@ flowchart TD
     B --> C[Step 2: Automatic Pre-Mutation Backup in ~/.ce-ai/backups/]
     C --> D[Step 3: Atomic Disk Asset Copy]
     D --> E[Step 4: Non-Destructive Harness Config Merger]
-    E --> F[Step 5: Record Install Manifest]
+    E --> F[Step 5: Record Install Manifest install-manifest.json]
     F --> G[Step 6: Update Global State state.json]
 ```
 
