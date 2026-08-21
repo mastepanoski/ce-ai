@@ -794,3 +794,26 @@ fn status_validates_multi_harness_probing() {
         .stdout(predicate::str::contains("installed: opencode"))
         .stdout(predicate::str::contains("installed: claude"));
 }
+
+#[test]
+fn upgrade_local_source_protection_and_force() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Attempt upgrade without --force when source is local -> protective warning
+    ceai(&config_dir, &home)
+        .arg("upgrade")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "skipping upgrade for harness with local source",
+        ));
+
+    // Attempt upgrade with --force and --source -> proceeds
+    ceai(&config_dir, &home)
+        .args(["upgrade", "--force", "--source", source.to_str().unwrap()])
+        .assert()
+        .success();
+}

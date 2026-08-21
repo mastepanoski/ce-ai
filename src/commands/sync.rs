@@ -131,16 +131,12 @@ pub(crate) fn sync_with(
     }
     .write(&ctx.opencode_config_dir)?;
 
-    // Refresh the opencode harness entry in state.json (SU-2, SU-5).
+    // Refresh all registered harness entries in state.json (SU-2, SU-5).
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
-    if let Some(harness) = state
-        .installed_harnesses
-        .iter_mut()
-        .find(|h| h["name"].as_str() == Some("opencode"))
-    {
+    for harness in &mut state.installed_harnesses {
         harness["version"] = serde_json::Value::String(version.to_string());
-        harness["source"] = source_json;
+        harness["source"] = source_json.clone();
         harness["last_synced_at"] = serde_json::Value::String(Utc::now().to_rfc3339());
     }
     state.save(&state_path)?;
