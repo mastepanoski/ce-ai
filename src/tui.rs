@@ -328,6 +328,47 @@ fn run_app(
                             MenuTab::Exit => break,
                         }
                     }
+                    KeyCode::Char(c @ '1'..='7') if app.current_tab() == MenuTab::Workflow => {
+                        let stage_num = c.to_digit(10).unwrap();
+                        let (phase, task) = match stage_num {
+                            1 => (
+                                "Stage 1: Ideation",
+                                "1.0 Ideation & Brainstorming (ce-brainstorm)",
+                            ),
+                            2 => ("Stage 2: OpenSpec Definition", "2.0 OpenSpec Specification"),
+                            3 => ("Stage 3: Execution Plan", "3.0 Technical Plan (ce-plan)"),
+                            4 => ("Stage 4: TDD & Work", "4.0 Implementation (ce-work)"),
+                            5 => (
+                                "Stage 5: Empirical Verification",
+                                "5.0 Verification (cargo test)",
+                            ),
+                            6 => (
+                                "Stage 6: Knowledge Capture",
+                                "6.0 Knowledge Capture (ce-compound)",
+                            ),
+                            7 => (
+                                "Stage 7: Git Shipping",
+                                "7.0 PR Delivery (ce-commit-push-pr)",
+                            ),
+                            _ => ("Stage 1: Ideation", "1.0 Ideation"),
+                        };
+                        let args = crate::commands::workflow::Args {
+                            action: crate::commands::workflow::Action::Checkpoint {
+                                task: task.to_string(),
+                                phase: phase.to_string(),
+                            },
+                        };
+                        let lines = match crate::commands::workflow::run(ctx, &args) {
+                            Ok(_) => vec![
+                                format!("✅ Workflow Checkpoint Saved to {phase}!"),
+                                format!("Active Task: {task}"),
+                                "".to_string(),
+                                "Stage transition recorded in state.json successfully.".to_string(),
+                            ],
+                            Err(err) => vec![format!("❌ Failed to save checkpoint: {err}")],
+                        };
+                        execute_action(app, "Workflow Stage Transition", move || lines);
+                    }
                     _ => {}
                 }
             }
@@ -530,7 +571,7 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
                 lines.push(Line::from(Span::styled("  ⚠️ Could not read state.json", Style::default().fg(Color::Red))));
             }
             lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled("Press [Enter] to run 'ce-ai workflow status'.", Style::default().fg(Color::Gray))));
+            lines.push(Line::from(Span::styled("Press keys [1-7] to transition stage checkpoints directly, or [Enter] to query status.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))));
             lines
         }
         MenuTab::Install => vec![
