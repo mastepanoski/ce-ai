@@ -18,9 +18,9 @@ This document outlines the version milestones, feature criteria, and release pip
 ## 🗺️ Version Milestones to `v1.0.0`
 
 ```
-  v0.6.0 (Released) ──► v0.7.0 (Released) ──► v0.8.0 (Upcoming)
+  v0.7.0 (Released) ──► v0.8.0 (Released) ──► v0.9.0 (Upcoming)
                                                      │
-  v1.0.0 (Stable Release) ◄── v0.9.0 (Hardening) ◄───┘
+  v1.0.0 (Stable Release) ◄──────────────────────────┘
 ```
 
 ### ✅ `v0.3.0` & `v0.4.0` (Completed) — Multi-Harness Architecture & TUI
@@ -56,15 +56,10 @@ This document outlines the version milestones, feature criteria, and release pip
 
 ---
 
-### 🚀 `v0.8.0` — Automated CI/CD Release Pipeline
-- [ ] **Release Workflow (`.github/workflows/release.yml`)**:
-  - Triggered automatically on tag pushes (`v*`).
-  - Cross-compiles native binaries for:
-    - Linux `x86_64-unknown-linux-gnu` / `aarch64-unknown-linux-gnu`
-    - macOS `x86_64-apple-darwin` / `aarch64-apple-darwin` (Apple Silicon)
-    - Windows `x86_64-pc-windows-msvc`
-  - Generates SHA256 checksum manifests and attaches release assets to GitHub Releases.
-- [ ] **Automated Changelog**: Generates release notes from `CHANGELOG.md`.
+### ✅ `v0.8.0` (Released) — Universal Installer & Multi-Arch Release Matrix ([#2](https://github.com/mastepanoski/ce-ai/issues/2), [#3](https://github.com/mastepanoski/ce-ai/issues/3), [#28](https://github.com/mastepanoski/ce-ai/issues/28))
+- [x] **Multi-Platform Release Pipeline (`.github/workflows/release.yml`)**: Automated 6-target build matrix compiling Linux/macOS/Windows release binaries for `x86_64` and `ARM64`.
+- [x] **Universal One-Line Installer Script**: Cross-platform POSIX (`scripts/install.sh`) and PowerShell (`scripts/install.ps1`) scripts for zero-dependency installation.
+- [x] **Package Manager Homebrew Formula**: Formula template `Formula/ce-ai.rb`.
 
 ---
 
