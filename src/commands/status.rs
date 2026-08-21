@@ -42,11 +42,19 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
     if installed_list.is_empty() {
         println!("installed: none");
     } else {
+        let has_local_source = installed_list
+            .iter()
+            .any(|(_, ver, src)| ver == "local" || src == "local");
         for (name, version, source) in &installed_list {
             println!("installed: {name} ({version}, source: {source})");
             if ctx.verbose {
                 println!("  verbose: enabled for {name}");
             }
+        }
+        if has_local_source {
+            let latest_tag = state.latest_release_tag.as_deref().unwrap_or("latest");
+            println!("upstream: latest GitHub release available is {latest_tag}");
+            println!("recommendation: Run 'ce-ai upgrade' to update from local source to latest release.");
         }
     }
 
