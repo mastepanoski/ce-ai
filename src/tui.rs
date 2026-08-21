@@ -471,6 +471,13 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
                         Span::raw(format!(" — version: {ver} (source: {src})")),
                     ]));
                 }
+                let has_local = app.harnesses.iter().any(|(_, ver, src)| ver == "local" || src == "local");
+                if has_local {
+                    lines.push(Line::from(""));
+                    lines.push(Line::from(Span::styled("  💡 Aviso de Versión (Fuente Local):", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))));
+                    lines.push(Line::from("     Instalación realizada desde código fuente local (dev)."));
+                    lines.push(Line::from(Span::styled("     Para actualizar a la última Release publicada en GitHub, usa la pestaña '🚀 Upgrade Release'.", Style::default().fg(Color::Yellow))));
+                }
             }
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled("Host Detected Harnesses:", Style::default().fg(Color::Yellow))));

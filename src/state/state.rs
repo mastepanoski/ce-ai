@@ -27,6 +27,8 @@ pub struct State {
     pub model_assignments: BTreeMap<String, ModelAssignment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_update_check: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_release_tag: Option<String>,
 }
 
 fn default_version() -> u32 {
@@ -86,6 +88,7 @@ mod tests {
                 },
             )]),
             last_update_check: None,
+            latest_release_tag: None,
         }
     }
 
