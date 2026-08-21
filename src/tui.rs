@@ -952,6 +952,8 @@ fn run_uninstall_cmd(ctx: &Context, app: &App) -> Vec<String> {
     for harness in &target_harnesses {
         let args = uninstall::Args {
             harness: harness.clone(),
+            all: false,
+            yes: true,
         };
         match uninstall::run(ctx, &args) {
             Ok(_) => out.push(format!(

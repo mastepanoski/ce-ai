@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.0] - 2026-08-21
+
+### Added
+- **Workspace Configuration Overrides (`.ce-ai.json`)**: Added repository-local `.ce-ai.json` overrides with key-level precedence resolution over global `~/.config/ce-ai/state.json`.
+- **Complete Multi-Harness Uninstall Parity (Issue #64)**: Extended `ce-ai uninstall` with `--harness <name|all>`, `--all`, and `--yes` / `-y` flags for complete removal of managed loaders and skills across all installed harnesses cleanly.
+- **Teacher-Style Documentation**: Updated masterclass user guide with local cockpit settings vs master flight plan analogies.
+
+---
+
 ## [0.6.0] - 2026-08-21
 
 ### Added

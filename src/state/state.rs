@@ -65,6 +65,35 @@ impl State {
         };
         self.model_assignments.insert(slot.into(), assignment);
     }
+
+    /// Merges local workspace overrides on top of global state.
+    pub fn merge_overrides(&mut self, local_state: State) {
+        for (slot, assignment) in local_state.model_assignments {
+            self.model_assignments.insert(slot, assignment);
+        }
+        if local_state.last_update_check.is_some() {
+            self.last_update_check = local_state.last_update_check;
+        }
+        if local_state.latest_release_tag.is_some() {
+            self.latest_release_tag = local_state.latest_release_tag;
+        }
+    }
+
+    /// Loads global state and applies local `.ce-ai.json` overrides if present.
+    pub fn load_with_workspace_overrides(
+        global_path: &Path,
+        workspace_root: Option<&Path>,
+    ) -> Result<Self, CeError> {
+        let mut state = Self::load(global_path)?;
+        if let Some(ws_root) = workspace_root {
+            let local_config = ws_root.join(".ce-ai.json");
+            if local_config.exists() {
+                let local_state = Self::load(&local_config)?;
+                state.merge_overrides(local_state);
+            }
+        }
+        Ok(state)
+    }
 }
 
 #[cfg(test)]
@@ -127,5 +156,31 @@ mod tests {
         let loaded = State::load(&dir.path().join("absent.json")).unwrap();
         assert_eq!(loaded.version, 1);
         assert!(loaded.model_assignments.is_empty());
+    }
+
+    #[test]
+    fn workspace_overrides_precedence() {
+        let dir = tempdir().unwrap();
+        let global_path = dir.path().join("global_state.json");
+        let ws_dir = dir.path().join("workspace");
+        std::fs::create_dir_all(&ws_dir).unwrap();
+        let local_path = ws_dir.join(".ce-ai.json");
+
+        let mut global = State::new();
+        global.set_model_assignment("ce-brainstorm", "opencode-go", "kimi-k2.6");
+        global.set_model_assignment("ce-work", "anthropic", "claude-3-5-sonnet");
+        global.save(&global_path).unwrap();
+
+        let mut local = State::new();
+        local.set_model_assignment("ce-work", "openai", "gpt-4o");
+        local.save(&local_path).unwrap();
+
+        let loaded = State::load_with_workspace_overrides(&global_path, Some(&ws_dir)).unwrap();
+        assert_eq!(
+            loaded.model_assignments["ce-brainstorm"].provider_id,
+            "opencode-go"
+        );
+        assert_eq!(loaded.model_assignments["ce-work"].provider_id, "openai");
+        assert_eq!(loaded.model_assignments["ce-work"].model_id, "gpt-4o");
     }
 }

@@ -871,3 +871,19 @@ fn sync_watch_flag_parsing() {
         .success()
         .stdout(predicate::str::contains("monitoring managed paths"));
 }
+
+#[test]
+fn uninstall_harness_all_with_yes_flag_test() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "all", "--all", "--yes"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Uninstalled all target harnesses cleanly",
+        ));
+}

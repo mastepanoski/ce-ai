@@ -160,6 +160,9 @@ Think of an AI coding agent as a pilot flying a high-performance jet plane acros
 2. **Real-Time Sync Watcher (`ce-ai sync --watch`)**:
    - *The Automatic Autopilot Guardrail*: When multiple developers or harness tools edit local skills or configurations, files can drift out of sync. The `--watch` flag acts like an autopilot guardrail—continuously monitoring managed configuration paths in the background and re-syncing SHA256 integrity instantly upon detecting changes.
 
+3. **Workspace Configuration Overrides (`.ce-ai.json`)**:
+   - *Local Cockpit Presets vs Master Flight Plan*: Just like a pilot adjusting seat height or radio frequencies for a specific flight without changing standard airline defaults, `.ce-ai.json` allows team members to override model assignments (`ce-work`, `ce-plan`) locally per repository while preserving global developer preferences (`~/.config/ce-ai/state.json`).
+
 ---
 
 ## 📋 Masterclass Summary Checklist for Beginners
