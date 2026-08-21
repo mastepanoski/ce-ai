@@ -106,6 +106,7 @@ Before declaring any task or issue completed, an AI agent MUST satisfy all crite
 - [ ] All unit and CLI integration tests pass (`cargo test`).
 - [ ] Containerized Docker E2E gate passes (`make e2e` or `cargo test --test e2e`).
 - [ ] Cross-platform CI pipeline passes 100% green on GitHub Actions across Linux (`ubuntu-latest`), macOS (`macos-latest`), and Windows (`windows-latest`).
+- [ ] Pull Requests MUST pass 100% of CI status checks; any failing PR is automatically rejected with `REQUEST_CHANGES` and commented with failure guidance.
 
 ### 3. Compliance, Governance & Security
 - [ ] Aligns with **ISO/IEC 27001/27002** (SHA256 manifests, atomic writes, `cargo-audit` clean).

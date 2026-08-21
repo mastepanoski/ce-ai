@@ -74,3 +74,41 @@ jobs:
 
       - name: Run Docker E2E Test Suite
         run: make e2e
+
+  auto-reject-failed-pr:
+    name: Auto-Reject PR on CI Failure
+    needs: [check-and-test, security-audit, docker-e2e-gate]
+    if: always() && contains(needs.*.result, 'failure') && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Comment and Request Changes on Failed PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue_number = context.issue.number;
+            const message = `❌ **CI & Compliance Gate Failed — PR Auto-Rejected**\n\n` +
+              `This Pull Request failed mandatory CI verification steps (Build, Clippy Linter, Tests, Supply Chain Audit, or Docker E2E Gate).\n\n` +
+              `**Required Actions before re-submitting:**\n` +
+              `1. Fix all failing compilation, clippy, or unit test errors.\n` +
+              `2. Ensure zero security vulnerabilities (\`cargo audit\`).\n` +
+              `3. Pass local pre-commit hook (\`make hooks\` / \`./.githooks/pre-commit\`).\n\n` +
+              `Push updated commits to re-trigger CI validation.`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue_number,
+              body: message
+            }).catch(e => console.error(e));
+
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: issue_number,
+              event: 'REQUEST_CHANGES',
+              body: 'Automated CI Gate: Rejecting PR due to failed CI checks or security audit.'
+            }).catch(e => console.error(e));
+
