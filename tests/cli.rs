@@ -710,3 +710,38 @@ fn cli_without_subcommand_exits_usage_code_2() {
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
     ceai(&config_dir, &home).assert().failure().code(2);
 }
+
+#[test]
+fn backups_list_and_restore_subcommands() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let user_v1 = r#"{"plugin":["user-plugin-v1"]}"#;
+    user_config(&home, user_v1);
+    install(&config_dir, &home, &source);
+
+    // List backups
+    ceai(&config_dir, &home)
+        .args(["backups", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("BACKUP ID"))
+        .stdout(predicate::str::contains("opencode"));
+
+    // Mutate config
+    let user_v2 = r#"{"plugin":["user-plugin-v2"]}"#;
+    user_config(&home, user_v2);
+
+    // Restore latest backup
+    ceai(&config_dir, &home)
+        .args(["backups", "restore", "latest", "--harness", "opencode"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Successfully restored latest backup",
+        ));
+
+    // Verify restored content matches v1
+    let restored_content = fs::read_to_string(home.join(".config/opencode/opencode.json")).unwrap();
+    assert!(restored_content.contains("user-plugin-v1"));
+}
