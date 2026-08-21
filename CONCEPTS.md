@@ -21,3 +21,6 @@ An interactive, full-screen TUI panel (`ce-ai tui` ➔ `Workflow`) that visualiz
 
 ### Sync Watcher
 A real-time background watcher loop (`ce-ai sync --watch`) that monitors managed skill directories and automatically re-reconciles SHA256 integrity upon detecting file mutations.
+
+### Workspace Overrides (.ce-ai.json)
+A repository-local configuration file located in the working directory or Git root that overrides specific global settings (e.g. model assignments per slot) with higher precedence than `~/.config/ce-ai/state.json`.
