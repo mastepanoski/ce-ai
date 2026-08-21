@@ -74,6 +74,11 @@ src/
 6. **Standardized Exit Code Compliance**:
    - Errors MUST map to standard `CeError` exit codes: `0` (Success), `1` (Runtime), `2` (Usage), `3` (State), `4` (IO), `5` (Network), `6` (Verification).
 
+7. **Mandatory Pull Request Workflow (No Direct Push to `main`)**:
+   - Direct commits and pushes to `main` are strictly forbidden for feature development, refactoring, and bug fixes.
+   - Agents MUST create feature branches (`feature/<name>` or `fix/<name>`), push to origin, and open a Pull Request (`gh pr create`).
+   - PRs must wait for 100% green GitHub Actions CI status checks before merging.
+
 ---
 
 ## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement
