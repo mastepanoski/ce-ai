@@ -22,6 +22,9 @@ body:
         - AGY (Google Antigravity SDK)
         - Cursor (.cursorrules / Cursor IDE)
         - GitHub Copilot (.github/copilot-instructions.md)
+        - DeepSeek Harness (deepseek)
+        - fx.sh (fx)
+        - Custom / Unsupported Harness (Generic Fallback)
         - Other AI Agent Harness
     validations:
       required: true
