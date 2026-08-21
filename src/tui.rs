@@ -20,6 +20,7 @@ use ratatui::Terminal;
 
 use crate::commands::{doctor, install, sync, uninstall, upgrade, Context};
 use crate::error::CeError;
+use crate::harness::HarnessKind;
 use crate::opencode::manifest::InstallManifest;
 use crate::state::state::State;
 
@@ -80,6 +81,7 @@ struct App {
     selected_tab: usize,
     dry_run: bool,
     harnesses: Vec<(String, String, String)>, // (name, version, source)
+    detected_harnesses: Vec<HarnessKind>,
     model_assignments: Vec<(String, String)>, // (slot, model)
     output_modal: Option<(String, Vec<String>)>, // (title, lines)
 }
@@ -90,6 +92,7 @@ impl App {
             selected_tab: 0,
             dry_run: ctx.dry_run,
             harnesses: Vec::new(),
+            detected_harnesses: Vec::new(),
             model_assignments: Vec::new(),
             output_modal: None,
         };
@@ -99,7 +102,13 @@ impl App {
 
     fn reload_state(&mut self, ctx: &Context) {
         self.harnesses.clear();
+        self.detected_harnesses.clear();
         self.model_assignments.clear();
+
+        if let Ok(home) = std::env::var("HOME") {
+            self.detected_harnesses =
+                HarnessKind::detect_installed_harnesses(std::path::Path::new(&home));
+        }
 
         // Load harness status
         let state_path = ctx.config_dir.join("state.json");
@@ -202,9 +211,8 @@ fn run_app(
                                 execute_action(app, "Harness Status", || run_status_cmd(ctx));
                             }
                             MenuTab::Install => {
-                                execute_action(app, "Install Plugin", move || {
-                                    run_install_cmd(ctx, dry_run)
-                                });
+                                let lines = run_install_cmd(ctx, app, dry_run);
+                                execute_action(app, "Install Plugin", move || lines);
                             }
                             MenuTab::Models => {
                                 execute_action(app, "Model Assignments", || run_models_cmd(ctx));
@@ -221,7 +229,8 @@ fn run_app(
                                 execute_action(app, "Doctor Diagnostics", || run_doctor_cmd(ctx));
                             }
                             MenuTab::Uninstall => {
-                                execute_action(app, "Uninstall Plugin", || run_uninstall_cmd(ctx));
+                                let lines = run_uninstall_cmd(ctx, app);
+                                execute_action(app, "Uninstall Plugin", move || lines);
                             }
                             MenuTab::Exit => break,
                         }
@@ -267,15 +276,15 @@ fn ui(f: &mut ratatui::Frame, app: &App, ctx: &Context) {
             Style::default().fg(Color::LightCyan),
         )),
         Line::from(Span::styled(
-            "   ██        █████     Harness: OpenCode v1",
-            Style::default().fg(Color::LightCyan),
+            format!("   ██        █████     Harnesses: 12 Supported | {} Detected | {} Active", app.detected_harnesses.len(), app.harnesses.len()),
+            Style::default().fg(Color::LightCyan).add_modifier(Modifier::BOLD),
         )),
         Line::from(Span::styled(
-            "    ███                Config Path: ~/.config/opencode/opencode.json",
+            "    ███                Supported: opencode, claude, pi, cursor, copilot, codex, grok, kimi, agy, deepseek, fx, custom",
             Style::default().fg(Color::Gray),
         )),
         Line::from(Span::styled(
-            "      █████████████    Data Dir: ~/.ce-ai",
+            format!("      █████████████    Config Dir: {}", ctx.config_dir.display()),
             Style::default().fg(Color::Gray),
         )),
     ];
@@ -556,28 +565,31 @@ fn run_status_cmd(ctx: &Context) -> Vec<String> {
     out
 }
 
-fn run_install_cmd(ctx: &Context, dry_run: bool) -> Vec<String> {
+fn run_install_cmd(ctx: &Context, app: &App, dry_run: bool) -> Vec<String> {
     let mut install_ctx = ctx.clone();
     install_ctx.dry_run = dry_run;
-    let args = install::Args {
-        harness: "opencode".into(),
-        source: None,
+    let target_harnesses = if app.detected_harnesses.is_empty() {
+        vec![HarnessKind::Opencode]
+    } else {
+        app.detected_harnesses.clone()
     };
-    match install::run(&install_ctx, &args) {
-        Ok(_) => vec![
-            "✅ Installation completed successfully!".to_string(),
-            "Harness: opencode".to_string(),
-            format!(
-                "Mode: {}",
-                if dry_run {
-                    "Dry-run (Preview)"
-                } else {
-                    "Applied"
-                }
-            ),
-        ],
-        Err(err) => vec![format!("❌ Installation failed: {err}")],
+
+    let mut out = vec![
+        "✅ Multi-harness installation completed!".to_string(),
+        "".to_string(),
+    ];
+    for harness_kind in &target_harnesses {
+        let args = install::Args {
+            harness: harness_kind.to_string(),
+            source: None,
+        };
+        match install::run(&install_ctx, &args) {
+            Ok(_) => out.push(format!("  • {harness_kind}: OK")),
+            Err(err) => out.push(format!("  • {harness_kind}: {err}")),
+        }
     }
+    out.push("".to_string());
+    out
 }
 
 fn run_models_cmd(ctx: &Context) -> Vec<String> {
@@ -642,15 +654,27 @@ fn run_doctor_cmd(ctx: &Context) -> Vec<String> {
     }
 }
 
-fn run_uninstall_cmd(ctx: &Context) -> Vec<String> {
-    let args = uninstall::Args {
-        harness: "opencode".into(),
+fn run_uninstall_cmd(ctx: &Context, app: &App) -> Vec<String> {
+    let target_harnesses = if app.harnesses.is_empty() {
+        vec!["opencode".to_string()]
+    } else {
+        app.harnesses.iter().map(|(n, _, _)| n.clone()).collect()
     };
-    match uninstall::run(ctx, &args) {
-        Ok(_) => vec![
-            "✅ Uninstallation completed!".to_string(),
-            "Original OpenCode configuration restored from backup.".to_string(),
-        ],
-        Err(err) => vec![format!("❌ Uninstallation failed: {err}")],
+
+    let mut out = vec![
+        "✅ Multi-harness uninstallation completed!".to_string(),
+        "".to_string(),
+    ];
+    for harness in &target_harnesses {
+        let args = uninstall::Args {
+            harness: harness.clone(),
+        };
+        match uninstall::run(ctx, &args) {
+            Ok(_) => out.push(format!(
+                "  • {harness}: Uninstalled & pre-install config restored"
+            )),
+            Err(err) => out.push(format!("  • {harness}: {err}")),
+        }
     }
+    out
 }
