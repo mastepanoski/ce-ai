@@ -77,6 +77,8 @@ Preview changes without modifying disk:
 ce-ai install --all --dry-run
 ```
 
+> 📖 **Guía Detallada Paso a Paso**: Lee el documento **[Installation & Coexistence Guide](docs/user-guide/installation-and-coexistence-mechanisms.md)** para entender el mecanismo exacto de instalación, respaldos automáticos y convivencia segura con instalaciones oficiales (Claude Code, Cursor, OpenCode, etc.).
+
 ### 2. View Status & Check Health
 
 Check installed harness versions and status:
