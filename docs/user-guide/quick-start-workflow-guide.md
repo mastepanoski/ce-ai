@@ -135,6 +135,59 @@ flowchart TD
 
 ---
 
+## 🛠️ Advanced Workflow Patterns
+
+### 1. Interrupting & Resuming Work Across Sessions
+
+If you need to stop working and continue hours or days later:
+
+1. **Before Stopping (Save Progress)**:
+   ```bash
+   ce-ai workflow checkpoint --phase "Stage 4: Work/TDD" --task "4.2 Implementing Unit 2"
+   ```
+2. **When Resuming Later**:
+   ```bash
+   ce-ai workflow resume
+   ```
+3. **What Happens Behind the Scenes**:
+   - `ce-ai` reads `state.json` and queries Engram persistent memory (`mem_context` / `mem_search`) to restore your exact 7-stage phase, active task string, and OpenSpec checklist state—allowing you to pick up with 100% zero context loss.
+
+---
+
+### 2. Multi-Harness Collaboration (Harness Handoffs)
+
+You are not locked into a single AI harness! Because `ce-ai` stores state in shared, standardized disk files (`state.json`, `openspec/changes/`, `docs/solutions/`), different AI tools can handle different stages of the exact same task:
+
+```mermaid
+flowchart LR
+    CLAUDE[Claude Code: Stage 1 & 2 Ideation & OpenSpec] --> CURSOR[Cursor: Stage 4 TDD & Code Editing]
+    CURSOR --> AGY[Antigravity / OpenCode: Stage 5 & 6 Verification & ce-compound]
+```
+
+- **Example Workflow**:
+  - Use **Claude Code** for Stage 1 (`ce-brainstorm`) and Stage 2 (`OpenSpec`).
+  - Use **Cursor** or **Copilot** for Stage 4 (`ce-work` / TDD code editing).
+  - Use **Antigravity CLI (`agy`)** or **OpenCode** for Stage 5 (`Verify`), Stage 6 (`ce-compound`), and Stage 7 (`ce-commit-push-pr`).
+- **Handoff Mechanism**: In any harness, simply execute `ce-ai workflow status` or `ce-ai workflow resume`. The active harness reads the shared state on disk and seamlessly continues from the previous tool's checkpoint.
+
+---
+
+### 3. Working with Multiple Git Worktrees (`ce-worktree`)
+
+When working on multiple features or PRs concurrently, use isolated Git worktrees (`ce-worktree`):
+
+- **Worktree Placement Rule**: Place worktrees as siblings under your project parent directory (e.g. `../my-repo-worktrees/feature-auth/`).
+- **Workspace Scope Isolation**:
+  ```bash
+  ce-ai install --scope workspace
+  ```
+  Installing with `--scope workspace` inside a worktree places skills and configs (`./.opencode/`, `./.claude/`) strictly inside that worktree without polluting `main` or other parallel worktrees.
+- **CodeGraph & Engram Isolation**:
+  - *CodeGraph*: Each worktree maintains its own independent index. Run `gentle-ai codegraph init --cwd <worktree-root>` inside the new worktree.
+  - *Engram*: Memory observations are tagged with the worktree path so findings remain cleanly isolated per workspace.
+
+---
+
 ## 📋 Quick Reference Cheat Sheet
 
 | Task Goal | Entry Skill | Workflow Stages Used | Deliverable Output |

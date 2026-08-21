@@ -94,9 +94,12 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
   - *Diagnostic Interrupt Sub-Loop (`ce-debug` in Stage 4/5)*: Triggered on test failure or bug detection. Freezes task state, enters an iterative diagnosis loop (hypothesis ➔ log extraction ➔ minimal reproducer ➔ root cause fix), and once verified, transitions control back to `ce-work` or `Verify` while tagging `ce-compound` if a non-obvious learning was uncovered.
   - *Refactoring Sub-Loop (`ce-simplify-code` in Stage 4)*: Executes non-behavioral code tidying and simplification passes post-Green TDD implementation.
 - **Determinism over Probability**: Code generation with LLMs is inherently probabilistic. Without an FSM enforcing formal specifications (`OpenSpec`), plans (`Plan`), and test-driven verification (`TDD`), execution degrades into superficial patches.
-- **Checkpointing & Context Re-hydration**:
-  - *Problem*: During long-running multi-file tasks, an LLM's context window undergoes compaction (loss of earlier context).
-  - *Solution*: `ce-ai workflow checkpoint` atomically serializes the current FSM phase and active task to disk. Upon session restart or agent hand-off, `ce-ai workflow resume` reads the checkpoint and re-hydrates state without losing context or duplicating work.
+- **Checkpointing, Cross-Session Resumption & Multi-Harness Handoffs**:
+  - *Problem*: During long-running tasks or multi-harness workflows, an LLM's context window undergoes compaction or a developer switches editors (e.g. from Claude Code to Cursor or Antigravity).
+  - *Solution*: `ce-ai workflow checkpoint` atomically serializes the FSM phase and active subtask to disk. Any harness running `ce-ai workflow resume` reads the shared disk state (`state.json` + Engram memory) and seamlessly continues work with 100% zero context loss.
+- **Git Worktree Scope Isolation (`ce-worktree`)**:
+  - *Problem*: Concurrent feature development across multiple Git worktrees can pollute shared configs or CodeGraph indices.
+  - *Solution*: `ce-ai install --scope workspace` inside a worktree isolates managed skills (`./.opencode/`, `./.claude/`) to that worktree's path, while independent `.codegraph/` indices prevent call-graph corruption across worktrees.
 
 ---
 
