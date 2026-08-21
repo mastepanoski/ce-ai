@@ -15,7 +15,10 @@ const SOURCE_LOADER_PATH: &str = ".opencode/plugins/compound-engineering.js";
 
 /// Absolute path of the installed loader — the `plugin[]` entry value (D2).
 pub fn plugin_entry(config_dir: &Path) -> PathBuf {
-    config_dir.join(MANAGED_DIR).join(LOADER_REL_PATH)
+    config_dir
+        .join(MANAGED_DIR)
+        .join("plugins")
+        .join("compound-engineering.js")
 }
 
 /// Absolute skills directory registered in `skills.paths` (OI-4).

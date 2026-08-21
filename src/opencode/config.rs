@@ -156,14 +156,17 @@ mod tests {
 
     fn loader_entry(config_dir: &Path) -> String {
         config_dir
-            .join("compound-engineering/plugins/compound-engineering.js")
+            .join("compound-engineering")
+            .join("plugins")
+            .join("compound-engineering.js")
             .to_string_lossy()
             .into_owned()
     }
 
     fn skills_path(config_dir: &Path) -> String {
         config_dir
-            .join("compound-engineering/skills")
+            .join("compound-engineering")
+            .join("skills")
             .to_string_lossy()
             .into_owned()
     }
