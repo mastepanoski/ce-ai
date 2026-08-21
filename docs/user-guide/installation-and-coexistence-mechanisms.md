@@ -1,98 +1,98 @@
-# Guía Explicativa Paso a Paso: Mecanismo de Instalación y Convivencia con Arneses Oficiales
+# Step-by-Step Guide: Installation Pipeline and Coexistence with Official Harnesses
 
-Esta guía detalla paso a paso cómo `ce-ai` instala el **Compound Engineering Plugin** y cómo convive de forma segura con las configuraciones e instalaciones oficiales de herramientas como **Claude Code**, **OpenCode**, **Cursor**, **GitHub Copilot**, entre otras.
+This guide explains step-by-step how `ce-ai` installs the **Compound Engineering Plugin** and how it coexists safely with official configurations and setups of tools like **Claude Code**, **OpenCode**, **Cursor**, **GitHub Copilot**, and others.
 
 ---
 
-## 1. Mecanismo de Instalación Paso a Paso (`ce-ai install`)
+## 1. Step-by-Step Installation Pipeline (`ce-ai install`)
 
-Cuando ejecutas `ce-ai install --harness claude` (o con `--all`), `ce-ai` ejecuta un flujo estricto garantizando **cero pérdida de datos**.
+When executing `ce-ai install --harness claude` (or `--all`), `ce-ai` executes a strict 6-step pipeline ensuring **zero data loss**.
 
 ```mermaid
 flowchart TD
-    A[Inicio: ce-ai install] --> B[Paso 1: Resolución de la Fuente de Datos]
-    B --> C[Paso 2: Respaldo Preventivo en ~/.ce-ai/backups/]
-    C --> D[Paso 3: Copia de Activos Gestionados en Disco]
-    D --> E[Paso 4: Fusión No Destructiva de la Configuración del Arnés]
-    E --> F[Paso 5: Registro del Manifiesto de Instalación]
-    F --> G[Paso 6: Actualización del Estado Global state.json]
+    A[Start: ce-ai install] --> B[Step 1: Resolve Source Tree]
+    B --> C[Step 2: Automatic Pre-Mutation Backup in ~/.ce-ai/backups/]
+    C --> D[Step 3: Atomic Disk Asset Copy]
+    D --> E[Step 4: Non-Destructive Harness Config Merger]
+    E --> F[Step 5: Record Install Manifest]
+    F --> G[Step 6: Update Global State state.json]
 ```
 
-### 📋 Detalle de cada Paso
+### 📋 Detailed Step Breakdown
 
-#### Paso 1: Resolución de la Fuente de Datos
-- `ce-ai` determina el origen del plugin:
-  - **Por defecto**: Descarga o utiliza del caché local la última Release oficial de GitHub (`everyinc/compound-engineering-plugin`).
-  - **Con `--source <path>`**: Utiliza un directorio local de desarrollo.
-- Extrae y valida la estructura garantizando la presencia del cargador (`plugins/compound-engineering.js`) y las habilidades (`skills/`).
+#### Step 1: Resolve Source Tree
+- `ce-ai` determines the plugin source:
+  - **Default**: Resolves and caches the latest official release tarball from GitHub (`everyinc/compound-engineering-plugin`).
+  - **With `--source <path>`**: Uses a local development directory.
+- Extracts and validates the source layout, verifying the presence of the loader (`plugins/compound-engineering.js`) and skills (`skills/`).
 
-#### Paso 2: Respaldo Preventivo Automático (`~/.ce-ai/backups/`)
-- Antes de modificar cualquier archivo en tu computadora, `ce-ai` comprueba si el archivo de configuración del arnés (ejemplo: `.claude.json` o `opencode.json`) ya existe.
-- Si existe, genera una copia de respaldo inmutable e identificada con fecha y hora en `~/.ce-ai/backups/<timestamp>/`.
-- Esto garantiza que con `ce-ai uninstall` o una restauración puedas volver al estado exacto previo a la instalación.
+#### Step 2: Automatic Pre-Mutation Backup (`~/.ce-ai/backups/`)
+- Before writing any files or modifying configuration on disk, `ce-ai` checks if pre-existing harness configuration files (e.g., `.claude.json` or `opencode.json`) exist.
+- If present, it creates an immutable, timestamped backup copy inside `~/.ce-ai/backups/<timestamp>/`.
+- This guarantees that running `ce-ai uninstall` or restoring a backup reverts your system to its exact pre-installation state.
 
-#### Paso 3: Copia de Activos Gestionados en Disco
-- Copia las habilidades (`skills/`) y los loaders en el directorio gestionado del usuario (`~/.config/opencode/compound-engineering/` o carpetas específicas del arnés).
-- Escribe mediante escrituras atómicas (`write_atomic`) para prevenir archivos incompletos en caso de caídas.
+#### Step 3: Atomic Disk Asset Copy
+- Copies skills (`skills/`) and loader scripts into the user's managed directory (`~/.config/opencode/compound-engineering/` or harness-specific directories).
+- Writes files using atomic file writers (`write_atomic`) to prevent partial or corrupted file writes on process crash.
 
-#### Paso 4: Fusión No Destructiva de Configuración
-- Modifica el archivo de configuración del arnés de IA aplicando estrategias adapativas según el tipo de arnés (ver Sección 2).
+#### Step 4: Non-Destructive Config Merger
+- Updates target harness configuration files using non-destructive config merger strategies tailored per harness type (see Section 2).
 
-#### Paso 5: Registro del Manifiesto de Instalación (`install-manifest.json`)
-- Escribe `install-manifest.json` en el directorio gestionado registrando:
-  - Versión instalada y origen.
-  - Hashes SHA256 individuales de cada archivo instalado.
-  - Enlace al archivo de respaldo creado en el Paso 2.
+#### Step 5: Record Install Manifest (`install-manifest.json`)
+- Writes `install-manifest.json` in the managed directory recording:
+  - Installed plugin version and source.
+  - Per-file SHA256 hashes.
+  - Audit trail linking to the exact pre-install backup path created in Step 2.
 
-#### Paso 6: Actualización del Estado Global (`state.json`)
-- Registra el arnés en `~/.ce-ai/state.json` bajo `installed_harnesses` con la fecha y hora de instalación y sincronización.
+#### Step 6: Update Global State (`state.json`)
+- Registers the installed harness in `~/.ce-ai/state.json` under `installed_harnesses` with installation and sync timestamps.
 
 ---
 
-## 2. Convivencia con Instalaciones Oficiales (Claude Code, Cursor, OpenCode, etc.)
+## 2. Coexistence with Official Harness Setups (Claude Code, Cursor, OpenCode, etc.)
 
-`ce-ai` está diseñado bajo el principio de **Preservación Total de Configuraciones de Usuario** (Cumplimiento ISO/IEC 27001). NUNCA sobrescribe, borra o reemplaza configuraciones nativas del usuario o de la aplicación oficial.
+`ce-ai` adheres to the **Total User Configuration Preservation Principle** (ISO/IEC 27001 compliance). It NEVER deletes, overwrites, or clobbers user settings or native official application configurations.
 
-### 🤖 1. Convivencia en Claude Code (`.claude.json` / `~/.claude/`)
-- **Estrategia**: Fusión JSON segura (`ensure_plugin_and_skills`).
-- **Cómo convive**:
-  - Lee el archivo `.claude.json` existente.
-  - Si el usuario tiene configurados servidores MCP (Model Context Protocol), claves de API, preferencias de interfaz o plugins de terceros oficiales de Anthropic / Claude Code, `ce-ai` los **mantiene intactos**.
-  - Inserta o actualiza únicamente la entrada `"compound-engineering"` dentro de la matriz de plugins y la ruta de habilidades en `"skills"`.
-  - Si la entrada ya existía, la actualiza sin duplicarla.
+### 🤖 1. Coexistence in Claude Code (`.claude.json` / `~/.claude/`)
+- **Strategy**: Safe JSON Config Merger (`ensure_plugin_and_skills`).
+- **Coexistence Behavior**:
+  - Parses the existing `.claude.json` file.
+  - If the user has configured **MCP (Model Context Protocol) servers**, API keys, UI preferences, or official Anthropic / third-party plugins, `ce-ai` **preserves them completely intact**.
+  - Merges or updates only the `"compound-engineering"` entry inside the plugin array and skill paths in `"skills"`.
+  - Avoids duplicate entries if the plugin was previously registered.
 
-### 💻 2. Convivencia en OpenCode (`~/.config/opencode/opencode.json`)
-- **Estrategia**: Fusión de Arrays JSON (`plugin` & `skills`).
-- **Cómo convive**:
-  - Lee `opencode.json`.
-  - Agrega la entrada de `compound-engineering` respetando cualquier otro plugin instalado por el usuario.
+### 💻 2. Coexistence in OpenCode (`~/.config/opencode/opencode.json`)
+- **Strategy**: JSON Array Merger (`plugin` & `skills`).
+- **Coexistence Behavior**:
+  - Parses `opencode.json`.
+  - Merges the `compound-engineering` plugin entry and skills paths while keeping all existing user-defined plugins and skills untouched.
 
-### 🖱️ 3. Convivencia en Cursor (`.cursorrules` / `.cursor/rules/`)
-- **Estrategia**: Inyección de Bloques Markdown Delimitados.
-- **Cómo convive**:
-  - Si el usuario ya tiene reglas personalizadas en su archivo `.cursorrules`, `ce-ai` **NO borra el archivo**.
-  - Inyecta o actualiza las reglas de Compound Engineering dentro de marcadores especiales:
+### 🖱️ 3. Coexistence in Cursor (`.cursorrules` / `.cursor/rules/`)
+- **Strategy**: Markdown Delimited Block Injection.
+- **Coexistence Behavior**:
+  - If `.cursorrules` already exists with custom user rules, `ce-ai` **does NOT delete or overwrite the file**.
+  - Injects or updates Compound Engineering directives inside comment-delimited blocks:
     ```markdown
     <!-- CE-AI MANAGED BLOCK START -->
-    ... (Reglas gestionadas por ce-ai) ...
+    ... (CE-AI managed rules) ...
     <!-- CE-AI MANAGED BLOCK END -->
     ```
-  - Las reglas previas o posteriores escritas por el usuario permanecen 100% intactas fuera del bloque.
+  - Any custom rules placed above or below the managed block remain 100% untouched.
 
-### 🐙 4. Convivencia en GitHub Copilot (`.github/copilot-instructions.md`)
-- **Estrategia**: Inyección de Bloques Markdown Delimitados.
-- **Cómo convive**:
-  - Conserva todas las instrucciones previas del repositorio u organización, insertando o actualizando las directivas de Compound Engineering dentro del bloque delimitado por comentarios HTML.
+### 🐙 4. Coexistence in GitHub Copilot (`.github/copilot-instructions.md`)
+- **Strategy**: Markdown Delimited Block Injection.
+- **Coexistence Behavior**:
+  - Preserves all pre-existing repository instructions and injects/updates Compound Engineering directives within HTML comment delimiters.
 
-### 🔮 5. Convivencia en Pi, Kimi, Antigravity (AGY), Codex, Grok, DeepSeek, FX
-- **Estrategia**: Fusión JSON Genérica Adaptativa.
-- **Cómo convive**:
-  - Respeta la estructura de clave-valor nativa de cada herramienta en sus respectivas carpetas (`~/.pi/config.json`, `~/.gemini/antigravity-cli/`, `~/.kimi/`, etc.).
+### 🔮 5. Coexistence in Pi, Kimi, Antigravity (AGY), Codex, Grok, DeepSeek, FX
+- **Strategy**: Generic Adaptive JSON Merger.
+- **Coexistence Behavior**:
+  - Preserves existing key-value structures in each harness's respective configuration files (`~/.pi/config.json`, `~/.gemini/antigravity-cli/`, `~/.kimi/`, etc.).
 
 ---
 
-## 🛡️ Resumen de Garantías de Seguridad
+## 🛡️ Summary of Safety Guarantees
 
-1. **Cero Sobrescribimiento Destructivo**: Ningún plugin oficial de la aplicación o del usuario es eliminado.
-2. **Desinstalación Limpia (`ce-ai uninstall`)**: Al desinstalar, `ce-ai` remueve únicamente sus entradas o restaura el respaldo original creado en el Paso 2.
-3. **Auditabilidad**: Cada cambio queda registrado en `install-manifest.json` con su respectivo hash SHA256.
+1. **Zero Destructive Overwrites**: No official application plugin or custom user configuration is ever deleted.
+2. **Clean Uninstallation (`ce-ai uninstall`)**: Uninstallation removes only `ce-ai` managed assets or restores the original pre-install backup created in Step 2.
+3. **Auditability**: Every change is tracked in `install-manifest.json` with per-file SHA256 hashes.
