@@ -7,7 +7,7 @@ build:
 	cargo build --release
 
 e2e:
-	cargo test --test e2e -- --nocapture
+	cargo test --test e2e -- --ignored --nocapture
 
 lint:
 	cargo fmt --check

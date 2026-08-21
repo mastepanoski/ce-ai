@@ -68,8 +68,11 @@ src/
      make e2e
      ```
 
-6. **Mandatory OpenSpec Before Code Changes**:
+5. **Mandatory OpenSpec Before Code Changes**:
    - NO code changes or feature implementations shall be made without creating or updating a formal spec under `openspec/changes/<feature_name>/` containing `proposal.md`, `exploration.md`, `design.md`, `spec.md`, and `tasks.md`.
+
+6. **Standardized Exit Code Compliance**:
+   - Errors MUST map to standard `CeError` exit codes: `0` (Success), `1` (Runtime), `2` (Usage), `3` (State), `4` (IO), `5` (Network), `6` (Verification).
 
 ---
 
@@ -122,12 +125,16 @@ Before declaring any task or issue completed, an AI agent MUST satisfy all crite
   - *Justification*: Cryptographic SHA256 indexing detects asset tampering or file drift, while `cargo-audit` guarantees zero known CVE supply-chain vulnerabilities in third-party crates.
 - [ ] **ISO/IEC 42001 & NIST AI RMF 1.0 Compliance**:
   - *Justification*: Scoping model assignments per agent role (`ce-brainstorm`, `ce-plan`, `ce-work`) ensures capability/cost matching while maintaining transparent state logging.
+- [ ] **Local Security Pre-Commit Hook (`make hooks` / `.githooks/pre-commit`)**:
+  - *Justification*: Scans staged files for secret key leaks, blocks transient metadata (`.atl/`, `.pi/`), and runs formatting/linter/tests before git commit.
 - [ ] **Zero Secrets, Tokens, or Transient File Exposure**:
   - *Justification*: Prevents catastrophic credential leaks (API keys, SSH keys, bearer tokens) and prevents committing local transient metadata (`.atl/`, `.pi/`, `.codegraph/`).
 
 ### 4. Documentation & Git Delivery
+- [ ] **SemVer Versioning & `CHANGELOG.md` Maintenance**:
+  - *Justification*: Follows Semantic Versioning (`MAJOR.MINOR.PATCH` in `Cargo.toml`). Any breaking API/CLI change bump `MAJOR`, new feature bump `MINOR`, bug fix bump `PATCH`. All notable changes MUST be documented in `CHANGELOG.md` following the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) standard.
 - [ ] **Updated User Documentation**:
-  - *Justification*: Outdated docs create user confusion, improper CLI usage, and support overhead. Any schema, command, or flag change requires updating `README.md`, `SECURITY.md`, or CLI `--help` strings.
+  - *Justification*: Outdated docs create user confusion, improper CLI usage, and support overhead. Any schema, command, or flag change requires updating `README.md`, `SECURITY.md`, `CHANGELOG.md`, or CLI `--help` strings.
 - [ ] **Conventional Commits & Clean Git History**:
   - *Justification*: Clear commit messages provide auditability, enable automated changelog generation, and allow easy regression bisecting.
 

@@ -4,6 +4,7 @@
 use std::process::Command;
 
 #[test]
+#[ignore = "expensive containerized E2E test; execute via make e2e or cargo test --test e2e -- --ignored"]
 fn test_docker_e2e_gate() {
     // DG-3: Probe Docker availability. If unavailable or running on Windows, exit 0 with skip message.
     if cfg!(windows) {
