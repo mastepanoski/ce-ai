@@ -68,14 +68,28 @@ src/
      make e2e
      ```
 
-5. **Strict Exit Codes**:
-   - Exit codes MUST conform to `CeError` specification:
-     - `0`: Success
-     - `2`: Usage / CLI argument error
-     - `3`: State / manifest error
-     - `4`: I/O or filesystem error
-     - `5`: Network / HTTP error
-     - `6`: Integrity / Verification error
+6. **Mandatory OpenSpec Before Code Changes**:
+   - NO code changes or feature implementations shall be made without creating or updating a formal spec under `openspec/changes/<feature_name>/` containing `proposal.md`, `exploration.md`, `design.md`, `spec.md`, and `tasks.md`.
+
+---
+
+## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement
+
+Regardless of whether Compound Engineering, Spec-Driven Development, or pair programming workflows are used, all AI agents MUST strictly follow the 7-stage development cycle:
+
+```
+[Stage 1: Ideation (ce-brainstorm)] ➔ [Stage 2: OpenSpec Definition (MANDATORY)] ➔ [Stage 3: Execution Plan (ce-plan)]
+   ➔ [Stage 4: TDD & Implementation (ce-work)] ➔ [Stage 5: Verification (cargo test / make e2e)]
+   ➔ [Stage 6: Knowledge Capture (ce-compound)] ➔ [Stage 7: Git Shipping (ce-commit-push-pr)]
+```
+
+### Stage 2 OpenSpec Enforcement Requirements
+Before creating any PR or writing feature code, agents MUST verify that `openspec/changes/<feature_name>/` contains:
+- `proposal.md`: Problem statement, in-scope/out-of-scope boundaries, risk evaluation, and success criteria.
+- `exploration.md`: Technical investigation, evaluated options, and architectural tradeoffs.
+- `design.md`: Technical design, system architecture, structs, data schemas, and API/CLI contracts.
+- `spec.md`: Formal requirements using `WHEN ... THEN ...` format and explicit acceptance criteria.
+- `tasks.md`: Atomic, executable task checklist with TDD (Red-Green-Refactor) verification steps.
 
 ## ✅ Definition of Done (DoD) for AI Agents
 
