@@ -1,20 +1,26 @@
-# `ce-ai` — Compound Engineering Plugin Manager CLI
+# `ce-ai` — Compound Engineering CLI Orchestrator & Workflow FSM Engine
 
-`ce-ai` is a fast, safe Rust CLI for installing, syncing, upgrading, and managing model assignments for the **[Compound Engineering Plugin](https://github.com/Every-One-AI/compound-engineering)** across 12 AI agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `deepseek`, `fx`, and `custom`).
+`ce-ai` is a fast, safe Rust CLI for orchestrating the **[Compound Engineering Plugin](https://github.com/Every-One-AI/compound-engineering)** across 12 AI agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `deepseek`, `fx`, and `custom`).
+
+Inspired by the **`gentle-ai`** ecosystem, `ce-ai` governs the **7-stage Compound Engineering Flywheel** via a deterministic Finite State Machine (FSM) engine, providing workspace scope isolation, companion tools management (Engram, CodeGraph, Context7, RTK), atomic POSIX disk writes, and zero-context-loss progress checkpointing.
 
 > [!NOTE]
-> `ce-ai` manages distributions of the open-source **[Compound Engineering Plugin](https://github.com/Every-One-AI/compound-engineering)** — a suite of specialized skills, roles, and workflows for AI coding assistants.
+> `ce-ai` orchestrates distributions of the open-source **[Compound Engineering Plugin](https://github.com/Every-One-AI/compound-engineering)** — a suite of specialized skills, roles, and workflow guidelines for AI coding assistants.
 
 ## Features
 
 - **Multi-Harness Native Support**: Supports 12 AI coding harnesses with native config mergers (`opencode`, `claude`, `pi`), Markdown block delimiters (`cursor`, `copilot`), and generic JSON structures (`codex`, `grok`, `kimi`, `agy`, `deepseek`, `fx`, `custom`).
 - **Auto-Detection (`--all`)**: Auto-detects installed harnesses on the host system and installs/syncs across all active environments with a single command.
-- **Multi-Harness Model Sync**: Assign models per agent slot (`ce-brainstorm`, `ce-plan`, etc.) and automatically sync assignments across all installed harness configurations simultaneously.
+- **Workspace & Global Scope Isolation (`--scope workspace|global`)**: Install skills and configurations isolated strictly to a local Git repository root (`.opencode/`, `.claude/`, `state.json`) or globally across user profiles.
+- **Workflow FSM Engine & Checkpoint Recovery (`ce-ai workflow`)**: Governs the 7-stage development cycle (Ideation ➔ OpenSpec ➔ Plan ➔ Work/TDD ➔ Verify ➔ Compound ➔ Ship) with atomic disk savegames (`checkpoint`) and cross-session state re-hydration (`resume`).
+- **Companion Tools Manager (`ce-ai tools`)**: Inspect and install essential sidecars and companion tools (**MCP Servers**: Engram persistent memory, CodeGraph blast-radius, Context7 docs; **CLI Token Reducers**: RTK output filter).
+- **Multi-Harness Model Sync**: Assign models per agent slot (`ce-brainstorm`, `ce-plan`, `ce-work`) and automatically sync assignments across all installed harness configurations simultaneously.
+- **Methodology Flexibility**: Full support for Test-Driven Development (TDD), Code-First + Post-Verification, Behavior-Driven Development (BDD), and R&D Spikes (`ce-ideate`).
 - **Safe Extraction & Caching**: Validates tarball structures against path traversal attacks (zip-slip prevention) and maintains SHA256-verified release caches.
-- **Model Assignments & Profiles**: Take append-only snapshot profiles and restore role assignments cleanly.
-- **Diff & Reconcile (Sync)**: Inspect drift, preview planned updates with `--dry-run`, and repair modified or deleted managed assets.
+- **Model Assignments & Profiles**: Take append-only snapshot profiles (`ce-ai models profile save/load`) and restore role assignments cleanly.
+- **Diff & Reconcile (Sync)**: Inspect drift via SHA256 manifest indexing, preview planned updates with `--dry-run`, and repair modified or deleted managed assets.
 - **Automatic Backups & Clean Uninstallation**: Pre-mutation configuration is backed up automatically (`~/.ce-ai/backups/`) and `ce-ai uninstall` restores original pre-install configurations cleanly.
-- **Health Doctor**: Diagnose configuration errors, drift, and state inconsistency.
+- **Health Doctor**: Diagnose configuration errors, hash drift, and state inconsistency (`ce-ai doctor`).
 
 ## Supported Harness Matrix
 
