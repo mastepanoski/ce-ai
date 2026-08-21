@@ -745,3 +745,34 @@ fn backups_list_and_restore_subcommands() {
     let restored_content = fs::read_to_string(home.join(".config/opencode/opencode.json")).unwrap();
     assert!(restored_content.contains("user-plugin-v1"));
 }
+
+#[test]
+fn backups_restore_by_explicit_id() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let user_v1 = r#"{"plugin":["user-plugin-v1"]}"#;
+    user_config(&home, user_v1);
+    install(&config_dir, &home, &source);
+
+    let backup_dirs: Vec<_> = fs::read_dir(config_dir.join("backups"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    assert_eq!(backup_dirs.len(), 1);
+    let backup_id = &backup_dirs[0];
+
+    // Mutate config
+    let user_v2 = r#"{"plugin":["user-plugin-v2"]}"#;
+    user_config(&home, user_v2);
+
+    // Restore by explicit snapshot ID
+    ceai(&config_dir, &home)
+        .args(["backups", "restore", backup_id, "-t", "opencode"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Successfully restored backup"));
+
+    let restored_content = fs::read_to_string(home.join(".config/opencode/opencode.json")).unwrap();
+    assert!(restored_content.contains("user-plugin-v1"));
+}

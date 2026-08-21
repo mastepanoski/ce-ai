@@ -214,7 +214,7 @@ pub fn restore_backup_by_id(root: &Path, id: &str, target: &Path) -> Result<Back
 
     // Pre-restore safety backup of live target config if present
     if target.exists() {
-        let _ = backup_file(root, target);
+        backup_file(root, target)?;
     }
 
     write_atomic(target, &content)?;
