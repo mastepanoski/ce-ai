@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# .githooks/pre-commit — Security & Quality Pre-Commit Gate for ce-ai
+# Aligned with ISO/IEC 27001/27002, ISO 42001, NIST AI RMF, and AGENTS.md DoD.
+
+set -e
+
+BOLD="\031[1m"
+RED="\033[31m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+RESET="\033[0m"
+
+echo -e "${BOLD}== [Pre-Commit Gate] Validating security, code quality, and test suite ==${RESET}"
+
+# -----------------------------------------------------------------------------
+# 1. Secret & Credential Leak Scanning (ISO 27002 Control 8.9)
+# -----------------------------------------------------------------------------
+echo "--> Step 1/4: Scanning staged files for secrets and credentials..."
+
+# Patterns matching API keys, tokens, and private keys
+SECRET_PATTERNS='(BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY)|(ghp_[A-Za-z0-9]{36})|(gho_[A-Za-z0-9]{36})|(github_pat_[A-Za-z0-9]{22}_[A-Za-z0-9]{59})|(sk-[A-Za-z0-9]{32,})|(sk-ant-[A-Za-z0-9_-]{32,})|(AKIA[0-9A-Z]{16})'
+
+STAGED_SECRETS=$(git diff --cached --name-only | xargs -r git diff --cached -- | grep -E -i "$SECRET_PATTERNS" || true)
+
+if [ -n "$STAGED_SECRETS" ]; then
+    echo -e "${RED}[SECURITY ERROR] Potential credential or secret leak detected in staged changes!${RESET}"
+    echo "$STAGED_SECRETS"
+    echo -e "${RED}Aborting commit. Strip all credentials, API keys, and private tokens before committing.${RESET}"
+    exit 1
+fi
+
+# Check for staged forbidden directories or files (.atl, .pi, .env)
+FORBIDDEN_FILES=$(git diff --cached --name-only | grep -E '^(\.atl/|\.pi/|\.env|\.env\.local)' || true)
+if [ -n "$FORBIDDEN_FILES" ]; then
+    echo -e "${RED}[SECURITY ERROR] Forbidden transient/credential file(s) staged for commit:${RESET}"
+    echo "$FORBIDDEN_FILES"
+    echo -e "${RED}Aborting commit. Remove these files from staging and git history.${RESET}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Secret scan passed cleanly. Zero credentials exposed.${RESET}"
+
+# -----------------------------------------------------------------------------
+# 2. Code Quality & Code Review Check (AGENTS.md DoD)
+# -----------------------------------------------------------------------------
+echo "--> Step 2/4: Verifying code review standards & checking for suppressed tests..."
+
+COMMENTED_TESTS=$(git diff --cached --name-only | grep '\.rs$' | xargs -r git diff --cached -- | grep -E '^\+\s*//\s*#\[test\]' || true)
+if [ -n "$COMMENTED_TESTS" ]; then
+    echo -e "${YELLOW}[WARNING] Commented-out test detected in staged diff:${RESET}"
+    echo "$COMMENTED_TESTS"
+    echo -e "${RED}[DoD ERROR] Superficial symptom patches (commented-out tests) are strictly forbidden by AGENTS.md.${RESET}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Code review checks passed.${RESET}"
+
+# -----------------------------------------------------------------------------
+# 3. Formatting & Linting (cargo fmt & cargo clippy)
+# -----------------------------------------------------------------------------
+echo "--> Step 3/4: Running cargo fmt and cargo clippy..."
+
+if ! cargo fmt --check; then
+    echo -e "${RED}[FAIL] cargo fmt --check failed. Run 'cargo fmt' to fix formatting before committing.${RESET}"
+    exit 1
+fi
+
+if ! cargo clippy --all-targets --all-features -- -D warnings; then
+    echo -e "${RED}[FAIL] cargo clippy found linter warnings. Fix all clippy warnings before committing.${RESET}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Formatting and Clippy checks passed cleanly (0 warnings).${RESET}"
+
+# -----------------------------------------------------------------------------
+# 4. Test Suite Execution (cargo test)
+# -----------------------------------------------------------------------------
+echo "--> Step 4/4: Executing test suite (cargo test)..."
+
+if ! cargo test; then
+    echo -e "${RED}[FAIL] cargo test failed. Fix failing tests before committing.${RESET}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ All unit and CLI integration tests passed cleanly!${RESET}"
+echo -e "${BOLD}${GREEN}== [Pre-Commit Gate PASSED] Ready to commit securely! ==${RESET}"

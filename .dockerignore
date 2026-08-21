@@ -1,0 +1,6 @@
+target/
+.git/
+.ce-ai/
+.codegraph/
+.atl/
+.pi/

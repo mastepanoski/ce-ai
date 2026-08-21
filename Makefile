@@ -1,4 +1,4 @@
-.PHONY: e2e test build clean
+.PHONY: e2e test build clean hooks lint
 
 test:
 	cargo test
@@ -8,6 +8,14 @@ build:
 
 e2e:
 	cargo test --test e2e -- --nocapture
+
+lint:
+	cargo fmt --check
+	cargo clippy --all-targets --all-features -- -D warnings
+
+hooks:
+	chmod +x .githooks/pre-commit
+	git config core.hooksPath .githooks
 
 clean:
 	cargo clean
