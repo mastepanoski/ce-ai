@@ -547,18 +547,37 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
         MenuTab::Sync => vec![
             Line::from(Span::styled("Reconcile Drift (Sync):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
             Line::from(""),
-            Line::from("  - Compares managed files against the installed SHA256 manifest."),
-            Line::from("  - Restores tampered or missing plugin files across active harnesses."),
+            Line::from(vec![
+                Span::styled("  Target Harness: ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    format!("< [ {} ] >", app.selected_harness_target()),
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("  (Press ◄/► or h/l to switch)", Style::default().fg(Color::Gray)),
+            ]),
             Line::from(""),
-            Line::from(Span::styled("👉 Press [Enter] to execute sync.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
+            Line::from("  💡 ¿Qué hace Sync?"),
+            Line::from("     - Reconcilia archivos contra el manifiesto SHA256 actual (repara archivos borrados/dañados)."),
+            Line::from("     - NO descarga versiones nuevas de internet; mantiene la versión instalada."),
+            Line::from(""),
+            Line::from(Span::styled("👉 Press [Enter] to execute local sync.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
         ],
         MenuTab::Upgrade => vec![
-            Line::from(Span::styled("Upgrade CE Plugin Release:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("Upgrade CE Release (Descargar Nueva Versión):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  Target Harness: ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    format!("< [ {} ] >", app.selected_harness_target()),
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("  (Press ◄/► or h/l to switch)", Style::default().fg(Color::Gray)),
+            ]),
             Line::from(""),
             Line::from(format!("  - Current CLI Version: v{}", env!("CARGO_PKG_VERSION"))),
-            Line::from("  - Target Repository: everyinc/compound-engineering-plugin"),
-            Line::from("  - Fetches the latest release tag and updates local release cache."),
-            Line::from("  - Runs automatic sync to update local skills and loaders across active harnesses."),
+            Line::from("  💡 ¿Qué hace Upgrade?"),
+            Line::from("     - Busca y descarga la última Release publicada en GitHub."),
+            Line::from("     - Actualiza loaders y 200+ skills en todos los arneses seleccionados."),
             Line::from(""),
             Line::from(Span::styled("👉 Press [Enter] to fetch latest release and upgrade.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
         ],
@@ -832,7 +851,7 @@ fn run_upgrade_cmd(ctx: &Context, app: &App) -> Vec<String> {
         to: None,
         source: None,
         harness: target.clone(),
-        force: false,
+        force: true,
     };
     match upgrade::run(ctx, &args) {
         Ok(_) => vec![
