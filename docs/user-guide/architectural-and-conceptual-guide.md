@@ -103,6 +103,9 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
 - **Spec-Driven Development (SDD / `gentle-ai`) Compatibility & Upgrade**:
   - *Problem*: Projects migrating from Spec-Driven Development (SDD) or OpenSpec fear losing existing specs (`proposal.md`, `spec.md`, `tasks.md`).
   - *Solution*: Stage 2 of `ce-ai` natively consumes OpenSpec format without breaking changes. Compound Engineering upgrades SDD by appending **Stage 6 (`ce-compound`)**, turning linear spec execution into a self-reinforcing knowledge flywheel.
+- **Methodology Flexibility (TDD, Code-First, BDD, Spikes)**:
+  - *Problem*: Teams using Code-First, Behavior-Driven Development (BDD), or R&D Spikes may feel restricted by strict TDD.
+  - *Solution*: The FSM decouples *creation order* from *verification rigor*. Developers can write code before tests (Code-First) or explore fast prototypes (`ce-ideate` spikes), provided that **Stage 5 (Empirical Verification)** passes 100% green before shipping.
 
 ---
 
