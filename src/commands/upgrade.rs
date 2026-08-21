@@ -22,9 +22,34 @@ pub struct Args {
     /// Local CE source tree; bypasses release fetching and the cache.
     #[arg(long)]
     pub source: Option<PathBuf>,
+    /// Target harness to upgrade (e.g. opencode, claude, or all).
+    #[arg(short = 't', long, default_value = "all")]
+    pub harness: String,
+    /// Force upgrade even if the harness was installed from a local source.
+    #[arg(short, long)]
+    pub force: bool,
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
+    let state_path = ctx.config_dir.join("state.json");
+    let state = State::load(&state_path)?;
+
+    // MH-2: Protection guard for source: local installations.
+    if args.source.is_none() && args.to.is_none() && !args.force {
+        let is_local_installed = state.installed_harnesses.iter().any(|h| {
+            h.get("source")
+                .and_then(|s| s.get("kind"))
+                .and_then(|k| k.as_str())
+                == Some("local")
+        });
+        if is_local_installed {
+            println!(
+                "warning: skipping upgrade for harness with local source. Pass --force to override."
+            );
+            return Ok(());
+        }
+    }
+
     if let Some(path) = &args.source {
         let version = "local".to_string();
         let source_json = serde_json::json!({ "kind": "local", "path": path });
@@ -49,8 +74,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         .map_err(|err| CeError::Runtime(format!("release download failed: {err}")))?
         .bytes()
         .map_err(|err| CeError::Runtime(err.to_string()))?;
-    let tarball = Cache::new(ctx.config_dir.join("cache"))
-        .cache_tarball(&bytes, &ctx.config_dir.join("state.json"))?;
+    let tarball = Cache::new(ctx.config_dir.join("cache")).cache_tarball(&bytes, &state_path)?;
     sync_from_extracted(ctx, &tarball, &version, &version)
 }
 

@@ -303,7 +303,8 @@ fn run_app(
                                 });
                             }
                             MenuTab::Upgrade => {
-                                execute_action(app, "Upgrade Release", || run_upgrade_cmd(ctx));
+                                let lines = run_upgrade_cmd(ctx, app);
+                                execute_action(app, "Upgrade Release", move || lines);
                             }
                             MenuTab::Doctor => {
                                 execute_action(app, "Doctor Diagnostics", || run_doctor_cmd(ctx));
@@ -825,14 +826,18 @@ fn run_sync_cmd(ctx: &Context, dry_run: bool) -> Vec<String> {
     }
 }
 
-fn run_upgrade_cmd(ctx: &Context) -> Vec<String> {
+fn run_upgrade_cmd(ctx: &Context, app: &App) -> Vec<String> {
+    let target = app.selected_harness_target().to_string();
     let args = upgrade::Args {
         to: None,
         source: None,
+        harness: target.clone(),
+        force: false,
     };
     match upgrade::run(ctx, &args) {
         Ok(_) => vec![
             "✅ Upgrade completed successfully!".to_string(),
+            format!("Target Harness Scope: {target}"),
             format!("Updated to version: v{}", env!("CARGO_PKG_VERSION")),
         ],
         Err(err) => vec![format!("❌ Upgrade failed: {err}")],
