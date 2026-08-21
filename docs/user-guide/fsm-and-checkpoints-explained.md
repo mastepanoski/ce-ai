@@ -89,13 +89,51 @@ flowchart TD
 
 | Stage | Stage Name | Canonical CE Skills | Real-World Analogy | What Happens Here? |
 | :--- | :--- | :--- | :--- | :--- |
-| **Stage 1** | **Ideation** | `ce-brainstorm`<br>`ce-ideate`<br>`ce-strategy` | Architectural Blueprint Discussion | Exploring vague ideas, user constraints, product framing, and scope boundaries. |
+| **Stage 1** | **Ideation** | `ce-brainstorm`<br>`ce-ideate`<br>`ce-strategy` | Architectural Blueprint Discussion | Exploring vague ideas (`ce-ideate`), framing constraints (`ce-brainstorm`), and setting product strategy (`ce-strategy`). |
 | **Stage 2** | **OpenSpec Definition** | `openspec/changes/*/` | Formal Contract & Spec Sheet | Writing executable specifications (`proposal.md`, `exploration.md`, `design.md`, `spec.md`, `tasks.md`). |
-| **Stage 3** | **Execution Plan** | `ce-plan`<br>`ce-doc-review` | Construction Milestone Breakdown | Structuring implementation units, file lists, test scenarios, and reviewing doc rigor. |
-| **Stage 4** | **TDD & Work** | `ce-work`<br>`ce-debug`<br>`ce-simplify-code` | Laying Bricks & Wiring | Writing tests first (Red), implementing code (Green), debugging root causes, and refactoring. |
-| **Stage 5** | **Verification** | `ce-code-review`<br>`ce-test-browser`<br>`cargo test` | Safety Inspector Audit | Running linters (`clippy`), unit tests, browser tests, and Docker containerized E2E gates. |
-| **Stage 6** | **Knowledge Capture** | `ce-compound`<br>`ce-compound-refresh` | Updating Operations Manual | Documenting hard-earned discoveries in `docs/solutions/` and updating `CONCEPTS.md`. |
-| **Stage 7** | **Git Shipping** | `ce-commit-push-pr`<br>`ce-commit`<br>`ce-resolve-pr-feedback` | Delivering Keys to Client | Creating feature branches, writing value-communicating commit messages, and opening/resolving PRs. |
+| **Stage 3** | **Execution Plan** | `ce-plan`<br>`ce-doc-review` | Construction Milestone Breakdown | Structuring implementation units, file lists, test scenarios, and reviewing doc rigor (`ce-doc-review`). |
+| **Stage 4** | **TDD & Work** | `ce-work`<br>`ce-debug`<br>`ce-simplify-code` | Laying Bricks & Wiring | Writing tests first (Red), implementing code (Green), running diagnostic debug sub-loops (`ce-debug`), and refactoring (`ce-simplify-code`). |
+| **Stage 5** | **Verification** | `ce-code-review`<br>`ce-test-browser`<br>`cargo test` | Safety Inspector Audit | Running linters (`clippy`), unit tests, browser tests (`ce-test-browser`), and Docker containerized E2E gates. |
+| **Stage 6** | **Knowledge Capture** | `ce-compound`<br>`ce-compound-refresh` | Updating Operations Manual | Documenting hard-earned discoveries in `docs/solutions/` (`ce-compound`) and auditing stale docs (`ce-compound-refresh`). |
+| **Stage 7** | **Git Shipping** | `ce-commit-push-pr`<br>`ce-commit`<br>`ce-resolve-pr-feedback` | Delivering Keys to Client | Creating feature branches, writing value-communicating commit messages, and resolving PR feedback (`ce-resolve-pr-feedback`). |
+
+---
+
+## 4. FSM Sub-Loops & Entry Points: How `ce-ideate` and `ce-debug` Work
+
+The FSM is not just a rigid straight line; it supports **Sub-Loops** and **Diagnostic Interrupts** for specialized skills like `ce-ideate` and `ce-debug`.
+
+```mermaid
+flowchart TD
+    subgraph STAGE_1 ["STAGE 1: IDEATION"]
+        IDEATE[ce-ideate: Explore & Generate Ideas] --> BRAINSTORM[ce-brainstorm: Refine Scope & Requirements]
+    end
+
+    subgraph STAGE_4 ["STAGE 4: TDD & WORK"]
+        WORK[ce-work: Red-Green-Refactor Loop]
+        WORK -->|Test Failure / Bug Detected| DEBUG[ce-debug: Diagnostic Sub-Loop]
+        DEBUG -->|Root Cause Identified & Fixed| VERIFIED[Verify Fix via Tests]
+        VERIFIED -->|Green| SIMPLIFY[ce-simplify-code: Refactor & Tidy]
+        SIMPLIFY --> WORK
+    end
+
+    STAGE_1 --> STAGE_2[Stage 2: OpenSpec]
+    STAGE_2 --> STAGE_3[Stage 3: Plan]
+    STAGE_3 --> STAGE_4
+```
+
+### 1. How `ce-ideate` Operates in Stage 1 (Ideation)
+- **Role**: `ce-ideate` is an **Exploration Sub-Loop** within **Stage 1 (Ideation)**.
+- **Behavior**: When a user or agent doesn't have a concrete feature description yet, `ce-ideate` runs first to generate and evaluate surprise options or architectural directions.
+- **Transition**: Once an idea is chosen from `ce-ideate`, the FSM transitions to `ce-brainstorm` (to build the formal requirements document) and then moves forward to Stage 2 (`OpenSpec`).
+
+### 2. How `ce-debug` Operates in Stage 4/5 (Diagnostic Sub-Loop)
+- **Role**: `ce-debug` is an **Interrupt Sub-Loop** triggered whenever a bug, test failure, or regression is encountered during **Stage 4 (Work)** or **Stage 5 (Verify)**.
+- **Behavior**:
+  1. **Interrupt State**: Suspends linear forward progression and freezes current task state.
+  2. **Diagnostic Loop**: Executes empirical hypothesis testing ➔ log extraction ➔ root cause identification ➔ minimal reproducer.
+  3. **Fix Verification**: Applies the fix and verifies clean test execution.
+- **Transition**: Once verified, `ce-debug` returns control to Stage 4 (`ce-work`) or Stage 5 (`Verify`). If the bug fix uncovered a non-obvious learning or codebase gotcha, it flags **Stage 6 (`ce-compound`)** to capture the solution in `docs/solutions/` before shipping.
 
 ---
 
