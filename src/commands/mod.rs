@@ -35,14 +35,22 @@ impl Context {
             Some(dir) => dir,
             None => {
                 let home = std::env::var("HOME")
-                    .map_err(|_| CeError::Usage("cannot resolve HOME; pass --config-dir".into()))?;
+                    .or_else(|_| std::env::var("USERPROFILE"))
+                    .map_err(|_| {
+                        CeError::Usage(
+                            "cannot resolve home directory (HOME/USERPROFILE not set); pass --config-dir"
+                                .into(),
+                        )
+                    })?;
                 PathBuf::from(home).join(".ce-ai")
             }
         };
         let opencode_config_dir = match std::env::var("CE_AI_OPENCODE_CONFIG") {
             Ok(dir) => PathBuf::from(dir),
             Err(_) => {
-                let home = std::env::var("HOME").unwrap_or_default();
+                let home = std::env::var("HOME")
+                    .or_else(|_| std::env::var("USERPROFILE"))
+                    .unwrap_or_default();
                 PathBuf::from(home).join(".config/opencode")
             }
         };
