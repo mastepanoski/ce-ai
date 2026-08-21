@@ -1,5 +1,13 @@
 //! Harness abstraction module for multi-harness support.
 
+pub mod claude;
+pub mod copilot;
+pub mod cursor;
+pub mod custom;
+pub mod generic_json;
+pub mod opencode;
+pub mod pi;
+
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;

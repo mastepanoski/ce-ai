@@ -13,17 +13,17 @@
   - *Verification*: `cargo test tests::cli::install_unknown_harness_exits_usage_code`
 
 ### Phase 2: Native Harness Adapters Implementation
-- [ ] **Task 2.1**: Refactor OpenCode harness to implement `HarnessAdapter` trait in `src/harness/opencode.rs`.
+- [x] **Task 2.1**: Refactor OpenCode harness to implement `HarnessAdapter` trait in `src/harness/opencode.rs`.
   - *Verification*: `cargo test harness::opencode::tests::roundtrip`
-- [ ] **Task 2.2**: Implement Claude Code adapter in `src/harness/claude.rs`.
+- [x] **Task 2.2**: Implement Claude Code adapter in `src/harness/claude.rs`.
   - *Verification*: `cargo test harness::claude::tests::merges_claude_json`
-- [ ] **Task 2.3**: Implement Pi harness adapter in `src/harness/pi.rs`.
+- [x] **Task 2.3**: Implement Pi harness adapter in `src/harness/pi.rs`.
   - *Verification*: `cargo test harness::pi::tests::merges_pi_config`
-- [ ] **Task 2.4**: Implement Cursor & Copilot Markdown block adapters in `src/harness/cursor.rs` & `copilot.rs`.
+- [x] **Task 2.4**: Implement Cursor & Copilot Markdown block adapters in `src/harness/cursor.rs` & `copilot.rs`.
   - *Verification*: `cargo test harness::markdown::tests::ingests_managed_block`
-- [ ] **Task 2.5**: Implement Generic JSON adapter for Codex, Grok, Kimi, AGY, DeepSeek in `src/harness/generic_json.rs`.
+- [x] **Task 2.5**: Implement Generic JSON adapter for Codex, Grok, Kimi, AGY, DeepSeek in `src/harness/generic_json.rs`.
   - *Verification*: `cargo test harness::generic::tests::roundtrip`
-- [ ] **Task 2.6**: Implement Custom harness fallback mode (`--harness custom`) in `src/harness/custom.rs`.
+- [x] **Task 2.6**: Implement Custom harness fallback mode (`--harness custom`) in `src/harness/custom.rs`.
   - *Verification*: `cargo test harness::custom::tests::custom_flags_registration`
 
 ### Phase 3: Model Role Translation & Multi-Harness Sync
