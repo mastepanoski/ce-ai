@@ -1,0 +1,23 @@
+- name: harness
+  color: "5319e7"
+  description: "AI Harness integrations (Pi, Claude, Codex, Grok, Kimi, AGY, Cursor, Copilot, DeepSeek, fx.sh)"
+
+- name: distribution
+  color: "0e8a16"
+  description: "Package managers & binary distribution (Brew, WinGet, APT, Installer)"
+
+- name: security
+  color: "b60205"
+  description: "Security vulnerabilities, path traversal, ISO 27001 / NIST controls"
+
+- name: cli
+  color: "fbca04"
+  description: "CLI commands, flags, and subcommand features"
+
+- name: tui
+  color: "1d76db"
+  description: "Terminal UI dashboard & Ratatui components"
+
+- name: compliance
+  color: "0052cc"
+  description: "ISO 27001/27002, ISO 42001, and NIST AI RMF compliance"
