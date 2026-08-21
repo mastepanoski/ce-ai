@@ -20,7 +20,7 @@ This document outlines the version milestones, feature criteria, and release pip
 ```
   v0.7.0 (Released) ──► v0.8.0 (Released) ──► v0.9.0 (Released)
                                                      │
-  v1.0.0 (Upcoming) ◄────────────────────────────────┘
+  v1.0.0 (Released) ◄────────────────────────────────┘
 ```
 
 ### ✅ `v0.3.0` & `v0.4.0` (Completed) — Multi-Harness Architecture & TUI
@@ -70,10 +70,12 @@ This document outlines the version milestones, feature criteria, and release pip
 
 ---
 
-### 💎 `v1.0.0` — Production Release (Stable API Freeze)
-- [ ] Frozen CLI command contract and configuration schemas.
-- [ ] Complete production documentation, user guides, and sitemap.
-- [ ] Official release tag `v1.0.0` published via automated CI/CD release pipeline.
+### 💎 `v1.0.0` (Released) — Production Release (Stable API Freeze) ([#72](https://github.com/mastepanoski/ce-ai/issues/72), [#75](https://github.com/mastepanoski/ce-ai/issues/75), [#76](https://github.com/mastepanoski/ce-ai/issues/76))
+- [x] **Frozen CLI Contract & Configuration Schemas**: Stable subcommand flags and locked JSON schemas (`state.json`, `.ce-ai.json`, `opencode.json`).
+- [x] **TUI Modal Text Wrapping Fix (Issue #72)**: Ratatui Paragraph line wrapping (`Wrap { trim: false }`) in `MenuTab::Sync` and `MenuTab::Doctor` result modals.
+- [x] **TUI Direct Stage Invocation (Issue #76)**: Direct stage transition key shortcuts (`[1-7]`) inside `MenuTab::Workflow` panel for rapid Flywheel phase switching.
+- [x] **Bug Report Template (Issue #75)**: GitHub Issue Form `.github/ISSUE_TEMPLATE/bug_report.yml`.
+- [x] **Homebrew Installation Guidance**: Documented Homebrew tap and formula installation commands in `README.md`.
 
 ---
 

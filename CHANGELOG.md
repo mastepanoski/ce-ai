@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0] - 2026-08-21
+
+### 💎 Production Stable Release
+- **CLI Contract & Schema Freeze**: Frozen CLI subcommands (`install`, `sync`, `upgrade`, `models`, `status`, `uninstall`, `doctor`, `workflow`, `tools`, `backups`, `tui`) and state schemas (`state.json`, `.ce-ai.json`, `opencode.json`) with strict backwards-compatibility guarantees.
+- **TUI Modal Text Wrapping Fix (Issue #72)**: Ratatui Paragraph line wrapping (`Wrap { trim: false }`) in `MenuTab::Sync` and `MenuTab::Doctor` result modals preventing mid-word text breakage.
+- **TUI Direct Stage Invocation (Issue #76)**: Direct stage transition key shortcuts (`[1-7]`) inside `MenuTab::Workflow` panel for rapid Flywheel phase switching.
+- **Bug Report Template (Issue #75)**: GitHub Issue Form `.github/ISSUE_TEMPLATE/bug_report.yml`.
+- **Homebrew Documentation**: Official installation commands for Homebrew tap and formula in `README.md`.
+
+---
+
 ## [0.9.0] - 2026-08-21
 
 ### Added
