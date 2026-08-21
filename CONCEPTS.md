@@ -24,3 +24,6 @@ A real-time background watcher loop (`ce-ai sync --watch`) that monitors managed
 
 ### Workspace Overrides (.ce-ai.json)
 A repository-local configuration file located in the working directory or Git root that overrides specific global settings (e.g. model assignments per slot) with higher precedence than `~/.config/ce-ai/state.json`.
+
+### Universal One-Line Installer
+A zero-dependency installation script (`scripts/install.sh` / `scripts/install.ps1`) that auto-detects host OS and CPU architecture, fetches pre-compiled release binaries from GitHub, and installs them directly into `~/.ce-ai/bin/`.

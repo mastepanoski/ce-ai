@@ -41,13 +41,19 @@ Inspired by the **`gentle-ai`** ecosystem, `ce-ai` governs the **7-stage Compoun
 
 ## Installation
 
-Build from source with Cargo:
+### 🚀 Universal One-Line Installer (macOS & Linux)
 
 ```bash
-cargo build --release
+curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.sh | bash
 ```
 
-Or install binary directly:
+### 💻 Windows PowerShell
+
+```powershell
+irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps1 | iex
+```
+
+### 📦 Build from Source (Cargo)
 
 ```bash
 cargo install --path .
