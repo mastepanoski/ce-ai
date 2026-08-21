@@ -1,5 +1,7 @@
 //! ce-ai: compound-engineering plugin manager CLI entry point (CC-1, CC-2).
 
+#![forbid(unsafe_code)]
+
 mod commands;
 mod error;
 mod harness;

@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 pub mod commands;
 pub mod error;
 pub mod harness;
