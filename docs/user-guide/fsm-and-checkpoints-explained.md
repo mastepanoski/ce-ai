@@ -270,13 +270,13 @@ The `ce-ai` FSM engine was specifically designed to support **all real-world eng
 ```mermaid
 flowchart TD
     subgraph FSM_VARIANTS ["SUPPORTED FSM WORKFLOW VARIANTS"]
-        V1[1. Full 7-Stage Feature Cycle] -->|Stages 1 -> 7| FULL[New Feature / Enhancement]
-        V2[2. Direct Entry Bug Fix] -->|Stage 4 ce-debug -> 7| BUG[Bug Fix / Crash Repair]
-        V3[3. Exploration Sub-Loop] -->|Stage 1 ce-ideate| IDEATE[Architectural Discovery]
-        V4[4. Cross-Session Resumption] -->|ce-ai workflow resume| RESUME[Context Re-hydration]
-        V5[5. Multi-Harness Handoff] -->|Harness Agnostic Disk State| HANDOFF[Claude -> Cursor -> Antigravity]
-        V6[6. Worktree Isolation] -->|--scope workspace| WORKTREE[Parallel Git Worktrees]
-        V7[7. Targeted Fast-Track] -->|Stage 6 ce-compound| DOCS[Docs / Research Only]
+        V1["1. Full 7-Stage Feature Cycle"] -->|"Stages 1 ➔ 7"| FULL["New Feature / Enhancement"]
+        V2["2. Direct Entry Bug Fix"] -->|"Stage 4 ce-debug ➔ 7"| BUG["Bug Fix / Crash Repair"]
+        V3["3. Exploration Sub-Loop"] -->|"Stage 1 ce-ideate"| IDEATE["Architectural Discovery"]
+        V4["4. Cross-Session Resumption"] -->|"ce-ai workflow resume"| RESUME["Context Re-hydration"]
+        V5["5. Multi-Harness Handoff"] -->|"Harness Agnostic Disk State"| HANDOFF["Claude ➔ Cursor ➔ Antigravity"]
+        V6["6. Worktree Isolation"] -->|"--scope workspace"| WORKTREE["Parallel Git Worktrees"]
+        V7["7. Targeted Fast-Track"] -->|"Stage 6 ce-compound"| DOCS["Docs / Research Only"]
     end
 ```
 

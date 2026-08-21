@@ -131,12 +131,12 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
 
 `ce-ai`'s architectural design is deeply inspired by the **`gentle-ai`** open-source ecosystem, integrating modular sidecars and protocol standards:
 
-- **`gentle-ai` Inspiration**: Provided the foundational concepts behind Spec-Driven Development (OpenSpec), agentic workflow governance, and multi-harness orchestration.
-- **`Engram`**: Persistent memory sidecar (SQLite + FTS5). Solves cross-session memory loss and context window compaction.
-- **`CodeGraph`**: Codebase structural intelligence sidecar. Provides AST symbol indexes, caller/callee trees, and blast-radius analysis.
-- **`Context7`**: Real-time framework and library documentation retrieval engine for up-to-date API usage.
-- **`RTK` (Rust Token Killer)**: Terminal output stream pre-processor. Intercepts raw stdio (`cargo test`, `git status`, `docker ps`) and compresses token count by 60%–90%.
-- **`Sequential Thinking`**: Structured reasoning protocol enabling multi-step hypothesis testing, problem decomposition, and self-correction during agent execution loops.
+- **[`gentle-ai`](https://github.com/Gentleman-Programming)**: Provided the foundational concepts behind Spec-Driven Development (OpenSpec), agentic workflow governance, and multi-harness orchestration.
+- **[`Engram`](https://github.com/Gentleman-Programming/engram)**: Persistent memory sidecar (SQLite + FTS5). Solves cross-session memory loss and context window compaction.
+- **[`CodeGraph`](https://github.com/colbymchenry/codegraph)**: Codebase structural intelligence sidecar. Provides AST symbol indexes, caller/callee trees, and blast-radius analysis.
+- **[`Context7`](https://github.com/upstash/context7)**: Real-time framework and library documentation retrieval engine for up-to-date API usage.
+- **[`RTK / Rust Token Killer`](https://github.com/rtk-ai/rtk)**: Terminal output stream pre-processor. Intercepts raw stdio (`cargo test`, `git status`, `docker ps`) and compresses token count by 60%–90%.
+- **[`Sequential Thinking`](https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking)**: Structured reasoning protocol enabling multi-step hypothesis testing, problem decomposition, and self-correction during agent execution loops.
 
 ---
 
