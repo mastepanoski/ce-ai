@@ -100,6 +100,9 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
 - **Git Worktree Scope Isolation (`ce-worktree`)**:
   - *Problem*: Concurrent feature development across multiple Git worktrees can pollute shared configs or CodeGraph indices.
   - *Solution*: `ce-ai install --scope workspace` inside a worktree isolates managed skills (`./.opencode/`, `./.claude/`) to that worktree's path, while independent `.codegraph/` indices prevent call-graph corruption across worktrees.
+- **Spec-Driven Development (SDD / `gentle-ai`) Compatibility & Upgrade**:
+  - *Problem*: Projects migrating from Spec-Driven Development (SDD) or OpenSpec fear losing existing specs (`proposal.md`, `spec.md`, `tasks.md`).
+  - *Solution*: Stage 2 of `ce-ai` natively consumes OpenSpec format without breaking changes. Compound Engineering upgrades SDD by appending **Stage 6 (`ce-compound`)**, turning linear spec execution into a self-reinforcing knowledge flywheel.
 
 ---
 

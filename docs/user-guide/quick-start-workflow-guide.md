@@ -186,6 +186,30 @@ When working on multiple features or PRs concurrently, use isolated Git worktree
   - *CodeGraph*: Each worktree maintains its own independent index. Run `gentle-ai codegraph init --cwd <worktree-root>` inside the new worktree.
   - *Engram*: Memory observations are tagged with the worktree path so findings remain cleanly isolated per workspace.
 
+### 4. Transitioning from Spec-Driven Development (SDD / `gentle-ai`)
+
+#### How does `ce-ai` handle projects migrating from SDD?
+
+If your project previously used **Spec-Driven Development (SDD)** (such as `gentle-ai` or OpenSpec):
+
+```mermaid
+flowchart TD
+    TRADITIONAL_SDD["Traditional SDD Workflow\n(Specs -> Plan -> Code -> Verify -> DONE)"] -->|Missing Stage 6 Knowledge Capture| SINK[Knowledge Loss & Repeated Bugs]
+
+    CE_WORKFLOW["Compound Engineering Workflow\n(Specs -> Plan -> Code -> Verify -> COMPOUND -> Flywheel)"] -->|Stage 6: ce-compound| FLYWHEEL["docs/solutions/ & CONCEPTS.md\n(Compounding Knowledge Flywheel)"]
+```
+
+- **100% Backward Compatibility**:
+  - `ce-ai`'s Stage 2 **IS** OpenSpec / SDD! All existing specifications in `openspec/changes/<feature_name>/` (`proposal.md`, `exploration.md`, `design.md`, `spec.md`, `tasks.md`) remain 100% valid and untouched.
+- **What Compound Engineering Adds to SDD**:
+  - Traditional SDD stops after code passes tests (Stage 5: Verify).
+  - Compound Engineering extends SDD by enforcing **Stage 6 (`ce-compound`)**: capturing hard-earned discoveries in `docs/solutions/` and updating `CONCEPTS.md`.
+- **Migration Steps**:
+  1. Run `ce-ai install --scope workspace` in the repository.
+  2. Keep all existing `openspec/` files intact.
+  3. Run `/ce-compound-refresh` once to audit historical learnings against the codebase.
+  4. Continue writing OpenSpecs as before in Stage 2, enjoying the automatic compounding flywheel!
+
 ---
 
 ## 📋 Quick Reference Cheat Sheet
