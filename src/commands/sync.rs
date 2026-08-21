@@ -9,6 +9,7 @@ use chrono::Utc;
 
 use crate::commands::Context;
 use crate::error::CeError;
+use crate::harness::HarnessKind;
 use crate::opencode::manifest::{InstallManifest, ManifestFile};
 use crate::opencode::plugins::MANAGED_DIR;
 use crate::source::cache::read_local_tree;
@@ -131,13 +132,45 @@ pub(crate) fn sync_with(
     }
     .write(&ctx.opencode_config_dir)?;
 
-    // Refresh all registered harness entries in state.json (SU-2, SU-5).
+    // Refresh and sync across all active host-detected and registered harness entries in state.json (SU-2, SU-5).
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
-    for harness in &mut state.installed_harnesses {
-        harness["version"] = serde_json::Value::String(version.to_string());
-        harness["source"] = source_json.clone();
-        harness["last_synced_at"] = serde_json::Value::String(Utc::now().to_rfc3339());
+
+    let mut active_harnesses: Vec<String> = state
+        .installed_harnesses
+        .iter()
+        .filter_map(|h| h["name"].as_str().map(|s| s.to_string()))
+        .collect();
+
+    if let Ok(home) = std::env::var("HOME") {
+        let home_path = Path::new(&home);
+        for h in HarnessKind::detect_ce_installed_harnesses(home_path) {
+            let name = h.to_string();
+            if !active_harnesses.contains(&name) {
+                active_harnesses.push(name);
+            }
+        }
+    }
+    if active_harnesses.is_empty() {
+        active_harnesses.push("opencode".to_string());
+    }
+
+    state.installed_harnesses.clear();
+    for name in &active_harnesses {
+        if let Ok(h_kind) = name.parse::<HarnessKind>() {
+            let target_config = h_kind.config_path(&ctx.opencode_config_dir);
+            let _ = crate::opencode::config::ensure_plugin_and_skills(
+                &target_config,
+                &crate::opencode::plugins::plugin_entry(&ctx.opencode_config_dir).to_string_lossy(),
+                &crate::opencode::plugins::skills_path(&ctx.opencode_config_dir).to_string_lossy(),
+            );
+        }
+        state.installed_harnesses.push(serde_json::json!({
+            "name": name,
+            "version": version.to_string(),
+            "source": source_json.clone(),
+            "last_synced_at": Utc::now().to_rfc3339(),
+        }));
     }
     state.save(&state_path)?;
     Ok(())

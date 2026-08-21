@@ -1,7 +1,7 @@
 //! `ce-ai install`: resolve source, plan, back up, then apply (OI-1..OI-5, SU-4).
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::Utc;
 
@@ -37,7 +37,21 @@ pub struct Args {
 use crate::harness::HarnessKind;
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
-    let harness_kind = args.harness.parse::<HarnessKind>()?;
+    let harness_arg = args.harness.to_lowercase();
+    let target_harnesses: Vec<HarnessKind> = if harness_arg == "all" {
+        if let Ok(home) = std::env::var("HOME") {
+            let detected = HarnessKind::detect_installed_harnesses(Path::new(&home));
+            if detected.is_empty() {
+                vec![HarnessKind::Opencode]
+            } else {
+                detected
+            }
+        } else {
+            vec![HarnessKind::Opencode]
+        }
+    } else {
+        vec![harness_arg.parse::<HarnessKind>()?]
+    };
 
     let (source_path, version, source_json, tmp_dir) = resolve_source(ctx, &args.source)?;
 
@@ -61,101 +75,105 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 
     let config_dir = &ctx.opencode_config_dir;
-    let target_config = harness_kind.config_path(config_dir);
     let managed_dir = config_dir.join(MANAGED_DIR);
-    let needs_backup = target_config.exists();
 
-    // Dry-run plans only; SU-4 guarantees zero writes.
-    if ctx.dry_run {
-        println!(
-            "plan: {}",
-            if needs_backup {
-                format!("backup {}", target_config.display())
-            } else {
-                format!("create {}", target_config.display())
-            }
-        );
-        for rel in managed.keys() {
-            println!("plan: copy {rel}");
-        }
-        println!("plan: write install-manifest.json");
-        println!("plan: update state.json");
-        if let Some(tmp) = tmp_dir {
-            let _ = std::fs::remove_dir_all(tmp);
-        }
-        return Ok(());
-    }
-
-    // Apply: back up the existing config, then copy managed files (OI-1, OI-3).
-    let backup = if needs_backup {
-        Some(backup_file(
-            &ctx.config_dir.join("backups"),
-            &target_config,
-        )?)
-    } else {
-        None
-    };
-    let mut files = vec![install_loader(&source_path, config_dir)?];
-    for (rel, (source_rel, hash)) in &managed {
-        if rel == LOADER_REL_PATH {
-            continue;
-        }
-        write_atomic(
-            &managed_dir.join(rel),
-            &std::fs::read(source_path.join(source_rel))?,
-        )?;
-        files.push(ManifestFile {
-            path: rel.clone(),
-            sha256: hash.clone(),
-        });
-    }
-
-    // Merge plugin entry + skills path into target harness config (OI-2, OI-4).
-    let mut mutation = ensure_plugin_and_skills(
-        &target_config,
-        &plugin_entry(config_dir).to_string_lossy(),
-        &skills_path(config_dir).to_string_lossy(),
-    )?;
-    mutation.backup = backup.map(|p| p.display().to_string());
-
-    // Record managed files and the config mutation (OI-5).
-    InstallManifest {
-        version: version.clone(),
-        plugin_name: "compound-engineering".into(),
-        installed_at: Utc::now().to_rfc3339(),
-        source: source_json.clone(),
-        files,
-        config_mutations: vec![mutation],
-    }
-    .write(config_dir)?;
-
-    // Update state.json; replace any prior entry for this harness (idempotent).
-    let harness_name = args.harness.to_lowercase();
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
-    state
-        .installed_harnesses
-        .retain(|h| h["name"].as_str() != Some(harness_name.as_str()));
-    state.installed_harnesses.push(serde_json::json!({
-        "name": harness_name,
-        "version": version,
-        "source": source_json,
-        "installed_at": Utc::now().to_rfc3339(),
-        "last_synced_at": Utc::now().to_rfc3339(),
-    }));
-    state.save(&state_path)?;
+
+    for harness_kind in &target_harnesses {
+        let target_config = harness_kind.config_path(config_dir);
+        let needs_backup = target_config.exists();
+
+        // Dry-run plans only; SU-4 guarantees zero writes.
+        if ctx.dry_run {
+            println!(
+                "plan: {}",
+                if needs_backup {
+                    format!("backup {}", target_config.display())
+                } else {
+                    format!("create {}", target_config.display())
+                }
+            );
+            for rel in managed.keys() {
+                println!("plan: copy {rel}");
+            }
+            println!("plan: write install-manifest.json");
+            println!("plan: update state.json");
+            continue;
+        }
+
+        // Apply: back up the existing config, then copy managed files (OI-1, OI-3).
+        let backup = if needs_backup {
+            Some(backup_file(
+                &ctx.config_dir.join("backups"),
+                &target_config,
+            )?)
+        } else {
+            None
+        };
+        let mut files = vec![install_loader(&source_path, config_dir)?];
+        for (rel, (source_rel, hash)) in &managed {
+            if rel == LOADER_REL_PATH {
+                continue;
+            }
+            write_atomic(
+                &managed_dir.join(rel),
+                &std::fs::read(source_path.join(source_rel))?,
+            )?;
+            files.push(ManifestFile {
+                path: rel.clone(),
+                sha256: hash.clone(),
+            });
+        }
+
+        // Merge plugin entry + skills path into target harness config (OI-2, OI-4).
+        let mut mutation = ensure_plugin_and_skills(
+            &target_config,
+            &plugin_entry(config_dir).to_string_lossy(),
+            &skills_path(config_dir).to_string_lossy(),
+        )?;
+        mutation.backup = backup.map(|p| p.display().to_string());
+
+        // Record managed files and the config mutation (OI-5).
+        InstallManifest {
+            version: version.clone(),
+            plugin_name: "compound-engineering".into(),
+            installed_at: Utc::now().to_rfc3339(),
+            source: source_json.clone(),
+            files,
+            config_mutations: vec![mutation],
+        }
+        .write(config_dir)?;
+
+        // Update state.json; replace any prior entry for this harness (idempotent).
+        let harness_name = harness_kind.to_string();
+        state
+            .installed_harnesses
+            .retain(|h| h["name"].as_str() != Some(harness_name.as_str()));
+        state.installed_harnesses.push(serde_json::json!({
+            "name": harness_name,
+            "version": version,
+            "source": source_json,
+            "installed_at": Utc::now().to_rfc3339(),
+            "last_synced_at": Utc::now().to_rfc3339(),
+        }));
+
+        if !ctx.quiet && !ctx.dry_run {
+            let source_disp = if args.source.is_some() {
+                source_path.display().to_string()
+            } else {
+                source_json["tag"].as_str().unwrap_or("release").to_string()
+            };
+            println!("installed compound-engineering for {harness_name} (source: {source_disp})");
+        }
+    }
+
+    if !ctx.dry_run {
+        state.save(&state_path)?;
+    }
 
     if let Some(tmp) = tmp_dir {
         let _ = std::fs::remove_dir_all(tmp);
-    }
-
-    if !ctx.quiet {
-        let source_disp = if args.source.is_some() {
-            source_path.display().to_string()
-        } else {
-            source_json["tag"].as_str().unwrap_or("release").to_string()
-        };
-        println!("installed compound-engineering for opencode (source: {source_disp})");
     }
     Ok(())
 }
