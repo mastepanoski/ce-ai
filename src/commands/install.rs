@@ -129,14 +129,15 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
     .write(config_dir)?;
 
-    // Update state.json; replace any prior opencode entry (idempotent).
+    // Update state.json; replace any prior entry for this harness (idempotent).
+    let harness_name = args.harness.to_lowercase();
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
     state
         .installed_harnesses
-        .retain(|h| h["name"].as_str() != Some("opencode"));
+        .retain(|h| h["name"].as_str() != Some(harness_name.as_str()));
     state.installed_harnesses.push(serde_json::json!({
-        "name": "opencode",
+        "name": harness_name,
         "version": version,
         "source": source_json,
         "installed_at": Utc::now().to_rfc3339(),
