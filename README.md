@@ -298,6 +298,19 @@ Run Docker containerized E2E gate test:
 make e2e
 ```
 
+## 🌟 Acknowledgments & Ecosystem Inspiration
+
+`ce-ai` and Compound Engineering take deep inspiration from pioneering open-source work in the **`gentle-ai`** ecosystem:
+
+- **[`gentle-ai`](https://github.com)**: Foundational ecosystem inspiration for Spec-Driven Development (OpenSpec) and agentic workflows.
+- **`Engram`**: Persistent cross-session memory sidecar powered by SQLite + FTS5 full-text search.
+- **`CodeGraph`**: Codebase structural intelligence sidecar (symbol call-graphs, blast-radius calculation).
+- **`Context7`**: Up-to-date documentation retrieval engine for modern frameworks and libraries.
+- **`RTK` (Rust Token Killer)**: Terminal output stream filter compressing raw stdio by 60%–90%.
+- **`Sequential Thinking`**: Structured reasoning protocol for step-by-step hypothesis evaluation and reflection.
+
+---
+
 ## License
 
 Distributed under the [MIT License](./LICENSE).

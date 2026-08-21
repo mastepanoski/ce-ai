@@ -119,10 +119,42 @@ flowchart TD
 
 ---
 
+## 5. Ecosystem Acknowledgments & Inspiration
+
+`ce-ai` and **Compound Engineering** build upon pioneering open-source projects in the **`gentle-ai`** ecosystem:
+
+```mermaid
+flowchart TD
+    GENTLE["gentle-ai Ecosystem (Foundational Inspiration)"] --> CE_AI["ce-ai & Compound Engineering"]
+    CE_AI --> ENGRAM["Engram (Persistent Memory Sidecar)"]
+    CE_AI --> CODEGRAPH["CodeGraph (Blast-Radius & Call-Graph Indexer)"]
+    CE_AI --> CONTEXT7["Context7 (Modern Library & Docs Retrieval)"]
+    CE_AI --> RTK["RTK (Rust Token Killer Output Filter)"]
+    CE_AI --> SEQ["Sequential Thinking (Structured Reasoning Protocol)"]
+```
+
+### Key Ecosystem Tools:
+
+1. **`gentle-ai`**:
+   - The foundational suite and primary inspiration behind OpenSpec, Spec-Driven Development, and the Compound Engineering architecture.
+2. **`Engram`**:
+   - Persistent memory sidecar powered by SQLite + FTS5 full-text search. Stores architecture decisions, bug fixes, and user preferences across compaction cycles and sessions.
+3. **`CodeGraph`**:
+   - Codebase intelligence sidecar. Indexes AST symbols, function callers, callees, and blast-radius impacts before broad filesystem searches.
+4. **`Context7`**:
+   - Real-time documentation retrieval engine providing up-to-date framework APIs, libraries, and best-practice guidance for AI agents.
+5. **`RTK` (Rust Token Killer)**:
+   - CLI Token Reduction Engine. Intercepts raw terminal streams (`cargo test`, `git status`, `docker ps`), stripping noise and compressing text by **60% to 90%** before hitting LLM context.
+6. **`Sequential Thinking`**:
+   - Structured reasoning protocol that enables AI agents to decompose complex problems, form hypotheses, reflect on test outcomes, and refine solutions step-by-step.
+
+---
+
 ## 📋 Masterclass Summary Checklist for Beginners
 
 - [x] **Harness**: The AI editor/environment (Claude Code, Cursor, Copilot, Antigravity, OpenCode).
-- [x] **MCP Sidecars**: Protocol-based background servers for memory (Engram) and codebase graphs (CodeGraph).
+- [x] **MCP Sidecars**: Protocol-based background servers for memory (Engram), codebase graphs (CodeGraph), and docs (Context7).
 - [x] **CLI Reducers**: Shell output filters (RTK) that shrink terminal output by 60–90%.
+- [x] **Sequential Thinking**: Structured reasoning protocol for step-by-step problem decomposition.
 - [x] **Agent Loop**: The autonomous Read-Evaluate-Act-Reflect cycle driven by TDD and verification.
 - [x] **Context Engineering**: Using FSM checkpoints and Engram memory to overcome token compaction.
