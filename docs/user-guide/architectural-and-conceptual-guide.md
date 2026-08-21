@@ -124,6 +124,19 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
 
 ---
 
+## 6. Ecosystem Inspirations & Foundational Sidecars
+
+`ce-ai`'s architectural design is deeply inspired by the **`gentle-ai`** open-source ecosystem, integrating modular sidecars and protocol standards:
+
+- **`gentle-ai` Inspiration**: Provided the foundational concepts behind Spec-Driven Development (OpenSpec), agentic workflow governance, and multi-harness orchestration.
+- **`Engram`**: Persistent memory sidecar (SQLite + FTS5). Solves cross-session memory loss and context window compaction.
+- **`CodeGraph`**: Codebase structural intelligence sidecar. Provides AST symbol indexes, caller/callee trees, and blast-radius analysis.
+- **`Context7`**: Real-time framework and library documentation retrieval engine for up-to-date API usage.
+- **`RTK` (Rust Token Killer)**: Terminal output stream pre-processor. Intercepts raw stdio (`cargo test`, `git status`, `docker ps`) and compresses token count by 60%–90%.
+- **`Sequential Thinking`**: Structured reasoning protocol enabling multi-step hypothesis testing, problem decomposition, and self-correction during agent execution loops.
+
+---
+
 ## 📊 Summary of Architectural Pillars
 
 | Architectural Pillar | Design Pattern / Mechanism | System Problem Solved |
