@@ -91,31 +91,45 @@ Before creating any PR or writing feature code, agents MUST verify that `openspe
 - `spec.md`: Formal requirements using `WHEN ... THEN ...` format and explicit acceptance criteria.
 - `tasks.md`: Atomic, executable task checklist with TDD (Red-Green-Refactor) verification steps.
 
-## ✅ Definition of Done (DoD) for AI Agents
+## ✅ Definition of Done (DoD) & Technical Justifications
 
 Before declaring any task or issue completed, an AI agent MUST satisfy all criteria of the **Definition of Done**:
 
 ### 1. Code Quality & Architectural Integrity
-- [ ] Code compiles without warnings (`cargo clippy --all-targets --all-features -- -D warnings`).
-- [ ] Code formatting adheres strictly to `cargo fmt --check`.
-- [ ] All state/config mutations use `crate::state::write_atomic` (zero unbuffered overwrites).
-- [ ] Operating system paths use cross-platform `PathBuf::join` methods (no hardcoded `/` or `\` in join calls).
-- [ ] User configuration keys in `opencode.json` (or other harness configs) are preserved without clobbering.
+- [ ] **Zero Clippy Warnings (`cargo clippy --all-targets --all-features -- -D warnings`)**:
+  - *Justification*: Prevents unhandled error cases, memory leaks, unsound unsafe blocks, and performance anti-patterns before runtime compilation.
+- [ ] **Strict Formatting (`cargo fmt --check`)**:
+  - *Justification*: Ensures consistent codebase style, eliminates whitespace noise in Git diffs, and prevents merge conflicts across different operating systems.
+- [ ] **Atomic Writes (`crate::state::write_atomic`)**:
+  - *Justification*: Guarantees configuration files (`state.json`, `opencode.json`) are never left corrupted by unexpected process crashes or power loss (NIST SP 800-53 CP-9/CP-10 & ISO 27002 Control 8.9 compliance).
+- [ ] **Cross-Platform Path Joining (`PathBuf::join`)**:
+  - *Justification*: Operating systems use different path separators (Windows `\` vs Unix `/`). Hardcoded slashes cause test failures, path comparison bugs, and file lookup panics on Windows runners.
+- [ ] **Preservation of Unmanaged User Configurations**:
+  - *Justification*: Users rely on custom plugins and custom skills in `opencode.json`. Clobbering user keys destroys user configuration; targeted JSON merging protects user customization.
 
 ### 2. Testing & Empirical Verification
-- [ ] All unit and CLI integration tests pass (`cargo test`).
-- [ ] Containerized Docker E2E gate passes (`make e2e` or `cargo test --test e2e`).
-- [ ] Cross-platform CI pipeline passes 100% green on GitHub Actions across Linux (`ubuntu-latest`), macOS (`macos-latest`), and Windows (`windows-latest`).
-- [ ] Pull Requests MUST pass 100% of CI status checks; any failing PR is automatically rejected with `REQUEST_CHANGES` and commented with failure guidance.
+- [ ] **100% Passing Unit & Integration Tests (`cargo test`)**:
+  - *Justification*: Prevents functional regressions in archive extraction, manifest indexing, state diff calculation, and exit code mappings.
+- [ ] **Containerized Docker E2E Gate (`make e2e`)**:
+  - *Justification*: Validates real-world installation, sync, model setting, and uninstallation in a clean, isolated Linux container environment independent of host machine state.
+- [ ] **100% Green Cross-Platform CI Matrix**:
+  - *Justification*: Native binaries behave differently across operating systems. Verifying Linux (`ubuntu-latest`), macOS (`macos-latest`), and Windows (`windows-latest`) guarantees multi-platform reliability.
+- [ ] **Automated PR Rejection on CI Failure**:
+  - *Justification*: Enforces zero-tolerance for broken code on `main`. Automatically blocks PR merges and requests changes when any CI or security check fails.
 
 ### 3. Compliance, Governance & Security
-- [ ] Aligns with **ISO/IEC 27001/27002** (SHA256 manifests, atomic writes, `cargo-audit` clean).
-- [ ] Aligns with **ISO/IEC 42001** and **NIST AI RMF 1.0** (model role scoping, transparent state).
-- [ ] Zero secrets, tokens, credentials, or transient files (`.atl/`, `.pi/`, `.codegraph/`) committed to version control.
+- [ ] **ISO/IEC 27001/27002 Compliance (SHA256 Manifests & `cargo-audit`)**:
+  - *Justification*: Cryptographic SHA256 indexing detects asset tampering or file drift, while `cargo-audit` guarantees zero known CVE supply-chain vulnerabilities in third-party crates.
+- [ ] **ISO/IEC 42001 & NIST AI RMF 1.0 Compliance**:
+  - *Justification*: Scoping model assignments per agent role (`ce-brainstorm`, `ce-plan`, `ce-work`) ensures capability/cost matching while maintaining transparent state logging.
+- [ ] **Zero Secrets, Tokens, or Transient File Exposure**:
+  - *Justification*: Prevents catastrophic credential leaks (API keys, SSH keys, bearer tokens) and prevents committing local transient metadata (`.atl/`, `.pi/`, `.codegraph/`).
 
 ### 4. Documentation & Git Delivery
-- [ ] Updated user documentation (`README.md`, `SECURITY.md`, `AI_POLICY.md`, or CLI `--help` strings) if flags, subcommands, or schemas were altered.
-- [ ] Clear, value-communicating Git commit message added and pushed to remote branch.
+- [ ] **Updated User Documentation**:
+  - *Justification*: Outdated docs create user confusion, improper CLI usage, and support overhead. Any schema, command, or flag change requires updating `README.md`, `SECURITY.md`, or CLI `--help` strings.
+- [ ] **Conventional Commits & Clean Git History**:
+  - *Justification*: Clear commit messages provide auditability, enable automated changelog generation, and allow easy regression bisecting.
 
 ---
 
