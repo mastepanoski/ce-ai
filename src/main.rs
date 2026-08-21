@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 use crate::commands::{
-    backups, doctor, install, models, status, sync, uninstall, upgrade, Context,
+    backups, doctor, install, models, status, sync, tools, uninstall, upgrade, workflow, Context,
 };
 use crate::error::result_exit_code;
 
@@ -54,6 +54,10 @@ enum Commands {
     Doctor,
     /// Backup listing and point-in-time config recovery.
     Backups(backups::BackupsArgs),
+    /// Companion developer sidecars and memory tools manager (Engram, CodeGraph, Context7, RTK).
+    Tools(tools::Args),
+    /// Workflow FSM & progress recovery system across 7 development stages.
+    Workflow(workflow::Args),
 }
 
 fn main() {
@@ -74,6 +78,8 @@ fn main() {
         Some(Commands::Uninstall(args)) => uninstall::run(&ctx, &args),
         Some(Commands::Doctor) => doctor::run(&ctx),
         Some(Commands::Backups(args)) => backups::run(&ctx, &args),
+        Some(Commands::Tools(args)) => tools::run(&ctx, &args),
+        Some(Commands::Workflow(args)) => workflow::run(&ctx, &args),
         None => tui::run_interactive(&ctx),
     };
     if let Err(err) = &result {

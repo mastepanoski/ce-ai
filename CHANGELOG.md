@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-08-21
+
+### Added
+- **Workspace Scope Installation (Issue #7)**: Added `--scope workspace|global` flag in `ce-ai install` allowing repository-scoped skill installations (`./.opencode/`, `./.claude/`, `./.cursorrules`) resolved via `git rev-parse --show-toplevel`.
+- **Companion Tools Manager (Issue #9)**: Added `ce-ai tools status` and `ce-ai tools install` for managing developer sidecars and memory servers (`Engram`, `CodeGraph`, `Context7`, `RTK`).
+- **Workflow FSM & Recovery Engine (Issue #10)**: Added `ce-ai workflow status`, `ce-ai workflow checkpoint`, and `ce-ai workflow resume` tracking 7-stage development cycle progress and context recovery.
+- **Automated GitHub Release Workflow**: Added `.github/workflows/release.yml` for multi-platform cross-compilation on `main` branch pushes.
+- **Sync Verification Matrix**: Itemized SHA256 integrity reporting across all active host harnesses in `ce-ai sync`.
+
+---
+
 ## [0.4.0] - 2026-08-21
 
 ### Added
