@@ -122,6 +122,8 @@ Before declaring any task or issue completed, an AI agent MUST satisfy all crite
   - *Justification*: Validates real-world installation, sync, model setting, and uninstallation in a clean, isolated Linux container environment independent of host machine state.
 - [ ] **100% Green Cross-Platform CI Matrix**:
   - *Justification*: Native binaries behave differently across operating systems. Verifying Linux (`ubuntu-latest`), macOS (`macos-latest`), and Windows (`windows-latest`) guarantees multi-platform reliability.
+- [ ] **Windows PowerShell Installer Gate (`install.ps1`)**:
+  - *Justification*: Automatically verifies `scripts/install.ps1` downloads, extracts, and validates `ce-ai.exe` execution on native `windows-latest` GitHub Actions runners.
 - [ ] **Automated PR Rejection on CI Failure**:
   - *Justification*: Enforces zero-tolerance for broken code on `main`. Automatically blocks PR merges and requests changes when any CI or security check fails.
 

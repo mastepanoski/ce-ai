@@ -78,9 +78,29 @@ jobs:
       - name: Run Docker E2E Test Suite
         run: make e2e
 
+  windows-installation-gate:
+    name: Windows PowerShell Installer Gate (NIST SP 800-53)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Test PowerShell install.ps1 Script Execution
+        shell: powershell
+        run: |
+          ./scripts/install.ps1
+          $ExePath = "$env:USERPROFILE\.ce-ai\bin\ce-ai.exe"
+          if (Test-Path $ExePath) {
+              Write-Host "✅ Verified binary exists at $ExePath"
+              & $ExePath --version
+          } else {
+              Write-Error "❌ ce-ai.exe installation binary not found at $ExePath"
+              exit 1
+          }
+
   auto-reject-failed-pr:
     name: Auto-Reject PR on CI Failure
-    needs: [check-and-test, security-audit, docker-e2e-gate]
+    needs: [check-and-test, security-audit, docker-e2e-gate, windows-installation-gate]
     if: always() && contains(needs.*.result, 'failure') && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
