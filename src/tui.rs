@@ -84,6 +84,8 @@ struct App {
     detected_harnesses: Vec<HarnessKind>,
     model_assignments: Vec<(String, String)>, // (slot, model)
     output_modal: Option<(String, Vec<String>)>, // (title, lines)
+    selected_harness_idx: usize,
+    harness_targets: Vec<String>,
 }
 
 impl App {
@@ -95,9 +97,48 @@ impl App {
             detected_harnesses: Vec::new(),
             model_assignments: Vec::new(),
             output_modal: None,
+            selected_harness_idx: 0,
+            harness_targets: vec![
+                "all".into(),
+                "opencode".into(),
+                "claude".into(),
+                "pi".into(),
+                "cursor".into(),
+                "copilot".into(),
+                "codex".into(),
+                "grok".into(),
+                "kimi".into(),
+                "agy".into(),
+                "deepseek".into(),
+                "fx".into(),
+                "custom".into(),
+            ],
         };
         app.reload_state(ctx);
         app
+    }
+
+    fn selected_harness_target(&self) -> &str {
+        self.harness_targets
+            .get(self.selected_harness_idx)
+            .map(|s| s.as_str())
+            .unwrap_or("all")
+    }
+
+    fn next_harness(&mut self) {
+        if self.selected_harness_idx + 1 < self.harness_targets.len() {
+            self.selected_harness_idx += 1;
+        } else {
+            self.selected_harness_idx = 0;
+        }
+    }
+
+    fn prev_harness(&mut self) {
+        if self.selected_harness_idx > 0 {
+            self.selected_harness_idx -= 1;
+        } else {
+            self.selected_harness_idx = self.harness_targets.len() - 1;
+        }
     }
 
     fn reload_state(&mut self, ctx: &Context) {
@@ -200,6 +241,12 @@ fn run_app(
                         } else {
                             app.selected_tab = 0;
                         }
+                    }
+                    KeyCode::Left | KeyCode::Char('h') => {
+                        app.prev_harness();
+                    }
+                    KeyCode::Right | KeyCode::Char('l') => {
+                        app.next_harness();
                     }
                     KeyCode::Char('d') => {
                         app.dry_run = !app.dry_run;
@@ -376,8 +423,8 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
                 Line::from(""),
             ];
             if app.harnesses.is_empty() {
-                lines.push(Line::from(Span::styled("  ⚠️  No harnesses installed yet.", Style::default().fg(Color::Red))));
-                lines.push(Line::from("  Press [Enter] or select 'Install Plugin' to install CE."));
+                lines.push(Line::from(Span::styled("  ⚠️  No active harnesses installed yet.", Style::default().fg(Color::Red))));
+                lines.push(Line::from("  Use 'Install Plugin' tab to install CE into your host harness."));
             } else {
                 for (name, ver, src) in &app.harnesses {
                     lines.push(Line::from(vec![
@@ -388,8 +435,16 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
                 }
             }
             lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled("Host Detected Harnesses:", Style::default().fg(Color::Yellow))));
+            if app.detected_harnesses.is_empty() {
+                lines.push(Line::from("  (No host agent harnesses auto-detected in home directory)"));
+            } else {
+                let detected_names: Vec<String> = app.detected_harnesses.iter().map(|h| h.to_string()).collect();
+                lines.push(Line::from(format!("  Found: {}", detected_names.join(", "))));
+            }
+            lines.push(Line::from(""));
             lines.push(Line::from(Span::styled("Config Location:", Style::default().fg(Color::Yellow))));
-            lines.push(Line::from(format!("  {}", ctx.opencode_config_dir.join("opencode.json").display())));
+            lines.push(Line::from(format!("  {}", ctx.config_dir.display())));
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled("Press [Enter] to run full status check.", Style::default().fg(Color::Gray))));
             lines
@@ -397,9 +452,26 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
         MenuTab::Install => vec![
             Line::from(Span::styled("Install Compound Engineering Plugin:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
             Line::from(""),
-            Line::from("  - Downloads and installs the CE loader & 200+ skills into OpenCode."),
-            Line::from("  - Creates automatic backup of ~/.config/opencode/opencode.json."),
-            Line::from("  - Preserves existing user plugins & skill paths."),
+            Line::from(vec![
+                Span::styled("  Target Harness: ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    format!("< [ {} ] >", app.selected_harness_target()),
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("  (Press ◄/► or h/l to switch)", Style::default().fg(Color::Gray)),
+            ]),
+            Line::from(""),
+            Line::from(format!(
+                "  - Target selection: {}",
+                if app.selected_harness_target() == "all" {
+                    "All host-detected agent harnesses"
+                } else {
+                    app.selected_harness_target()
+                }
+            )),
+            Line::from("  - Downloads and installs CE loader & 200+ skills into selected harness."),
+            Line::from("  - Creates automatic backup of host configuration."),
+            Line::from("  - Preserves existing user plugins & custom skill paths."),
             Line::from(""),
             Line::from(vec![
                 Span::raw("  Mode: "),
@@ -407,9 +479,13 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
                     if app.dry_run { "PREVIEW (Dry-Run)" } else { "APPLY (Real Write)" },
                     Style::default().fg(if app.dry_run { Color::Yellow } else { Color::Green }).add_modifier(Modifier::BOLD),
                 ),
+                Span::styled("  (Press 'd' to toggle)", Style::default().fg(Color::Gray)),
             ]),
             Line::from(""),
-            Line::from(Span::styled("👉 Press [Enter] to execute installation.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled(
+                format!("👉 Press [Enter] to execute installation for target [{}].", app.selected_harness_target()),
+                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            )),
         ],
         MenuTab::Models => {
             let mut lines = vec![
@@ -434,23 +510,24 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
             Line::from(Span::styled("Reconcile Drift (Sync):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
             Line::from(""),
             Line::from("  - Compares managed files against the installed SHA256 manifest."),
-            Line::from("  - Restores tampered or missing plugin files."),
+            Line::from("  - Restores tampered or missing plugin files across active harnesses."),
             Line::from(""),
             Line::from(Span::styled("👉 Press [Enter] to execute sync.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
         ],
         MenuTab::Upgrade => vec![
-            Line::from(Span::styled("Upgrade CE Plugin:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("Upgrade CE Plugin Release:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
             Line::from(""),
-            Line::from("  - Fetches the latest release from GitHub (everyinc/compound-engineering-plugin)."),
-            Line::from("  - Caches tarball and SHA256 digest under ~/.ce-ai/cache/."),
-            Line::from("  - Runs sync to update local skills and loaders."),
+            Line::from(format!("  - Current CLI Version: v{}", env!("CARGO_PKG_VERSION"))),
+            Line::from("  - Target Repository: everyinc/compound-engineering-plugin"),
+            Line::from("  - Fetches the latest release tag and updates local release cache."),
+            Line::from("  - Runs automatic sync to update local skills and loaders across active harnesses."),
             Line::from(""),
-            Line::from(Span::styled("👉 Press [Enter] to run upgrade.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("👉 Press [Enter] to fetch latest release and upgrade.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
         ],
         MenuTab::Doctor => vec![
             Line::from(Span::styled("Health Doctor Diagnostics:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
             Line::from(""),
-            Line::from("  - Validates opencode.json JSON structure."),
+            Line::from("  - Validates harness config JSON structures."),
             Line::from("  - Verifies managed asset integrity and state consistency."),
             Line::from("  - Reports non-zero exit on findings."),
             Line::from(""),
@@ -459,11 +536,23 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
         MenuTab::Uninstall => vec![
             Line::from(Span::styled("Uninstall Plugin & Restore Config:", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))),
             Line::from(""),
-            Line::from("  - Restores opencode.json from the latest timestamped backup."),
-            Line::from("  - Removes ~/.config/opencode/compound-engineering/."),
+            Line::from(vec![
+                Span::styled("  Target Harness: ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    format!("< [ {} ] >", app.selected_harness_target()),
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("  (Press ◄/► or h/l to switch)", Style::default().fg(Color::Gray)),
+            ]),
+            Line::from(""),
+            Line::from("  - Restores target harness config from the latest timestamped backup."),
+            Line::from("  - Removes managed compound-engineering plugin files."),
             Line::from("  - Cleans internal state."),
             Line::from(""),
-            Line::from(Span::styled("👉 Press [Enter] to execute uninstallation.", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled(
+                format!("👉 Press [Enter] to execute uninstallation for target [{}].", app.selected_harness_target()),
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            )),
         ],
         MenuTab::Exit => vec![
             Line::from(""),
@@ -568,27 +657,44 @@ fn run_status_cmd(ctx: &Context) -> Vec<String> {
 fn run_install_cmd(ctx: &Context, app: &App, dry_run: bool) -> Vec<String> {
     let mut install_ctx = ctx.clone();
     install_ctx.dry_run = dry_run;
-    let target_harnesses = if app.detected_harnesses.is_empty() {
-        vec![HarnessKind::Opencode]
+
+    let selected = app.selected_harness_target();
+    let target_harnesses: Vec<String> = if selected == "all" {
+        if app.detected_harnesses.is_empty() {
+            vec!["opencode".into()]
+        } else {
+            app.detected_harnesses
+                .iter()
+                .map(|h| h.to_string())
+                .collect()
+        }
     } else {
-        app.detected_harnesses.clone()
+        vec![selected.to_string()]
     };
 
     let mut out = vec![
-        "✅ Multi-harness installation completed!".to_string(),
+        format!("✅ Installation completed for target: [{selected}]"),
         "".to_string(),
     ];
-    for harness_kind in &target_harnesses {
+    for harness_str in &target_harnesses {
         let args = install::Args {
-            harness: harness_kind.to_string(),
+            harness: harness_str.clone(),
             source: None,
         };
         match install::run(&install_ctx, &args) {
-            Ok(_) => out.push(format!("  • {harness_kind}: OK")),
-            Err(err) => out.push(format!("  • {harness_kind}: {err}")),
+            Ok(_) => out.push(format!("  • {harness_str}: OK")),
+            Err(err) => out.push(format!("  • {harness_str}: {err}")),
         }
     }
     out.push("".to_string());
+    out.push(format!(
+        "Mode: {}",
+        if dry_run {
+            "Dry-run (Preview)"
+        } else {
+            "Applied"
+        }
+    ));
     out
 }
 
@@ -639,7 +745,10 @@ fn run_upgrade_cmd(ctx: &Context) -> Vec<String> {
         source: None,
     };
     match upgrade::run(ctx, &args) {
-        Ok(_) => vec!["✅ Upgrade completed successfully!".to_string()],
+        Ok(_) => vec![
+            "✅ Upgrade completed successfully!".to_string(),
+            format!("Updated to version: v{}", env!("CARGO_PKG_VERSION")),
+        ],
         Err(err) => vec![format!("❌ Upgrade failed: {err}")],
     }
 }
@@ -655,14 +764,19 @@ fn run_doctor_cmd(ctx: &Context) -> Vec<String> {
 }
 
 fn run_uninstall_cmd(ctx: &Context, app: &App) -> Vec<String> {
-    let target_harnesses = if app.harnesses.is_empty() {
-        vec!["opencode".to_string()]
+    let selected = app.selected_harness_target();
+    let target_harnesses: Vec<String> = if selected == "all" {
+        if app.harnesses.is_empty() {
+            vec!["opencode".to_string()]
+        } else {
+            app.harnesses.iter().map(|(n, _, _)| n.clone()).collect()
+        }
     } else {
-        app.harnesses.iter().map(|(n, _, _)| n.clone()).collect()
+        vec![selected.to_string()]
     };
 
     let mut out = vec![
-        "✅ Multi-harness uninstallation completed!".to_string(),
+        format!("✅ Uninstallation completed for target: [{selected}]"),
         "".to_string(),
     ];
     for harness in &target_harnesses {
