@@ -1,18 +1,37 @@
 # `ce-ai` — Compound Engineering Plugin Manager CLI
 
-`ce-ai` is a fast, safe Rust CLI for installing, syncing, upgrading, and managing model assignments for the **[Compound Engineering Plugin](https://github.com/Every-One-AI/compound-engineering)** across AI agent harnesses (starting with OpenCode v1).
+`ce-ai` is a fast, safe Rust CLI for installing, syncing, upgrading, and managing model assignments for the **[Compound Engineering Plugin](https://github.com/Every-One-AI/compound-engineering)** across 12 AI agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `deepseek`, `fx`, and `custom`).
 
 > [!NOTE]
 > `ce-ai` manages distributions of the open-source **[Compound Engineering Plugin](https://github.com/Every-One-AI/compound-engineering)** — a suite of specialized skills, roles, and workflows for AI coding assistants.
 
 ## Features
 
-- **Direct OpenCode Integration**: Installs CE loader and registers skills without clobbering existing configuration (`~/.config/opencode/opencode.json`).
+- **Multi-Harness Native Support**: Supports 12 AI coding harnesses with native config mergers (`opencode`, `claude`, `pi`), Markdown block delimiters (`cursor`, `copilot`), and generic JSON structures (`codex`, `grok`, `kimi`, `agy`, `deepseek`, `fx`, `custom`).
+- **Auto-Detection (`--all`)**: Auto-detects installed harnesses on the host system and installs/syncs across all active environments with a single command.
+- **Multi-Harness Model Sync**: Assign models per agent slot (`ce-brainstorm`, `ce-plan`, etc.) and automatically sync assignments across all installed harness configurations simultaneously.
 - **Safe Extraction & Caching**: Validates tarball structures against path traversal attacks (zip-slip prevention) and maintains SHA256-verified release caches.
-- **Model Assignments & Profiles**: Set models per agent slot (`ce-brainstorm`, `ce-plan`, etc.) and take append-only snapshot profiles.
+- **Model Assignments & Profiles**: Take append-only snapshot profiles and restore role assignments cleanly.
 - **Diff & Reconcile (Sync)**: Inspect drift, preview planned updates with `--dry-run`, and repair modified or deleted managed assets.
-- **Automatic Backups & Clean Uninstallation**: Pre-mutation configuration is backed up automatically (`~/.ce-ai/backups/`) and `ce-ai uninstall` restores the original pre-install configuration cleanly.
+- **Automatic Backups & Clean Uninstallation**: Pre-mutation configuration is backed up automatically (`~/.ce-ai/backups/`) and `ce-ai uninstall` restores original pre-install configurations cleanly.
 - **Health Doctor**: Diagnose configuration errors, drift, and state inconsistency.
+
+## Supported Harness Matrix
+
+| Harness Identifier | Config File / Location | Strategy |
+| :--- | :--- | :--- |
+| `opencode` | `~/.config/opencode/opencode.json` | JSON Array Merger (`plugin` & `skills`) |
+| `claude` | `~/.claude.json` / `~/.config/claude/` | JSON Config Merger |
+| `pi` | `~/.pi/config.json` / `~/.pi/skills/` | JSON Merger & Native Skill Directory Copy |
+| `cursor` | `.cursorrules` / `.cursor/rules/` | Markdown Rule Block Ingestion (`<!-- CE-AI MANAGED BLOCK -->`) |
+| `copilot` | `.github/copilot-instructions.md` | Markdown Instruction Block Ingestion |
+| `codex` | `~/.codex/config.json` | Generic JSON Config Merger |
+| `grok` | `~/.grok/config.json` | Generic JSON Config Merger |
+| `kimi` | `~/.kimi/config.json` | Generic JSON Config Merger |
+| `agy` | `~/.gemini/antigravity-cli/config.json` | Generic JSON Merger & Skill Copy |
+| `deepseek` | `~/.deepseek/config.json` | Generic JSON Config Merger |
+| `fx` | `~/.fx/config.json` | Generic JSON Config Merger |
+| `custom` | Specified via CLI flags | Fallback Custom Config Mode |
 
 ## Installation
 
@@ -32,22 +51,30 @@ cargo install --path .
 
 ### 1. Install Plugin
 
-Install from the latest GitHub release (default):
+Install into a specific harness (e.g. Claude Code, Cursor, or OpenCode):
 
 ```bash
+ce-ai install --harness claude
+ce-ai install --harness cursor
 ce-ai install --harness opencode
+```
+
+Install into **all auto-detected host harnesses**:
+
+```bash
+ce-ai install --all
 ```
 
 Install from a local source repository or directory:
 
 ```bash
-ce-ai install --harness opencode --source /path/to/compound-engineering-plugin
+ce-ai install --harness claude --source /path/to/compound-engineering-plugin
 ```
 
 Preview changes without modifying disk:
 
 ```bash
-ce-ai install --harness opencode --dry-run
+ce-ai install --all --dry-run
 ```
 
 ### 2. View Status & Check Health
@@ -104,9 +131,10 @@ ce-ai models profile load my-profile
 To completely remove `ce-ai` and restore your system:
 
 #### Step 1: Restore Harness Config & Remove Plugin
-Restore your original harness configuration (`opencode.json`) and remove managed plugin files:
+Restore original harness configurations and remove managed plugin files across installed harnesses:
 
 ```bash
+ce-ai uninstall --harness claude
 ce-ai uninstall --harness opencode
 ```
 
@@ -128,17 +156,17 @@ rm -rf ~/.ce-ai
 
 ## Backup, Restore & Uninstallation Architecture
 
-`ce-ai` is built with a zero-data-loss guarantee for host harness configurations.
+`ce-ai` is built with a zero-data-loss guarantee for host harness configurations across all supported harnesses.
 
 ### 1. Automatic Pre-Mutation Backups
-- Before any file write or configuration update during `install` or `models set`, `ce-ai` checks if a pre-existing harness config (`~/.config/opencode/opencode.json`) exists.
-- If present, `ce-ai` creates a timestamped backup copy inside `~/.ce-ai/backups/<utc-timestamp>/opencode.json`.
+- Before any file write or configuration update during `install` or `models set`, `ce-ai` checks if pre-existing harness configs (e.g. `opencode.json`, `.claude.json`, `.cursorrules`) exist.
+- If present, `ce-ai` creates a timestamped backup copy inside `~/.ce-ai/backups/<utc-timestamp>/`.
 - The backup path is registered in the managed manifest (`install-manifest.json`).
 
 ### 2. Atomic Uninstallation (`uninstall`)
-Running `ce-ai uninstall --harness opencode`:
-1. **Restores Original Config**: Locates the latest backup in `~/.ce-ai/backups/` and atomically restores `opencode.json` to its exact pre-install content.
-2. **Removes Created Files**: If `opencode.json` did not exist before `ce-ai install`, it is cleanly deleted rather than left behind.
+Running `ce-ai uninstall --harness <name>`:
+1. **Restores Original Config**: Locates the latest backup in `~/.ce-ai/backups/` and atomically restores the target config to its exact pre-install content.
+2. **Removes Created Files**: If configuration files or Markdown blocks were created by `ce-ai install`, they are cleanly deleted or stripped rather than left behind.
 3. **Purges Managed Directory**: Deletes `<harness-config>/compound-engineering/` containing loaders, installed skills, and `install-manifest.json`.
 4. **Cleans State**: Updates `~/.ce-ai/state.json` to reflect that the harness is uninstalled.
 
