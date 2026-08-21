@@ -12,7 +12,9 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use crate::commands::{doctor, install, models, status, sync, uninstall, upgrade, Context};
+use crate::commands::{
+    backups, doctor, install, models, status, sync, uninstall, upgrade, Context,
+};
 use crate::error::result_exit_code;
 
 #[derive(Parser)]
@@ -50,6 +52,8 @@ enum Commands {
     Uninstall(uninstall::Args),
     /// Report config validity, drift, and state consistency.
     Doctor,
+    /// Backup listing and point-in-time config recovery.
+    Backups(backups::BackupsArgs),
 }
 
 fn main() {
@@ -69,6 +73,7 @@ fn main() {
         Some(Commands::Status) => status::run(&ctx),
         Some(Commands::Uninstall(args)) => uninstall::run(&ctx, &args),
         Some(Commands::Doctor) => doctor::run(&ctx),
+        Some(Commands::Backups(args)) => backups::run(&ctx, &args),
         None => tui::run_interactive(&ctx),
     };
     if let Err(err) = &result {

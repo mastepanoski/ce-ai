@@ -114,6 +114,42 @@ impl HarnessKind {
             .filter(|h| h.is_installed_on_host(home_dir))
             .collect()
     }
+
+    /// Return string slice representation of the harness kind.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            HarnessKind::Opencode => "opencode",
+            HarnessKind::Claude => "claude",
+            HarnessKind::Pi => "pi",
+            HarnessKind::Cursor => "cursor",
+            HarnessKind::Copilot => "copilot",
+            HarnessKind::Codex => "codex",
+            HarnessKind::Grok => "grok",
+            HarnessKind::Kimi => "kimi",
+            HarnessKind::Agy => "agy",
+            HarnessKind::Deepseek => "deepseek",
+            HarnessKind::Fx => "fx",
+            HarnessKind::Custom => "custom",
+        }
+    }
+
+    /// Resolves target configuration file path for the harness given a base config directory.
+    pub fn config_path(&self, base_dir: &Path) -> PathBuf {
+        match self {
+            HarnessKind::Opencode => base_dir.join("opencode.json"),
+            HarnessKind::Claude => base_dir.join("claude.json"),
+            HarnessKind::Pi => base_dir.join("config.json"),
+            HarnessKind::Cursor => base_dir.join(".cursorrules"),
+            HarnessKind::Copilot => base_dir.join("copilot-instructions.md"),
+            HarnessKind::Codex => base_dir.join("codex.json"),
+            HarnessKind::Grok => base_dir.join("grok.json"),
+            HarnessKind::Kimi => base_dir.join("kimi.json"),
+            HarnessKind::Agy => base_dir.join("antigravity.json"),
+            HarnessKind::Deepseek => base_dir.join("deepseek.json"),
+            HarnessKind::Fx => base_dir.join("fx.json"),
+            HarnessKind::Custom => base_dir.join("custom.json"),
+        }
+    }
 }
 
 impl FromStr for HarnessKind {

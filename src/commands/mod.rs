@@ -1,5 +1,6 @@
 //! CLI subcommands: install, sync, upgrade, models, status, uninstall, doctor.
 
+pub mod backups;
 pub mod doctor;
 pub mod install;
 pub mod models;

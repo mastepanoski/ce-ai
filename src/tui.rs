@@ -45,6 +45,7 @@ pub enum MenuTab {
     Sync,
     Upgrade,
     Doctor,
+    Backups,
     Uninstall,
     Exit,
 }
@@ -58,6 +59,7 @@ impl MenuTab {
             MenuTab::Sync,
             MenuTab::Upgrade,
             MenuTab::Doctor,
+            MenuTab::Backups,
             MenuTab::Uninstall,
             MenuTab::Exit,
         ]
@@ -71,6 +73,7 @@ impl MenuTab {
             MenuTab::Sync => "🔄  Sync & Reconcile",
             MenuTab::Upgrade => "🚀  Upgrade Release",
             MenuTab::Doctor => "🩺  Health Doctor",
+            MenuTab::Backups => "💾  Backups & Restore",
             MenuTab::Uninstall => "🗑️   Uninstall Plugin",
             MenuTab::Exit => "❌  Quit Dashboard",
         }
@@ -86,6 +89,8 @@ struct App {
     output_modal: Option<(String, Vec<String>)>, // (title, lines)
     selected_harness_idx: usize,
     harness_targets: Vec<String>,
+    selected_backup_idx: usize,
+    backups: Vec<crate::state::backups::BackupEntry>,
 }
 
 impl App {
@@ -98,6 +103,8 @@ impl App {
             model_assignments: Vec::new(),
             output_modal: None,
             selected_harness_idx: 0,
+            selected_backup_idx: 0,
+            backups: Vec::new(),
             harness_targets: vec![
                 "all".into(),
                 "opencode".into(),
@@ -166,6 +173,14 @@ impl App {
                     format!("{}/{}", model_info.provider_id, model_info.model_id),
                 ));
             }
+        }
+
+        let backups_dir = ctx.config_dir.join("backups");
+        let filter = self.selected_harness_target();
+        self.backups =
+            crate::state::backups::list_backups(&backups_dir, Some(filter)).unwrap_or_default();
+        if self.selected_backup_idx >= self.backups.len() && !self.backups.is_empty() {
+            self.selected_backup_idx = self.backups.len() - 1;
         }
     }
 
@@ -244,14 +259,16 @@ fn run_app(
                     }
                     KeyCode::Left | KeyCode::Char('h') => {
                         app.prev_harness();
+                        app.reload_state(ctx);
                     }
                     KeyCode::Right | KeyCode::Char('l') => {
                         app.next_harness();
+                        app.reload_state(ctx);
                     }
                     KeyCode::Char('d') => {
                         app.dry_run = !app.dry_run;
                     }
-                    KeyCode::Enter => {
+                    KeyCode::Enter | KeyCode::Char('r') => {
                         let dry_run = app.dry_run;
                         match app.current_tab() {
                             MenuTab::Status => {
@@ -274,6 +291,10 @@ fn run_app(
                             }
                             MenuTab::Doctor => {
                                 execute_action(app, "Doctor Diagnostics", || run_doctor_cmd(ctx));
+                            }
+                            MenuTab::Backups => {
+                                let lines = run_restore_backup_cmd(ctx, app);
+                                execute_action(app, "Restore Backup", move || lines);
                             }
                             MenuTab::Uninstall => {
                                 let lines = run_uninstall_cmd(ctx, app);
@@ -533,6 +554,55 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
             Line::from(""),
             Line::from(Span::styled("👉 Press [Enter] to run health doctor.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
         ],
+        MenuTab::Backups => {
+            let mut lines = vec![
+                Line::from(Span::styled("Historical Configuration Backups:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("  Target Filter: ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        format!("< [ {} ] >", app.selected_harness_target()),
+                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled("  (Press ◄/► or h/l to switch)", Style::default().fg(Color::Gray)),
+                ]),
+                Line::from(""),
+            ];
+            if app.backups.is_empty() {
+                lines.push(Line::from(Span::styled("  (No backups found for current harness target)", Style::default().fg(Color::Gray))));
+            } else {
+                lines.push(Line::from(Span::styled(
+                    "   ID                       HARNESS      TIMESTAMP                SIZE",
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                )));
+                lines.push(Line::from(Span::styled(
+                    "   -----------------------------------------------------------------------",
+                    Style::default().fg(Color::DarkGray),
+                )));
+                for (idx, b) in app.backups.iter().enumerate() {
+                    let selected = idx == app.selected_backup_idx;
+                    let prefix = if selected { " 👉 " } else { "    " };
+                    let style = if selected {
+                        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(Color::White)
+                    };
+                    lines.push(Line::from(vec![
+                        Span::styled(prefix, Style::default().fg(Color::Green)),
+                        Span::styled(
+                            format!("{:<24} {:<12} {:<24} {} B", b.id, b.harness, b.timestamp_rfc3339, b.size_bytes),
+                            style,
+                        ),
+                    ]));
+                }
+            }
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "👉 Press [Enter] or 'r' to restore selected backup snapshot.",
+                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            )));
+            lines
+        }
         MenuTab::Uninstall => vec![
             Line::from(Span::styled("Uninstall Plugin & Restore Config:", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))),
             Line::from(""),
@@ -791,4 +861,33 @@ fn run_uninstall_cmd(ctx: &Context, app: &App) -> Vec<String> {
         }
     }
     out
+}
+
+fn run_restore_backup_cmd(ctx: &Context, app: &mut App) -> Vec<String> {
+    if app.backups.is_empty() {
+        return vec!["No backups found for the selected harness target.".to_string()];
+    }
+
+    let idx = app.selected_backup_idx.min(app.backups.len() - 1);
+    let entry = &app.backups[idx];
+
+    let target_harness = entry
+        .harness
+        .parse::<HarnessKind>()
+        .unwrap_or(HarnessKind::Opencode);
+    let target_path = target_harness.config_path(&ctx.opencode_config_dir);
+    let backups_dir = ctx.config_dir.join("backups");
+
+    match crate::state::backups::restore_backup_by_id(&backups_dir, &entry.id, &target_path) {
+        Ok(restored) => {
+            app.reload_state(ctx);
+            vec![
+                format!("✅ Successfully restored backup '{}'", restored.id),
+                format!("   Harness Target: {}", restored.harness),
+                format!("   Restored File: {}", restored.file_name),
+                format!("   Config Path: {}", target_path.display()),
+            ]
+        }
+        Err(err) => vec![format!("❌ Failed to restore backup: {}", err)],
+    }
 }
