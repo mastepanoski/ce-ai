@@ -1,6 +1,9 @@
 # `ce-ai` — Compound Engineering Plugin Manager CLI
 
-`ce-ai` is a fast, safe Rust CLI for installing, syncing, upgrading, and managing model assignments for the **compound-engineering plugin** across AI agent harnesses (starting with OpenCode v1).
+`ce-ai` is a fast, safe Rust CLI for installing, syncing, upgrading, and managing model assignments for the **[Compound Engineering Plugin](https://github.com/Every-One-AI/compound-engineering)** across AI agent harnesses (starting with OpenCode v1).
+
+> [!NOTE]
+> `ce-ai` manages distributions of the open-source **[Compound Engineering Plugin](https://github.com/Every-One-AI/compound-engineering)** — a suite of specialized skills, roles, and workflows for AI coding assistants.
 
 ## Features
 
