@@ -34,13 +34,10 @@ pub struct Args {
     pub source: Option<PathBuf>,
 }
 
+use crate::harness::HarnessKind;
+
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
-    if args.harness != "opencode" {
-        return Err(CeError::Usage(format!(
-            "unsupported harness '{}' — v1 supports opencode only",
-            args.harness
-        )));
-    }
+    let _harness_kind = args.harness.parse::<HarnessKind>()?;
 
     let (source_path, version, source_json, tmp_dir) = resolve_source(ctx, &args.source)?;
 

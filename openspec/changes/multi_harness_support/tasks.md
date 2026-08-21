@@ -9,7 +9,7 @@
 ### Phase 1: Harness Domain Model & CLI Expansion
 - [x] **Task 1.1**: Define `HarnessKind` enum and `HarnessAdapter` trait in `src/harness/mod.rs`.
   - *Verification*: `cargo test harness::tests::enum_parsing_and_resolution`
-- [ ] **Task 1.2**: Update CLI Clap subcommand parser for `--harness` and `--all` flags in `src/main.rs`.
+- [x] **Task 1.2**: Update CLI Clap subcommand parser for `--harness` and `--all` flags in `src/main.rs`.
   - *Verification*: `cargo test tests::cli::install_unknown_harness_exits_usage_code`
 
 ### Phase 2: Native Harness Adapters Implementation

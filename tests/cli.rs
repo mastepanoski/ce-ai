@@ -175,7 +175,7 @@ fn install_unknown_harness_exits_usage_code() {
     let source = ce_source(tmp.path());
 
     ceai(&config_dir, &home)
-        .args(["install", "--harness", "codex", "--source"])
+        .args(["install", "--harness", "unknown_foo_harness", "--source"])
         .arg(&source)
         .assert()
         .failure()
