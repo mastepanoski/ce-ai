@@ -1,3 +1,22 @@
+---
+title: "ISO 27001 Security Audit Suite & Sub-50ms Performance Benchmarks"
+date: "2026-08-21"
+category: "security"
+problem_type: "security_vulnerability"
+component: "security"
+symptoms:
+  - "Need explicit verification for path traversal payload rejection"
+  - "Need sub-50ms execution bound guarantee for state diffing and hash calculation"
+root_cause: "Absence of dedicated security threat matrix test suite and performance benchmark harness"
+resolution_type: "code_fix"
+tags:
+  - "iso27001"
+  - "iso27002"
+  - "security"
+  - "benchmarks"
+  - "hardening"
+---
+
 # Solution: ISO 27001 Threat Matrix Audit Suite & Performance Benchmarks (Release v0.9.0)
 
 ## Problem Statement
