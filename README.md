@@ -77,7 +77,7 @@ Preview changes without modifying disk:
 ce-ai install --all --dry-run
 ```
 
-> 📖 **Architecture & Deep Dive Documentation**: Read the **[Architectural & Conceptual Guide](docs/user-guide/architectural-and-conceptual-guide.md)**, **[FSM & Checkpoints Masterclass Guide](docs/user-guide/fsm-and-checkpoints-explained.md)**, and **[Installation & Coexistence Guide](docs/user-guide/installation-and-coexistence-mechanisms.md)** for a complete systems engineering breakdown of multi-harness orchestration, workspace scope isolation, sidecars (Engram/CodeGraph), workflow FSM state recovery, and POSIX atomic I/O guarantees.
+> 📖 **Architecture & Deep Dive Documentation**: Read the **[Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md)**, **[Architectural & Conceptual Guide](docs/user-guide/architectural-and-conceptual-guide.md)**, **[FSM & Checkpoints Masterclass Guide](docs/user-guide/fsm-and-checkpoints-explained.md)**, and **[Installation & Coexistence Guide](docs/user-guide/installation-and-coexistence-mechanisms.md)** for a complete systems engineering breakdown of multi-harness orchestration, workspace scope isolation, sidecars (Engram/CodeGraph), workflow FSM state recovery, and POSIX atomic I/O guarantees.
 
 ### 2. View Status & Check Health
 
