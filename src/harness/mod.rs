@@ -45,37 +45,52 @@ impl HarnessKind {
         ]
     }
 
-    /// Check if harness configuration exists on the host system.
+    /// Check if harness directory or configuration exists on the host system.
     pub fn is_installed_on_host(&self, home_dir: &Path) -> bool {
         match self {
-            HarnessKind::Opencode => home_dir
-                .join(".config")
-                .join("opencode")
-                .join("opencode.json")
-                .exists(),
+            HarnessKind::Opencode => {
+                home_dir.join(".config").join("opencode").exists()
+                    || home_dir.join(".opencode").exists()
+            }
             HarnessKind::Claude => {
-                home_dir.join(".claude.json").exists()
+                home_dir.join(".claude").exists()
+                    || home_dir.join(".claude.json").exists()
                     || home_dir.join(".config").join("claude").exists()
             }
-            HarnessKind::Pi => home_dir.join(".pi").join("config.json").exists(),
+            HarnessKind::Pi => home_dir.join(".pi").exists() || home_dir.join(".pi-lens").exists(),
             HarnessKind::Cursor => {
-                home_dir.join(".cursorrules").exists()
-                    || home_dir.join(".cursor").join("rules").exists()
+                home_dir.join(".cursor").exists() || home_dir.join(".cursorrules").exists()
             }
-            HarnessKind::Copilot => home_dir
-                .join(".github")
-                .join("copilot-instructions.md")
-                .exists(),
-            HarnessKind::Codex => home_dir.join(".codex").join("config.json").exists(),
-            HarnessKind::Grok => home_dir.join(".grok").join("config.json").exists(),
-            HarnessKind::Kimi => home_dir.join(".kimi").join("config.json").exists(),
-            HarnessKind::Agy => home_dir
-                .join(".gemini")
-                .join("antigravity-cli")
-                .join("config.json")
-                .exists(),
-            HarnessKind::Deepseek => home_dir.join(".deepseek").join("config.json").exists(),
-            HarnessKind::Fx => home_dir.join(".fx").join("config.json").exists(),
+            HarnessKind::Copilot => {
+                home_dir.join(".copilot").exists()
+                    || home_dir
+                        .join(".github")
+                        .join("copilot-instructions.md")
+                        .exists()
+            }
+            HarnessKind::Codex => {
+                home_dir.join(".codex").exists() || home_dir.join(".config").join("codex").exists()
+            }
+            HarnessKind::Grok => {
+                home_dir.join(".grok").exists() || home_dir.join(".config").join("grok").exists()
+            }
+            HarnessKind::Kimi => {
+                home_dir.join(".kimi").exists()
+                    || home_dir.join(".kimi-code").exists()
+                    || home_dir.join(".config").join("kimi").exists()
+            }
+            HarnessKind::Agy => {
+                home_dir.join(".gemini").join("antigravity-cli").exists()
+                    || home_dir.join(".gemini").exists()
+                    || home_dir.join(".config").join("antigravity").exists()
+            }
+            HarnessKind::Deepseek => {
+                home_dir.join(".deepseek").exists()
+                    || home_dir.join(".config").join("deepseek").exists()
+            }
+            HarnessKind::Fx => {
+                home_dir.join(".fx").exists() || home_dir.join(".config").join("fx").exists()
+            }
             HarnessKind::Custom => false,
         }
     }
