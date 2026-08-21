@@ -127,13 +127,34 @@ flowchart TD
 - **Behavior**: When a user or agent doesn't have a concrete feature description yet, `ce-ideate` runs first to generate and evaluate surprise options or architectural directions.
 - **Transition**: Once an idea is chosen from `ce-ideate`, the FSM transitions to `ce-brainstorm` (to build the formal requirements document) and then moves forward to Stage 2 (`OpenSpec`).
 
-### 2. How `ce-debug` Operates in Stage 4/5 (Diagnostic Sub-Loop)
-- **Role**: `ce-debug` is an **Interrupt Sub-Loop** triggered whenever a bug, test failure, or regression is encountered during **Stage 4 (Work)** or **Stage 5 (Verify)**.
-- **Behavior**:
-  1. **Interrupt State**: Suspends linear forward progression and freezes current task state.
-  2. **Diagnostic Loop**: Executes empirical hypothesis testing ➔ log extraction ➔ root cause identification ➔ minimal reproducer.
-  3. **Fix Verification**: Applies the fix and verifies clean test execution.
-- **Transition**: Once verified, `ce-debug` returns control to Stage 4 (`ce-work`) or Stage 5 (`Verify`). If the bug fix uncovered a non-obvious learning or codebase gotcha, it flags **Stage 6 (`ce-compound`)** to capture the solution in `docs/solutions/` before shipping.
+### 2. How `ce-debug` Operates in Stage 4/5 (Diagnostic Sub-Loop & Direct Entry Point)
+
+#### Can I start an FSM cycle directly with `ce-debug`?
+**YES! Absolutely.** When your goal is repairing a bug, resolving a crash, or fixing a failing test (rather than building a new feature from scratch), `ce-debug` serves as a **Direct Entry Point** to the FSM cycle.
+
+```mermaid
+flowchart TD
+    START[Bug Report / Failing Test / Production Error] --> ENTRY[Direct Entry Point: ce-debug]
+    ENTRY --> DIAGNOSE[Stage 4: Diagnosis & Root Cause Identification]
+    DIAGNOSE --> REPRODUCE[Write Failing Test Case / Minimal Reproducer]
+    REPRODUCE --> FIX[Apply Root Cause Fix & Verify Green]
+    FIX --> VERIFY[Stage 5: Empirical Verification: cargo test / make e2e]
+    VERIFY --> COMPOUND[Stage 6: ce-compound: Store Learning in docs/solutions/]
+    COMPOUND --> SHIP[Stage 7: ce-commit-push-pr: Ship Fix via PR]
+```
+
+#### What happens when starting with `ce-debug`?
+
+1. **Bypasses Feature Planning (Stages 1–3)**: Since you are repairing an existing system defect rather than inventing new product behavior, the FSM bypasses Stage 1 (`Ideation`) and Stage 2 (`OpenSpec`).
+2. **Direct Entry into Stage 4 (Work/TDD & Diagnosis)**: The FSM initializes directly in Stage 4 under the diagnostic state.
+3. **Empirical Diagnostic Cycle**:
+   - *Log Inspection*: Reads un-truncated error tracebacks and failing test outputs.
+   - *Minimal Reproducer*: Writes a failing test case reproducing the issue.
+   - *Root Cause Fix*: Traces the defect upstream and applies a targeted fix (never masking symptoms with dummy fallbacks or swallowing exceptions).
+4. **Mandatory Knowledge Capture (Stage 6: `ce-compound`)**:
+   - Once verified in Stage 5, if the bug fix uncovered a non-obvious discovery, architectural gotcha, or edge case, `ce-debug` triggers **Stage 6 (`ce-compound`)**.
+   - Captures the solution in `docs/solutions/` and updates `CONCEPTS.md`, enriching Engram memory so the bug never re-occurs in future sessions.
+5. **Git Delivery (Stage 7: `ce-commit-push-pr`)**: Ships the fix via a `fix/<name>` feature branch and Pull Request.
 
 ---
 

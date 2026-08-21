@@ -47,7 +47,7 @@ fn status(ctx: &Context) -> Result<(), CeError> {
     println!("  • [1: Ideation]   ➔ ce-brainstorm / ce-ideate / ce-strategy");
     println!("  • [2: OpenSpec]   ➔ Formal Spec Definition (proposal, spec, tasks)");
     println!("  • [3: Plan]       ➔ ce-plan / ce-doc-review");
-    println!("  • [4: Work/TDD]   ➔ ce-work / ce-debug / ce-simplify-code");
+    println!("  • [4: Work/TDD]   ➔ ce-work / ce-debug (Direct Entry Point for Bug Fixes) / ce-simplify-code");
     println!("  • [5: Verify]     ➔ Empirical Testing (cargo test, make e2e, ce-test-browser)");
     println!("  • [6: Compound]   ➔ ce-compound / ce-compound-refresh (docs/solutions/)");
     println!("  • [7: Ship]       ➔ ce-commit-push-pr / ce-commit / ce-resolve-pr-feedback");
