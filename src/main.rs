@@ -2,6 +2,7 @@
 
 mod commands;
 mod error;
+mod harness;
 mod opencode;
 mod source;
 mod state;
