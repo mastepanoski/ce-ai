@@ -21,3 +21,7 @@
 - name: compliance
   color: "0052cc"
   description: "ISO 27001/27002, ISO 42001, and NIST AI RMF compliance"
+
+- name: tools
+  color: "f9d0c4"
+  description: "Companion developer tools, MCP servers, and memory servers (Engram, CodeGraph, Context7, RTK)"
