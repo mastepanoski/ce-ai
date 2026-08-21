@@ -164,3 +164,34 @@ fn load(ctx: &Context, name: &str) -> Result<(), CeError> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn syncs_across_all_active_harnesses() {
+        let tmp = TempDir::new().unwrap();
+        let ctx = Context::resolve(Some(tmp.path().join("ce-ai")), false, false, true).unwrap();
+        let home = tmp.path().join("home");
+        std::fs::create_dir_all(home.join(".config/opencode")).unwrap();
+        std::fs::write(
+            home.join(".config/opencode/opencode.json"),
+            r#"{"plugin":["user"]}"#,
+        )
+        .unwrap();
+
+        set(&ctx, "ce-brainstorm", "anthropic/claude-3-5-sonnet").unwrap();
+        let state = State::load(&ctx.config_dir.join("state.json")).unwrap();
+        assert_eq!(state.model_assignments.len(), 1);
+        assert_eq!(
+            state
+                .model_assignments
+                .get("ce-brainstorm")
+                .unwrap()
+                .model_id,
+            "claude-3-5-sonnet"
+        );
+    }
+}

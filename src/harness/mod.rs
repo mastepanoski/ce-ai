@@ -79,6 +79,26 @@ impl HarnessKind {
             HarnessKind::Custom => false,
         }
     }
+
+    /// Auto-detect all harnesses present on the host system.
+    pub fn detect_installed_harnesses(home_dir: &Path) -> Vec<HarnessKind> {
+        let all = [
+            HarnessKind::Opencode,
+            HarnessKind::Claude,
+            HarnessKind::Pi,
+            HarnessKind::Cursor,
+            HarnessKind::Copilot,
+            HarnessKind::Codex,
+            HarnessKind::Grok,
+            HarnessKind::Kimi,
+            HarnessKind::Agy,
+            HarnessKind::Deepseek,
+            HarnessKind::Fx,
+        ];
+        all.into_iter()
+            .filter(|h| h.is_installed_on_host(home_dir))
+            .collect()
+    }
 }
 
 impl FromStr for HarnessKind {
@@ -175,5 +195,21 @@ mod tests {
             "invalid_harness".parse::<HarnessKind>(),
             Err(CeError::Usage(_))
         ));
+    }
+
+    #[test]
+    fn auto_detects_installed_harnesses() {
+        use tempfile::TempDir;
+        let tmp = TempDir::new().unwrap();
+        let home = tmp.path();
+
+        std::fs::create_dir_all(home.join(".config/opencode")).unwrap();
+        std::fs::write(home.join(".config/opencode/opencode.json"), "{}").unwrap();
+        std::fs::write(home.join(".claude.json"), "{}").unwrap();
+
+        let detected = HarnessKind::detect_installed_harnesses(home);
+        assert_eq!(detected.len(), 2);
+        assert!(detected.contains(&HarnessKind::Opencode));
+        assert!(detected.contains(&HarnessKind::Claude));
     }
 }

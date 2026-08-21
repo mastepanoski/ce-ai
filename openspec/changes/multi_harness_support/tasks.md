@@ -27,9 +27,9 @@
   - *Verification*: `cargo test harness::custom::tests::custom_flags_registration`
 
 ### Phase 3: Model Role Translation & Multi-Harness Sync
-- [ ] **Task 3.1**: Implement multi-harness model translation engine in `src/commands/models.rs`.
+- [x] **Task 3.1**: Implement multi-harness model translation engine in `src/commands/models.rs`.
   - *Verification*: `cargo test commands::models::tests::syncs_across_all_active_harnesses`
-- [ ] **Task 3.2**: Implement `--all` host harness auto-detection.
+- [x] **Task 3.2**: Implement `--all` host harness auto-detection.
   - *Verification*: `cargo test harness::tests::auto_detects_installed_harnesses`
 
 ### Phase 4: Containerized E2E Gate & Verification
