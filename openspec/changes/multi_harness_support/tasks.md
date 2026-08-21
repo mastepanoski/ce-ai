@@ -20,7 +20,7 @@
 - [x] **Task 2.3**: Implement Pi harness adapter in `src/harness/pi.rs`.
   - *Verification*: `cargo test harness::pi::tests::merges_pi_config`
 - [x] **Task 2.4**: Implement Cursor & Copilot Markdown block adapters in `src/harness/cursor.rs` & `copilot.rs`.
-  - *Verification*: `cargo test harness::markdown::tests::ingests_managed_block`
+  - *Verification*: `cargo test harness::cursor::tests::managed_block_injection_and_stripping`
 - [x] **Task 2.5**: Implement Generic JSON adapter for Codex, Grok, Kimi, AGY, DeepSeek in `src/harness/generic_json.rs`.
   - *Verification*: `cargo test harness::generic::tests::roundtrip`
 - [x] **Task 2.6**: Implement Custom harness fallback mode (`--harness custom`) in `src/harness/custom.rs`.
