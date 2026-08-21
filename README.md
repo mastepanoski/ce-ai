@@ -105,6 +105,8 @@ Upgrade plugin to a specific version tag:
 ce-ai upgrade --to compound-engineering-v3.5.0
 ```
 
+> 📖 **Guía Detallada Paso a Paso**: Lee el documento **[Sync & Upgrade User Guide](docs/user-guide/sync-and-upgrade-mechanisms.md)** para una explicación completa de cómo funcionan internamente la sincronización, la comprobación de hashes SHA256 y las actualizaciones desde GitHub.
+
 ### 4. Configure Models & Profiles
 
 Assign a model to a specific slot:
