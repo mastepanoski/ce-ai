@@ -186,7 +186,46 @@ When working on multiple features or PRs concurrently, use isolated Git worktree
   - *CodeGraph*: Each worktree maintains its own independent index. Run `gentle-ai codegraph init --cwd <worktree-root>` inside the new worktree.
   - *Engram*: Memory observations are tagged with the worktree path so findings remain cleanly isolated per workspace.
 
-### 4. Transitioning from Spec-Driven Development (SDD / `gentle-ai`)
+### 4. Scenario 4: Starting a Project from Scratch (Greenfield Setup)
+
+When creating a brand new project in an empty directory:
+
+```mermaid
+flowchart TD
+    INIT["1. mkdir & git init"] --> INST["2. ce-ai install --scope workspace"]
+    INST --> STRAT["3. ce-strategy / ce-brainstorm"]
+    STRAT --> SPEC["4. Initial OpenSpec (001-initial-scaffold)"]
+    SPEC --> PLAN["5. ce-plan & ce-work (Boilerplate & Test Pipeline)"]
+    PLAN --> VERIFY["6. Verify linters & tests"]
+    VERIFY --> COMP["7. ce-compound (Initialize CONCEPTS.md)"]
+    COMP --> SHIP["8. ce-commit-push-pr (PR #1)"]
+```
+
+#### Step-by-Step Greenfield Process:
+
+1. **Initialize Directory & `ce-ai`**:
+   ```bash
+   mkdir my-new-project && cd my-new-project
+   git init
+   ce-ai install --scope workspace
+   ```
+2. **Define Product Strategy & Framing (Stage 1: Ideation)**:
+   - Run `/ce-strategy` or `/ce-brainstorm`.
+   - *Goal*: Establish tech stack, architecture boundaries, and core goals in `STRATEGY.md` or `docs/brainstorms/`.
+3. **Draft Initial Scaffold OpenSpec (Stage 2: OpenSpec)**:
+   - Create `openspec/changes/001-initial-scaffold/` containing `proposal.md`, `spec.md`, and `tasks.md`.
+4. **Build Boilerplate & Test Pipeline (Stage 3 & 4: Plan & Work/TDD)**:
+   - Run `/ce-plan` ➔ `/ce-work`. Build initial files, configure linters (`clippy`, `eslint`), and set up tests.
+5. **Establish Verification Gates (Stage 5: Verification)**:
+   - Run `cargo test` or `npm test` to ensure green tests.
+6. **Capture Initial Architecture Concepts (Stage 6: Knowledge Capture)**:
+   - Run `/ce-compound` to initialize `CONCEPTS.md` and document initial structural decisions in `docs/solutions/`.
+7. **Ship First Commit (Stage 7: Git Delivery)**:
+   - Run `/ce-commit-push-pr` to commit initial repository structure.
+
+---
+
+### 5. Transitioning from Spec-Driven Development (SDD / `gentle-ai`)
 
 #### How does `ce-ai` handle projects migrating from SDD?
 
