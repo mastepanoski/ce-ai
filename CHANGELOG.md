@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.2] - 2026-08-21
+
+### Fixed
+- **Windows PowerShell Installer (`scripts/install.ps1`)**: Fixed boolean download validation flag and eliminated `$LASTEXITCODE` null evaluation syntax error in PowerShell.
+
+---
+
 ## [1.0.1] - 2026-08-21
 
 ### Fixed
