@@ -1,0 +1,77 @@
+name: 🛡️ Security Vulnerability Report
+description: Report a security vulnerability, path traversal flaw, or cryptographic integrity issue in ce-ai.
+title: "[SECURITY]: "
+labels: ["security", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping keep `ce-ai` and the open-source AI community secure!
+        Please fill out the details below to help us evaluate and patch the vulnerability promptly.
+
+  - type: dropdown
+    id: vulnerability_type
+    attributes:
+      label: Vulnerability Category
+      description: Select the category that best describes this vulnerability.
+      options:
+        - Path Traversal / Zip-Slip in Archive Extraction
+        - Config Clobbering / Non-Atomic File Overwrite
+        - SHA256 Manifest / Asset Tampering Bypass
+        - Supply Chain / Dependency CVE
+        - Privilege Escalation / Shell Execution
+        - Other Security Issue
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description of the Vulnerability
+      description: Provide a clear and concise description of the security issue.
+      placeholder: Describe the security flaw, affected component, and potential exploit vector...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction_steps
+    attributes:
+      label: Steps to Reproduce / Proof of Concept
+      description: Provide detailed steps or sample tarball/command payload to reproduce the issue.
+      placeholder: |
+        1. Create a tarball containing...
+        2. Run `ce-ai install ...`
+        3. Observe unauthorized file write at...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os_affected
+    attributes:
+      label: Affected Operating Systems
+      description: Which operating system(s) are impacted?
+      options:
+        - All Platforms (Linux, macOS, Windows)
+        - Linux Only
+        - macOS Only
+        - Windows Only
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact_evaluation
+    attributes:
+      label: Impact Evaluation
+      description: What can an attacker achieve if this flaw is exploited?
+      placeholder: Potential impact on user system, file overwrites, unvetted code execution...
+    validations:
+      required: false
+
+  - type: textarea
+    id: suggested_fix
+    attributes:
+      label: Suggested Fix or Mitigation (Optional)
+      description: If you have suggestions or a proposed patch, please detail them here.
+      placeholder: Proposed code change or input validation logic...
+    validations:
+      required: false

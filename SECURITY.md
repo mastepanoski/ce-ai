@@ -34,14 +34,14 @@ Every installed plugin asset (JS loaders, skill markdown definitions, configurat
 
 ## 🛡️ Vulnerability Disclosure Protocol
 
-If you discover a security vulnerability or security flaw in `ce-ai`, please report it responsibly:
+If you discover a security vulnerability, flaw, or unexpected behavior in `ce-ai`, please report it responsibly:
 
-1. **Do NOT open a public GitHub issue.**
-2. Email your findings to `security@compound-engineering.org` or report via [GitHub Security Advisories](https://github.com/mastepanoski/ce-ai/security/advisories/new).
+1. **Report via GitHub Private Security Advisory**: Submit a report directly via [GitHub Security Advisories](https://github.com/mastepanoski/ce-ai/security/advisories/new) (preferred).
+2. **Report via GitHub Security Issue**: Alternatively, open a GitHub Issue using our dedicated [Security Report Template](.github/ISSUE_TEMPLATE/security_report.yml).
 3. Include:
-   - Detailed description of the vulnerability.
-   - Steps to reproduce or proof-of-concept exploit.
-   - Impact evaluation.
+   - Detailed description of the vulnerability (e.g. path traversal, unsafe extraction, state corruption).
+   - Steps to reproduce or proof-of-concept payload.
+   - Impact evaluation across operating systems (Linux, macOS, Windows).
 
 ### Response Timelines
 - **Initial Acknowledgement**: Within 24 hours.

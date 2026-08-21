@@ -176,7 +176,7 @@ mod tests {
             &path,
             serde_json::json!({
                 "plugin": ["user-plugin"],
-                "agent": { "sdd-explore": { "model": "user-model" } }
+                "agent": { "ce-brainstorm": { "model": "user-model" } }
             }),
         );
         let entry = loader_entry(dir.path());
@@ -187,7 +187,7 @@ mod tests {
         assert_eq!(plugins.len(), 2, "user entry plus CE entry");
         assert!(plugins.iter().any(|v| v.as_str() == Some("user-plugin")));
         assert!(plugins.iter().any(|v| v.as_str() == Some(&entry)));
-        assert_eq!(config["agent"]["sdd-explore"]["model"], "user-model");
+        assert_eq!(config["agent"]["ce-brainstorm"]["model"], "user-model");
     }
 
     #[test]

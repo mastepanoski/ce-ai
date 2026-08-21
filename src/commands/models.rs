@@ -30,7 +30,7 @@ pub enum ModelsCommand {
 
 #[derive(clap::Args)]
 pub struct SetArgs {
-    /// Agent slot, e.g. sdd-explore.
+    /// Agent slot, e.g. ce-brainstorm.
     pub slot: String,
     /// Model as provider/model, e.g. opencode-go/kimi-k2.6.
     pub model: String,

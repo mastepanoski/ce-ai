@@ -18,7 +18,7 @@ This policy establishes our AI Governance System, adhering strictly to:
 
 ### 1.2 Model & Provider Neutrality
 - `ce-ai` provides model-agnostic assignment capabilities across multi-vendor LLMs (e.g. OpenAI, Anthropic, Kimi, DeepSeek, Google Gemini).
-- Model assignments are explicitly scoped per agent role (e.g. `sdd-explore`, `sdd-design`, `sdd-code`, `sdd-review`) to enforce appropriate capability matching.
+- Model assignments are explicitly scoped per agent role (e.g. `ce-brainstorm`, `ce-plan`, `ce-work`, `ce-code-review`, `ce-debug`) to enforce appropriate capability matching.
 
 ---
 

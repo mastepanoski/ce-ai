@@ -96,7 +96,7 @@ mod tests {
 
     fn models() -> BTreeMap<String, String> {
         BTreeMap::from([(
-            "sdd-explore".to_string(),
+            "ce-brainstorm".to_string(),
             "opencode-go/kimi-k2.6".to_string(),
         )])
     }

@@ -6,7 +6,7 @@
 
 - **Direct OpenCode Integration**: Installs CE loader and registers skills without clobbering existing configuration (`~/.config/opencode/opencode.json`).
 - **Safe Extraction & Caching**: Validates tarball structures against path traversal attacks (zip-slip prevention) and maintains SHA256-verified release caches.
-- **Model Assignments & Profiles**: Set models per agent slot (`sdd-explore`, `sdd-design`, etc.) and take append-only snapshot profiles.
+- **Model Assignments & Profiles**: Set models per agent slot (`ce-brainstorm`, `ce-plan`, etc.) and take append-only snapshot profiles.
 - **Diff & Reconcile (Sync)**: Inspect drift, preview planned updates with `--dry-run`, and repair modified or deleted managed assets.
 - **Automatic Backups & Clean Uninstallation**: Pre-mutation configuration is backed up automatically (`~/.ce-ai/backups/`) and `ce-ai uninstall` restores the original pre-install configuration cleanly.
 - **Health Doctor**: Diagnose configuration errors, drift, and state inconsistency.
@@ -80,7 +80,7 @@ ce-ai upgrade --to compound-engineering-v3.5.0
 Assign a model to a specific slot:
 
 ```bash
-ce-ai models set sdd-explore opencode-go/kimi-k2.6
+ce-ai models set ce-brainstorm opencode-go/kimi-k2.6
 ```
 
 List current model assignments:

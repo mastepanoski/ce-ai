@@ -42,11 +42,11 @@ echo "$SYNC_OUT" | grep -q -E "(plan: no changes|up-to-date)" || {
 }
 
 echo "== [E2E 4] Running ce-ai models set =="
-ce-ai models set sdd-explore opencode-go/kimi-k2.6
+ce-ai models set ce-brainstorm opencode-go/kimi-k2.6
 
 echo "== [E2E 5] Asserting model assignment =="
-grep -q "sdd-explore" "$HOME/.config/opencode/opencode.json" || {
-  echo "FAIL: sdd-explore not found in opencode.json"
+grep -q "ce-brainstorm" "$HOME/.config/opencode/opencode.json" || {
+  echo "FAIL: ce-brainstorm not found in opencode.json"
   exit 1
 }
 grep -q "opencode-go/kimi-k2.6" "$HOME/.config/opencode/opencode.json" || {

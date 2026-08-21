@@ -66,7 +66,9 @@ fn install_fresh_install_creates_backup_entry_loader_skills_and_manifest() {
     let loader_path = opencode_json
         .parent()
         .unwrap()
-        .join("compound-engineering/plugins/compound-engineering.js");
+        .join("compound-engineering")
+        .join("plugins")
+        .join("compound-engineering.js");
     assert!(plugins
         .iter()
         .any(|v| v.as_str() == Some(loader_path.to_str().unwrap())));
@@ -201,7 +203,7 @@ fn uninstall_restores_newest_backup_and_removes_managed_files() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
     let source = ce_source(tmp.path());
-    let user = r#"{"plugin":["user-plugin"],"agent":{"sdd-explore":{"model":"user-model"}}}"#;
+    let user = r#"{"plugin":["user-plugin"],"agent":{"ce-brainstorm":{"model":"user-model"}}}"#;
     user_config(&home, user);
     install(&config_dir, &home, &source);
 
@@ -269,7 +271,9 @@ fn manifest_path(home: &Path) -> PathBuf {
 }
 
 fn loader_path(home: &Path) -> PathBuf {
-    managed_dir(home).join("plugins/compound-engineering.js")
+    managed_dir(home)
+        .join("plugins")
+        .join("compound-engineering.js")
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -408,34 +412,34 @@ fn models_set_reflects_in_state_and_opencode_config() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
     let source = ce_source(tmp.path());
-    let user = r#"{"plugin":["user-plugin"],"agent":{"sdd-explore":{"model":"user-model","temperature":0.7}}}"#;
+    let user = r#"{"plugin":["user-plugin"],"agent":{"ce-brainstorm":{"model":"user-model","temperature":0.7}}}"#;
     user_config(&home, user);
     install(&config_dir, &home, &source);
 
     ceai(&config_dir, &home)
-        .args(["models", "set", "sdd-explore", "opencode-go/kimi-k2.6"])
+        .args(["models", "set", "ce-brainstorm", "opencode-go/kimi-k2.6"])
         .assert()
         .success();
 
     // MM-1: persisted in state.json.
     let state = read_json(&config_dir.join("state.json"));
     assert_eq!(
-        state["model_assignments"]["sdd-explore"]["provider_id"],
+        state["model_assignments"]["ce-brainstorm"]["provider_id"],
         "opencode-go"
     );
     assert_eq!(
-        state["model_assignments"]["sdd-explore"]["model_id"],
+        state["model_assignments"]["ce-brainstorm"]["model_id"],
         "kimi-k2.6"
     );
     // MM-2: applied to opencode.json agent.<slot>.model/variant without clobbering user keys.
     let config = read_json(&home.join(".config/opencode/opencode.json"));
     assert_eq!(
-        config["agent"]["sdd-explore"]["model"],
+        config["agent"]["ce-brainstorm"]["model"],
         "opencode-go/kimi-k2.6"
     );
-    assert_eq!(config["agent"]["sdd-explore"]["variant"], "");
+    assert_eq!(config["agent"]["ce-brainstorm"]["variant"], "");
     assert_eq!(
-        config["agent"]["sdd-explore"]["temperature"], 0.7,
+        config["agent"]["ce-brainstorm"]["temperature"], 0.7,
         "user agent keys preserved"
     );
     assert_eq!(
@@ -483,11 +487,11 @@ fn models_profile_save_load_round_trip_restores_snapshot() {
     install(&config_dir, &home, &source);
 
     ceai(&config_dir, &home)
-        .args(["models", "set", "sdd-explore", "opencode-go/kimi-k2.6"])
+        .args(["models", "set", "ce-brainstorm", "opencode-go/kimi-k2.6"])
         .assert()
         .success();
     ceai(&config_dir, &home)
-        .args(["models", "set", "sdd-spec", "opencode-go/claude-sonnet-4"])
+        .args(["models", "set", "ce-plan", "opencode-go/claude-sonnet-4"])
         .assert()
         .success();
 
@@ -512,12 +516,12 @@ fn models_profile_save_load_round_trip_restores_snapshot() {
 
     // Change the assignment, then load the profile back.
     ceai(&config_dir, &home)
-        .args(["models", "set", "sdd-explore", "opencode-go/gemini-3-pro"])
+        .args(["models", "set", "ce-brainstorm", "opencode-go/gemini-3-pro"])
         .assert()
         .success();
     let opencode_json = home.join(".config/opencode/opencode.json");
     assert_eq!(
-        read_json(&opencode_json)["agent"]["sdd-explore"]["model"],
+        read_json(&opencode_json)["agent"]["ce-brainstorm"]["model"],
         "opencode-go/gemini-3-pro"
     );
 
@@ -528,20 +532,20 @@ fn models_profile_save_load_round_trip_restores_snapshot() {
 
     let config = read_json(&opencode_json);
     assert_eq!(
-        config["agent"]["sdd-explore"]["model"], "opencode-go/kimi-k2.6",
+        config["agent"]["ce-brainstorm"]["model"], "opencode-go/kimi-k2.6",
         "opencode.json matches snapshot"
     );
     assert_eq!(
-        config["agent"]["sdd-spec"]["model"],
+        config["agent"]["ce-plan"]["model"],
         "opencode-go/claude-sonnet-4"
     );
     let state = read_json(&config_dir.join("state.json"));
     assert_eq!(
-        state["model_assignments"]["sdd-explore"]["provider_id"],
+        state["model_assignments"]["ce-brainstorm"]["provider_id"],
         "opencode-go"
     );
     assert_eq!(
-        state["model_assignments"]["sdd-spec"]["model_id"],
+        state["model_assignments"]["ce-plan"]["model_id"],
         "claude-sonnet-4"
     );
 }

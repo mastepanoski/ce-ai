@@ -93,7 +93,7 @@ mod tests {
     fn round_trips_through_state_json() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("state.json");
-        let state = state_with("sdd-explore");
+        let state = state_with("ce-brainstorm");
         state.save(&path).unwrap();
         assert_eq!(State::load(&path).unwrap(), state);
     }
@@ -102,7 +102,7 @@ mod tests {
     fn atomic_write_leaves_no_temp_file() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("state.json");
-        state_with("sdd-explore").save(&path).unwrap();
+        state_with("ce-brainstorm").save(&path).unwrap();
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
     }
 
@@ -111,9 +111,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("state.json");
         let mut state = State::new();
-        state.set_model_assignment("sdd-explore", "opencode-go", "kimi-k2.6");
+        state.set_model_assignment("ce-brainstorm", "opencode-go", "kimi-k2.6");
         state.save(&path).unwrap();
-        let assignment = &State::load(&path).unwrap().model_assignments["sdd-explore"];
+        let assignment = &State::load(&path).unwrap().model_assignments["ce-brainstorm"];
         assert_eq!(assignment.provider_id, "opencode-go");
         assert_eq!(assignment.model_id, "kimi-k2.6");
     }
