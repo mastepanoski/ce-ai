@@ -793,6 +793,7 @@ fn run_install_cmd(ctx: &Context, app: &App, dry_run: bool) -> Vec<String> {
         let args = install::Args {
             harness: harness_str.clone(),
             source: None,
+            scope: "global".into(),
         };
         match install::run(&install_ctx, &args) {
             Ok(_) => out.push(format!("  • {harness_str}: OK")),

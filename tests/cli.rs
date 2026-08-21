@@ -808,3 +808,52 @@ fn upgrade_local_source_protection_and_force() {
         .assert()
         .success();
 }
+
+#[test]
+fn companion_tools_status_and_install_subcommands() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    ceai(&config_dir, &home)
+        .args(["tools", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Companion Tools"));
+
+    ceai(&config_dir, &home)
+        .args(["tools", "install", "engram"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("engram"));
+}
+
+#[test]
+fn workflow_status_checkpoint_and_resume_subcommands() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    ceai(&config_dir, &home)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Workflow FSM"));
+
+    ceai(&config_dir, &home)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--task",
+            "4.2 TDD",
+            "--phase",
+            "Stage 4: TDD",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("checkpoint saved"));
+
+    ceai(&config_dir, &home)
+        .args(["workflow", "resume"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("resuming execution"));
+}

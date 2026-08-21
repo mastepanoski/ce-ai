@@ -6,8 +6,10 @@ pub mod install;
 pub mod models;
 pub mod status;
 pub mod sync;
+pub mod tools;
 pub mod uninstall;
 pub mod upgrade;
+pub mod workflow;
 
 use std::path::PathBuf;
 

@@ -26,18 +26,40 @@ const MANAGED_PREFIXES: [&str; 2] = [".opencode/plugins", ".opencode/skills"];
 
 #[derive(clap::Args)]
 pub struct Args {
-    /// Harness to install into (v1: opencode only).
+    /// Harness to install into (e.g. opencode, claude, or all).
     #[arg(long)]
     pub harness: String,
     /// Local CE source tree; bypasses GitHub release fetching.
     #[arg(long)]
     pub source: Option<PathBuf>,
+    /// Installation scope: global (default) or workspace (repository root).
+    #[arg(long, default_value = "global")]
+    pub scope: String,
 }
 
 use crate::harness::HarnessKind;
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let harness_arg = args.harness.to_lowercase();
+    let scope_arg = args.scope.to_lowercase();
+
+    let target_base_dir = if scope_arg == "workspace" {
+        let output = std::process::Command::new("git")
+            .args(["rev-parse", "--show-toplevel"])
+            .output();
+        if let Ok(out) = output {
+            if out.status.success() {
+                let repo_root = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                PathBuf::from(repo_root)
+            } else {
+                ctx.opencode_config_dir.clone()
+            }
+        } else {
+            ctx.opencode_config_dir.clone()
+        }
+    } else {
+        ctx.opencode_config_dir.clone()
+    };
     let target_harnesses: Vec<HarnessKind> = if harness_arg == "all" {
         if let Ok(home) = std::env::var("HOME") {
             let detected = HarnessKind::detect_installed_harnesses(Path::new(&home));
@@ -74,7 +96,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         return err;
     }
 
-    let config_dir = &ctx.opencode_config_dir;
+    let config_dir = &target_base_dir;
     let managed_dir = config_dir.join(MANAGED_DIR);
 
     let state_path = ctx.config_dir.join("state.json");
