@@ -53,6 +53,19 @@ curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/ins
 irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps1 | iex
 ```
 
+### 🍺 Homebrew (macOS & Linux)
+
+```bash
+brew tap mastepanoski/ce-ai https://github.com/mastepanoski/ce-ai
+brew install ce-ai
+```
+
+Or install directly using the formula specification:
+
+```bash
+brew install Formula/ce-ai.rb
+```
+
 ### 📦 Build from Source (Cargo)
 
 ```bash

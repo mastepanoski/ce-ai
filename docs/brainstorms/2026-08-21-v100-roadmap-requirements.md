@@ -15,9 +15,10 @@ With Release v0.9.0 providing 100% test coverage, ISO 27001/27002 security threa
 - **R2.1 TUI Modal Text Wrapping Fix (#72)**: Fix text wrapping inside `MenuTab::Sync` and `MenuTab::Doctor` result modals so lines do not break mid-word or overflow container bounds.
 - **R2.2 Direct Workflow Stage Invocation (#76)**: Allow users to trigger Flywheel workflow stage commands (Brainstorm, Plan, Work, Compound) directly from the `🎮 Workflow (FSM)` panel in `ce-ai tui`.
 
-### 3. Production Governance & Issue Templates (Issue #75) (R3)
+### 3. Production Governance, Homebrew Docs & Issue Templates (Issue #75) (R3)
 - **R3.1 Bug Report Template (#75)**: Create `.github/ISSUE_TEMPLATE/bug_report.yml` for structured bug reporting.
-- **R3.2 Production Documentation**: Complete `README.md`, `ROADMAP.md`, `CONCEPTS.md`, and `CHANGELOG.md` for `v1.0.0`.
+- **R3.2 Homebrew Installation Guidance**: Document Homebrew tap and formula installation (`brew tap mastepanoski/ce-ai` & `brew install ce-ai` / `brew install Formula/ce-ai.rb`).
+- **R3.3 Production Documentation**: Complete `README.md`, `ROADMAP.md`, `CONCEPTS.md`, and `CHANGELOG.md` for `v1.0.0`.
 
 ---
 
