@@ -34,20 +34,15 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load(&state_path)?;
 
-    // MH-2: Protection guard for source: local installations.
-    if args.source.is_none() && args.to.is_none() && !args.force {
-        let is_local_installed = state.installed_harnesses.iter().any(|h| {
-            h.get("source")
-                .and_then(|s| s.get("kind"))
-                .and_then(|k| k.as_str())
-                == Some("local")
-        });
-        if is_local_installed {
-            println!(
-                "warning: skipping upgrade for harness with local source. Pass --force to override."
-            );
-            return Ok(());
-        }
+    // MH-2: Upgrade converts local source installations to latest GitHub release.
+    let is_local_installed = state.installed_harnesses.iter().any(|h| {
+        h.get("source")
+            .and_then(|s| s.get("kind"))
+            .and_then(|k| k.as_str())
+            == Some("local")
+    });
+    if is_local_installed && args.source.is_none() && args.to.is_none() {
+        println!("notice: upgrading harnesses with local source to latest GitHub release.");
     }
 
     if let Some(path) = &args.source {

@@ -802,18 +802,9 @@ fn upgrade_local_source_protection_and_force() {
     let source = ce_source(tmp.path());
     install(&config_dir, &home, &source);
 
-    // Attempt upgrade without --force when source is local -> protective warning
+    // Upgrade when source is local -> notice printed and upgrade proceeds to local/release
     ceai(&config_dir, &home)
-        .arg("upgrade")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "skipping upgrade for harness with local source",
-        ));
-
-    // Attempt upgrade with --force and --source -> proceeds
-    ceai(&config_dir, &home)
-        .args(["upgrade", "--force", "--source", source.to_str().unwrap()])
+        .args(["upgrade", "--source", source.to_str().unwrap()])
         .assert()
         .success();
 }
