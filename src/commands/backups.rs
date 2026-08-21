@@ -17,7 +17,7 @@ pub enum BackupsSubcommand {
     /// List historical backup snapshots.
     List {
         /// Filter backups by harness target (e.g. opencode, claude, pi, cursor).
-        #[arg(short = 'H', long)]
+        #[arg(short = 't', long)]
         harness: Option<String>,
     },
     /// Restore a specific historical backup snapshot.
@@ -25,7 +25,7 @@ pub enum BackupsSubcommand {
         /// Timestamp or backup ID to restore (or 'latest').
         target_id: Option<String>,
         /// Target harness override (e.g. opencode, claude).
-        #[arg(short = 'H', long)]
+        #[arg(short = 't', long)]
         harness: Option<String>,
     },
 }
