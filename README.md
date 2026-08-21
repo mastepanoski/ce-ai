@@ -77,7 +77,7 @@ Preview changes without modifying disk:
 ce-ai install --all --dry-run
 ```
 
-> 📖 **Detailed Step-by-Step Guide**: Read the **[Installation & Coexistence Guide](docs/user-guide/installation-and-coexistence-mechanisms.md)** for a complete explanation of the installation pipeline, automatic pre-mutation backups, and non-destructive coexistence with official setups (Claude Code, Cursor, OpenCode, etc.).
+> 📖 **Architecture & Deep Dive Documentation**: Read the **[Architectural & Conceptual Guide](docs/user-guide/architectural-and-conceptual-guide.md)** and **[Installation & Coexistence Guide](docs/user-guide/installation-and-coexistence-mechanisms.md)** for a complete systems engineering breakdown of multi-harness orchestration, workspace scope isolation, sidecars (Engram/CodeGraph), workflow FSM state recovery, and POSIX atomic I/O guarantees.
 
 ### 2. View Status & Check Health
 
