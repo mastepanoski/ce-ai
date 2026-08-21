@@ -214,18 +214,33 @@ flowchart TD
    git init
    ce-ai install --scope workspace
    ```
-2. **Define Product Strategy & Framing (Stage 1: Ideation)**:
-   - Run `/ce-strategy` or `/ce-brainstorm`.
-   - *Goal*: Establish tech stack, architecture boundaries, and core goals in `STRATEGY.md` or `docs/brainstorms/`.
-3. **Draft Initial Scaffold OpenSpec (Stage 2: OpenSpec)**:
+
+2. **Define High-Level Product Strategy (Stage 1: Strategy)**:
+   - Run `/ce-strategy`.
+   - *Goal*: Establish tech stack (e.g. Rust, TypeScript, React), macro goals, and architectural principles in `STRATEGY.md`.
+
+3. **Bridge from Strategy to OpenSpec: When to use `/ce-ideate` vs `/ce-brainstorm`**:
+   - **Do I need `/ce-ideate` or `/ce-brainstorm` before drafting OpenSpec?**
+     - **Option A (Feature Scope is Known)**: Run `/ce-brainstorm`.
+       - *Why*: `/ce-brainstorm` refines your feature idea, resolves user constraints, and defines explicit out-of-scope boundaries. The output (`docs/brainstorms/`) feeds directly into drafting `openspec/changes/<feature_name>/`.
+     - **Option B (Uncertain Technical Approach or Architecture Alternatives)**: Run `/ce-ideate` first, then `/ce-brainstorm`.
+       - *Why*: `/ce-ideate` explores unconstrained options, evaluates library trade-offs, and generates surprise directions. Once an option is chosen, run `/ce-brainstorm` to lock requirements before writing OpenSpec.
+     - **Option C (Standard Repository Scaffolding)**: Skip both and write `openspec/changes/001-initial-scaffold/` directly.
+       - *Why*: Basic repository boilerplate (`Cargo.toml`, linter configs, directory tree) is standard and un-ambiguous.
+
+4. **Draft Initial Scaffold OpenSpec (Stage 2: OpenSpec)**:
    - Create `openspec/changes/001-initial-scaffold/` containing `proposal.md`, `spec.md`, and `tasks.md`.
-4. **Build Boilerplate & Test Pipeline (Stage 3 & 4: Plan & Work/TDD)**:
+
+5. **Build Boilerplate & Test Pipeline (Stage 3 & 4: Plan & Work/TDD)**:
    - Run `/ce-plan` ➔ `/ce-work`. Build initial files, configure linters (`clippy`, `eslint`), and set up tests.
-5. **Establish Verification Gates (Stage 5: Verification)**:
+
+6. **Establish Verification Gates (Stage 5: Verification)**:
    - Run `cargo test` or `npm test` to ensure green tests.
-6. **Capture Initial Architecture Concepts (Stage 6: Knowledge Capture)**:
+
+7. **Capture Initial Architecture Concepts (Stage 6: Knowledge Capture)**:
    - Run `/ce-compound` to initialize `CONCEPTS.md` and document initial structural decisions in `docs/solutions/`.
-7. **Ship First Commit (Stage 7: Git Delivery)**:
+
+8. **Ship First Commit (Stage 7: Git Delivery)**:
    - Run `/ce-commit-push-pr` to commit initial repository structure.
 
 ---
