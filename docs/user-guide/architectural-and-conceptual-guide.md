@@ -80,14 +80,15 @@ The system enforces a **Scope-Aware Configuration Hierarchy**.
 
 ---
 
-## 4. Finite State Machine & Flow Resilience (Workflow FSM & Checkpointing)
+## 4. Finite State Machine & Compound Engineering Flywheel (Workflow FSM & Checkpointing)
 
 ### 📐 Architectural Concept
-AI-assisted development in `ce-ai` is governed by a **Finite State Machine (FSM)** structuring the lifecycle into 7 deterministic stages:
+AI-assisted development in `ce-ai` is governed by a **Finite State Machine (FSM)** structuring the lifecycle into 7 deterministic stages directly enforcing the **Compound Engineering Flywheel**:
 
 $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \xrightarrow{3} \text{Work/TDD} \xrightarrow{4} \text{Verify} \xrightarrow{5} \text{Compound} \xrightarrow{6} \text{Ship}$$
 
 ### 💡 Architectural Rationale
+- **Compound Engineering Alignment**: Compound Engineering dictates that software development must act as a self-reinforcing flywheel: every solved bug, design decision, and feature must compound knowledge over time. The FSM strictly mandates **Stage 6: Compound (`ce-compound`)**, ensuring agents document learnings in `docs/solutions/` and `CONCEPTS.md` before any task can close.
 - **Determinism over Probability**: Code generation with LLMs is inherently probabilistic. Without an FSM enforcing formal specifications (`OpenSpec`), plans (`Plan`), and test-driven verification (`TDD`), execution degrades into superficial patches.
 - **Checkpointing & Context Re-hydration**:
   - *Problem*: During long-running multi-file tasks, an LLM's context window undergoes compaction (loss of earlier context).

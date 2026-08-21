@@ -40,9 +40,9 @@ stateDiagram-v2
     Red --> Green: Timer Expires
 ```
 
-### ⚙️ The FSM in `ce-ai`: The 7-Stage Development Cycle
+### ⚙️ The FSM in `ce-ai`: The 7-Stage Lifecycle
 
-In `ce-ai`, an AI agent is governed by an FSM that enforces a strict 7-stage lifecycle. The agent is **never** allowed to skip a stage.
+In `ce-ai`, an AI agent is governed by an FSM that enforces a strict 7-stage lifecycle directly derived from the **Compound Engineering Philosophy**. The agent is **never** allowed to skip a stage.
 
 ```mermaid
 flowchart LR
@@ -53,6 +53,37 @@ flowchart LR
     S5 --> S6[Stage 6: Compound]
     S6 --> S7[Stage 7: Ship / PR]
 ```
+
+---
+
+## 3. How the FSM Enforces the Compound Engineering Flywheel
+
+**Compound Engineering** is the foundational philosophy behind `ce-ai`. Its core premise is that software engineering should act as a **compounding flywheel**: every solved bug, architectural decision, and feature implementation must store durable knowledge so that future development becomes exponentially faster, safer, and higher quality.
+
+```mermaid
+flowchart TD
+    subgraph COMPOUND_FLYWHEEL ["THE COMPOUND ENGINEERING FLYWHEEL"]
+        IDEATE[1. Ideate & Frame Scope] --> OPENSPEC[2. Define Formal OpenSpec]
+        OPENSPEC --> PLAN[3. Technical Execution Plan]
+        PLAN --> WORK[4. TDD & Refactored Work]
+        WORK --> VERIFY[5. 100% Empirical Verification]
+        VERIFY --> COMPOUND[6. Knowledge Capture: docs/solutions/ & CONCEPTS.md]
+        COMPOUND --> SHIP[7. Value-Communicating Git Ship]
+        COMPOUND -.->|Feeds Learnings Back to Future Sessions| IDEATE
+    end
+```
+
+### Why the FSM is Essential for Compound Engineering:
+
+1. **Eliminates "Zero-Knowledge" Patching**:
+   - Without an FSM, AI agents tend to perform superficial symptom patches (editing code without recording *why*). 
+   - The FSM forces the agent to enter **Stage 6: Compound (`ce-compound`)**, capturing hard-earned learnings in `docs/solutions/` and `CONCEPTS.md` before a task can be closed.
+
+2. **Guarantees Upstream Spec Grounding**:
+   - Stage 4 (`ce-work`) is strictly blocked until Stage 2 (`OpenSpec`) defines explicit `WHEN ... THEN ...` acceptance criteria. This prevents agents from inventing product behavior on the fly.
+
+3. **Self-Reinforcing Quality**:
+   - Each completed FSM cycle enriches Engram persistent memory and `docs/solutions/`. In subsequent sessions, agents query these artifacts via `ce-ai tools` and `mem_search`, preventing old bugs from ever re-occurring.
 
 #### The 7 Stages Explained:
 
