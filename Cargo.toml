@@ -15,7 +15,7 @@ flate2 = "1"
 tar = "0.4"
 chrono = "0.4"
 inquire = "0.7"
-ratatui = "0.28"
+ratatui = "0.30"
 crossterm = "0.28"
 
 [dev-dependencies]
