@@ -22,10 +22,14 @@ if (!(Test-Path $InstallDir)) {
 $TempZip = Join-Path $env:TEMP $AssetName
 
 Write-Host "📦 Downloading $AssetName..." -ForegroundColor Yellow
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempZip -UseBasicParsing
+if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+    curl.exe -fsSL -o $TempZip $DownloadUrl
+} else {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempZip -UseBasicParsing -MaximumRedirection 10
+}
 
-if (!(Test-Path $TempZip)) {
+if (!(Test-Path $TempZip) -or (Get-Item $TempZip).Length -eq 0) {
     Write-Error "❌ Failed to download release asset from $DownloadUrl"
     exit 1
 }
