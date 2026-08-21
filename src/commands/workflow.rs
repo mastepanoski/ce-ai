@@ -43,17 +43,25 @@ fn status(ctx: &Context) -> Result<(), CeError> {
     let state = State::load(&state_path)?;
 
     println!("== [Workflow FSM & Progress Recovery Status] ==");
-    println!("7-Stage Cycle: [1:Ideation] ➔ [2:OpenSpec] ➔ [3:Plan] ➔ [4:Work/TDD] ➔ [5:Verify] ➔ [6:Compound] ➔ [7:Ship]");
+    println!("7-Stage Cycle (Compound Engineering Skill Mappings):");
+    println!("  • [1: Ideation]   ➔ ce-brainstorm / ce-ideate / ce-strategy");
+    println!("  • [2: OpenSpec]   ➔ Formal Spec Definition (proposal, spec, tasks)");
+    println!("  • [3: Plan]       ➔ ce-plan / ce-doc-review");
+    println!("  • [4: Work/TDD]   ➔ ce-work / ce-debug / ce-simplify-code");
+    println!("  • [5: Verify]     ➔ Empirical Testing (cargo test, make e2e, ce-test-browser)");
+    println!("  • [6: Compound]   ➔ ce-compound / ce-compound-refresh (docs/solutions/)");
+    println!("  • [7: Ship]       ➔ ce-commit-push-pr / ce-commit / ce-resolve-pr-feedback");
+    println!();
 
     if let Some(cp) = state.latest_release_tag.as_ref() {
         println!("latest release: {cp}");
     }
 
     if state.model_assignments.is_empty() {
-        println!("current phase: Stage 4: TDD & Work");
+        println!("current phase: Stage 4: Work/TDD (ce-work)");
         println!("active subtask: Execution in progress");
     } else {
-        println!("current phase: Stage 4: TDD & Work");
+        println!("current phase: Stage 4: Work/TDD (ce-work)");
         println!("active subtask: Tasks verified");
     }
     println!("recovery status: Ready (100% state preserved)");

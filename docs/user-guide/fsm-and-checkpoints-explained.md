@@ -85,17 +85,17 @@ flowchart TD
 3. **Self-Reinforcing Quality**:
    - Each completed FSM cycle enriches Engram persistent memory and `docs/solutions/`. In subsequent sessions, agents query these artifacts via `ce-ai tools` and `mem_search`, preventing old bugs from ever re-occurring.
 
-#### The 7 Stages Explained:
+#### The 7 Stages & Skill Alignment Matrix:
 
-| Stage | Name | Real-World Analogy | What Happens Here? |
-| :--- | :--- | :--- | :--- |
-| **Stage 1** | **Ideation** (`ce-brainstorm`) | Architectural Blueprint Discussion | Exploring vague ideas, user constraints, and scope boundaries. |
-| **Stage 2** | **OpenSpec Definition** | Formal Contract & Spec Sheet | Writing executable requirements (`proposal.md`, `spec.md`, `tasks.md`). |
-| **Stage 3** | **Execution Plan** (`ce-plan`) | Construction Milestone Breakdown | Structuring implementation units, file lists, and test scenarios. |
-| **Stage 4** | **TDD & Work** (`ce-work`) | Laying Bricks & Wiring | Writing tests first (Red), implementing code (Green), and refactoring. |
-| **Stage 5** | **Verification** | Safety Inspector Audit | Running `cargo fmt`, `cargo clippy`, unit tests, and Docker E2E gates. |
-| **Stage 6** | **Knowledge Capture** (`ce-compound`) | Updating the Operations Manual | Documenting discoveries in `docs/solutions/` and `CONCEPTS.md`. |
-| **Stage 7** | **Git Shipping** (`ce-commit-push-pr`) | Delivering the Keys to the Client | Creating a feature branch, pushing to origin, and opening a Pull Request. |
+| Stage | Stage Name | Canonical CE Skills | Real-World Analogy | What Happens Here? |
+| :--- | :--- | :--- | :--- | :--- |
+| **Stage 1** | **Ideation** | `ce-brainstorm`<br>`ce-ideate`<br>`ce-strategy` | Architectural Blueprint Discussion | Exploring vague ideas, user constraints, product framing, and scope boundaries. |
+| **Stage 2** | **OpenSpec Definition** | `openspec/changes/*/` | Formal Contract & Spec Sheet | Writing executable specifications (`proposal.md`, `exploration.md`, `design.md`, `spec.md`, `tasks.md`). |
+| **Stage 3** | **Execution Plan** | `ce-plan`<br>`ce-doc-review` | Construction Milestone Breakdown | Structuring implementation units, file lists, test scenarios, and reviewing doc rigor. |
+| **Stage 4** | **TDD & Work** | `ce-work`<br>`ce-debug`<br>`ce-simplify-code` | Laying Bricks & Wiring | Writing tests first (Red), implementing code (Green), debugging root causes, and refactoring. |
+| **Stage 5** | **Verification** | `ce-code-review`<br>`ce-test-browser`<br>`cargo test` | Safety Inspector Audit | Running linters (`clippy`), unit tests, browser tests, and Docker containerized E2E gates. |
+| **Stage 6** | **Knowledge Capture** | `ce-compound`<br>`ce-compound-refresh` | Updating Operations Manual | Documenting hard-earned discoveries in `docs/solutions/` and updating `CONCEPTS.md`. |
+| **Stage 7** | **Git Shipping** | `ce-commit-push-pr`<br>`ce-commit`<br>`ce-resolve-pr-feedback` | Delivering Keys to Client | Creating feature branches, writing value-communicating commit messages, and opening/resolving PRs. |
 
 ---
 
