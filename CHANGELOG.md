@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2026-08-21
+
+### Fixed
+- **Windows PowerShell Installer (`scripts/install.ps1`)**: Added GitHub REST API resolution to retrieve direct release asset URLs, `$LASTEXITCODE` validation for native `curl.exe`, and TLS 1.2 fallback download verification.
+- **CI Pipeline (`.github/workflows/ci.yml`)**: Added dedicated `windows-installation-gate` job running on `windows-latest` runners.
+
+---
+
 ## [1.0.0] - 2026-08-21
 
 ### 💎 Production Stable Release
