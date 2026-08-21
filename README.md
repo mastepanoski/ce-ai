@@ -77,7 +77,51 @@ Preview changes without modifying disk:
 ce-ai install --all --dry-run
 ```
 
-> 📖 **Architecture & Deep Dive Documentation**: Read the **[Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md)**, **[Architectural & Conceptual Guide](docs/user-guide/architectural-and-conceptual-guide.md)**, **[FSM & Checkpoints Masterclass Guide](docs/user-guide/fsm-and-checkpoints-explained.md)**, and **[Installation & Coexistence Guide](docs/user-guide/installation-and-coexistence-mechanisms.md)** for a complete systems engineering breakdown of multi-harness orchestration, workspace scope isolation, sidecars (Engram/CodeGraph), workflow FSM state recovery, and POSIX atomic I/O guarantees.
+## 📚 User Documentation Directory & Sitemap
+
+`ce-ai` includes comprehensive technical documentation for developers, architects, and newcomers:
+
+| Guide Document | Focus Area | Key Concepts Covered |
+| :--- | :--- | :--- |
+| 🚀 **[Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md)** | **Beginner & Developer Workflows** | • Greenfield Projects (Scratch Setup)<br>• Building New Features & Enhancements<br>• Fixing Bugs via `ce-debug` (Direct Entry)<br>• Research & Documentation Fast-Tracks<br>• SDD Migration (`gentle-ai` / OpenSpec)<br>• Cross-Session Resumption & Multi-Harness Handoffs<br>• Git Worktree Isolation (`ce-worktree`) |
+| 🏛️ **[Architectural & Conceptual Guide](docs/user-guide/architectural-and-conceptual-guide.md)** | **Systems Engineering & Architecture** | • Multi-Harness Trait Architecture (`HarnessAdapter`)<br>• Scope Isolation Hierarchy (`--scope workspace`)<br>• MCP Sidecars (Engram/CodeGraph) vs. CLI Token Reducers (RTK)<br>• Workflow FSM & Compounding Knowledge Flywheel<br>• POSIX Atomic Write Guarantees (`write_atomic`) |
+| 🎮 **[FSM & Checkpoints Masterclass](docs/user-guide/fsm-and-checkpoints-explained.md)** | **FSM Engine & State Persistence** | • 7-Stage Workflow Cycle & Skill Alignment<br>• Savegame Concept & Context Compaction<br>• Sub-Loops (`ce-ideate`, `ce-debug`, `ce-simplify-code`)<br>• FSM Capability Matrix (All Supported Variants) |
+| 🔧 **[Installation & Coexistence Guide](docs/user-guide/installation-and-coexistence-mechanisms.md)** | **Installation & Configuration** | • Global vs Workspace Scope Isolation<br>• Non-Destructive User JSON Merging<br>• Manifest SHA256 Indexing & Multi-Harness Discovery |
+| 🔄 **[Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md)** | **Maintenance & Upgrades** | • Manifest Drift Calculation (Copy, Restore, Remove)<br>• GitHub Release API & Local Source Protection<br>• Atomic Rollbacks & Backup Snapshots |
+
+---
+
+## 🚀 Starting a Project from Scratch (Greenfield Setup)
+
+Starting a new project with `ce-ai` and **Compound Engineering** is straightforward:
+
+```bash
+# 1. Create project directory and initialize git
+mkdir my-new-project && cd my-new-project
+git init
+
+# 2. Install ce-ai scoped to this workspace
+ce-ai install --scope workspace
+
+# 3. Define product strategy & architectural vision
+# In your AI harness (Claude Code, Cursor, Antigravity, OpenCode):
+/ce-strategy
+
+# 4. Create initial OpenSpec scaffold (openspec/changes/001-initial-scaffold/)
+# Define proposal.md, spec.md, tasks.md for initial build targets
+
+# 5. Build boilerplate & test pipeline
+/ce-plan
+/ce-work
+
+# 6. Document initial architecture concepts
+/ce-compound
+
+# 7. Ship first commit & PR
+/ce-commit-push-pr
+```
+
+> 💡 *For detailed step-by-step instructions on greenfield setups, bug fixes, multi-harness handoffs, and worktree workflows, read the **[Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md)**.*
 
 ### 2. View Status & Check Health
 
