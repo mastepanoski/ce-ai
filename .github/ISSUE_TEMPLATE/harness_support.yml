@@ -20,6 +20,8 @@ body:
         - Grok (xAI Grok)
         - Kimi Code (Moonshot Kimi)
         - AGY (Google Antigravity SDK)
+        - Cursor (.cursorrules / Cursor IDE)
+        - GitHub Copilot (.github/copilot-instructions.md)
         - Other AI Agent Harness
     validations:
       required: true
