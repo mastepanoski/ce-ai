@@ -1,0 +1,37 @@
+name: 🤖 Harness Integration Request
+description: Request integration support for a new AI agent harness (e.g. Pi, Claude Code, Codex, Grok, Kimi Code, AGY).
+title: "[HARNESS]: "
+labels: ["harness", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Requesting support for a new AI agent harness in `ce-ai`!
+
+  - type: dropdown
+    id: harness_name
+    attributes:
+      label: Target AI Harness
+      description: Select or specify the target AI harness platform.
+      options:
+        - Pi (OpenCode/Pi)
+        - Claude Code (.claude)
+        - Codex (OpenAI Codex)
+        - Grok (xAI Grok)
+        - Kimi Code (Moonshot Kimi)
+        - AGY (Google Antigravity SDK)
+        - Other AI Agent Harness
+    validations:
+      required: true
+
+  - type: textarea
+    id: config_format
+    attributes:
+      label: Harness Configuration & Plugin Structure
+      description: Describe where the harness stores configuration files, plugins, and skills on disk.
+      placeholder: |
+        Config file: ~/.pi/config.json
+        Plugins directory: ~/.pi/plugins/
+        Skills directory: ~/.pi/skills/
+    validations:
+      required: true

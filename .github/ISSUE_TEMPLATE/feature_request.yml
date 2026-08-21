@@ -1,0 +1,42 @@
+name: ✨ Feature Request
+description: Propose a new feature, distribution package, or enhancement for ce-ai.
+title: "[FEATURE]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature for `ce-ai`!
+
+  - type: dropdown
+    id: feature_category
+    attributes:
+      label: Feature Category
+      description: Select the category for this feature proposal.
+      options:
+        - Package Manager / Distribution (Brew, WinGet, APT, Universal Installer)
+        - TUI / Dashboard Enhancement
+        - CLI Subcommand / Developer Tooling
+        - Model Assignments & Profile Management
+        - Security & Compliance Control
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: Problem or Use Case
+      description: Is your feature request related to a problem or specific workflow requirement?
+      placeholder: Describe the goal, pain point, or requirement...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution or capability you would like to see implemented.
+      placeholder: Detailed description of the proposed command, flag, or workflow...
+    validations:
+      required: true
