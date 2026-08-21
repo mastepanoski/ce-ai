@@ -30,25 +30,25 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
 fn status(_ctx: &Context) -> Result<(), CeError> {
     let tools = [
-        ("engram", "Engram Persistent Memory Server", "mem_context"),
+        ("engram", "Engram Persistent Memory Server", "MCP Server"),
         (
             "codegraph",
             "CodeGraph Codebase Indexer",
-            "codegraph_explore",
+            "MCP Server & CLI",
         ),
-        ("context7", "Context7 Tech Specs Provider", "context7_fetch"),
-        ("rtk", "RTK Real-Time Knowledge Server", "rtk_query"),
+        ("context7", "Context7 Tech Specs Provider", "MCP Server"),
+        ("rtk", "RTK CLI Token Reduction Engine", "CLI Pre-Processor"),
     ];
 
-    println!("== [Companion Tools & Memory Sidecars Status] ==");
-    for (name, label, _mcp_tool) in &tools {
+    println!("== [Companion Tools, Memory Sidecars & Token Reducers Status] ==");
+    for (name, label, category) in &tools {
         let is_in_path = is_tool_in_path(name);
         let status_str = if is_in_path {
             "✅ Installed (In PATH)"
         } else {
             "⚠️ Not Found (Available to install via 'ce-ai tools install')"
         };
-        println!("  • {name} ({label}): {status_str}");
+        println!("  • {name} [{category}] ({label}): {status_str}");
     }
     Ok(())
 }

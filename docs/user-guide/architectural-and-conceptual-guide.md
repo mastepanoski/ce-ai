@@ -49,29 +49,34 @@ The system enforces a **Scope-Aware Configuration Hierarchy**.
 
 ---
 
-## 3. Sidecars & Knowledge Protocol Architecture (MCP & Sidecar Pattern)
+## 3. Sidecars & Knowledge Architecture (MCP Protocol vs. CLI Token Pre-Processors)
 
 ### 📐 Architectural Concept
-`ce-ai` leverages the **Sidecar Pattern** coupled with the **Model Context Protocol (MCP)** infrastructure.
+`ce-ai` integrates two distinct architectural categories of companion tools:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       AI Execution Agent                        │
-└──────┬──────────────────────┬──────────────────────┬────────────┘
-       │ (MCP)                │ (MCP)                │ (MCP)
-┌──────┴──────────────┐ ┌─────┴──────────────┐ ┌─────┴──────────────┐
-│  Engram Memory      │ │ CodeGraph Engine   │ │ Context7 / RTK     │
-│  (Long-Term Store)  │ │ (Code Topology)    │ │ (Live Docs/Specs)  │
-└─────────────────────┘ └────────────────────┘ └────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                      AI Execution Agent                          │
+└──────────────┬───────────────────┬───────────────────┬───────────┘
+               │ (MCP Protocol)    │ (MCP Protocol)    │ (CLI Wrapper)
+┌──────────────┴───────┐ ┌─────────┴─────────┐ ┌───────┴──────────┐
+│  Engram Memory       │ │ CodeGraph Engine │ │ RTK Token        │
+│  (Long-Term Store)   │ │ (Call Graphs)     │ │ Reducer (Filter) │
+└──────────────────────┘ └───────────────────┘ └──────────────────┘
 ```
 
-- **Engram**: Long-term persistent memory server storing findings, decisions, and past solutions across sessions.
-- **CodeGraph**: Static indexing and blast-radius analysis engine exposing codebase call graphs.
-- **Context7 & RTK**: Real-time documentation and knowledge providers.
+1. **MCP Protocol Servers (Model Context Protocol)**:
+   - **Engram**: Long-term persistent memory server storing findings, decisions, and past solutions across sessions via RPC.
+   - **CodeGraph**: Static indexing and blast-radius analysis engine exposing codebase call graphs via MCP tools and CLI.
+   - **Context7**: Real-time technical documentation and library spec provider.
+
+2. **CLI Token Reduction Pre-Processor (RTK)**:
+   - **RTK (Rust Token Killer / RTK-AI)** is **not an MCP server**, but a **CLI Output Filter / Command Pre-Processor**.
+   - It intercepts verbose raw terminal outputs (e.g. `git status`, `cargo test`, `docker ps`, `ls -la`), strips boilerplate noise, and compresses the text stream by 60–90% *before* it reaches the LLM's context window.
 
 ### 💡 Architectural Rationale
-- **Decoupling Reasoning from Persistence**: Large Language Models (LLMs) excel at real-time reasoning but lack durable, long-term memory.
-- **Context Window Token Efficiency**: Rather than stuffing entire codebases or past histories into the prompt, Sidecars respond to targeted queries on demand via MCP, reducing token overhead and preventing context saturation.
+- **Decoupling Reasoning from Storage**: LLMs excel at real-time reasoning but lack durable memory. MCP servers handle structured data retrieval without polluting main prompt state.
+- **Context Window Cost & Speed Optimization**: Large raw CLI outputs exhaust context windows rapidly. Integrating CLI pre-processors like RTK reduces token consumption and cost while accelerating inference speed.
 
 ---
 
