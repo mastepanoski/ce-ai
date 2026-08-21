@@ -115,6 +115,97 @@ impl HarnessKind {
             .collect()
     }
 
+    /// Check if compound-engineering assets are installed for this harness on the host system.
+    pub fn is_ce_installed(&self, home_dir: &Path) -> bool {
+        match self {
+            HarnessKind::Opencode => {
+                let opencode_dir = home_dir.join(".config").join("opencode");
+                opencode_dir.join("opencode.json").exists()
+                    || opencode_dir.join("compound-engineering").exists()
+                    || home_dir.join(".opencode").join("plugins").exists()
+            }
+            HarnessKind::Claude => {
+                home_dir.join(".claude.json").exists()
+                    || home_dir.join(".claude").join("plugins").exists()
+                    || home_dir
+                        .join(".config")
+                        .join("claude")
+                        .join("claude.json")
+                        .exists()
+            }
+            HarnessKind::Pi => {
+                home_dir.join(".pi").join("config.json").exists()
+                    || home_dir.join(".pi").join("plugins").exists()
+            }
+            HarnessKind::Cursor => {
+                home_dir.join(".cursorrules").exists()
+                    || home_dir.join(".cursor").join("rules").exists()
+            }
+            HarnessKind::Copilot => {
+                home_dir
+                    .join(".github")
+                    .join("copilot-instructions.md")
+                    .exists()
+                    || home_dir.join(".copilot").exists()
+            }
+            HarnessKind::Codex => {
+                home_dir.join(".codex").join("codex.json").exists()
+                    || home_dir.join(".config").join("codex").exists()
+            }
+            HarnessKind::Grok => {
+                home_dir.join(".grok").join("grok.json").exists()
+                    || home_dir.join(".config").join("grok").exists()
+            }
+            HarnessKind::Kimi => {
+                home_dir.join(".kimi").join("kimi.json").exists()
+                    || home_dir.join(".kimi-code").exists()
+                    || home_dir.join(".config").join("kimi").exists()
+            }
+            HarnessKind::Agy => {
+                home_dir
+                    .join(".gemini")
+                    .join("antigravity-cli")
+                    .join("antigravity.json")
+                    .exists()
+                    || home_dir
+                        .join(".gemini")
+                        .join("antigravity-cli")
+                        .join("plugins")
+                        .exists()
+                    || home_dir.join(".config").join("antigravity").exists()
+            }
+            HarnessKind::Deepseek => {
+                home_dir.join(".deepseek").join("deepseek.json").exists()
+                    || home_dir.join(".config").join("deepseek").exists()
+            }
+            HarnessKind::Fx => {
+                home_dir.join(".fx").join("fx.json").exists()
+                    || home_dir.join(".config").join("fx").exists()
+            }
+            HarnessKind::Custom => false,
+        }
+    }
+
+    /// Auto-detect all host harnesses that have compound-engineering installed.
+    pub fn detect_ce_installed_harnesses(home_dir: &Path) -> Vec<HarnessKind> {
+        let all = [
+            HarnessKind::Opencode,
+            HarnessKind::Claude,
+            HarnessKind::Pi,
+            HarnessKind::Cursor,
+            HarnessKind::Copilot,
+            HarnessKind::Codex,
+            HarnessKind::Grok,
+            HarnessKind::Kimi,
+            HarnessKind::Agy,
+            HarnessKind::Deepseek,
+            HarnessKind::Fx,
+        ];
+        all.into_iter()
+            .filter(|h| h.is_ce_installed(home_dir))
+            .collect()
+    }
+
     /// Return string slice representation of the harness kind.
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -262,5 +353,21 @@ mod tests {
         assert_eq!(detected.len(), 2);
         assert!(detected.contains(&HarnessKind::Opencode));
         assert!(detected.contains(&HarnessKind::Claude));
+    }
+
+    #[test]
+    fn detects_ce_installed_harnesses() {
+        use tempfile::TempDir;
+        let tmp = TempDir::new().unwrap();
+        let home = tmp.path();
+
+        std::fs::create_dir_all(home.join(".config/opencode")).unwrap();
+        std::fs::write(home.join(".config/opencode/opencode.json"), "{}").unwrap();
+        std::fs::write(home.join(".claude.json"), "{}").unwrap();
+
+        let ce_harnesses = HarnessKind::detect_ce_installed_harnesses(home);
+        assert_eq!(ce_harnesses.len(), 2);
+        assert!(ce_harnesses.contains(&HarnessKind::Opencode));
+        assert!(ce_harnesses.contains(&HarnessKind::Claude));
     }
 }
