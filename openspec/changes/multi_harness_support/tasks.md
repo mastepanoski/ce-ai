@@ -33,7 +33,7 @@
   - *Verification*: `cargo test harness::tests::auto_detects_installed_harnesses`
 
 ### Phase 4: Containerized E2E Gate & Verification
-- [ ] **Task 4.1**: Expand Docker E2E gate runner (`e2e_runner.sh`) to test multi-harness installation, sync, model setting, and uninstallation.
+- [x] **Task 4.1**: Expand Docker E2E gate runner (`e2e_runner.sh`) to test multi-harness installation, sync, model setting, and uninstallation.
   - *Verification*: `make e2e`
-- [ ] **Task 4.2**: Verify 100% green cross-platform CI matrix across Linux, macOS, and Windows.
+- [x] **Task 4.2**: Verify 100% green cross-platform CI matrix across Linux, macOS, and Windows.
   - *Verification*: `./.githooks/pre-commit` & GitHub Actions CI.

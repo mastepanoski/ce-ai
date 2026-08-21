@@ -61,10 +61,18 @@ echo "$STATUS_OUT" | grep -q "opencode" || {
   exit 1
 }
 
-echo "== [E2E 7] Running ce-ai uninstall =="
+echo "== [E2E 7] Validating multi-harness probing and support =="
+touch "$HOME/.claude.json"
+STATUS_OUT=$(ce-ai status)
+echo "$STATUS_OUT" | grep -q "opencode" || {
+  echo "FAIL: status output did not report opencode: $STATUS_OUT"
+  exit 1
+}
+
+echo "== [E2E 8] Running ce-ai uninstall =="
 ce-ai uninstall --harness opencode
 
-echo "== [E2E 8] Asserting uninstall restoration =="
+echo "== [E2E 9] Asserting uninstall restoration =="
 grep -q "pre-existing-plugin" "$HOME/.config/opencode/opencode.json" || {
   echo "FAIL: pre-existing-plugin lost after uninstall"
   exit 1

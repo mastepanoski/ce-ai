@@ -14,13 +14,10 @@ pub struct Args {
     pub harness: String,
 }
 
+use crate::harness::HarnessKind;
+
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
-    if args.harness != "opencode" {
-        return Err(CeError::Usage(format!(
-            "unsupported harness '{}' — v1 supports opencode only",
-            args.harness
-        )));
-    }
+    let _harness_kind = args.harness.parse::<HarnessKind>()?;
     // Manifest presence marks an install; refuse to uninstall what isn't installed.
     let manifest = InstallManifest::load(&ctx.opencode_config_dir)
         .map_err(|_| CeError::Runtime("no install-manifest.json — nothing to uninstall".into()))?;
