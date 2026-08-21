@@ -776,3 +776,21 @@ fn backups_restore_by_explicit_id() {
     let restored_content = fs::read_to_string(home.join(".config/opencode/opencode.json")).unwrap();
     assert!(restored_content.contains("user-plugin-v1"));
 }
+
+#[test]
+fn status_validates_multi_harness_probing() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Create host-installed claude config
+    fs::write(home.join(".claude.json"), "{}").unwrap();
+
+    ceai(&config_dir, &home)
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("installed: opencode"))
+        .stdout(predicate::str::contains("installed: claude"));
+}

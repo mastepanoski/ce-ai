@@ -37,7 +37,7 @@ pub struct Args {
 use crate::harness::HarnessKind;
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
-    let _harness_kind = args.harness.parse::<HarnessKind>()?;
+    let harness_kind = args.harness.parse::<HarnessKind>()?;
 
     let (source_path, version, source_json, tmp_dir) = resolve_source(ctx, &args.source)?;
 
@@ -61,18 +61,18 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 
     let config_dir = &ctx.opencode_config_dir;
-    let opencode_json = config_dir.join("opencode.json");
+    let target_config = harness_kind.config_path(config_dir);
     let managed_dir = config_dir.join(MANAGED_DIR);
-    let needs_backup = opencode_json.exists();
+    let needs_backup = target_config.exists();
 
     // Dry-run plans only; SU-4 guarantees zero writes.
     if ctx.dry_run {
         println!(
             "plan: {}",
             if needs_backup {
-                "backup opencode.json"
+                format!("backup {}", target_config.display())
             } else {
-                "create opencode.json"
+                format!("create {}", target_config.display())
             }
         );
         for rel in managed.keys() {
@@ -90,7 +90,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let backup = if needs_backup {
         Some(backup_file(
             &ctx.config_dir.join("backups"),
-            &opencode_json,
+            &target_config,
         )?)
     } else {
         None
@@ -110,9 +110,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         });
     }
 
-    // Merge plugin entry + skills path into opencode.json (OI-2, OI-4).
+    // Merge plugin entry + skills path into target harness config (OI-2, OI-4).
     let mut mutation = ensure_plugin_and_skills(
-        &opencode_json,
+        &target_config,
         &plugin_entry(config_dir).to_string_lossy(),
         &skills_path(config_dir).to_string_lossy(),
     )?;

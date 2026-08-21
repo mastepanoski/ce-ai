@@ -158,13 +158,16 @@ impl App {
                 HarnessKind::detect_installed_harnesses(std::path::Path::new(&home));
         }
 
-        // Load harness status
+        let mut seen = std::collections::HashSet::new();
+
+        // Load harness status from state.json
         let state_path = ctx.config_dir.join("state.json");
         if let Ok(state) = State::load(&state_path) {
             for h in &state.installed_harnesses {
                 let name = h["name"].as_str().unwrap_or("unknown").to_string();
                 let version = h["version"].as_str().unwrap_or("unknown").to_string();
                 let source = h["source"]["kind"].as_str().unwrap_or("local").to_string();
+                seen.insert(name.clone());
                 self.harnesses.push((name, version, source));
             }
             for (slot, model_info) in &state.model_assignments {
@@ -172,6 +175,19 @@ impl App {
                     slot.clone(),
                     format!("{}/{}", model_info.provider_id, model_info.model_id),
                 ));
+            }
+        }
+
+        // Auto-probe host harnesses for compound-engineering installations
+        if let Ok(home) = std::env::var("HOME") {
+            let home_path = std::path::Path::new(&home);
+            for h in HarnessKind::detect_ce_installed_harnesses(home_path) {
+                let name = h.to_string();
+                if !seen.contains(&name) {
+                    seen.insert(name.clone());
+                    self.harnesses
+                        .push((name, "host-detected".to_string(), "local".to_string()));
+                }
             }
         }
 
