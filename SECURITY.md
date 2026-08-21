@@ -32,6 +32,45 @@ Every installed plugin asset (JS loaders, skill markdown definitions, configurat
 
 ---
 
+## 🎓 Masterclass: Why We Adopted These Security Guardrails (Teacher's Guide)
+
+To understand why `ce-ai` implements these specific controls, let's explore the core architectural threats and the exact analogies behind each guardrail:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        🛡️ THE 5 PILLARS OF SECURITY IN CE-AI                           │
+├──────────────────────┬──────────────────────┬───────────────────┬──────────────────────┤
+│ 1. Path Traversal    │ 2. Atomic Writes     │ 3. #![forbid]     │ 4. Cryptographic     │
+│    Sanitizer         │    Scratchpad        │    Memory Safety  │    SHA256 Seals      │
+│ (No Trojan Archives) │ (Zero Partial State) │ (No Raw Pointers) │ (Drift Auto-Repair)  │
+└──────────────────────┴──────────────────────┴───────────────────┴──────────────────────┘
+```
+
+### 1. The Border Guard: Why `safe_extract` Rejects Path Traversal (`../` & `/etc/passwd`)
+- **The Threat**: When extracting a remote `.tar.gz` archive, an attacker could craft malicious entries like `../../../../usr/bin/malicious` or `/etc/passwd`. Standard extractors extract files as they read them, which means by the time a malicious path is encountered, half the archive is already written to your disk.
+- **The Teacher Analogy**: Imagine a customs officer at an international airport. Instead of letting passengers enter the terminal and checking their passports later, the officer inspects the manifest of the entire plane *at the gate*. If even one passenger lacks a valid visa, the entire plane is turned back before anyone steps onto the tarmac.
+- **Our Guarantee**: `safe_extract` scans 100% of archive headers *in memory* before performing a single disk write.
+
+### 2. The Ink Scratchpad: Why `write_atomic` Uses Temporary Files & Renames
+- **The Threat**: If a computer loses power, crashes, or runs out of disk space while writing to `state.json` or `opencode.json`, the file gets cut in half, corrupting the user's configurations and active agent model profiles.
+- **The Teacher Analogy**: Imagine writing a legal deed with permanent ink directly on the original document. If your pen leaks halfway through, the deed is ruined forever. Instead, you draft on a separate scratchpad first (`.state.json.tmp-12345`). Once every letter is complete and verified, you swap the scratchpad for the final document in one instantaneous, un-interruptible motion (`std::fs::rename`).
+- **Our Guarantee**: File states in `ce-ai` are mathematically binary: they are either 100% up-to-date or unchanged. Partial corruption is impossible.
+
+### 3. The Structural Steel Lock: Why Compiler-Enforced `#![forbid(unsafe_code)]`
+- **The Threat**: In Rust, `unsafe` blocks allow developers to bypass memory safety checks (e.g. raw pointer arithmetic or manual memory allocation). Over time, un-reviewed `unsafe` code can introduce buffer overflows, use-after-free bugs, or segmentation faults.
+- **The Teacher Analogy**: Rust gives you structural steel beams for building a skyscraper safely. Using `unsafe` is like building temporary wooden scaffolding to shortcut a corner. By declaring `#![forbid(unsafe_code)]` at the root of `src/lib.rs` and `src/main.rs`, we physically lock the door to wooden scaffolding: the compiler itself will refuse to compile the binary if any `unsafe` block is introduced anywhere in the codebase.
+- **Our Guarantee**: 100% compiler-verified memory safety across the entire application codebase.
+
+### 4. The Self-Contained Vault: Why `rustls-tls` Replaces System OpenSSL
+- **The Threat**: Dynamically linking to the host system's OpenSSL dynamic libraries (`libssl.so` or `libssl.dylib`) introduces vulnerability drift. If the user's OS has an unpatched OpenSSL CVE, `ce-ai` becomes vulnerable by association.
+- **The Teacher Analogy**: Instead of relying on a shared hotel room lock whose keys might be duplicated by the front desk, you carry your own portable, modern vault key. `rustls-tls` is written in pure, memory-safe Rust and compiled directly into the static binary, eliminating C-library memory corruption vulnerabilities and dynamic library mismatch crashes.
+
+### 5. Digital Tamper Seals: Why Cryptographic SHA256 Manifests Exist
+- **The Threat**: Local files, agent skills, or plugin loaders can be accidentally deleted, edited by another tool, or tampered with by malware.
+- **The Teacher Analogy**: Think of a tamper-evident seal placed on high-security cargo containers. Every time `ce-ai doctor` or `ce-ai sync` runs, it re-calculates the SHA256 fingerprint of every managed asset and compares it against `install-manifest.json`. If a seal is broken, `ce-ai` flags the exact modified file and automatically repairs it from the pristine cache.
+
+---
+
 ## 🛡️ Vulnerability Disclosure Protocol
 
 If you discover a security vulnerability, flaw, or unexpected behavior in `ce-ai`, please report it responsibly:
