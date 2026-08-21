@@ -1,0 +1,14 @@
+# Concepts & Vocabulary
+
+This document defines core domain nouns and concepts in `ce-ai`.
+
+## Domain Glossary
+
+### Harness
+An external AI agent runner or development environment (such as OpenCode, Claude Code, Cursor, GitHub Copilot, or Pi) into which `ce-ai` installs, manages, and updates compound engineering loaders, skills, and configuration state.
+
+### Backup Snapshot
+An immutable, timestamped directory containing a point-in-time copy of a harness's configuration file, created automatically prior to installation, upgrade, or manual config mutation.
+
+### Managed Assets
+The set of loader scripts, skill documents, and tracking manifests installed and maintained by `ce-ai` within a harness's configuration directory.
