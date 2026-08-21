@@ -1,13 +1,13 @@
-# 🏛️ Guía Arquitectónica y Conceptual de `ce-ai`
+# 🏛️ Architectural & Conceptual Guide: `ce-ai`
 
-Esta guía aborda en profundidad la **arquitectura de software, patrones de diseño y conceptos de ingeniería** sobre los cuales está construido `ce-ai`. Su objetivo es explicar el *cómo* y el *porqué* arquitectónico detrás de cada decisión del sistema.
+This guide presents a deep dive into the **software architecture, design patterns, and engineering principles** upon which `ce-ai` is built. Its goal is to explain the architectural *how* and *why* behind every system decision.
 
 ---
 
-## 1. Capa de Orquestación Multi-Arnés (Multi-Harness Orchestration Architecture)
+## 1. Multi-Harness Orchestration Architecture
 
-### 📐 El Concepto Arquitectónico
-`ce-ai` está diseñado bajo un patrón de **desacoplamiento total de adaptadores** (`HarnessAdapter` trait en Rust).
+### 📐 Architectural Concept
+`ce-ai` is engineered around **complete adapter decoupling** via the `HarnessAdapter` trait in Rust.
 
 ```
                       ┌─────────────────────────┐
@@ -28,92 +28,92 @@ Esta guía aborda en profundidad la **arquitectura de software, patrones de dise
         └─────────────────────┘         └─────────────────────┘
 ```
 
-### 💡 Justificación Arquitectónica
-- **Abstracción de Interfaces**: Cada herramienta de IA (Claude Code, OpenCode, Cursor, Copilot, Kimi, Antigravity) maneja formatos de archivo y esquemas de configuración totalmente heterogéneos (JSON, Markdown con delimitadores, estructuras de arreglos de plugins).
-- **Principio de Responsabilidad Única (SRP)**: El motor central de `ce-ai` no conoce los detalles internos de sintaxis de cada editor. Simplemente delega en el `HarnessAdapter` correspondiente la tarea de fusionar la configuración de forma no destructiva.
-- **Extensibilidad Segura**: Agregar soporte para un nuevo editor o arnés de IA requiere únicamente implementar un nuevo adaptador que satisfaga el trait `HarnessAdapter`, sin arriesgar regresiones en el motor principal.
+### 💡 Architectural Rationale
+- **Interface Abstraction**: Every AI agent harness (Claude Code, OpenCode, Cursor, Copilot, Kimi, Antigravity) uses heterogeneous file formats and configuration structures (JSON schemas, Markdown comment-delimited blocks, plugin array lists).
+- **Single Responsibility Principle (SRP)**: The core engine of `ce-ai` has zero knowledge of editor-specific syntax or file structures. It delegates configuration merging exclusively to the matching `HarnessAdapter`.
+- **Safe Extensibility (Open/Closed Principle)**: Adding support for a new AI harness requires only implementing the `HarnessAdapter` trait for the target harness, ensuring zero regressions in the core engine.
 
 ---
 
-## 2. Aislamiento de Capas y Árbol de Ámbito (Scope Isolation: Global vs Workspace)
+## 2. Scope Isolation & Hierarchy (Global vs. Workspace Scope)
 
-### 📐 El Concepto Arquitectónico
-El sistema aplica un patrón de **Jerarquía de Configuración y Aislamiento de Ámbito** (*Scope-Aware Hierarchy*).
+### 📐 Architectural Concept
+The system enforces a **Scope-Aware Configuration Hierarchy**.
 
-- **Global Scope (`~/.config/` / `~/.claude.json`)**: Capa de usuario donde residen las preferencias personales y herramientas transversales a cualquier máquina o repositorio.
-- **Workspace Scope (`./.opencode/` / `./.cursorrules`)**: Capa de repositorio acotada al árbol de trabajo de Git, resuelta determinísticamente mediante `git rev-parse --show-toplevel`.
+- **Global Scope (`~/.config/` / `~/.claude.json`)**: User-level configuration layer housing preferences and tools available across all projects on a developer's machine.
+- **Workspace Scope (`./.opencode/` / `./.cursorrules`)**: Repository-level configuration layer bounded to the current Git working tree, deterministically resolved via `git rev-parse --show-toplevel`.
 
-### 💡 Justificación Arquitectónica
-- **Prevención de Contaminación Cruzada (Rule Cross-Contamination)**: Proyectos distintos poseen diferentes arquitecturas, restricciones de seguridad y convenciones de código. Si las reglas de IA fuesen únicamente globales, las directivas de un proyecto backend en Rust contaminarían la sesión de un proyecto frontend en React.
-- **Reproducibilidad en Equipo**: El ámbito *workspace* permite versionar dentro del repositorio Git las habilidades y reglas del proyecto. Cualquier desarrollador o agente que clone el repositorio adquiere automáticamente el mismo contexto operativo exacto.
+### 💡 Architectural Rationale
+- **Prevention of Rule Cross-Contamination**: Different repositories have distinct architectures, security policies, and coding conventions. Global-only rules would cause Rust backend directives to contaminate React frontend AI sessions.
+- **Team Reproducibility**: Workspace scope allows skills and agent rules to be checked directly into Git. Any teammate or agent instance cloning the repository automatically inherits the exact same operational context.
 
 ---
 
-## 3. Arquitectura de Sidecars y Servidores de Conocimiento (Sidecars & MCP Protocol)
+## 3. Sidecars & Knowledge Protocol Architecture (MCP & Sidecar Pattern)
 
-### 📐 El Concepto Arquitectónico
-`ce-ai` utiliza el patrón de diseño **Sidecar (Procesos Acompañantes)** junto con la infraestructura de **Model Context Protocol (MCP)**.
+### 📐 Architectural Concept
+`ce-ai` leverages the **Sidecar Pattern** coupled with the **Model Context Protocol (MCP)** infrastructure.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Agente Ejecutor de IA                        │
+│                       AI Execution Agent                        │
 └──────┬──────────────────────┬──────────────────────┬────────────┘
        │ (MCP)                │ (MCP)                │ (MCP)
 ┌──────┴──────────────┐ ┌─────┴──────────────┐ ┌─────┴──────────────┐
 │  Engram Memory      │ │ CodeGraph Engine   │ │ Context7 / RTK     │
-│  (Persistencia)     │ │ (Grafo de Código)  │ │ (Docs en Vivo)     │
+│  (Long-Term Store)  │ │ (Code Topology)    │ │ (Live Docs/Specs)  │
 └─────────────────────┘ └────────────────────┘ └────────────────────┘
 ```
 
-- **Engram**: Microservicio de almacenamiento duradero que persiste descubrimientos, decisiones y soluciones entre sesiones.
-- **CodeGraph**: Motor de indexación estática y análisis de impacto (*blast-radius*) que expone la topología del código.
-- **Context7 & RTK**: Proveedores de contexto dinámico y documentación en tiempo real.
+- **Engram**: Long-term persistent memory server storing findings, decisions, and past solutions across sessions.
+- **CodeGraph**: Static indexing and blast-radius analysis engine exposing codebase call graphs.
+- **Context7 & RTK**: Real-time documentation and knowledge providers.
 
-### 💡 Justificación Arquitectónica
-- **Desacoplamiento entre Razonamiento y Almacenamiento**: Los Modelos de Lenguaje (LLMs) son excelentes procesando razonamiento en tiempo presente, pero deficientes almacenando estructuras duraderas a largo plazo.
-- **Eficiencia de la Ventana de Contexto**: En lugar de cargar todo el código fuente o la historia pasada dentro del prompt, el proceso Sidecar responde a consultas puntuales bajo demanda via MCP, reduciendo el consumo de tokens y evitando saturar la atención del modelo.
-
----
-
-## 4. Máquinas de Estados Finitos y Resiliencia de Flujo (Workflow FSM & Checkpointing)
-
-### 📐 El Concepto Arquitectónico
-El desarrollo asistido por IA en `ce-ai` está gobernado por una **Máquina de Estados Finitos (FSM)** que estructura el ciclo de vida en 7 fases deterministas:
-
-$$\text{Ideación} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Planificación} \xrightarrow{3} \text{Trabajo/TDD} \xrightarrow{4} \text{Verificación} \xrightarrow{5} \text{Documentación} \xrightarrow{6} \text{Publicación}$$
-
-### 💡 Justificación Arquitectónica
-- **Determinismo vs. Probabilidad**: La generación de código con LLMs es probabilística. Sin un motor de estados que exija pasar por especificación (`OpenSpec`), plan (`Plan`) y pruebas (`TDD`), el proceso degenera en parches superficiales o código inconsistente.
-- **Checkpointing y Re-hidratación de Contexto**:
-  - *Problema*: Durante tareas largas, la ventana de contexto del LLM sufre compactación (pérdida de memoria).
-  - *Solución Arquitectónica*: `ce-ai workflow checkpoint` serializa en disco el estado exacto de la FSM y la tarea activa. Al reiniciar o cambiar de agente, `ce-ai workflow resume` lee el disco y re-hidrata la memoria sin duplicar trabajo ni perder la traza.
+### 💡 Architectural Rationale
+- **Decoupling Reasoning from Persistence**: Large Language Models (LLMs) excel at real-time reasoning but lack durable, long-term memory.
+- **Context Window Token Efficiency**: Rather than stuffing entire codebases or past histories into the prompt, Sidecars respond to targeted queries on demand via MCP, reducing token overhead and preventing context saturation.
 
 ---
 
-## 5. Resiliencia de E/S y Tolerancia a Fallos (System Integrity & Fault Tolerance)
+## 4. Finite State Machine & Flow Resilience (Workflow FSM & Checkpointing)
 
-### 📐 El Concepto Arquitectónico
+### 📐 Architectural Concept
+AI-assisted development in `ce-ai` is governed by a **Finite State Machine (FSM)** structuring the lifecycle into 7 deterministic stages:
 
-1. **Escrituras Atómicas (`write_atomic`)**:
-   - Para evitar corrupción de configuración (`state.json`, `opencode.json`), las escrituras nunca modifican el archivo destino de forma directa. Se escribe un archivo borrador temporal (`.tmp`) en el mismo sistema de archivos y se ejecuta una operación de renombrado atómico del kernel POSIX/OS.
+$$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \xrightarrow{3} \text{Work/TDD} \xrightarrow{4} \text{Verify} \xrightarrow{5} \text{Compound} \xrightarrow{6} \text{Ship}$$
 
-2. **Detección de Desviación criptográfica (SHA256 Drift Detection)**:
-   - `install-manifest.json` mantiene un índice hash SHA256 de cada habilidad. El motor de reconciliación (`sync`) calcula el diff criptográfico de tres vías:
-     - **Copy**: Archivos faltantes en disco.
-     - **Restore**: Archivos locales alterados respecto al manifest de referencia.
-     - **Remove**: Archivos obsoletos o extirpados de la versión de origen.
-
-3. **Invariante de Preservación del Usuario (Non-Destructive Merger)**:
-   - El sistema garantiza que ninguna mutación de `ce-ai` elimine claves, servidores MCP o configuraciones personalizadas del usuario.
+### 💡 Architectural Rationale
+- **Determinism over Probability**: Code generation with LLMs is inherently probabilistic. Without an FSM enforcing formal specifications (`OpenSpec`), plans (`Plan`), and test-driven verification (`TDD`), execution degrades into superficial patches.
+- **Checkpointing & Context Re-hydration**:
+  - *Problem*: During long-running multi-file tasks, an LLM's context window undergoes compaction (loss of earlier context).
+  - *Solution*: `ce-ai workflow checkpoint` atomically serializes the current FSM phase and active task to disk. Upon session restart or agent hand-off, `ce-ai workflow resume` reads the checkpoint and re-hydrates state without losing context or duplicating work.
 
 ---
 
-## 📊 Matriz de Conceptos y Pilares Arquitectónicos
+## 5. System Integrity & Fault Tolerance (POSIX I/O Guarantees)
 
-| Pilar Arquitectónico | Patrón / Mecanismo | Problema del Sistema que Resuelve |
+### 📐 Architectural Concept
+
+1. **Atomic Disk Writes (`write_atomic`)**:
+   - To prevent file corruption (`state.json`, `opencode.json`), disk mutations never write directly to the target file. Content is written to a temporary file (`.tmp`) on the same filesystem and swapped via an OS-level atomic `rename` call.
+
+2. **Cryptographic SHA256 Drift Detection**:
+   - `install-manifest.json` tracks SHA256 checksums for every managed asset. The `sync` engine performs a 3-way diff:
+     - **Copy**: Missing files on disk.
+     - **Restore**: Locally modified files exhibiting hash drift.
+     - **Remove**: Stale or deprecated assets.
+
+3. **User Configuration Preservation Principle**:
+   - Non-destructive JSON mergers ensure `ce-ai` never deletes or clobbers custom user keys, third-party plugins, or MCP servers.
+
+---
+
+## 📊 Summary of Architectural Pillars
+
+| Architectural Pillar | Design Pattern / Mechanism | System Problem Solved |
 | :--- | :--- | :--- |
-| **Adaptabilidad** | `HarnessAdapter` (Traits) | Heterogeneidad de editores de IA y esquemas de configuración. |
-| **Aislamiento** | Hierarchical Scope (Global vs Workspace) | Contaminación cruzada de directivas entre distintos proyectos. |
-| **Persistencia Externa** | Sidecars & MCP (Engram / CodeGraph) | Saturación de la ventana de contexto y pérdida de memoria entre sesiones. |
-| **Determinismo de Flujo** | Workflow FSM & Checkpointing | Inestabilidad probabilística y degradación por compactación de contexto. |
-| **Tolerancia a Fallos** | Atomic Writes & SHA256 Manifest Index | Corrupción de archivos por interrupciones o ediciones accidentales en disco. |
+| **Adaptability** | `HarnessAdapter` (Traits) | Heterogeneous AI editors and configuration file formats. |
+| **Scope Isolation** | Hierarchical Scope (Global vs. Workspace) | Cross-contamination of agent rules across different repositories. |
+| **External Persistence** | Sidecars & MCP (Engram / CodeGraph) | Context window saturation and memory loss between sessions. |
+| **Flow Determinism** | Workflow FSM & Checkpointing | Probabilistic instability and state loss post context compaction. |
+| **Fault Tolerance** | Atomic Writes & SHA256 Manifest Indexing | File corruption during process crashes or unbuffered overwrites. |
