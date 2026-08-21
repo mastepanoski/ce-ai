@@ -77,12 +77,38 @@ src/
      - `5`: Network / HTTP error
      - `6`: Integrity / Verification error
 
+## ✅ Definition of Done (DoD) for AI Agents
+
+Before declaring any task or issue completed, an AI agent MUST satisfy all criteria of the **Definition of Done**:
+
+### 1. Code Quality & Architectural Integrity
+- [ ] Code compiles without warnings (`cargo clippy --all-targets --all-features -- -D warnings`).
+- [ ] Code formatting adheres strictly to `cargo fmt --check`.
+- [ ] All state/config mutations use `crate::state::write_atomic` (zero unbuffered overwrites).
+- [ ] Operating system paths use cross-platform `PathBuf::join` methods (no hardcoded `/` or `\` in join calls).
+- [ ] User configuration keys in `opencode.json` (or other harness configs) are preserved without clobbering.
+
+### 2. Testing & Empirical Verification
+- [ ] All unit and CLI integration tests pass (`cargo test`).
+- [ ] Containerized Docker E2E gate passes (`make e2e` or `cargo test --test e2e`).
+- [ ] Cross-platform CI pipeline passes 100% green on GitHub Actions across Linux (`ubuntu-latest`), macOS (`macos-latest`), and Windows (`windows-latest`).
+
+### 3. Compliance, Governance & Security
+- [ ] Aligns with **ISO/IEC 27001/27002** (SHA256 manifests, atomic writes, `cargo-audit` clean).
+- [ ] Aligns with **ISO/IEC 42001** and **NIST AI RMF 1.0** (model role scoping, transparent state).
+- [ ] Zero secrets, tokens, credentials, or transient files (`.atl/`, `.pi/`, `.codegraph/`) committed to version control.
+
+### 4. Documentation & Git Delivery
+- [ ] Updated user documentation (`README.md`, `SECURITY.md`, `AI_POLICY.md`, or CLI `--help` strings) if flags, subcommands, or schemas were altered.
+- [ ] Clear, value-communicating Git commit message added and pushed to remote branch.
+
 ---
 
 ## 📜 Verification Checklist for Agents
 
 - [ ] Code compiles without warnings (`-D warnings`).
 - [ ] Formatting complies with `cargo fmt`.
-- [ ] All 18+ unit and CLI integration tests pass (`cargo test`).
+- [ ] All unit and CLI integration tests pass (`cargo test`).
 - [ ] Containerized Docker E2E gate passes (`make e2e`).
-- [ ] Updated documentation if CLI arguments or schemas modified.
+- [ ] All GitHub Actions CI jobs pass green across Linux, macOS, and Windows.
+- [ ] Definition of Done (DoD) criteria fully satisfied.
