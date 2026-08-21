@@ -237,7 +237,7 @@ dependencies = [
 
 [[package]]
 name = "ce-ai"
-version = "0.4.0"
+version = "0.9.0"
 dependencies = [
  "assert_cmd",
  "chrono",

@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.0] - 2026-08-21
+
+### Added
+- **ISO 27001 / ISO 27002 Security Audit Test Suite (`tests/security.rs`)**: Path traversal payload rejection, atomic state write tempfile cleanup, and corrupted JSON state recovery.
+- **High-Performance Benchmarks (`benches/benchmarks.rs`)**: Verified sub-50ms execution bounds for state resolution, workspace overrides merging, and SHA256 integrity hash calculation.
+- **Security Policy Update**: Updated `SECURITY.md` supported versions matrix.
+
+---
+
 ## [0.8.0] - 2026-08-21
 
 ### Added

@@ -56,5 +56,6 @@ Security updates are actively applied to the following versions:
 
 | Version | Supported          | Security Maintenance Status |
 | ------- | ------------------ | --------------------------- |
-| 0.1.x   | :white_check_mark: | Active Mainline             |
-| < 0.1   | :x:                | Unsupported                 |
+| 0.9.x   | :white_check_mark: | Active Mainline (v0.9.0)    |
+| 0.8.x   | :white_check_mark: | Supported Maintenance       |
+| < 0.8   | :x:                | Deprecated                  |
