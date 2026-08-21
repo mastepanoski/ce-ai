@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.0] - 2026-08-21
+
+### Added
+- **TUI Workflow Dashboard**: Interactive `🎮 Workflow (FSM)` panel in `ce-ai tui` visualizing 7-stage Flywheel status, active subtasks, and progress checkpoints.
+- **Extended Companion Health Diagnostics**: Empirical health probes in `ce-ai doctor` for Engram SQLite DB (`~/.engram/engram.db`), CodeGraph index (`.codegraph/`), and RTK binary PATH.
+- **Real-Time Sync Watcher**: Added `ce-ai sync --watch` flag for continuous drift monitoring and automatic SHA256 re-syncing.
+- **Teacher-Style Documentation**: Updated masterclass user guides explaining cockpit instrument panels and autopilot guardrails.
+
+---
+
 ## [0.5.0] - 2026-08-21
 
 ### Added
