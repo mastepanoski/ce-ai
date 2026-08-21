@@ -45,10 +45,15 @@ flowchart LR
    - Run `/ce-brainstorm` (or `/ce-ideate` to explore surprise options).
    - *Goal*: Clarify scope, user constraints, and out-of-scope boundaries. Writes `docs/brainstorms/<date>-<name>-requirements.md`.
 
-2. **Stage 2: OpenSpec Definition**
-   - Create formal specs under `openspec/changes/<feature_name>/`:
-     - `proposal.md`, `exploration.md`, `design.md`, `spec.md`, and `tasks.md`.
-   - *Goal*: Define explicit `WHEN ... THEN ...` acceptance criteria.
+2. **Stage 2: OpenSpec Definition (How to Create & Instruct OpenSpec)**
+   - Create a dedicated change directory: `openspec/changes/<feature_name>/`.
+   - Populate the **5 Standard OpenSpec Files**:
+     - `proposal.md`: Problem statement, scope boundaries, risk assessment, and success criteria.
+     - `exploration.md`: Technical investigation, evaluated options, and trade-offs.
+     - `design.md`: System architecture, struct definitions, data schemas, and API contracts.
+     - `spec.md`: Formal behavior requirements using explicit `WHEN ... THEN ...` scenario blocks.
+     - `tasks.md`: Atomic, executable task checklist with TDD verification steps (`- [ ] Unit 1`).
+   - *How to Instruct an AI Agent*: Provide the path `openspec/changes/<feature_name>/` to your AI harness and ask it to execute the tasks in `tasks.md`.
 
 3. **Stage 3: Technical Execution Plan**
    - Run `/ce-plan` (and optionally `/ce-doc-review` to audit plan rigor).
@@ -258,9 +263,52 @@ flowchart TD
 
 > ⚠️ **The Non-Negotiable Rule**: Regardless of whether you use TDD, Code-First, or BDD, **Stage 5 (Empirical Verification)** and **Stage 6 (`ce-compound`)** remain mandatory: code must be verified empirically via tests, and discoveries must be documented in `docs/solutions/`.
 
+### 6. Practical Guide: How to Author & Instruct OpenSpec Specifications
+
+OpenSpec is the formal contract engine in Stage 2. Here is how to author and instruct AI agents using OpenSpec:
+
+```mermaid
+flowchart TD
+    DIR["1. Create Folder: openspec/changes/<feature_name>/"] --> FILES["2. Author 5 OpenSpec Files"]
+    FILES --> PROP["proposal.md: Problem & Scope Boundaries"]
+    FILES --> EXPL["exploration.md: Tech Options & Trade-offs"]
+    FILES --> DES["design.md: Schemas & Struct Definitions"]
+    FILES --> SPEC["spec.md: WHEN...THEN Acceptance Scenarios"]
+    FILES --> TASK["tasks.md: Executable Checklist (- [ ] Task)"]
+
+    FILES --> INSTRUCT["3. Instruct Agent: Executing tasks.md via ce-plan / ce-work"]
+```
+
+#### The 5 Standard OpenSpec Files:
+
+1. **`proposal.md`**:
+   - Defines the problem statement, in-scope vs. out-of-scope boundaries, risk evaluation, and success criteria.
+2. **`exploration.md`**:
+   - Documents technical research, evaluated libraries, architectural trade-offs, and prototype findings.
+3. **`design.md`**:
+   - Details technical architecture, data schemas, API contracts, struct fields, and error exit code mappings.
+4. **`spec.md`**:
+   - Written in formal `WHEN ... THEN ...` scenario blocks:
+     ```markdown
+     ### Scenario 1: Workspace Installation
+     WHEN the user runs `ce-ai install --scope workspace` inside a Git repository
+     THEN it MUST write `.opencode/` and `state.json` isolated to the repository root.
+     ```
+5. **`tasks.md`**:
+   - Contains checkable tasks (`- [ ]`) broken into atomic implementation units:
+     ```markdown
+     - [ ] Unit 1: Add `--scope workspace` CLI flag parsing in `src/commands/install.rs`
+     - [ ] Unit 2: Implement repository root resolution via `git rev-parse`
+     - [ ] Unit 3: Add integration tests in `tests/cli.rs`
+     ```
+
+#### How to Instruct an AI Agent with OpenSpec:
+- **Prompt Example**:
+  > *"Execute the tasks defined in `openspec/changes/001-workspace-scope/tasks.md` using the `/ce-work` skill. Update each checklist item to `- [x]` as tests pass."*
+
 ---
 
-### 6. Transitioning from Spec-Driven Development (SDD / `gentle-ai`)
+### 7. Transitioning from Spec-Driven Development (SDD / `gentle-ai`)
 
 #### How does `ce-ai` handle projects migrating from SDD?
 
