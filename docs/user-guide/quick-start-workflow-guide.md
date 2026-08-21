@@ -225,7 +225,42 @@ flowchart TD
 
 ---
 
-### 5. Transitioning from Spec-Driven Development (SDD / `gentle-ai`)
+### 5. Alternative Development Methodologies: What if I don't use TDD?
+
+While Test-Driven Development (TDD: Red-Green-Refactor) is the recommended default in Stage 4, **`ce-ai` and Compound Engineering fully support alternative development styles**:
+
+```mermaid
+flowchart TD
+    CHOICE{What is your development style?}
+    CHOICE -->|TDD (Default)| TDD["TDD: Write Failing Test (Red) -> Code Fix (Green) -> Refactor"]
+    CHOICE -->|Code-First| CODE_FIRST["Code-First: Implement Code -> Write Tests -> Verify"]
+    CHOICE -->|BDD / Scenario-First| BDD["BDD: Write WHEN...THEN Scenario Tests -> Implement -> Verify"]
+    CHOICE -->|Spike / R&D Spike| SPIKE["R&D Spike (ce-ideate): Quick PoC -> Evaluate -> Convert to OpenSpec"]
+
+    TDD --> GATE[Stage 5: Mandatory Verification cargo test & make e2e]
+    CODE_FIRST --> GATE
+    BDD --> GATE
+    SPIKE -->|If Retained| GATE
+```
+
+#### How Non-TDD Variants Work in the FSM:
+
+1. **Code-First + Post-Verification**:
+   - *Flow*: Implement code directly in Stage 4 based on OpenSpec requirements (`spec.md`), then write tests afterwards.
+   - *FSM Rule*: The FSM does not restrict whether code or test files were written first. However, **Stage 5 (Empirical Verification)** strictly mandates that unit/integration tests must exist and pass 100% green before shipping.
+
+2. **Behavior-Driven Development (BDD)**:
+   - *Flow*: Define acceptance scenarios using explicit `WHEN <condition> THEN <expected outcome>` blocks in Stage 2 (`OpenSpec`). Tests are written to validate high-level behavior contracts.
+
+3. **Spike Prototyping / R&D Spikes**:
+   - *Flow*: Use `/ce-ideate` to build a fast proof-of-concept (PoC) without writing tests or specs initially.
+   - *Transition*: If the spike proves viable, convert the learnings into Stage 2 (`OpenSpec`) and proceed through standard verification.
+
+> ⚠️ **The Non-Negotiable Rule**: Regardless of whether you use TDD, Code-First, or BDD, **Stage 5 (Empirical Verification)** and **Stage 6 (`ce-compound`)** remain mandatory: code must be verified empirically via tests, and discoveries must be documented in `docs/solutions/`.
+
+---
+
+### 6. Transitioning from Spec-Driven Development (SDD / `gentle-ai`)
 
 #### How does `ce-ai` handle projects migrating from SDD?
 
