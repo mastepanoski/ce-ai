@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.2.0] - 2026-08-21
+
 ### Added
 - Pre-commit security gate (`.githooks/pre-commit` & `make hooks`) for secret scanning, test suites, and formatting checks.
 - Automated PR rejection workflow (`auto-reject-failed-pr`) in GitHub Actions CI.
