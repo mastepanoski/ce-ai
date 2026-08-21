@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.0] - 2026-08-21
+
+### Added
+- **Multi-Platform Native Release Pipeline (Issue #28)**: GitHub Actions CI matrix cross-compiling release binaries for Linux (`x86_64`, `ARM64`), macOS (`Intel`, `Apple Silicon`), and Windows (`x86_64`, `ARM64`).
+- **Universal One-Line Installer Script (Issue #3)**: Cross-platform POSIX (`scripts/install.sh`) and PowerShell (`scripts/install.ps1`) installer scripts for zero-dependency binary downloads.
+- **Homebrew Formula Specification (Issue #2)**: Package manager formula template (`Formula/ce-ai.rb`).
+
+---
+
 ## [0.7.0] - 2026-08-21
 
 ### Added

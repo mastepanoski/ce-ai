@@ -20,6 +20,10 @@ jobs:
             os: ubuntu-latest
             artifact_name: ce-ai
             asset_name: ce-ai-x86_64-unknown-linux-gnu.tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: ce-ai
+            asset_name: ce-ai-aarch64-unknown-linux-gnu.tar.gz
           - target: x86_64-apple-darwin
             os: macos-latest
             artifact_name: ce-ai
@@ -32,6 +36,10 @@ jobs:
             os: windows-latest
             artifact_name: ce-ai.exe
             asset_name: ce-ai-x86_64-pc-windows-msvc.zip
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            artifact_name: ce-ai.exe
+            asset_name: ce-ai-aarch64-pc-windows-msvc.zip
 
     steps:
       - name: Checkout Repository
