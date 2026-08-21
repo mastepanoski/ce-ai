@@ -5,7 +5,12 @@ use std::process::Command;
 
 #[test]
 fn test_docker_e2e_gate() {
-    // DG-3: Probe Docker availability. If unavailable, exit 0 with skip message.
+    // DG-3: Probe Docker availability. If unavailable or running on Windows, exit 0 with skip message.
+    if cfg!(windows) {
+        println!("SKIPPED: Docker E2E gate targets Linux containers; skipping on Windows host environment.");
+        return;
+    }
+
     let probe = Command::new("docker").arg("info").output();
     match probe {
         Ok(output) if output.status.success() => {
