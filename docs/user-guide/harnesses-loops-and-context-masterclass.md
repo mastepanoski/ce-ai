@@ -135,17 +135,17 @@ flowchart TD
 
 ### Key Ecosystem Tools:
 
-1. **`gentle-ai`**:
+1. **[`gentle-ai`](https://github.com/Gentleman-Programming)**:
    - The foundational suite and primary inspiration behind OpenSpec, Spec-Driven Development, and the Compound Engineering architecture.
-2. **`Engram`**:
+2. **[`Engram`](https://github.com/Gentleman-Programming/engram)**:
    - Persistent memory sidecar powered by SQLite + FTS5 full-text search. Stores architecture decisions, bug fixes, and user preferences across compaction cycles and sessions.
-3. **`CodeGraph`**:
+3. **[`CodeGraph`](https://github.com/colbymchenry/codegraph)**:
    - Codebase intelligence sidecar. Indexes AST symbols, function callers, callees, and blast-radius impacts before broad filesystem searches.
-4. **`Context7`**:
+4. **[`Context7`](https://github.com/upstash/context7)**:
    - Real-time documentation retrieval engine providing up-to-date framework APIs, libraries, and best-practice guidance for AI agents.
-5. **`RTK` (Rust Token Killer)**:
+5. **[`RTK / Rust Token Killer`](https://github.com/rtk-ai/rtk)**:
    - CLI Token Reduction Engine. Intercepts raw terminal streams (`cargo test`, `git status`, `docker ps`), stripping noise and compressing text by **60% to 90%** before hitting LLM context.
-6. **`Sequential Thinking`**:
+6. **[`Sequential Thinking`](https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking)**:
    - Structured reasoning protocol that enables AI agents to decompose complex problems, form hypotheses, reflect on test outcomes, and refine solutions step-by-step.
 
 ---

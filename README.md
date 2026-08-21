@@ -308,12 +308,12 @@ make e2e
 
 `ce-ai` and Compound Engineering take deep inspiration from pioneering open-source work in the **`gentle-ai`** ecosystem:
 
-- **[`gentle-ai`](https://github.com)**: Foundational ecosystem inspiration for Spec-Driven Development (OpenSpec) and agentic workflows.
-- **`Engram`**: Persistent cross-session memory sidecar powered by SQLite + FTS5 full-text search.
-- **`CodeGraph`**: Codebase structural intelligence sidecar (symbol call-graphs, blast-radius calculation).
-- **`Context7`**: Up-to-date documentation retrieval engine for modern frameworks and libraries.
-- **`RTK` (Rust Token Killer)**: Terminal output stream filter compressing raw stdio by 60%–90%.
-- **`Sequential Thinking`**: Structured reasoning protocol for step-by-step hypothesis evaluation and reflection.
+- **[`gentle-ai`](https://github.com/Gentleman-Programming)**: Foundational ecosystem inspiration for Spec-Driven Development (OpenSpec) and agentic workflows.
+- **[`Engram`](https://github.com/Gentleman-Programming/engram)**: Persistent cross-session memory sidecar powered by SQLite + FTS5 full-text search.
+- **[`CodeGraph`](https://github.com/colbymchenry/codegraph)**: Codebase structural intelligence sidecar (symbol call-graphs, blast-radius calculation).
+- **[`Context7`](https://github.com/upstash/context7)**: Up-to-date documentation retrieval engine for modern frameworks and libraries.
+- **[`RTK / Rust Token Killer`](https://github.com/rtk-ai/rtk)**: Terminal output stream filter compressing raw stdio by 60%–90%.
+- **[`Sequential Thinking`](https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking)**: Structured reasoning protocol for step-by-step hypothesis evaluation and reflection.
 
 ---
 
