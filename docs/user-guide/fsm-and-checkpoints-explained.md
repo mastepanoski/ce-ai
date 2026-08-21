@@ -263,10 +263,41 @@ The new agent immediately knows **where it is**, **what was already built**, and
 
 ---
 
-## 5. Summary Cheat Sheet
+## 5. FSM Capability Matrix: Supported Workflow Variants & Transitions
+
+The `ce-ai` FSM engine was specifically designed to support **all real-world engineering variants**:
+
+```mermaid
+flowchart TD
+    subgraph FSM_VARIANTS ["SUPPORTED FSM WORKFLOW VARIANTS"]
+        V1[1. Full 7-Stage Feature Cycle] -->|Stages 1 -> 7| FULL[New Feature / Enhancement]
+        V2[2. Direct Entry Bug Fix] -->|Stage 4 ce-debug -> 7| BUG[Bug Fix / Crash Repair]
+        V3[3. Exploration Sub-Loop] -->|Stage 1 ce-ideate| IDEATE[Architectural Discovery]
+        V4[4. Cross-Session Resumption] -->|ce-ai workflow resume| RESUME[Context Re-hydration]
+        V5[5. Multi-Harness Handoff] -->|Harness Agnostic Disk State| HANDOFF[Claude -> Cursor -> Antigravity]
+        V6[6. Worktree Isolation] -->|--scope workspace| WORKTREE[Parallel Git Worktrees]
+        V7[7. Targeted Fast-Track] -->|Stage 6 ce-compound| DOCS[Docs / Research Only]
+    end
+```
+
+### Complete Variant Matrix:
+
+| Workflow Variant | FSM Entry Point | FSM Traversal | State & Persistence Mechanism |
+| :--- | :--- | :--- | :--- |
+| **New Feature / Enhancement** | Stage 1 (`ce-brainstorm`) | Stages 1 ➔ 2 ➔ 3 ➔ 4 ➔ 5 ➔ 6 ➔ 7 | Formal OpenSpec (`proposal`, `spec`, `tasks`) + Plan + TDD + Solution + PR |
+| **Bug Fix / Crash Repair** | Stage 4 (`ce-debug`) | Stage 4 (Direct Entry) ➔ 5 ➔ 6 ➔ 7 | Bypasses feature briefs; reproduces test ➔ applies fix ➔ tags `ce-compound` |
+| **Architectural Exploration** | Stage 1 (`ce-ideate`) | Stage 1 Sub-Loop ➔ Stage 1 (`ce-brainstorm`) | Generates unconstrained options before formalizing requirements |
+| **Session Interruption & Resume** | Any Stage | Resumes at exact checkpoint | Atomic disk writes (`state.json`) + Engram persistent memory re-hydration |
+| **Multi-Harness Handoff** | Any Stage | Harness-Agnostic State Traversal | Shared disk state allows Claude Code to ideate, Cursor to edit, and AGY to ship |
+| **Git Worktree Isolation** | Worktree Root | Workspace-Scoped Traversal | `install --scope workspace` isolates state and CodeGraph per worktree |
+| **Docs / Research Fast-Track** | Stage 1 or Stage 6 | Targeted Pass | Bypasses code implementation; mutates `docs/solutions/` or research summary directly |
+
+---
+
+## 6. Summary Cheat Sheet
 
 | Command | Everyday Analogy | Technical Purpose |
 | :--- | :--- | :--- |
-| `ce-ai workflow status` | Checking the Map | Queries current FSM stage and active subtask progress. |
+| `ce-ai workflow status` | Checking the Map | Queries current FSM stage, active subtask, and variant capability status. |
 | `ce-ai workflow checkpoint` | Saving Your Game | Persists stage name, task string, and timestamp atomically to disk. |
-| `ce-ai workflow resume` | Reloading Your Save | Re-hydrates state and Engram memory after context compaction or agent hand-off. |
+| `ce-ai workflow resume` | Reloading Your Save | Re-hydrates state and Engram memory across sessions, handoffs, or compactions. |
