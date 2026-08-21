@@ -18,8 +18,8 @@ This document outlines the version milestones, feature criteria, and release pip
 ## 🗺️ Version Milestones to `v1.0.0`
 
 ```
-  v0.5.0 (Released) ──► v0.6.0 (Features Merged) ──► v0.7.0 (Upcoming)
-                                                             │
+  v0.5.0 (Released) ──► v0.6.0 (Released) ──► v0.7.0 (Upcoming)
+                                                     │
   v1.0.0 (Stable Release) ◄── v0.9.0 (Hardening) ◄── v0.8.0 (CI/CD Releases)
 ```
 
@@ -41,7 +41,7 @@ This document outlines the version milestones, feature criteria, and release pip
 
 ---
 
-### ✅ `v0.6.0` (Features Merged) — Proactive Workflow Observability & Sync Watcher
+### ✅ `v0.6.0` (Released) — Proactive Workflow Observability & Sync Watcher
 - [x] **TUI Workflow Dashboard**: Dedicated `🎮 Workflow (FSM)` panel in `ce-ai tui` visualizing 7-stage Flywheel status and progress checkpoints.
 - [x] **Extended Companion Diagnostics**: Non-fatal health probes in `ce-ai doctor` for Engram SQLite DB, CodeGraph index, and RTK binary PATH.
 - [x] **Real-Time Sync Watcher**: `ce-ai sync --watch` for real-time drift monitoring and automatic SHA256 re-syncing.
