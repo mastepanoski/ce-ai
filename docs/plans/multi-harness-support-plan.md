@@ -24,7 +24,7 @@
 - **Goal**: Define `HarnessKind` enum, `HarnessAdapter` trait, and CLI `--harness` flag parsing.
 - **Files**:
   - `src/harness/mod.rs` (Create core trait & registry)
-  - `src/main.rs` (Update Clap parser for `--harness` and `--all`)
+  - `src/main.rs` (Declare `mod harness;` and update Clap parser for `--harness` and `--all`)
   - `src/error.rs` (Ensure exit code mapping: Usage=2, State=3, IO=4, Network=5, Verification=6)
 - **Approach**:
   - Implement `HarnessKind` with `FromStr` and `Display` traits.
@@ -68,6 +68,7 @@
 - **Files**:
   - `src/harness/custom.rs`
   - `src/commands/install.rs`
+  - `src/state/state.rs` (Add `CustomHarnessConfig` to `state.json` schema)
 - **Approach**:
   - Read custom flags from `Context`.
   - If missing and TTY active, launch interactive `inquire::Text` prompts.
