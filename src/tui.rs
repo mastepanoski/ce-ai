@@ -566,7 +566,7 @@ fn run_install_cmd(ctx: &Context, dry_run: bool) -> Vec<String> {
     match install::run(&install_ctx, &args) {
         Ok(_) => vec![
             "✅ Installation completed successfully!".to_string(),
-            format!("Harness: opencode"),
+            "Harness: opencode".to_string(),
             format!(
                 "Mode: {}",
                 if dry_run {
