@@ -13,6 +13,9 @@ fn is_safe_relative_path(path: &Path) -> bool {
         return false;
     }
     let raw = path.to_string_lossy();
+    if raw.starts_with('/') || raw.starts_with('\\') {
+        return false;
+    }
     let bytes = raw.as_bytes();
     if bytes.len() >= 2
         && bytes[0].is_ascii_alphabetic()
@@ -21,7 +24,12 @@ fn is_safe_relative_path(path: &Path) -> bool {
     {
         return false; // drive-letter absolute, e.g. `C:\x` or `C:/x`
     }
-    !path.components().any(|c| matches!(c, Component::ParentDir))
+    !path.components().any(|c| {
+        matches!(
+            c,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
+    })
 }
 
 /// Opens archive bytes as a tar reader, transparently handling gzip (GitHub
