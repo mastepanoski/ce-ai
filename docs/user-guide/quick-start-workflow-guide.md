@@ -251,16 +251,16 @@ While Test-Driven Development (TDD: Red-Green-Refactor) is the recommended defau
 
 ```mermaid
 flowchart TD
-    CHOICE{What is your development style?}
-    CHOICE -->|TDD (Default)| TDD["TDD: Write Failing Test (Red) -> Code Fix (Green) -> Refactor"]
-    CHOICE -->|Code-First| CODE_FIRST["Code-First: Implement Code -> Write Tests -> Verify"]
-    CHOICE -->|BDD / Scenario-First| BDD["BDD: Write WHEN...THEN Scenario Tests -> Implement -> Verify"]
-    CHOICE -->|Spike / R&D Spike| SPIKE["R&D Spike (ce-ideate): Quick PoC -> Evaluate -> Convert to OpenSpec"]
+    CHOICE{"What is your development style?"}
+    CHOICE -->|"TDD (Default)"| TDD["TDD: Write Failing Test Red ➔ Code Fix Green ➔ Refactor"]
+    CHOICE -->|"Code-First"| CODE_FIRST["Code-First: Implement Code ➔ Write Tests ➔ Verify"]
+    CHOICE -->|"BDD / Scenario-First"| BDD["BDD: Write WHEN-THEN Scenarios ➔ Implement ➔ Verify"]
+    CHOICE -->|"Spike / R&D Spike"| SPIKE["R&D Spike: Quick PoC ➔ Evaluate ➔ Convert to OpenSpec"]
 
-    TDD --> GATE[Stage 5: Mandatory Verification cargo test & make e2e]
+    TDD --> GATE["Stage 5: Mandatory Verification cargo test & make e2e"]
     CODE_FIRST --> GATE
     BDD --> GATE
-    SPIKE -->|If Retained| GATE
+    SPIKE -->|"If Retained"| GATE
 ```
 
 #### How Non-TDD Variants Work in the FSM:
@@ -331,9 +331,9 @@ If your project previously used **Spec-Driven Development (SDD)** (such as `gent
 
 ```mermaid
 flowchart TD
-    TRADITIONAL_SDD["Traditional SDD Workflow\n(Specs -> Plan -> Code -> Verify -> DONE)"] -->|Missing Stage 6 Knowledge Capture| SINK[Knowledge Loss & Repeated Bugs]
+    TRADITIONAL_SDD["Traditional SDD Workflow\n(Specs ➔ Plan ➔ Code ➔ Verify ➔ DONE)"] -->|"Missing Stage 6 Knowledge Capture"| SINK["Knowledge Loss & Repeated Bugs"]
 
-    CE_WORKFLOW["Compound Engineering Workflow\n(Specs -> Plan -> Code -> Verify -> COMPOUND -> Flywheel)"] -->|Stage 6: ce-compound| FLYWHEEL["docs/solutions/ & CONCEPTS.md\n(Compounding Knowledge Flywheel)"]
+    CE_WORKFLOW["Compound Engineering Workflow\n(Specs ➔ Plan ➔ Code ➔ Verify ➔ COMPOUND ➔ Flywheel)"] -->|"Stage 6: ce-compound"| FLYWHEEL["docs/solutions/ & CONCEPTS.md\n(Compounding Knowledge Flywheel)"]
 ```
 
 - **100% Backward Compatibility**:
