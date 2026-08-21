@@ -18,9 +18,9 @@ This document outlines the version milestones, feature criteria, and release pip
 ## 🗺️ Version Milestones to `v1.0.0`
 
 ```
-  v0.4.0 (Current) ──► v0.5.0 (Backups & Restore) ──► v0.6.0 (Update Checker)
+  v0.5.0 (Released) ──► v0.6.0 (Features Merged) ──► v0.7.0 (Upcoming)
                                                              │
-  v1.0.0 (Stable Release) ◄── v0.9.0 (Hardening) ◄── v0.8.0 (CI/CD Releases) ◄── v0.7.0 (Project Scope)
+  v1.0.0 (Stable Release) ◄── v0.9.0 (Hardening) ◄── v0.8.0 (CI/CD Releases)
 ```
 
 ### ✅ `v0.3.0` & `v0.4.0` (Completed) — Multi-Harness Architecture & TUI
@@ -32,19 +32,20 @@ This document outlines the version milestones, feature criteria, and release pip
 
 ---
 
-### 🚧 `v0.5.0` — Backup Management & Point-in-Time Recovery ([#13](https://github.com/mastepanoski/ce-ai/issues/13))
-- [ ] **CLI Commands**:
-  - `ce-ai backups list`: List timestamped backups per harness with creation dates and paths.
-  - `ce-ai backups restore <timestamp_or_id>`: Restore a specific backup snapshot.
-- [ ] **TUI Panel**: Dedicated `Backups & Restore` tab in Ratatui dashboard for 1-click config recovery.
-- [ ] **Retention Policy**: Automatic pruning of old backups exceeding configurable retention limits.
+### ✅ `v0.5.0` (Released) — Workspace Scope, Companion Tools & Workflow FSM ([#5](https://github.com/mastepanoski/ce-ai/issues/5), [#7](https://github.com/mastepanoski/ce-ai/issues/7), [#9](https://github.com/mastepanoski/ce-ai/issues/9), [#10](https://github.com/mastepanoski/ce-ai/issues/10))
+- [x] **Workspace Scope Isolation**: Added `--scope workspace|global` flag in `ce-ai install` resolving repository root via `git rev-parse`.
+- [x] **Companion Tools Manager**: Added `ce-ai tools status` and `ce-ai tools install` for developer sidecars (`Engram`, `CodeGraph`, `Context7`, `RTK`).
+- [x] **Workflow FSM & Recovery Engine**: Added `ce-ai workflow status`, `checkpoint`, and `resume` tracking 7-stage progress and context recovery.
+- [x] **Backup Management & Point-in-Time Recovery**: `ce-ai backups list/restore` CLI and dedicated TUI panel (`MenuTab::Backups`).
+- [x] **Automated Release Pipeline**: Added `.github/workflows/release.yml` for multi-platform cross-compilation.
 
 ---
 
-### 🔔 `v0.6.0` — Automated Update Checker & Recommendations ([#14](https://github.com/mastepanoski/ce-ai/issues/14))
-- [ ] **`ce-ai` CLI Binary Checker**: Query GitHub API for new releases of `mastepanoski/ce-ai`.
-- [ ] **Plugin Release Checker**: Compare installed plugin release tag against `everyinc/compound-engineering-plugin`.
-- [ ] **Proactive Prompts**: Display update recommendations in `ce-ai status` and TUI header banner.
+### ✅ `v0.6.0` (Features Merged) — Proactive Workflow Observability & Sync Watcher
+- [x] **TUI Workflow Dashboard**: Dedicated `🎮 Workflow (FSM)` panel in `ce-ai tui` visualizing 7-stage Flywheel status and progress checkpoints.
+- [x] **Extended Companion Diagnostics**: Non-fatal health probes in `ce-ai doctor` for Engram SQLite DB, CodeGraph index, and RTK binary PATH.
+- [x] **Real-Time Sync Watcher**: `ce-ai sync --watch` for real-time drift monitoring and automatic SHA256 re-syncing.
+- [x] **Teacher-Style Documentation**: Explaining cockpit instrument panels and autopilot guardrails in user guides.
 
 ---
 
