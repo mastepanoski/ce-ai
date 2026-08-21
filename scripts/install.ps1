@@ -13,6 +13,16 @@ switch ($Arch) {
 $Target = "$ArchName-pc-windows-msvc"
 $AssetName = "ce-ai-$Target.zip"
 $DownloadUrl = "https://github.com/mastepanoski/ce-ai/releases/latest/download/$AssetName"
+try {
+    $ReleaseApi = "https://api.github.com/repos/mastepanoski/ce-ai/releases/latest"
+    $ReleaseInfo = Invoke-RestMethod -Uri $ReleaseApi -Headers @{"User-Agent"="ce-ai-installer"} -UseBasicParsing
+    $MatchedAsset = $ReleaseInfo.assets | Where-Object { $_.name -eq $AssetName }
+    if ($MatchedAsset -and $MatchedAsset.browser_download_url) {
+        $DownloadUrl = $MatchedAsset.browser_download_url
+    }
+} catch {
+    # Fallback to default redirect URL
+}
 
 $InstallDir = Join-Path $env:USERPROFILE ".ce-ai\bin"
 if (!(Test-Path $InstallDir)) {
@@ -27,12 +37,15 @@ $ProgressPreference = 'SilentlyContinue'
 
 if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
     & curl.exe -fsSL -o "$TempZip" "$DownloadUrl"
-} else {
+}
+
+if ($LASTEXITCODE -ne 0 -or !(Test-Path $TempZip) -or (Get-Item $TempZip).Length -lt 1000) {
+    Write-Host "  Trying PowerShell Invoke-WebRequest fallback..." -ForegroundColor Yellow
     Invoke-WebRequest -Uri "$DownloadUrl" -OutFile "$TempZip" -UserAgent "ce-ai-installer/1.0" -UseBasicParsing
 }
 
 if (!(Test-Path $TempZip) -or (Get-Item $TempZip).Length -lt 1000) {
-    Write-Error "❌ Failed to download release asset from $DownloadUrl"
+    Write-Error "❌ Failed to download valid release asset from $DownloadUrl"
     exit 1
 }
 
