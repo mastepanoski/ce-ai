@@ -89,6 +89,10 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
 
 ### 💡 Architectural Rationale
 - **Compound Engineering Alignment**: Compound Engineering dictates that software development must act as a self-reinforcing flywheel: every solved bug, design decision, and feature must compound knowledge over time. The FSM strictly mandates **Stage 6: Compound (`ce-compound`)**, ensuring agents document learnings in `docs/solutions/` and `CONCEPTS.md` before any task can close.
+- **FSM Sub-Loops & Diagnostic Interrupts**:
+  - *Exploration Sub-Loop (`ce-ideate` in Stage 1)*: Generates and evaluates unconstrained architectural ideas before transitioning to `ce-brainstorm` for structured requirements framing.
+  - *Diagnostic Interrupt Sub-Loop (`ce-debug` in Stage 4/5)*: Triggered on test failure or bug detection. Freezes task state, enters an iterative diagnosis loop (hypothesis ➔ log extraction ➔ minimal reproducer ➔ root cause fix), and once verified, transitions control back to `ce-work` or `Verify` while tagging `ce-compound` if a non-obvious learning was uncovered.
+  - *Refactoring Sub-Loop (`ce-simplify-code` in Stage 4)*: Executes non-behavioral code tidying and simplification passes post-Green TDD implementation.
 - **Determinism over Probability**: Code generation with LLMs is inherently probabilistic. Without an FSM enforcing formal specifications (`OpenSpec`), plans (`Plan`), and test-driven verification (`TDD`), execution degrades into superficial patches.
 - **Checkpointing & Context Re-hydration**:
   - *Problem*: During long-running multi-file tasks, an LLM's context window undergoes compaction (loss of earlier context).
