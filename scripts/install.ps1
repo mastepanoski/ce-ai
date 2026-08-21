@@ -22,18 +22,16 @@ if (!(Test-Path $InstallDir)) {
 $TempZip = Join-Path $env:TEMP $AssetName
 
 Write-Host "📦 Downloading $AssetName from $DownloadUrl..." -ForegroundColor Yellow
+$ProgressPreference = 'SilentlyContinue'
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
-try {
-    $WebClient = New-Object System.Net.WebClient
-    $WebClient.Headers.Add("User-Agent", "ce-ai-installer")
-    $WebClient.DownloadFile($DownloadUrl, $TempZip)
-} catch {
-    Write-Host "  Falling back to Invoke-WebRequest..." -ForegroundColor Gray
-    Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempZip -UseBasicParsing -MaximumRedirection 10
+if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+    & curl.exe -fsSL -o "$TempZip" "$DownloadUrl"
+} else {
+    Invoke-WebRequest -Uri "$DownloadUrl" -OutFile "$TempZip" -UserAgent "ce-ai-installer/1.0" -UseBasicParsing
 }
 
-if (!(Test-Path $TempZip) -or (Get-Item $TempZip).Length -eq 0) {
+if (!(Test-Path $TempZip) -or (Get-Item $TempZip).Length -lt 1000) {
     Write-Error "❌ Failed to download release asset from $DownloadUrl"
     exit 1
 }
