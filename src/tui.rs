@@ -40,6 +40,7 @@ pub const LOGO: &str = r#"
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuTab {
     Status,
+    Workflow,
     Install,
     Models,
     Sync,
@@ -54,6 +55,7 @@ impl MenuTab {
     fn all() -> Vec<Self> {
         vec![
             MenuTab::Status,
+            MenuTab::Workflow,
             MenuTab::Install,
             MenuTab::Models,
             MenuTab::Sync,
@@ -68,6 +70,7 @@ impl MenuTab {
     fn title(&self) -> &'static str {
         match self {
             MenuTab::Status => "📊  Status & Harnesses",
+            MenuTab::Workflow => "🎮  Workflow (FSM)",
             MenuTab::Install => "📥  Install Plugin",
             MenuTab::Models => "🤖  Models & Profiles",
             MenuTab::Sync => "🔄  Sync & Reconcile",
@@ -290,6 +293,11 @@ fn run_app(
                             MenuTab::Status => {
                                 execute_action(app, "Harness Status", || run_status_cmd(ctx));
                             }
+                            MenuTab::Workflow => {
+                                execute_action(app, "Workflow FSM Status", || {
+                                    run_workflow_cmd(ctx)
+                                });
+                            }
                             MenuTab::Install => {
                                 let lines = run_install_cmd(ctx, app, dry_run);
                                 execute_action(app, "Install Plugin", move || lines);
@@ -492,6 +500,37 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
             lines.push(Line::from(format!("  {}", ctx.config_dir.display())));
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled("Press [Enter] to run full status check.", Style::default().fg(Color::Gray))));
+            lines
+        }
+        MenuTab::Workflow => {
+            let mut lines = vec![
+                Line::from(Span::styled("Workflow FSM Engine & Progress Recovery:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+                Line::from(""),
+                Line::from(Span::styled("7-Stage Flywheel Cycle:", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
+                Line::from("  • [1: Ideation]   ➔ ce-brainstorm / ce-ideate / ce-strategy"),
+                Line::from("  • [2: OpenSpec]   ➔ Formal Spec Definition (proposal, spec, tasks)"),
+                Line::from("  • [3: Plan]       ➔ ce-plan / ce-doc-review"),
+                Line::from("  • [4: Work/TDD]   ➔ ce-work / ce-debug / ce-simplify-code"),
+                Line::from("  • [5: Verify]     ➔ Empirical Testing (cargo test, make e2e)"),
+                Line::from("  • [6: Compound]   ➔ ce-compound (docs/solutions/)"),
+                Line::from("  • [7: Ship]       ➔ ce-commit-push-pr"),
+                Line::from(""),
+            ];
+            let state_path = ctx.config_dir.join("state.json");
+            if let Ok(state) = State::load(&state_path) {
+                if let Some(cp) = state.last_update_check.clone() {
+                    lines.push(Line::from(vec![
+                        Span::styled("  Latest Checkpoint: ", Style::default().fg(Color::Yellow)),
+                        Span::styled(cp, Style::default().fg(Color::White)),
+                    ]));
+                } else {
+                    lines.push(Line::from("  (No progress checkpoint saved yet — run 'ce-ai workflow checkpoint')"));
+                }
+            } else {
+                lines.push(Line::from(Span::styled("  ⚠️ Could not read state.json", Style::default().fg(Color::Red))));
+            }
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled("Press [Enter] to run 'ce-ai workflow status'.", Style::default().fg(Color::Gray))));
             lines
         }
         MenuTab::Install => vec![
@@ -837,7 +876,7 @@ fn run_models_cmd(ctx: &Context) -> Vec<String> {
 fn run_sync_cmd(ctx: &Context, dry_run: bool) -> Vec<String> {
     let mut sync_ctx = ctx.clone();
     sync_ctx.dry_run = dry_run;
-    match sync::run(&sync_ctx) {
+    match sync::run(&sync_ctx, &sync::Args::default()) {
         Ok(_) => vec![
             "✅ Sync completed!".to_string(),
             format!(
@@ -850,6 +889,19 @@ fn run_sync_cmd(ctx: &Context, dry_run: bool) -> Vec<String> {
             ),
         ],
         Err(err) => vec![format!("❌ Sync failed: {err}")],
+    }
+}
+
+fn run_workflow_cmd(ctx: &Context) -> Vec<String> {
+    let args = crate::commands::workflow::Args {
+        action: crate::commands::workflow::Action::Status,
+    };
+    match crate::commands::workflow::run(ctx, &args) {
+        Ok(_) => vec![
+            "✅ Workflow FSM Status checked cleanly!".to_string(),
+            "Use 'ce-ai workflow checkpoint' or 'resume' to manage progress.".to_string(),
+        ],
+        Err(err) => vec![format!("❌ Workflow check failed: {err}")],
     }
 }
 

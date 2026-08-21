@@ -41,7 +41,7 @@ enum Commands {
     /// Install the CE plugin into a harness.
     Install(install::Args),
     /// Reconcile the installed plugin against the current source tree.
-    Sync,
+    Sync(sync::Args),
     /// Fetch a newer CE source and sync the installed plugin.
     Upgrade(upgrade::Args),
     /// Manage model assignments and named profiles.
@@ -71,7 +71,7 @@ fn main() {
     };
     let result = match cli.command {
         Some(Commands::Install(args)) => install::run(&ctx, &args),
-        Some(Commands::Sync) => sync::run(&ctx),
+        Some(Commands::Sync(args)) => sync::run(&ctx, &args),
         Some(Commands::Upgrade(args)) => upgrade::run(&ctx, &args),
         Some(Commands::Models(args)) => models::run(&ctx, &args),
         Some(Commands::Status) => status::run(&ctx),

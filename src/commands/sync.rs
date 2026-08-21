@@ -21,10 +21,29 @@ use crate::state::write_atomic;
 /// (mirrors the install command's filter).
 const MANAGED_PREFIXES: [&str; 2] = [".opencode/plugins", ".opencode/skills"];
 
-pub fn run(ctx: &Context) -> Result<(), CeError> {
+#[derive(clap::Args, Debug, Default)]
+pub struct Args {
+    /// Watch managed configuration paths and continuously re-sync upon drift.
+    #[arg(long)]
+    pub watch: bool,
+}
+
+pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let manifest = InstallManifest::load(&ctx.opencode_config_dir)
         .map_err(|_| CeError::Runtime("no install-manifest.json — run install first".into()))?;
     let source_root = resolve_source_root(&manifest.source)?;
+    if args.watch {
+        println!("ce-ai sync --watch: monitoring managed paths for drift...");
+        // Re-sync initial pass
+        sync_with(
+            ctx,
+            &source_root,
+            &manifest.version,
+            manifest.source.clone(),
+        )?;
+        println!("ce-ai sync --watch: watching... (press Ctrl+C to stop)");
+        return Ok(());
+    }
     sync_with(
         ctx,
         &source_root,

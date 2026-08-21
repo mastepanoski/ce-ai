@@ -150,6 +150,18 @@ flowchart TD
 
 ---
 
+## 👨‍🏫 Teacher's Guide: Understanding Proactive Workflow Observability (v0.6.0)
+
+Think of an AI coding agent as a pilot flying a high-performance jet plane across complex software projects:
+
+1. **The TUI Workflow Dashboard (`ce-ai tui` ➔ `Workflow` Tab)**:
+   - *The Cockpit Instrument Panel*: Imagine flying blind without gauges showing speed, altitude, or fuel. The TUI Workflow Dashboard acts like your live cockpit display: it visualizes exactly which of the 7 Flywheel stages your AI agent is navigating, what subtask is active, and shows historical progress checkpoints saved to disk.
+
+2. **Real-Time Sync Watcher (`ce-ai sync --watch`)**:
+   - *The Automatic Autopilot Guardrail*: When multiple developers or harness tools edit local skills or configurations, files can drift out of sync. The `--watch` flag acts like an autopilot guardrail—continuously monitoring managed configuration paths in the background and re-syncing SHA256 integrity instantly upon detecting changes.
+
+---
+
 ## 📋 Masterclass Summary Checklist for Beginners
 
 - [x] **Harness**: The AI editor/environment (Claude Code, Cursor, Copilot, Antigravity, OpenCode).

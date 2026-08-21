@@ -50,6 +50,40 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
             .push("state-inconsistent: opencode state entry and install manifest disagree".into());
     }
 
+    // Companion tool health checks.
+    if let Ok(home) = std::env::var("HOME") {
+        let engram_db = std::path::Path::new(&home)
+            .join(".engram")
+            .join("engram.db");
+        if !engram_db.exists() {
+            println!("doctor-info: engram db (~/.engram/engram.db) not found");
+        }
+    }
+
+    if let Ok(repo_root) = std::process::Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+    {
+        if repo_root.status.success() {
+            let root_str = String::from_utf8_lossy(&repo_root.stdout)
+                .trim()
+                .to_string();
+            let codegraph_dir = std::path::Path::new(&root_str).join(".codegraph");
+            if !codegraph_dir.exists() {
+                println!("doctor-info: codegraph index (.codegraph/) not initialized");
+            }
+        }
+    }
+
+    let rtk_on_path = std::process::Command::new("which")
+        .arg("rtk")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if !rtk_on_path {
+        println!("doctor-info: rtk binary not found on PATH");
+    }
+
     for finding in &findings {
         println!("{finding}");
     }

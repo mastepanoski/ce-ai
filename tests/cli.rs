@@ -857,3 +857,17 @@ fn workflow_status_checkpoint_and_resume_subcommands() {
         .success()
         .stdout(predicate::str::contains("resuming execution"));
 }
+
+#[test]
+fn sync_watch_flag_parsing() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    ceai(&config_dir, &home)
+        .args(["sync", "--watch"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("monitoring managed paths"));
+}
