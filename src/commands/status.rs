@@ -82,5 +82,50 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
         }
         Err(_) => println!("drift: unknown (no install manifest)"),
     }
+
+    // Project Adoption Status
+    if !state.projects.is_empty() {
+        println!("projects: {} adopted", state.projects.len());
+        for p in &state.projects {
+            let agents_file = p.path.join(&p.file);
+            let status_str = if !agents_file.exists() {
+                "MISSING"
+            } else if let Ok(text) = std::fs::read_to_string(&agents_file) {
+                if let Some(start_idx) = text.find(crate::commands::init_prj::BLOCK_BEGIN_MARKER) {
+                    if let Some(end_rel_idx) =
+                        text[start_idx..].find(crate::commands::init_prj::BLOCK_END_MARKER)
+                    {
+                        let end_idx = start_idx
+                            + end_rel_idx
+                            + crate::commands::init_prj::BLOCK_END_MARKER.len();
+                        let block_text = &text[start_idx..end_idx];
+                        let inner_body = crate::commands::init_prj::render_block_content(p.tier);
+                        let expected_sha = crate::commands::init_prj::compute_sha256(inner_body);
+                        if block_text.contains(&expected_sha) {
+                            "OK"
+                        } else {
+                            "DRIFT DETECTED"
+                        }
+                    } else {
+                        "MALFORMED BLOCK"
+                    }
+                } else {
+                    "BLOCK MISSING"
+                }
+            } else {
+                "READ ERROR"
+            };
+            println!(
+                "  - {} (tier: {:?}, file: {}, status: {})",
+                p.path.display(),
+                p.tier,
+                p.file,
+                status_str
+            );
+        }
+    } else {
+        println!("projects: none adopted");
+    }
+
     Ok(())
 }
