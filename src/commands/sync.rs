@@ -203,6 +203,10 @@ pub(crate) fn sync_with(
     }
     state.save(&state_path)?;
 
+    if !ctx.dry_run {
+        let _ = crate::source::registry::SkillRegistry::sync_registry(ctx);
+    }
+
     if !ctx.quiet && !ctx.dry_run {
         let count = desired.len();
         println!("== [Sync Verification Matrix] ==");

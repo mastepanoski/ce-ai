@@ -5,12 +5,39 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
----
-
 ## [Unreleased]
 
 ### Added
 - **Adoption Block v2 — Single Source of Truth Guidance**: `init-prj` full-tier blocks now include the SSOT rule (ideation artifacts in `docs/brainstorms/` / `docs/ideation/` are disposable inputs to distill into OpenSpec, never parallel specifications), orchestrator blocks carry a one-line distillation directive, and the block header/state version moved to a shared `BLOCK_VERSION` constant (`v=2`). Re-run `ce-ai init-prj <project> --tier <t>` to upgrade adopted projects; `doctor`/`status` report SHA drift for stale v1 blocks until re-adopted (#adoption-block-ssot-v2).
+
+## [1.4.1] - 2026-08-22
+
+### Fixed
+- **Harness Path Scoping**: Scoped Tier 3 global user harness scanning (`harness-<kind>/skills`) strictly to target harness to prevent cross-harness path bleed (`#135`).
+- **Precedence Scope Updates**: Preserved and updated `entry.scope = scope;` during 4-tier precedence overrides (`#135`).
+- **UTF-8 Slicing Safety**: Replaced raw byte indexing (`&skill.description[..37]`) with character-aware iterator truncation in `ce-ai skills list` (`#135`).
+- **Inline Array Trigger Parsing**: Stripped `[` and `]` brackets when parsing inline YAML array triggers (`triggers: [a, b]`) (`#135`).
+- **R3 Security Boundary Hardening**: Narrowed `collect_authorized_roots` to specific harness skill subdirectories and propagated `fs::set_permissions` errors (`#135`).
+- **Code Review Refactorings**: Extracted `SkillRegistry::sync_registry` and `SkillRegistry::remove` helpers and introduced `SkillFrontmatter` struct (`#135`).
+
+---
+
+## [1.4.0] - 2026-08-22
+
+### Added
+- **Multi-Harness Skill Registry Engine (`ce-ai skills`)**: Harness-neutral JSON index (`~/.ce-ai/skills-registry.json`) indexing and resolving skills across 12 AI coding agent harnesses (Issue #96).
+- **Dual-Format Prompt Resolution**: `ce-ai skills resolve --harness <kind> --query <query> [--json]` generating sub-agent prompt blocks (`## Skills to load...`) with resolution-time SHA256 integrity checks and explicit degradation tags (`paths-injected` | `fallback-fuzzy` | `none`).
+- **Security Canonicalization Boundary**: Strict path canonicalization rejecting relative path traversals (`../`) or symlinks escaping authorized skill roots (`R3`).
+- **YAML Frontmatter Extraction**: Header parser for `SKILL.md` files supporting YAML list bullet syntax (`- trigger`).
+- **Lifecycle Integration & `--dry-run` Invariants**: Automatic index building and refresh during `install`, `sync`, `upgrade`, and `init-prj` (gated behind `if !ctx.dry_run`).
+- **Sentinel `.gitignore` & Uninstall Parity**: `deinit-prj` and `uninstall` cleanly remove registry files, temporary `.tmp*` artifacts, project stubs, and sentinel-bounded `.gitignore` entries (`# BEGIN CE-AI MANAGED BLOCK` / `# END CE-AI MANAGED BLOCK`).
+- **Diagnostic Health Probes**: Wired `skill-registry-integrity` probe into `ce-ai doctor` and created `ce-ai skills doctor` alias.
+
+---
+
+## [1.3.0] - 2026-08-22
+
+### Added
 - **`ce-ai` Orchestrator Agent Definition**: `install` seeds the structural agent entry (description, `mode: primary`, permissions) into harness configs that support agent maps — **without** `model` or `variant`; those belong to the user (#111).
 - **Harness-Driven Model Discovery**: The TUI model picker lists what the active harness actually offers by querying `opencode models` at runtime; discovery failures surface explicit errors instead of a stale static catalog.
 - **Editable TUI Models Tab**: Slot navigation (`n`/`p`) and live model picker (`m`) applying assignments through the same atomic path as `ce-ai models set`; shows only real assignments plus clear "(not assigned)" placeholders.

@@ -204,6 +204,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     if !ctx.dry_run {
         state.save(&state_path)?;
+        let _ = crate::source::registry::SkillRegistry::sync_registry(ctx);
     }
 
     if let Some(tmp) = tmp_dir {

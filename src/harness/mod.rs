@@ -46,6 +46,24 @@ impl HarnessKind {
         ]
     }
 
+    /// List all natively supported harness enum variants.
+    pub fn all() -> Vec<HarnessKind> {
+        vec![
+            HarnessKind::Opencode,
+            HarnessKind::Claude,
+            HarnessKind::Pi,
+            HarnessKind::Cursor,
+            HarnessKind::Copilot,
+            HarnessKind::Codex,
+            HarnessKind::Grok,
+            HarnessKind::Kimi,
+            HarnessKind::Agy,
+            HarnessKind::Deepseek,
+            HarnessKind::Fx,
+            HarnessKind::Custom,
+        ]
+    }
+
     /// Check if harness directory or configuration exists on the host system.
     pub fn is_installed_on_host(&self, home_dir: &Path) -> bool {
         match self {

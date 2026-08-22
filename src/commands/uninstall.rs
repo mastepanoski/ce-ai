@@ -79,6 +79,8 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     state.save(&state_path)?;
 
+    let _ = crate::source::registry::SkillRegistry::remove(ctx);
+
     if !ctx.quiet {
         if args.harness == "all" {
             println!("✅ Uninstalled all target harnesses cleanly.");
