@@ -59,9 +59,11 @@ src/
     ├── upgrade.rs     # ce-ai upgrade implementation
     ├── models.rs      # ce-ai models set/list/profile implementation
     ├── status.rs      # ce-ai status implementation
-    ├── uninstall.rs   # ce-ai uninstall implementation
+    ├── uninstall.rs    # ce-ai uninstall implementation
     └── doctor.rs      # ce-ai doctor health check implementation
 ```
+
+`docs/solutions/` documents solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in documented areas.
 
 ---
 
