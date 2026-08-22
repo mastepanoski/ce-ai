@@ -16,8 +16,8 @@ curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/ins
 # Windows PowerShell
 irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps1 | iex
 
-# Homebrew (macOS & Linux)
-brew tap mastepanoski/ce-ai https://github.com/mastepanoski/ce-ai && brew install ce-ai
+# Homebrew (macOS & Linux) — auto-taps mastepanoski/ce-ai
+brew install mastepanoski/ce-ai/ce-ai
 
 # From source
 cargo install --path .
