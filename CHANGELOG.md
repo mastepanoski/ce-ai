@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.4] - 2026-08-21
+
+### Fixed
+- **Windows PowerShell Installer (`scripts/install.ps1`)**: Added 3-tier download fallback (`curl.exe` -> `Invoke-WebRequest` -> `System.Net.WebClient`) and safe `Test-ValidZipFile` validator function.
+
+---
+
 ## [1.0.3] - 2026-08-21
 
 ### Fixed
