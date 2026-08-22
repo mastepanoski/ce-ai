@@ -7,13 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.2.0] - 2026-08-22
 
 ### Added
-- **Homebrew Tap Automation**: Self-updating tap (`mastepanoski/homebrew-ce-ai`) polls ce-ai releases every 30 minutes and publishes the formula with verified SHA256 checksums — zero secrets, no manual maintenance.
-
-### Fixed
-- **README Homebrew Install Command**: Corrected broken `brew tap`/`brew install` instructions to the canonical `brew install mastepanoski/ce-ai/ce-ai`, which auto-taps and installs from the dedicated tap repository.
+- **Context-Exhaustion Resilience**: Implemented 3-tier defense-in-depth governance pattern (Issue #97) replacing probabilistic prose prompt instructions with fail-closed deterministic platform boundaries.
+- **Automated Branch Protection Script**: `scripts/protect-branch.sh` configures GitHub REST API branch protection on `main` (enforcing PRs, 100% green CI matrix status checks, and blocking force pushes).
+- **`ce-ai doctor` Health Probes**: Diagnostic suite expanded with `git-hooks` probe (verifying `core.hooksPath` and `.githooks/pre-commit` executable status) and `branch-protection` probe (with `gh auth status` offline fallback).
+- **Compact Hard-Gate Invariant Index**: High-density header (~22 lines) top-loaded into `AGENTS.md` for maximum LLM attention weight.
+- **Educational Solution Architecture**: Published [`docs/solutions/architecture/context-exhaustion-resilience-and-deterministic-invariants.md`](docs/solutions/architecture/context-exhaustion-resilience-and-deterministic-invariants.md).
 
 ---
 
