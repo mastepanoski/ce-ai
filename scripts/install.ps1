@@ -31,20 +31,38 @@ if (!(Test-Path $InstallDir)) {
 
 $TempZip = Join-Path $env:TEMP $AssetName
 
+function Test-ValidZipFile($Path) {
+    if (-not (Test-Path $Path)) { return $false }
+    $item = Get-Item $Path -ErrorAction SilentlyContinue
+    if ($null -eq $item -or $item.Length -lt 1000) { return $false }
+    return $true
+}
+
 Write-Host "📦 Downloading $AssetName from $DownloadUrl..." -ForegroundColor Yellow
 $ProgressPreference = 'SilentlyContinue'
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
 if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-    & curl.exe -fsSL -o "$TempZip" "$DownloadUrl"
+    & curl.exe -fsSL -H "User-Agent: ce-ai-installer/1.0" -o "$TempZip" "$DownloadUrl"
 }
 
-if (-not (Test-Path $TempZip) -or (Get-Item $TempZip).Length -lt 1000) {
+if (-not (Test-ValidZipFile $TempZip)) {
     Write-Host "  Trying PowerShell Invoke-WebRequest fallback..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri "$DownloadUrl" -OutFile "$TempZip" -UserAgent "ce-ai-installer/1.0" -UseBasicParsing
+    try {
+        Invoke-WebRequest -Uri "$DownloadUrl" -OutFile "$TempZip" -UserAgent "ce-ai-installer/1.0" -UseBasicParsing -ErrorAction SilentlyContinue
+    } catch {}
 }
 
-if (!(Test-Path $TempZip) -or (Get-Item $TempZip).Length -lt 1000) {
+if (-not (Test-ValidZipFile $TempZip)) {
+    Write-Host "  Trying System.Net.WebClient fallback..." -ForegroundColor Yellow
+    try {
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add("User-Agent", "ce-ai-installer/1.0")
+        $wc.DownloadFile($DownloadUrl, $TempZip)
+    } catch {}
+}
+
+if (-not (Test-ValidZipFile $TempZip)) {
     Write-Error "❌ Failed to download valid release asset from $DownloadUrl"
     exit 1
 }
