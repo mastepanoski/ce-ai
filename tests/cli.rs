@@ -14,6 +14,11 @@ fn ceai(config_dir: &Path, home: &Path) -> Command {
         .arg(config_dir)
         .env("HOME", home)
         .env("CE_AI_OPENCODE_CONFIG", home.join(".config/opencode"));
+    // Hermetic git resolution: under the pre-commit hook GIT_DIR points at the
+    // real checkout, which would make doctor's repo probes leave the fixture.
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
+        cmd.env_remove(var);
+    }
     cmd
 }
 
@@ -716,16 +721,23 @@ fn doctor_reports_git_hooks_misconfigured_finding() {
     let source = ce_source(tmp.path());
     install(&config_dir, &home, &source);
 
-    // Initialize git repo in tmp dir with invalid core.hooksPath
+    // Initialize git repo in tmp dir with invalid core.hooksPath.
+    // Strip GIT_* env so this never resolves outside the fixture repo —
+    // under the pre-commit hook GIT_DIR points at the real checkout.
     let repo = tmp.path().join("repo");
     fs::create_dir_all(&repo).unwrap();
-    let _ = std::process::Command::new("git")
-        .args(["init"])
-        .current_dir(&repo)
-        .output();
-    let _ = std::process::Command::new("git")
+    let isolated_git = || {
+        let mut cmd = std::process::Command::new("git");
+        cmd.current_dir(&repo)
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
+            .env_remove("GIT_PREFIX");
+        cmd
+    };
+    let _ = isolated_git().args(["init"]).output();
+    let _ = isolated_git()
         .args(["config", "core.hooksPath", "invalid_hooks"])
-        .current_dir(&repo)
         .output();
 
     let mut cmd = ceai(&config_dir, &home);
@@ -972,6 +984,16 @@ fn workflow_status_checkpoint_and_resume_subcommands() {
         .assert()
         .success()
         .stdout(predicate::str::contains("checkpoint saved"));
+
+    // Status derives phase/task from the saved checkpoint (single source of truth).
+    ceai(&config_dir, &home)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("current phase: Stage 4: TDD")
+                .and(predicate::str::contains("active subtask: 4.2 TDD")),
+        );
 
     ceai(&config_dir, &home)
         .args(["workflow", "resume"])
