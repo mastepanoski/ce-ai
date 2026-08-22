@@ -4,6 +4,19 @@ This document defines mandatory instructions, architectural boundaries, and oper
 
 ---
 
+## ⚡ Hard-Gate Invariant Index (Non-Negotiable Delivery Rules)
+
+All AI agents MUST enforce these hard invariants deterministically at every session start:
+1. **Never Direct Commit to `main`**: All changes MUST be committed on feature branches (`feat/*` or `fix/*`) and opened as a PR (`gh pr create`).
+2. **100% Green CI Matrix Gate**: NEVER merge a PR until ALL GitHub Actions CI matrix jobs pass (`gh pr checks --watch`).
+3. **Atomic File Writes**: Mutations to `state.json` or `opencode.json` MUST use `crate::state::write_atomic`.
+4. **Preserve User Configs**: NEVER overwrite unmanaged custom plugins or custom skills in `opencode.json`.
+5. **No Dummy Fallbacks**: NEVER comment out failing assertions, mask errors with empty catches, or ignore CLI errors.
+6. **OpenSpec Required**: NO code changes without formal spec in `openspec/changes/<feature_name>/`.
+7. **Strict Exit Codes**: Map all errors to `CeError` enum exit codes (`0` Success, `1` Runtime, `2` Usage, `3` State, `4` IO, `5` Network, `6` Verification).
+
+---
+
 ## 🛡️ Governance & Compliance Standards
 
 All AI agent operations on this repository MUST strictly follow:
