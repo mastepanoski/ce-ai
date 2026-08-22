@@ -5,6 +5,18 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-08-22
+
+### Fixed
+- **Harness Path Scoping**: Scoped Tier 3 global user harness scanning (`harness-<kind>/skills`) strictly to target harness to prevent cross-harness path bleed (`#135`).
+- **Precedence Scope Updates**: Preserved and updated `entry.scope = scope;` during 4-tier precedence overrides (`#135`).
+- **UTF-8 Slicing Safety**: Replaced raw byte indexing (`&skill.description[..37]`) with character-aware iterator truncation in `ce-ai skills list` (`#135`).
+- **Inline Array Trigger Parsing**: Stripped `[` and `]` brackets when parsing inline YAML array triggers (`triggers: [a, b]`) (`#135`).
+- **R3 Security Boundary Hardening**: Narrowed `collect_authorized_roots` to specific harness skill subdirectories and propagated `fs::set_permissions` errors (`#135`).
+- **Code Review Refactorings**: Extracted `SkillRegistry::sync_registry` and `SkillRegistry::remove` helpers and introduced `SkillFrontmatter` struct (`#135`).
+
+---
+
 ## [1.4.0] - 2026-08-22
 
 ### Added
