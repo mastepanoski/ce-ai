@@ -204,9 +204,7 @@ pub(crate) fn sync_with(
     state.save(&state_path)?;
 
     if !ctx.dry_run {
-        if let Ok(registry) = crate::source::registry::SkillRegistry::build(ctx) {
-            let _ = registry.save(&ctx.config_dir.join("skills-registry.json"));
-        }
+        let _ = crate::source::registry::SkillRegistry::sync_registry(ctx);
     }
 
     if !ctx.quiet && !ctx.dry_run {

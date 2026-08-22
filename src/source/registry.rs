@@ -44,6 +44,15 @@ impl Default for SkillRegistry {
     }
 }
 
+/// Parsed YAML frontmatter from `SKILL.md`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SkillFrontmatter {
+    pub name: String,
+    pub description: String,
+    pub triggers: Vec<String>,
+    pub scope: String,
+}
+
 impl SkillRegistry {
     /// Loads `SkillRegistry` from disk, returning default if file is missing.
     pub fn load(path: &Path) -> Result<Self, CeError> {
@@ -70,9 +79,47 @@ impl SkillRegistry {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o644));
+            fs::set_permissions(path, fs::Permissions::from_mode(0o644)).map_err(|e| {
+                CeError::Runtime(format!(
+                    "failed to set permissions on '{}': {}",
+                    path.display(),
+                    e
+                ))
+            })?;
         }
 
+        Ok(())
+    }
+
+    /// Helper encapsulating index build and save lifecycle integration (MAINT-003).
+    pub fn sync_registry(ctx: &Context) -> Result<(), CeError> {
+        if !ctx.dry_run {
+            let registry = Self::build(ctx)?;
+            let _ = registry.save(&ctx.config_dir.join("skills-registry.json"));
+        }
+        Ok(())
+    }
+
+    /// Helper encapsulating registry index and residual temporary file removal (MAINT-004).
+    pub fn remove(ctx: &Context) -> Result<(), CeError> {
+        if !ctx.dry_run {
+            let registry_path = ctx.config_dir.join("skills-registry.json");
+            if registry_path.exists() {
+                let _ = fs::remove_file(&registry_path);
+            }
+            if let Ok(entries) = fs::read_dir(&ctx.config_dir) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if name.starts_with(".skills-registry.json.tmp") {
+                        if let Ok(meta) = fs::symlink_metadata(entry.path()) {
+                            if meta.is_file() && !meta.file_type().is_symlink() {
+                                let _ = fs::remove_file(entry.path());
+                            }
+                        }
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
@@ -88,7 +135,13 @@ impl SkillRegistry {
 
         // Precedence Tier 4 (Lowest): Global Managed (~/.ce-ai/skills/ and managed opencode skills)
         let global_managed = ctx.config_dir.join("skills");
-        scan_skill_directory(&global_managed, "global", &authorized_roots, &mut skill_map)?;
+        scan_skill_directory(
+            &global_managed,
+            "global",
+            None,
+            &authorized_roots,
+            &mut skill_map,
+        )?;
 
         let opencode_managed = ctx
             .opencode_config_dir
@@ -97,6 +150,7 @@ impl SkillRegistry {
         scan_skill_directory(
             &opencode_managed,
             "global",
+            None,
             &authorized_roots,
             &mut skill_map,
         )?;
@@ -105,6 +159,7 @@ impl SkillRegistry {
         scan_skill_directory(
             &opencode_skills,
             "global",
+            None,
             &authorized_roots,
             &mut skill_map,
         )?;
@@ -113,16 +168,34 @@ impl SkillRegistry {
         for harness in HarnessKind::all() {
             let harness_dir = ctx.config_dir.join(format!("harness-{}", harness.as_str()));
             let harness_skills = harness_dir.join("skills");
-            scan_skill_directory(&harness_skills, "global", &authorized_roots, &mut skill_map)?;
+            scan_skill_directory(
+                &harness_skills,
+                "global",
+                Some(harness),
+                &authorized_roots,
+                &mut skill_map,
+            )?;
         }
 
         // Precedence Tier 2: Workspace (.opencode/skills/)
         let ws_opencode = cwd.join(".opencode").join("skills");
-        scan_skill_directory(&ws_opencode, "project", &authorized_roots, &mut skill_map)?;
+        scan_skill_directory(
+            &ws_opencode,
+            "project",
+            None,
+            &authorized_roots,
+            &mut skill_map,
+        )?;
 
         // Precedence Tier 1 (Highest): Workspace (.ce-ai/skills/)
         let ws_ce_ai = cwd.join(".ce-ai").join("skills");
-        scan_skill_directory(&ws_ce_ai, "project", &authorized_roots, &mut skill_map)?;
+        scan_skill_directory(
+            &ws_ce_ai,
+            "project",
+            None,
+            &authorized_roots,
+            &mut skill_map,
+        )?;
 
         registry.skills = skill_map.into_values().collect();
         Ok(registry)
@@ -160,7 +233,11 @@ impl SkillRegistry {
         }
 
         let status_tag = if matched.is_empty() {
-            "none".to_string()
+            if has_degradation {
+                "fallback-fuzzy".to_string()
+            } else {
+                "none".to_string()
+            }
         } else if has_degradation {
             "fallback-fuzzy".to_string()
         } else {
@@ -205,8 +282,12 @@ pub fn collect_authorized_roots(ctx: &Context, cwd: &Path) -> Vec<PathBuf> {
 
     if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
         let home_path = PathBuf::from(home);
-        roots.push(home_path.join(".config"));
         roots.push(home_path.join(".ce-ai"));
+        roots.push(home_path.join(".config").join("opencode"));
+        for harness in HarnessKind::all() {
+            roots.push(home_path.join(format!(".{}", harness.as_str())));
+            roots.push(home_path.join(".config").join(harness.as_str()));
+        }
     }
 
     roots
@@ -243,6 +324,7 @@ pub fn canonicalize_and_validate_path(
 fn scan_skill_directory(
     dir: &Path,
     default_scope: &str,
+    target_harness: Option<HarnessKind>,
     roots: &[PathBuf],
     skill_map: &mut BTreeMap<String, SkillEntry>,
 ) -> Result<(), CeError> {
@@ -260,10 +342,10 @@ fn scan_skill_directory(
         if path.is_dir() {
             let skill_md = path.join("SKILL.md");
             if skill_md.exists() {
-                process_skill_file(&skill_md, default_scope, roots, skill_map)?;
+                process_skill_file(&skill_md, default_scope, target_harness, roots, skill_map)?;
             }
         } else if path.is_file() && path.file_name() == Some(std::ffi::OsStr::new("SKILL.md")) {
-            process_skill_file(&path, default_scope, roots, skill_map)?;
+            process_skill_file(&path, default_scope, target_harness, roots, skill_map)?;
         }
     }
 
@@ -274,6 +356,7 @@ fn scan_skill_directory(
 fn process_skill_file(
     skill_path: &Path,
     default_scope: &str,
+    target_harness: Option<HarnessKind>,
     roots: &[PathBuf],
     skill_map: &mut BTreeMap<String, SkillEntry>,
 ) -> Result<(), CeError> {
@@ -293,8 +376,8 @@ fn process_skill_file(
         Err(_) => return Ok(()),
     };
 
-    let (name, description, triggers, scope_override) = parse_skill_frontmatter(&content);
-    let name = if name.is_empty() {
+    let fm = parse_skill_frontmatter(&content);
+    let name = if fm.name.is_empty() {
         skill_path
             .parent()
             .and_then(|p| p.file_name())
@@ -302,11 +385,11 @@ fn process_skill_file(
             .unwrap_or("unknown")
             .to_string()
     } else {
-        name
+        fm.name
     };
 
-    let scope = if !scope_override.is_empty() {
-        scope_override
+    let scope = if !fm.scope.is_empty() {
+        fm.scope
     } else {
         default_scope.to_string()
     };
@@ -315,21 +398,32 @@ fn process_skill_file(
 
     let entry = skill_map.entry(name.clone()).or_insert_with(|| SkillEntry {
         name: name.clone(),
-        description: description.clone(),
-        scope,
-        triggers: triggers.clone(),
+        description: fm.description.clone(),
+        scope: scope.clone(),
+        triggers: fm.triggers.clone(),
         sha256: sha256.clone(),
         harness_paths: BTreeMap::new(),
     });
 
-    entry.description = description;
-    entry.triggers = triggers;
+    entry.scope = scope;
+    if !fm.description.is_empty() {
+        entry.description = fm.description;
+    }
+    if !fm.triggers.is_empty() {
+        entry.triggers = fm.triggers;
+    }
     entry.sha256 = sha256;
 
-    for harness in HarnessKind::all() {
+    if let Some(target) = target_harness {
         entry
             .harness_paths
-            .insert(harness.as_str().to_string(), path_str.clone());
+            .insert(target.as_str().to_string(), path_str);
+    } else {
+        for harness in HarnessKind::all() {
+            entry
+                .harness_paths
+                .insert(harness.as_str().to_string(), path_str.clone());
+        }
     }
 
     Ok(())
@@ -343,21 +437,18 @@ pub fn compute_file_sha256(path: &Path) -> Result<String, CeError> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-/// Parses YAML frontmatter `---\n...\n---` headers from `SKILL.md`.
-pub fn parse_skill_frontmatter(content: &str) -> (String, String, Vec<String>, String) {
-    let mut name = String::new();
-    let mut description = String::new();
-    let mut triggers: Vec<String> = Vec::new();
-    let mut scope = String::new();
+/// Parses YAML frontmatter `---\n...\n---` headers from `SKILL.md` (MAINT-005).
+pub fn parse_skill_frontmatter(content: &str) -> SkillFrontmatter {
+    let mut fm = SkillFrontmatter::default();
 
     if !content.starts_with("---") {
-        return (name, description, triggers, scope);
+        return fm;
     }
 
     let rest = &content[3..];
     let end_idx = match rest.find("\n---") {
         Some(idx) => idx,
-        None => return (name, description, triggers, scope),
+        None => return fm,
     };
 
     let header_lines = &rest[..end_idx];
@@ -377,24 +468,26 @@ pub fn parse_skill_frontmatter(content: &str) -> (String, String, Vec<String>, S
                 .trim_matches('\'')
                 .to_string();
             if !item.is_empty() {
-                triggers.push(item);
+                fm.triggers.push(item);
             }
             continue;
         }
 
         if let Some((k, v)) = trimmed.split_once(':') {
             let key = k.trim().to_lowercase();
-            let val = v.trim().trim_matches('"').trim_matches('\'').to_string();
+            let val = v.trim().trim_matches('"').trim_matches('\'');
             current_key = key.clone();
 
             match key.as_str() {
-                "name" => name = val,
-                "description" => description = val,
-                "scope" => scope = val,
+                "name" => fm.name = val.to_string(),
+                "description" => fm.description = val.to_string(),
+                "scope" => fm.scope = val.to_string(),
                 "triggers" if !val.is_empty() => {
-                    triggers.extend(
-                        val.split(',')
-                            .map(|s| s.trim().to_string())
+                    let clean_val = val.trim_start_matches('[').trim_end_matches(']');
+                    fm.triggers.extend(
+                        clean_val
+                            .split(',')
+                            .map(|s| s.trim().trim_matches('"').trim_matches('\'').to_string())
                             .filter(|s| !s.is_empty()),
                     );
                 }
@@ -403,7 +496,7 @@ pub fn parse_skill_frontmatter(content: &str) -> (String, String, Vec<String>, S
         }
     }
 
-    (name, description, triggers, scope)
+    fm
 }
 
 /// Shared diagnostic probe helper function for `ce-ai doctor` and `ce-ai skills doctor` (DEC-05).
@@ -431,20 +524,26 @@ pub fn check_skill_registry_health(ctx: &Context) -> Result<Vec<String>, CeError
         }
     };
 
+    // Deduplicate file path health checks across harnesses (SKILL-REG-05)
     for skill in &registry.skills {
-        for (harness, path_str) in &skill.harness_paths {
-            let path = PathBuf::from(path_str);
-            if !path.exists() {
-                findings.push(format!(
-                    "Skill '{}' file missing for harness '{}' at '{}'",
-                    skill.name, harness, path_str
-                ));
-            } else if let Ok(current_sha) = compute_file_sha256(&path) {
-                if current_sha != skill.sha256 {
+        let mut checked_paths: std::collections::BTreeSet<String> =
+            std::collections::BTreeSet::new();
+
+        for path_str in skill.harness_paths.values() {
+            if checked_paths.insert(path_str.clone()) {
+                let path = PathBuf::from(path_str);
+                if !path.exists() {
                     findings.push(format!(
-                        "Skill '{}' SHA256 digest drift for harness '{}' (expected {}, found {})",
-                        skill.name, harness, skill.sha256, current_sha
+                        "Skill '{}' file missing at '{}'",
+                        skill.name, path_str
                     ));
+                } else if let Ok(current_sha) = compute_file_sha256(&path) {
+                    if current_sha != skill.sha256 {
+                        findings.push(format!(
+                            "Skill '{}' SHA256 digest drift at '{}' (expected {}, found {})",
+                            skill.name, path_str, skill.sha256, current_sha
+                        ));
+                    }
                 }
             }
         }
@@ -469,11 +568,11 @@ triggers:
 ---
 # Skill Body
 "#;
-        let (name, desc, triggers, scope) = parse_skill_frontmatter(content);
-        assert_eq!(name, "ce-brainstorm");
-        assert_eq!(desc, "Explore vague or ambitious ideas");
-        assert_eq!(scope, "project");
-        assert_eq!(triggers, vec!["brainstorm", "ideate"]);
+        let fm = parse_skill_frontmatter(content);
+        assert_eq!(fm.name, "ce-brainstorm");
+        assert_eq!(fm.description, "Explore vague or ambitious ideas");
+        assert_eq!(fm.scope, "project");
+        assert_eq!(fm.triggers, vec!["brainstorm", "ideate"]);
     }
 
     #[test]
@@ -510,7 +609,7 @@ triggers:
         #[cfg(unix)]
         {
             let symlink_file = root.join("symlink_SKILL.md");
-            let _ = std::os::unix::fs::symlink(&target_file, &symlink_file);
+            std::os::unix::fs::symlink(&target_file, &symlink_file).unwrap();
 
             let roots = vec![root.clone()];
             assert!(canonicalize_and_validate_path(&symlink_file, &roots).is_err());
@@ -520,21 +619,29 @@ triggers:
     #[test]
     fn test_registry_4_tier_precedence_override() {
         let temp = tempfile::tempdir().unwrap();
-        let config_dir = temp.path().join(".ce-ai");
-        let opencode_dir = temp.path().join(".config/opencode");
-        fs::create_dir_all(&config_dir).unwrap();
-        fs::create_dir_all(&opencode_dir).unwrap();
+        let global_skills = temp.path().join(".ce-ai/skills/shared-skill");
+        let workspace_skills = temp.path().join(".ce-ai/skills/shared-skill");
+        fs::create_dir_all(&global_skills).unwrap();
+        fs::create_dir_all(&workspace_skills).unwrap();
+
+        fs::write(
+            global_skills.join("SKILL.md"),
+            "---\nname: shared-skill\ndescription: Global skill\n---\n",
+        )
+        .unwrap();
 
         let ctx = Context {
-            config_dir,
-            opencode_config_dir: opencode_dir,
+            config_dir: temp.path().join(".ce-ai"),
+            opencode_config_dir: temp.path().join(".config/opencode"),
             dry_run: false,
             verbose: false,
             quiet: true,
         };
 
         let registry = SkillRegistry::build(&ctx).unwrap();
-        assert!(registry.skills.is_empty() || !registry.skills.is_empty());
+        assert!(!registry.skills.is_empty());
+        let found = registry.skills.iter().find(|s| s.name == "shared-skill");
+        assert!(found.is_some());
     }
 
     #[test]

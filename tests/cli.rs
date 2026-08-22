@@ -1138,6 +1138,7 @@ fn skills_list_outputs_catalog_table_and_json() {
 
     // List in text table mode
     ceai(&config_dir, &home)
+        .current_dir(tmp.path())
         .args(["skills", "list"])
         .assert()
         .success()
@@ -1146,6 +1147,7 @@ fn skills_list_outputs_catalog_table_and_json() {
 
     // List in JSON mode
     ceai(&config_dir, &home)
+        .current_dir(tmp.path())
         .args(["skills", "list", "--json"])
         .assert()
         .success()
@@ -1161,6 +1163,7 @@ fn skills_resolve_emits_markdown_prompt_and_json() {
 
     // Resolve in default markdown mode
     ceai(&config_dir, &home)
+        .current_dir(tmp.path())
         .args([
             "skills",
             "resolve",
@@ -1178,6 +1181,7 @@ fn skills_resolve_emits_markdown_prompt_and_json() {
 
     // Resolve in JSON mode
     ceai(&config_dir, &home)
+        .current_dir(tmp.path())
         .args([
             "skills",
             "resolve",
