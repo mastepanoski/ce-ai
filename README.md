@@ -70,6 +70,7 @@ That's it — your harnesses are ready for Compound Engineering. Run your first 
 
 - **Security policy**: [`SECURITY.md`](./SECURITY.md) — ISO/IEC 27001/27002, NIST CSF 2.0, vulnerability disclosure.
 - **AI governance**: [`AI_POLICY.md`](./AI_POLICY.md) — ISO/IEC 42001, NIST AI RMF 1.0.
+- **Disclaimer**: [`DISCLAIMER.md`](./DISCLAIMER.md) — AI-co-created, experimental software under active development.
 - **Contributing**: [`CONTRIBUTING.md`](./CONTRIBUTING.md) · Code of Conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md).
 - **CI**: GitHub Actions runs build + tests, `clippy -D warnings`, `cargo audit`, and a Docker E2E gate on every PR.
 - **Local verification**: `cargo test` (unit/integration) · `make e2e` (containerized E2E).
