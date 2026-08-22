@@ -1091,7 +1091,7 @@ fn workflow_stage_transition_lines(ctx: &Context, stage_num: u32) -> Vec<String>
     lines
 }
 
-fn run_upgrade_cmd(ctx: &Context, app: &App) -> Vec<String> {
+fn run_upgrade_cmd(_ctx: &Context, app: &App) -> Vec<String> {
     let target = app.selected_harness_target().to_string();
     let mut lines = capture_cli(&["upgrade", "--harness", &target, "--force"]);
     lines.push(format!("Target Harness Scope: {target}"));
