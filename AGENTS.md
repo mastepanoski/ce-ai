@@ -14,6 +14,7 @@ All AI agents MUST enforce these hard invariants deterministically at every sess
 5. **No Dummy Fallbacks**: NEVER comment out failing assertions, mask errors with empty catches, or ignore CLI errors.
 6. **OpenSpec Required**: NO code changes without formal spec in `openspec/changes/<feature_name>/`.
 7. **Strict Exit Codes**: Map all errors to `CeError` enum exit codes (`0` Success, `1` Runtime, `2` Usage, `3` State, `4` IO, `5` Network, `6` Verification).
+8. **Preserve Active Worktrees**: NEVER run `git worktree remove` or delete sibling worktrees in `<repo>-worktrees/` without explicit USER permission or verifying creation within the current turn.
 
 ---
 
