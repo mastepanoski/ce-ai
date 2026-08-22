@@ -648,37 +648,7 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
             lines.push(Line::from(Span::styled("Press [Enter] to run full status check.", Style::default().fg(Color::Gray))));
             lines
         }
-        MenuTab::Workflow => {
-            let mut lines = vec![
-                Line::from(Span::styled("Workflow FSM Engine & Progress Recovery:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
-                Line::from(""),
-                Line::from(Span::styled("7-Stage Flywheel Cycle:", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-                Line::from("  • [1: Ideation]   ➔ ce-brainstorm / ce-ideate / ce-strategy"),
-                Line::from("  • [2: OpenSpec]   ➔ Formal Spec Definition (proposal, spec, tasks)"),
-                Line::from("  • [3: Plan]       ➔ ce-plan / ce-doc-review"),
-                Line::from("  • [4: Work/TDD]   ➔ ce-work / ce-debug / ce-simplify-code"),
-                Line::from("  • [5: Verify]     ➔ Empirical Testing (cargo test, make e2e)"),
-                Line::from("  • [6: Compound]   ➔ ce-compound (docs/solutions/)"),
-                Line::from("  • [7: Ship]       ➔ ce-commit-push-pr"),
-                Line::from(""),
-            ];
-            let state_path = ctx.config_dir.join("state.json");
-            if let Ok(state) = State::load(&state_path) {
-                if let Some(cp) = state.last_update_check.clone() {
-                    lines.push(Line::from(vec![
-                        Span::styled("  Latest Checkpoint: ", Style::default().fg(Color::Yellow)),
-                        Span::styled(cp, Style::default().fg(Color::White)),
-                    ]));
-                } else {
-                    lines.push(Line::from("  (No progress checkpoint saved yet — run 'ce-ai workflow checkpoint')"));
-                }
-            } else {
-                lines.push(Line::from(Span::styled("  ⚠️ Could not read state.json", Style::default().fg(Color::Red))));
-            }
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled("Press keys [1-7] to transition stage checkpoints directly, or [Enter] to query status.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))));
-            lines
-        }
+        MenuTab::Workflow => workflow_panel_lines(ctx),
         MenuTab::Install => vec![
             Line::from(Span::styled("Install Compound Engineering Plugin:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
             Line::from(""),
@@ -1005,6 +975,81 @@ fn run_workflow_cmd(_ctx: &Context) -> Vec<String> {
     capture_cli(&["workflow", "status"])
 }
 
+/// Workflow panel content: native actions marked `[run]`, agent-session stages
+/// marked `skill:` — text-perceivable, never color-only (R6).
+fn workflow_panel_lines(ctx: &Context) -> Vec<Line<'static>> {
+    let header = |text: &str| {
+        Line::from(Span::styled(
+            text.to_string(),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ))
+    };
+    let native = |key: &str, desc: &str| {
+        Line::from(vec![
+            Span::styled(
+                "  [run] ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(format!("{key:<6} "), Style::default().fg(Color::Green)),
+            Span::raw(desc.to_string()),
+        ])
+    };
+    let skill = |row: &str| Line::from(format!("  skill: {row}"));
+
+    let mut lines = vec![
+        Line::from(Span::styled(
+            "Workflow FSM Engine & Progress Recovery:",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        header("Native actions (run inside this dashboard):"),
+        native("[Enter]", "Query workflow status"),
+        native("[1-7]", "Save stage-transition checkpoint"),
+        Line::from(""),
+        header("7-Stage Flywheel Cycle (agent-session work):"),
+        skill("[1: Ideation]   ➔ /ce-brainstorm · /ce-ideate · /ce-strategy"),
+        skill("[2: OpenSpec]   ➔ Formal spec definition (proposal, spec, tasks)"),
+        skill("[3: Plan]       ➔ /ce-plan · /ce-doc-review"),
+        skill("[4: Work/TDD]   ➔ /ce-work · /ce-debug · /ce-simplify-code"),
+        skill("[5: Verify]     ➔ Run your project's test/e2e commands"),
+        skill("[6: Compound]   ➔ /ce-compound · /ce-compound-refresh (docs/solutions/)"),
+        skill("[7: Ship]       ➔ /ce-commit-push-pr"),
+        Line::from(""),
+    ];
+
+    let state_path = ctx.config_dir.join("state.json");
+    match State::load(&state_path) {
+        Ok(state) => match state.last_update_check.clone() {
+            Some(cp) => lines.push(Line::from(vec![
+                Span::styled("  Latest Checkpoint: ", Style::default().fg(Color::Yellow)),
+                Span::styled(cp, Style::default().fg(Color::White)),
+            ])),
+            None => lines.push(Line::from(
+                "  (No progress checkpoint saved yet — press [1-7] or run 'ce-ai workflow checkpoint')",
+            )),
+        },
+        Err(_) => lines.push(Line::from(Span::styled(
+            "  ⚠️ Could not read state.json",
+            Style::default().fg(Color::Red),
+        ))),
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Press [Enter] to query status, or keys [1-7] to save a stage checkpoint.",
+        Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD),
+    )));
+    lines
+}
+
 /// Failure-class modal content for workflow actions: cause plus actionable remedy.
 fn workflow_failure_lines(err: &CeError) -> Vec<String> {
     vec![
@@ -1157,5 +1202,78 @@ mod tests {
         let joined = workflow_stage_transition_lines(&ctx, 4).join("\n");
         assert!(joined.contains('❌'));
         assert!(!joined.contains("✅"));
+    }
+}
+
+#[cfg(test)]
+mod workflow_guide_tests {
+    use super::*;
+    use crate::commands::Context;
+    use tempfile::TempDir;
+
+    fn ctx() -> (TempDir, Context) {
+        let tmp = TempDir::new().unwrap();
+        let ctx = Context::resolve(Some(tmp.path().join("ce-ai")), false, false, true).unwrap();
+        (tmp, ctx)
+    }
+
+    fn panel_text(ctx: &Context) -> String {
+        workflow_panel_lines(ctx)
+            .iter()
+            .map(|l| {
+                l.spans
+                    .iter()
+                    .map(|s| s.content.clone())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn every_cycle_row_carries_skill_marker_and_native_rows_run_marker() {
+        let (_tmp, ctx) = ctx();
+        let joined = panel_text(&ctx);
+        let cycle_rows: Vec<&str> = joined
+            .lines()
+            .filter(|l| {
+                l.contains("[1:")
+                    || l.contains("[2:")
+                    || l.contains("[3:")
+                    || l.contains("[4:")
+                    || l.contains("[5:")
+                    || l.contains("[6:")
+                    || l.contains("[7:")
+            })
+            .collect();
+        assert_eq!(cycle_rows.len(), 7);
+        assert!(cycle_rows
+            .iter()
+            .all(|l| l.trim_start().starts_with("skill:")));
+        assert!(joined.matches("[run]").count() >= 2);
+    }
+
+    #[test]
+    fn verify_stage_is_tech_neutral() {
+        let (_tmp, ctx) = ctx();
+        let joined = panel_text(&ctx);
+        let verify_line = joined.lines().find(|l| l.contains("[5:")).unwrap();
+        for tool in ["cargo", "make e2e", "npm", "pytest"] {
+            assert!(!verify_line.contains(tool), "toolchain leaked: {tool}");
+        }
+        assert!(verify_line.contains("test/e2e"));
+    }
+
+    #[test]
+    fn hints_enumerate_actions_without_resume() {
+        let (_tmp, ctx) = ctx();
+        let joined = panel_text(&ctx);
+        let hint_line = joined
+            .lines()
+            .find(|l| l.contains("Press"))
+            .expect("hint line present");
+        assert!(hint_line.contains("[Enter]"));
+        assert!(hint_line.contains("[1-7]"));
+        assert!(!joined.to_lowercase().contains("resume"));
     }
 }
