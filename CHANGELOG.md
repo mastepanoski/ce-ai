@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.6] - 2026-08-21
+
+### Fixed
+- **Windows PowerShell Installer (`scripts/install.ps1`)**: Switched failure handling to `throw` to enforce instant termination and added diagnostic WebClient exception printing.
+
+---
+
+## [1.0.5] - 2026-08-21
+
+### Fixed
+- **Windows PowerShell Installer (`scripts/install.ps1`)**: Fixed `curl.exe` User-Agent flag formatting (`-A "ce-ai-installer/1.0"`) to prevent PowerShell space-splitting argument errors.
+
+---
+
 ## [1.0.4] - 2026-08-21
 
 ### Fixed
