@@ -15,6 +15,10 @@ impl HarnessAdapter for ClaudeAdapter {
     fn default_config_path(&self, home: &Path) -> PathBuf {
         home.join(".claude.json")
     }
+
+    fn derived_stub_files(&self) -> Vec<PathBuf> {
+        vec![PathBuf::from("CLAUDE.md")]
+    }
 }
 
 #[cfg(test)]

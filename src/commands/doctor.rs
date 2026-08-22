@@ -50,6 +50,27 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
             .push("state-inconsistent: opencode state entry and install manifest disagree".into());
     }
 
+    // Project adoption health checks
+    for p in &state.projects {
+        let agents_file = p.path.join(&p.file);
+        if !agents_file.exists() {
+            findings.push(format!(
+                "project-adoption: missing instruction file '{}' at '{}'",
+                p.file,
+                p.path.display()
+            ));
+        } else if let Ok(text) = std::fs::read_to_string(&agents_file) {
+            let inner_body = crate::commands::init_prj::render_block_content(p.tier);
+            let expected_sha = crate::commands::init_prj::compute_sha256(inner_body);
+            if !text.contains(&expected_sha) {
+                findings.push(format!(
+                    "project-adoption: block SHA drift detected at '{}'",
+                    p.path.display()
+                ));
+            }
+        }
+    }
+
     // Companion tool health checks.
     if let Ok(home) = std::env::var("HOME") {
         let engram_db = std::path::Path::new(&home)

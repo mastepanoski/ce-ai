@@ -6,6 +6,28 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use std::path::PathBuf;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum AdoptionTier {
+    #[default]
+    Full,
+    Minimal,
+    Orchestrator,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectAdoptionEntry {
+    pub path: PathBuf,
+    pub file: String,
+    pub tier: AdoptionTier,
+    pub block_version: u32,
+    pub block_sha256: String,
+    pub created_file: bool,
+    pub adopted_at: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModelAssignment {
     pub provider_id: String,
@@ -29,6 +51,8 @@ pub struct State {
     pub last_update_check: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_release_tag: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub projects: Vec<ProjectAdoptionEntry>,
 }
 
 fn default_version() -> u32 {
@@ -118,6 +142,7 @@ mod tests {
             )]),
             last_update_check: None,
             latest_release_tag: None,
+            projects: vec![],
         }
     }
 
@@ -182,5 +207,31 @@ mod tests {
         );
         assert_eq!(loaded.model_assignments["ce-work"].provider_id, "openai");
         assert_eq!(loaded.model_assignments["ce-work"].model_id, "gpt-4o");
+    }
+
+    #[test]
+    fn project_adoption_entry_roundtrip() {
+        use crate::state::state::{AdoptionTier, ProjectAdoptionEntry};
+        use std::path::PathBuf;
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("state.json");
+        let mut state = State::new();
+        state.projects.push(ProjectAdoptionEntry {
+            path: PathBuf::from("/tmp/repo"),
+            file: "AGENTS.md".into(),
+            tier: AdoptionTier::Full,
+            block_version: 1,
+            block_sha256: "abc123sha".into(),
+            created_file: true,
+            adopted_at: "2026-08-22T00:00:00Z".into(),
+        });
+        state.save(&path).unwrap();
+
+        let loaded = State::load(&path).unwrap();
+        assert_eq!(loaded.projects.len(), 1);
+        assert_eq!(loaded.projects[0].path, PathBuf::from("/tmp/repo"));
+        assert_eq!(loaded.projects[0].tier, AdoptionTier::Full);
+        assert!(loaded.projects[0].created_file);
     }
 }

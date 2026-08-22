@@ -287,6 +287,10 @@ fn run_app(
                     KeyCode::Char('d') => {
                         app.dry_run = !app.dry_run;
                     }
+                    KeyCode::Char('i') | KeyCode::Char('I') => {
+                        let lines = run_init_prj_cmd(ctx);
+                        execute_action(app, "Adopt Project (init-prj)", move || lines);
+                    }
                     KeyCode::Enter | KeyCode::Char('r') => {
                         let dry_run = app.dry_run;
                         match app.current_tab() {
@@ -1031,6 +1035,17 @@ fn run_restore_backup_cmd(ctx: &Context, app: &mut App) -> Vec<String> {
                 format!("   Config Path: {}", target_path.display()),
             ]
         }
-        Err(err) => vec![format!("❌ Failed to restore backup: {}", err)],
+        Err(err) => vec![format!("❌ Failed to restore backup: {err}")],
+    }
+}
+
+fn run_init_prj_cmd(ctx: &Context) -> Vec<String> {
+    match crate::commands::init_prj::run(ctx, None, "full", false) {
+        Ok(_) => vec![
+            "✓ Project Adoption Complete!".into(),
+            "".into(),
+            "Injected managed block into AGENTS.md and updated state.json.".into(),
+        ],
+        Err(err) => vec![format!("❌ Failed to adopt project: {err}")],
     }
 }
