@@ -79,6 +79,12 @@ src/
    - Agents MUST create feature branches (`feature/<name>` or `fix/<name>`), push to origin, and open a Pull Request (`gh pr create`).
    - PRs must wait for 100% green GitHub Actions CI status checks before merging.
 
+8. **Documentation Style Compliance (Diátaxis + Cognitive Load)**:
+   - ALL documentation changes (`README.md`, `docs/`, guides) MUST follow the project style guide at [`docs/references/docs-styling.md`](./docs/references/docs-styling.md).
+   - `README.md` MUST stay ≤ 100 lines: title + what/why, Quick Path (install → first command → verification), then an audience-labeled documentation map. Deep internals belong in `docs/`, never inline.
+   - Every document MUST have exactly one Diátaxis intent (tutorial / how-to / reference / explanation). Do not blend quadrants within a section.
+   - Documentation must self-route two audiences: newbies via the Quick Start tutorial path, seniors directly to reference/architecture.
+
 ---
 
 ## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement
