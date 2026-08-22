@@ -42,8 +42,8 @@ flowchart LR
 ### Step-by-Step Flow:
 
 1. **Stage 1: Ideation & Requirements**
-   - Run `/ce-brainstorm` (or `/ce-ideate` to explore surprise options).
-   - *Goal*: Clarify scope, user constraints, and out-of-scope boundaries. Writes `docs/brainstorms/<date>-<name>-requirements.md`.
+   - Run `/ce-brainstorm` when requirements are fuzzy. Only run `/ce-ideate` first if even the technical approach is uncertain (see Section 7 FAQ 0).
+   - *Goal*: Clarify scope, user constraints, and out-of-scope boundaries. Writes `docs/brainstorms/<date>-<name>-requirements.md` — disposable input for Stage 2, never a second source of truth.
 
 2. **Stage 2: OpenSpec Definition (How to Create & Instruct OpenSpec)**
    - Create a dedicated change directory: `openspec/changes/<feature_name>/`.
@@ -129,6 +129,9 @@ flowchart TD
 ### 1. Research & Codebase Surveys
 - **Use**: `/ce-ideate` or dispatch read-only research subagents.
 - **Workflow**: Bypasses OpenSpec, execution plans, and PR delivery. Generates a summary report or dossier directly for the user.
+- ⚠️ **Two distinct uses of `/ce-ideate` — do not confuse them**:
+  - **Use A — Standalone research (this scenario)**: you want ideas or a survey as the *final deliverable*. Nothing feeds forward; full bypass.
+  - **Use B — Upstream of a feature**: you run ideation because the approach is uncertain, then continue into `ce-brainstorm` → Stage 2. In that case it is NOT a bypass: the chosen idea and rejected alternatives distill into `exploration.md` (see Section 7, FAQ 1b).
 
 ### 2. Documentation Generation & Knowledge Audits
 - **Use**: `/ce-compound` or `/ce-compound-refresh`.
@@ -223,8 +226,8 @@ flowchart TD
    - **Do I need `/ce-ideate` or `/ce-brainstorm` before drafting OpenSpec?**
      - **Option A (Feature Scope is Known)**: Run `/ce-brainstorm`.
        - *Why*: `/ce-brainstorm` refines your feature idea, resolves user constraints, and defines explicit out-of-scope boundaries. The output (`docs/brainstorms/`) feeds directly into drafting `openspec/changes/<feature_name>/`.
-     - **Option B (Uncertain Technical Approach or Architecture Alternatives)**: Run `/ce-ideate` first, then `/ce-brainstorm`.
-       - *Why*: `/ce-ideate` explores unconstrained options, evaluates library trade-offs, and generates surprise directions. Once an option is chosen, run `/ce-brainstorm` to lock requirements before writing OpenSpec.
+      - **Option B (Uncertain Technical Approach or Architecture Alternatives)**: Run `/ce-ideate` first, then `/ce-brainstorm`.
+        - *Why*: `/ce-ideate` generates and ranks mechanism-level directions with explicit rejection reasons in `docs/ideation/`. Once one direction is chosen, run `/ce-brainstorm` to lock requirements before writing OpenSpec; the chosen idea and rejected alternatives distill into `exploration.md`.
      - **Option C (Standard Repository Scaffolding)**: Skip both and write `openspec/changes/001-initial-scaffold/` directly.
        - *Why*: Basic repository boilerplate (`Cargo.toml`, linter configs, directory tree) is standard and un-ambiguous.
 
@@ -273,8 +276,8 @@ flowchart TD
    - *Flow*: Define acceptance scenarios using explicit `WHEN <condition> THEN <expected outcome>` blocks in Stage 2 (`OpenSpec`). Tests are written to validate high-level behavior contracts.
 
 3. **Spike Prototyping / R&D Spikes**:
-   - *Flow*: Use `/ce-ideate` to build a fast proof-of-concept (PoC) without writing tests or specs initially.
-   - *Transition*: If the spike proves viable, convert the learnings into Stage 2 (`OpenSpec`) and proceed through standard verification.
+   - *Flow*: Run `/ce-ideate` to generate and rank candidate directions (it produces an idea dossier in `docs/ideation/`, **not code**). Once one direction is chosen, build the throwaway PoC yourself or with `/ce-work` in a scratch branch — no tests or specs at this point.
+   - *Transition*: If the spike proves viable, convert the learnings into Stage 2 (`OpenSpec`) and proceed through standard verification. If not, discard the branch — the only durable output was the decision recorded in the dossier.
 
 > ⚠️ **The Non-Negotiable Rule**: Regardless of whether you use TDD, Code-First, or BDD, **Stage 5 (Empirical Verification)** and **Stage 6 (`ce-compound`)** remain mandatory: code must be verified empirically via tests, and discoveries must be documented in `docs/solutions/`.
 
@@ -336,16 +339,57 @@ flowchart TD
     CE_WORKFLOW["Compound Engineering Workflow\n(Specs ➔ Plan ➔ Code ➔ Verify ➔ COMPOUND ➔ Flywheel)"] -->|"Stage 6: ce-compound"| FLYWHEEL["docs/solutions/ & CONCEPTS.md\n(Compounding Knowledge Flywheel)"]
 ```
 
-- **100% Backward Compatibility**:
-  - `ce-ai`'s Stage 2 **IS** OpenSpec / SDD! All existing specifications in `openspec/changes/<feature_name>/` (`proposal.md`, `exploration.md`, `design.md`, `spec.md`, `tasks.md`) remain 100% valid and untouched.
-- **What Compound Engineering Adds to SDD**:
-  - Traditional SDD stops after code passes tests (Stage 5: Verify).
-  - Compound Engineering extends SDD by enforcing **Stage 6 (`ce-compound`)**: capturing hard-earned discoveries in `docs/solutions/` and updating `CONCEPTS.md`.
-- **Migration Steps**:
-  1. Run `ce-ai install --scope workspace` in the repository.
-  2. Keep all existing `openspec/` files intact.
-  3. Run `/ce-compound-refresh` once to audit historical learnings against the codebase.
-  4. Continue writing OpenSpecs as before in Stage 2, enjoying the automatic compounding flywheel!
+- **100% Backward Compatibility**: `ce-ai`'s Stage 2 **IS** OpenSpec / SDD. All existing specifications in `openspec/changes/<feature_name>/` (`proposal.md`, `exploration.md`, `design.md`, `spec.md`, `tasks.md`) remain valid and untouched.
+
+#### The Mental Model: OpenSpec Is the Contract — CE Skills Wrap Around It, Never Rewrite It
+
+> 💡 **KISS · YAGNI · DRY**: Write each fact exactly once. The five OpenSpec files are the **single source of truth** for *what* to build and *when it is done*. Every other skill either **feeds** them, **sequences** them, **executes** them, or **learns from** them. If you find yourself copying the same content into two documents, stop — one of them should reference the other.
+
+**Who touches what (and what each stage adds):**
+
+| Stage | Skill | Reads (Input) | Writes (Output) | Relationship to OpenSpec |
+| :--- | :--- | :--- | :--- | :--- |
+| 0. Idea Discovery *(optional)* | `/ce-ideate` | Focus hint + repo scan | `docs/ideation/*.md` dossier | **Feeds it**: the chosen idea plus rejected alternatives distill into `exploration.md`. Dossier is disposable input. Expensive (~9 sub-agents) — skip when the approach is already known |
+| 1. Ideation | `/ce-brainstorm` | Your idea + constraints | `docs/brainstorms/*.md` | **Feeds it**: raw material to distill into `proposal.md` / `exploration.md` |
+| 2. Spec | You (+ agent) | Brainstorm doc | `openspec/changes/<name>/` (5 files) | **IS the contract**: single source of truth |
+| Gate | `/ce-doc-review` | Brainstorm or plan docs | Findings only | **Audits it**: flags gaps; never rewrites specs |
+| 3. Plan | `/ce-plan` | `spec.md` + `tasks.md` | `docs/plans/*.md` | **Sequences it**: orders the SAME units already in `tasks.md` by Unit ID (`U1`, `U2`), maps files/tests — never re-describes them |
+| 4. Work | `/ce-work` | `tasks.md` + plan | Code + green tests | **Executes it**: ticks `- [x]` items — `tasks.md` is the progress ledger |
+| 5. Verify | Tests / E2E | Code | Evidence | **Validates it**: proves every `spec.md` WHEN/THEN scenario |
+| 6. Capture | `/ce-compound` | Session learnings | `docs/solutions/`, `CONCEPTS.md` | **Extends beyond it**: knowledge the spec never contained |
+| 7. Ship | `/ce-commit-push-pr` | Branch | PR | **Delivers it**: spec + code + evidence together |
+
+**Newbie FAQ — "Where does the duplication go?"**
+
+0. *"Do I always need `/ce-ideate` or `/ce-brainstorm` before OpenSpec?"*
+   No. KISS: if requirements AND approach are clear, write OpenSpec directly. Brainstorm only when requirements are fuzzy; ideate only when even the approach is uncertain (and remember it dispatches ~9 sub-agents — the most expensive skill in the pipeline).
+
+1. *"If I already wrote `proposal.md`, does `/ce-brainstorm` duplicate it?"*
+   No. Run brainstorm **before** Stage 2. Its conclusions get distilled into `proposal.md`; the brainstorm doc is disposable input, not a second source of truth.
+
+1b. *"Doesn't `/ce-ideate` duplicate `exploration.md`?"*
+   No — same distillation rule, different target. The ideation dossier (`docs/ideation/`) lists many ideas with critiques; `exploration.md` records only the ONE chosen direction plus one-line reasons for the rejected alternatives, linking back to the dossier:
+   ```markdown
+   # openspec/changes/auth-refactor/exploration.md
+   Chosen: session-as-entity (survivor #1 of ideation run 2026-08-22)
+   Rejected: JWT-stateless — revocation would require a token blacklist (docs/ideation/auth-ideas.md §critique)
+   ```
+   After this entry exists, the dossier is conversation history, not a maintained document.
+
+2. *"Doesn't `/ce-plan` duplicate `tasks.md`?"*
+   Only if you violate DRY. `tasks.md` defines the atomic units (`- [ ] U1 ...`). The plan only decides **order, file targets, and test scenarios per unit**, referencing IDs like `U2`. If a description exists in `tasks.md`, the plan links to it instead of restating it.
+
+3. *"When I run `/ce-work`, which document does it follow?"*
+   Both, with distinct roles: `tasks.md` is the **checklist it ticks**; the plan is the **execution order**; `spec.md`'s WHEN/THEN blocks define **done**.
+
+4. *"What about the review/test loop and human QA?"*
+   `/ce-code-review` findings send you back into Stage 4 iterations until tests are 100% green. Human QA happens after `/ce-compound`, before opening/merging the PR (Stage 7).
+
+**Migration Steps** (from traditional SDD):
+1. Run `ce-ai install --scope workspace` in the repository.
+2. Keep all existing `openspec/` files intact — they are already your Stage 2 contract.
+3. Run `/ce-compound-refresh` once to audit historical learnings against the codebase.
+4. Continue writing OpenSpecs as before in Stage 2, enjoying the automatic compounding flywheel!
 
 ---
 
@@ -354,9 +398,12 @@ flowchart TD
 | Task Goal | Entry Skill | Workflow Stages Used | Deliverable Output |
 | :--- | :--- | :--- | :--- |
 | **New Feature** | `/ce-brainstorm` | Full Stages 1 ➔ 7 | OpenSpec + Implementation + Solution + PR |
-| **Architectural Option Exploration** | `/ce-ideate` | Stage 1 (Sub-Loop) | Evaluation dossier & trade-off analysis |
+| **Implementation Plan** | `/ce-plan` | Stage 3 | Numbered unit plan in `docs/plans/` |
+| **Implement / TDD Execution** | `/ce-work` | Stage 4 | Code + green tests, `tasks.md` items ticked |
+| **Doc / Plan Quality Audit** | `/ce-doc-review` | Gate after Stages 1 & 3 | Review findings (no rewrites) |
+| **Approach Uncertain (pre-feature)** | `/ce-ideate` | Stage 0/1 Sub-Loop ➔ Stage 2 | Idea dossier in `docs/ideation/` → distills into `exploration.md` |
+| **Standalone Research / Survey** | `/ce-ideate` / Subagents | Targeted Pass (bypass) | Research report for the user only |
 | **Bug Fix / Crash Repair** | `/ce-debug` | Direct Entry: Stage 4 ➔ 7 | Reproducer Test + Fix + Solution + PR |
 | **Refactoring Clean Code** | `/ce-simplify-code` | Stage 4 (Sub-Loop) | Non-behavioral code tidying |
-| **Research / Exploration** | `/ce-ideate` / Subagents | Targeted Pass (Stage 1) | Research summary report |
 | **Documentation Update** | `/ce-compound` | Targeted Pass (Stage 6) | Solution doc in `docs/solutions/` |
 | **Trivial Chore / Typo** | Direct Edit | Fast-Track: Stage 4 ➔ 7 | Direct git commit |

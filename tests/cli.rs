@@ -1030,7 +1030,7 @@ fn init_prj_and_deinit_prj_roundtrip_fresh_repo() {
     assert!(claude_stub.exists());
 
     let agents_text = fs::read_to_string(&agents_file).unwrap();
-    assert!(agents_text.contains("<!-- ce-ai:block begin v=1 tier=full"));
+    assert!(agents_text.contains("<!-- ce-ai:block begin v=2 tier=full"));
     assert!(agents_text.contains("<!-- ce-ai:block end -->"));
 
     let claude_text = fs::read_to_string(&claude_stub).unwrap();
@@ -1074,7 +1074,7 @@ fn init_prj_preserves_preexisting_content_and_crlf() {
 
     let updated_text = fs::read_to_string(&agents_file).unwrap();
     assert!(updated_text.starts_with("# My Existing Project\r\n"));
-    assert!(updated_text.contains("<!-- ce-ai:block begin v=1 tier=minimal"));
+    assert!(updated_text.contains("<!-- ce-ai:block begin v=2 tier=minimal"));
     assert!(updated_text.contains("\r\n"));
 
     // 2. Run deinit-prj
@@ -1085,6 +1085,139 @@ fn init_prj_preserves_preexisting_content_and_crlf() {
 
     let restored_text = fs::read_to_string(&agents_file).unwrap();
     assert_eq!(restored_text, initial_content);
+}
+
+#[test]
+fn init_prj_full_tier_contains_ssot_rule() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("ssot-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let agents_text = fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap();
+    assert!(agents_text.contains("### Single Source of Truth Rule"));
+    assert!(agents_text.contains(
+        "Skip ideation skills entirely when requirements and approach are already clear."
+    ));
+}
+
+#[test]
+fn init_prj_orchestrator_tier_contains_distillation_line_once() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("orchestrator-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args([
+            "init-prj",
+            prj_dir.to_str().unwrap(),
+            "--tier",
+            "orchestrator",
+        ])
+        .assert()
+        .success();
+
+    let agents_text = fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap();
+    assert_eq!(
+        agents_text
+            .matches("never maintain them in parallel")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn init_prj_minimal_block_matches_v1_bytes() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("minimal-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "minimal"])
+        .assert()
+        .success();
+
+    let agents_text = fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap();
+    let start = agents_text
+        .find("<!-- ce-ai:block begin")
+        .expect("begin marker present");
+    let body_start = agents_text[start..]
+        .find('\n')
+        .map(|i| start + i + 1)
+        .unwrap();
+    let end = agents_text
+        .find("<!-- ce-ai:block end -->")
+        .expect("end marker present");
+    let inner_body = agents_text[..end].trim_end_matches(['\n', '\r']);
+    let inner_body = &inner_body[body_start..];
+
+    let expected_v1_body = "## 🔄 Compound Engineering Workflow Guidelines\n\nAI agents operating on this codebase should follow structured planning and verification:\n- Validate scope boundaries before making changes.\n- Ensure all unit, integration, and linter tests pass before committing.\n- Document key technical learnings and post-mortem fixes.";
+    assert_eq!(inner_body, expected_v1_body);
+}
+
+#[test]
+fn init_prj_replaces_v1_block_with_v2_preserving_content_and_crlf() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("v1-adopted-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    let user_head = "# My Existing Project\r\n\r\nCustom developer notes.\r\n\r\n";
+    let user_tail = "\r\nTrailing custom section.\r\n";
+    let v1_block = "<!-- ce-ai:block begin v=1 tier=full sha256=deadbeef -->\r\n## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement\r\n\r\nStale v1 content.\r\n<!-- ce-ai:block end -->";
+    fs::write(
+        &agents_file,
+        format!("{}{}{}", user_head, v1_block, user_tail),
+    )
+    .unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let updated_text = fs::read_to_string(&agents_file).unwrap();
+    assert!(updated_text.starts_with(user_head));
+    assert!(updated_text.ends_with(user_tail));
+    assert!(!updated_text.contains("Stale v1 content."));
+    assert!(updated_text.contains("<!-- ce-ai:block begin v=2 tier=full"));
+    assert!(updated_text.contains("### Single Source of Truth Rule"));
+
+    let state_text = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    assert!(state_text.contains("\"block_version\":2"));
+}
+
+#[test]
+fn init_prj_second_run_is_byte_identical() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("idempotent-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let before = fs::read_to_string(&agents_file).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("already adopted"));
+
+    let after = fs::read_to_string(&agents_file).unwrap();
+    assert_eq!(before, after);
 }
 
 #[test]

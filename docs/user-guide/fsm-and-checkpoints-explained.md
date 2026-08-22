@@ -123,9 +123,9 @@ flowchart TD
 ```
 
 ### 1. How `ce-ideate` Operates in Stage 1 (Ideation)
-- **Role**: `ce-ideate` is an **Exploration Sub-Loop** within **Stage 1 (Ideation)**.
-- **Behavior**: When a user or agent doesn't have a concrete feature description yet, `ce-ideate` runs first to generate and evaluate surprise options or architectural directions.
-- **Transition**: Once an idea is chosen from `ce-ideate`, the FSM transitions to `ce-brainstorm` (to build the formal requirements document) and then moves forward to Stage 2 (`OpenSpec`).
+- **Role**: `ce-ideate` is an **Idea Discovery Sub-Loop** within **Stage 1 (Ideation)**.
+- **Behavior**: When a user or agent doesn't have a concrete feature description yet, `ce-ideate` runs first to generate and evaluate candidate directions. It writes a ranked dossier to `docs/ideation/` — it does **not** produce requirements, plans, or code.
+- **Transition**: Once an idea is chosen from the dossier, the FSM transitions to `ce-brainstorm` (to build the formal requirements document) and then moves forward to Stage 2 (`OpenSpec`), where the chosen idea plus one-line rejection reasons for the alternatives are distilled into `exploration.md`. The dossier itself is disposable input, not a maintained document.
 
 ### 2. How `ce-debug` Operates in Stage 4/5 (Diagnostic Sub-Loop & Direct Entry Point)
 
@@ -272,7 +272,7 @@ flowchart TD
     subgraph FSM_VARIANTS ["SUPPORTED FSM WORKFLOW VARIANTS"]
         V1["1. Full 7-Stage Feature Cycle"] -->|"Stages 1 ➔ 7"| FULL["New Feature / Enhancement"]
         V2["2. Direct Entry Bug Fix"] -->|"Stage 4 ce-debug ➔ 7"| BUG["Bug Fix / Crash Repair"]
-        V3["3. Exploration Sub-Loop"] -->|"Stage 1 ce-ideate"| IDEATE["Architectural Discovery"]
+        V3["3. Idea Discovery Sub-Loop"] -->|"Stage 1 ce-ideate"| IDEATE["Ranked Idea Dossier in docs/ideation/"]
         V4["4. Cross-Session Resumption"] -->|"ce-ai workflow resume"| RESUME["Context Re-hydration"]
         V5["5. Multi-Harness Handoff"] -->|"Harness Agnostic Disk State"| HANDOFF["Claude ➔ Cursor ➔ Antigravity"]
         V6["6. Worktree Isolation"] -->|"--scope workspace"| WORKTREE["Parallel Git Worktrees"]
@@ -286,7 +286,7 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | **New Feature / Enhancement** | Stage 1 (`ce-brainstorm`) | Stages 1 ➔ 2 ➔ 3 ➔ 4 ➔ 5 ➔ 6 ➔ 7 | Formal OpenSpec (`proposal`, `spec`, `tasks`) + Plan + TDD + Solution + PR |
 | **Bug Fix / Crash Repair** | Stage 4 (`ce-debug`) | Stage 4 (Direct Entry) ➔ 5 ➔ 6 ➔ 7 | Bypasses feature briefs; reproduces test ➔ applies fix ➔ tags `ce-compound` |
-| **Architectural Exploration** | Stage 1 (`ce-ideate`) | Stage 1 Sub-Loop ➔ Stage 1 (`ce-brainstorm`) | Generates unconstrained options before formalizing requirements |
+| **Approach Uncertain** | Stage 0/1 (`ce-ideate`) | Idea Discovery Sub-Loop ➔ Stage 1 (`ce-brainstorm`) ➔ Stage 2 | Ranked dossier in `docs/ideation/`; chosen idea + rejected alternatives distill into `exploration.md` |
 | **Session Interruption & Resume** | Any Stage | Resumes at exact checkpoint | Atomic disk writes (`state.json`) + Engram persistent memory re-hydration |
 | **Multi-Harness Handoff** | Any Stage | Harness-Agnostic State Traversal | Shared disk state allows Claude Code to ideate, Cursor to edit, and AGY to ship |
 | **Git Worktree Isolation** | Worktree Root | Workspace-Scoped Traversal | `install --scope workspace` isolates state and CodeGraph per worktree |
