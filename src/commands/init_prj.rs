@@ -11,6 +11,8 @@ use crate::state::state::{AdoptionTier, ProjectAdoptionEntry, State};
 
 pub const BLOCK_BEGIN_MARKER: &str = "<!-- ce-ai:block begin";
 pub const BLOCK_END_MARKER: &str = "<!-- ce-ai:block end -->";
+pub const GITIGNORE_BEGIN_MARKER: &str = "# BEGIN CE-AI MANAGED BLOCK";
+pub const GITIGNORE_END_MARKER: &str = "# END CE-AI MANAGED BLOCK";
 
 /// Renders the managed block content based on tier.
 pub fn render_block_content(tier: AdoptionTier) -> &'static str {
@@ -193,6 +195,30 @@ pub fn run(
         }
 
         state.save(&global_state_path)?;
+
+        // Inject sentinel-bounded .gitignore block (DEC-06)
+        let gitignore_file = target_dir.join(".gitignore");
+        let gitignore_block = format!(
+            "{}\n.ce-ai/skills-registry.json\n{}\n",
+            GITIGNORE_BEGIN_MARKER, GITIGNORE_END_MARKER
+        );
+        let gitignore_text = if gitignore_file.exists() {
+            fs::read_to_string(&gitignore_file).unwrap_or_default()
+        } else {
+            String::new()
+        };
+        if !gitignore_text.contains(GITIGNORE_BEGIN_MARKER) {
+            let mut updated_gi = gitignore_text;
+            if !updated_gi.is_empty() && !updated_gi.ends_with('\n') {
+                updated_gi.push('\n');
+            }
+            updated_gi.push_str(&gitignore_block);
+            let _ = crate::state::write_atomic(&gitignore_file, updated_gi.as_bytes());
+        }
+
+        if let Ok(registry) = crate::source::registry::SkillRegistry::build(ctx) {
+            let _ = registry.save(&ctx.config_dir.join("skills-registry.json"));
+        }
     }
 
     if !ctx.quiet {

@@ -107,6 +107,32 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             state.projects.remove(idx);
             state.save(&global_state_path)?;
         }
+
+        // Clean up sentinel-bounded .gitignore block (DEC-06)
+        let gitignore_file = target_dir.join(".gitignore");
+        if gitignore_file.exists() {
+            if let Ok(gi_text) = fs::read_to_string(&gitignore_file) {
+                use crate::commands::init_prj::{GITIGNORE_BEGIN_MARKER, GITIGNORE_END_MARKER};
+                if let Some(start_idx) = gi_text.find(GITIGNORE_BEGIN_MARKER) {
+                    if let Some(end_rel) = gi_text[start_idx..].find(GITIGNORE_END_MARKER) {
+                        let end_idx = start_idx + end_rel + GITIGNORE_END_MARKER.len();
+                        let mut cleaned_gi = String::new();
+                        cleaned_gi.push_str(&gi_text[..start_idx]);
+                        let rest = &gi_text[end_idx..];
+                        let rest_trimmed = rest
+                            .strip_prefix("\r\n")
+                            .unwrap_or_else(|| rest.strip_prefix('\n').unwrap_or(rest));
+                        cleaned_gi.push_str(rest_trimmed);
+                        if cleaned_gi.trim().is_empty() {
+                            let _ = fs::remove_file(&gitignore_file);
+                        } else {
+                            let _ =
+                                crate::state::write_atomic(&gitignore_file, cleaned_gi.as_bytes());
+                        }
+                    }
+                }
+            }
+        }
     }
 
     if !ctx.quiet {

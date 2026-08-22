@@ -79,6 +79,25 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     state.save(&state_path)?;
 
+    if !ctx.dry_run {
+        let registry_path = ctx.config_dir.join("skills-registry.json");
+        if registry_path.exists() {
+            let _ = std::fs::remove_file(&registry_path);
+        }
+        if let Ok(entries) = std::fs::read_dir(&ctx.config_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with(".skills-registry.json.tmp") {
+                    if let Ok(meta) = std::fs::symlink_metadata(entry.path()) {
+                        if meta.is_file() && !meta.file_type().is_symlink() {
+                            let _ = std::fs::remove_file(entry.path());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if !ctx.quiet {
         if args.harness == "all" {
             println!("✅ Uninstalled all target harnesses cleanly.");

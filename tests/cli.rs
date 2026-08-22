@@ -1106,14 +1106,90 @@ fn doctor_reports_model_assignment_drift_and_sync_reconciles() {
 
     // 1. Doctor should report model assignment drift
     ceai(&config_dir, &home)
+        .current_dir(tmp.path())
         .arg("doctor")
         .assert()
         .failure()
         .stdout(predicate::str::contains("model-assignment-drift"));
 
     // 2. Sync should reconcile model assignments bidirectionally
-    ceai(&config_dir, &home).arg("sync").assert().success();
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .arg("sync")
+        .assert()
+        .success();
 
     // 3. Doctor should now pass cleanly
-    ceai(&config_dir, &home).arg("doctor").assert().success();
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .arg("doctor")
+        .assert()
+        .success();
+}
+
+// ---- skills (R1..R6) ----
+
+#[test]
+fn skills_list_outputs_catalog_table_and_json() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // List in text table mode
+    ceai(&config_dir, &home)
+        .args(["skills", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Skill Registry Catalog"))
+        .stdout(predicate::str::contains("ce-brainstorm"));
+
+    // List in JSON mode
+    ceai(&config_dir, &home)
+        .args(["skills", "list", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"name\": \"ce-brainstorm\""));
+}
+
+#[test]
+fn skills_resolve_emits_markdown_prompt_and_json() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Resolve in default markdown mode
+    ceai(&config_dir, &home)
+        .args([
+            "skills",
+            "resolve",
+            "--harness",
+            "opencode",
+            "--query",
+            "brainstorm",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "<!-- ce-ai:skill_resolution status=",
+        ))
+        .stdout(predicate::str::contains("## Skills to load before work:"));
+
+    // Resolve in JSON mode
+    ceai(&config_dir, &home)
+        .args([
+            "skills",
+            "resolve",
+            "--harness",
+            "opencode",
+            "--query",
+            "brainstorm",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"resolution_status\": \"paths-injected\"",
+        ));
 }
