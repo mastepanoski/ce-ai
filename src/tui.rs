@@ -428,43 +428,7 @@ fn run_app(
                     }
                     KeyCode::Char(c @ '1'..='7') if app.current_tab() == MenuTab::Workflow => {
                         let stage_num = c.to_digit(10).unwrap();
-                        let (phase, task) = match stage_num {
-                            1 => (
-                                "Stage 1: Ideation",
-                                "1.0 Ideation & Brainstorming (ce-brainstorm)",
-                            ),
-                            2 => ("Stage 2: OpenSpec Definition", "2.0 OpenSpec Specification"),
-                            3 => ("Stage 3: Execution Plan", "3.0 Technical Plan (ce-plan)"),
-                            4 => ("Stage 4: TDD & Work", "4.0 Implementation (ce-work)"),
-                            5 => (
-                                "Stage 5: Empirical Verification",
-                                "5.0 Verification (cargo test)",
-                            ),
-                            6 => (
-                                "Stage 6: Knowledge Capture",
-                                "6.0 Knowledge Capture (ce-compound)",
-                            ),
-                            7 => (
-                                "Stage 7: Git Shipping",
-                                "7.0 PR Delivery (ce-commit-push-pr)",
-                            ),
-                            _ => ("Stage 1: Ideation", "1.0 Ideation"),
-                        };
-                        let args = crate::commands::workflow::Args {
-                            action: crate::commands::workflow::Action::Checkpoint {
-                                task: task.to_string(),
-                                phase: phase.to_string(),
-                            },
-                        };
-                        let lines = match crate::commands::workflow::run(ctx, &args) {
-                            Ok(_) => vec![
-                                format!("✅ Workflow Checkpoint Saved to {phase}!"),
-                                format!("Active Task: {task}"),
-                                "".to_string(),
-                                "Stage transition recorded in state.json successfully.".to_string(),
-                            ],
-                            Err(err) => vec![format!("❌ Failed to save checkpoint: {err}")],
-                        };
+                        let lines = workflow_stage_transition_lines(ctx, stage_num);
                         execute_action(app, "Workflow Stage Transition", move || lines);
                     }
                     _ => {}
@@ -1041,7 +1005,48 @@ fn run_workflow_cmd(_ctx: &Context) -> Vec<String> {
     capture_cli(&["workflow", "status"])
 }
 
-fn run_upgrade_cmd(_ctx: &Context, app: &App) -> Vec<String> {
+/// Failure-class modal content for workflow actions: cause plus actionable remedy.
+fn workflow_failure_lines(err: &CeError) -> Vec<String> {
+    vec![
+        format!("❌ Workflow command failed: {err}"),
+        "Remedy: check state.json corruption or permissions, then run `ce-ai doctor`.".into(),
+    ]
+}
+
+/// Saves the `[1-7]` stage-transition checkpoint and builds its confirmation modal.
+fn workflow_stage_transition_lines(ctx: &Context, stage_num: u32) -> Vec<String> {
+    let (phase, task) = match stage_num {
+        1 => (
+            "Stage 1: Ideation",
+            "1.0 Ideation & Brainstorming (ce-brainstorm)",
+        ),
+        2 => ("Stage 2: OpenSpec Definition", "2.0 OpenSpec Specification"),
+        3 => ("Stage 3: Execution Plan", "3.0 Technical Plan (ce-plan)"),
+        4 => ("Stage 4: TDD & Work", "4.0 Implementation (ce-work)"),
+        5 => (
+            "Stage 5: Empirical Verification",
+            "5.0 Verification (project test/e2e commands)",
+        ),
+        6 => (
+            "Stage 6: Knowledge Capture",
+            "6.0 Knowledge Capture (ce-compound)",
+        ),
+        7 => (
+            "Stage 7: Git Shipping",
+            "7.0 PR Delivery (ce-commit-push-pr)",
+        ),
+        _ => ("Stage 1: Ideation", "1.0 Ideation"),
+    };
+    let mut lines = match crate::commands::workflow::checkpoint_lines(ctx, task, phase) {
+        Ok(out) => out,
+        Err(err) => return workflow_failure_lines(&err),
+    };
+    lines.insert(0, format!("✅ Workflow Checkpoint Saved to {phase}!"));
+    lines.push("Stage transition recorded in state.json successfully.".to_string());
+    lines
+}
+
+fn run_upgrade_cmd(ctx: &Context, app: &App) -> Vec<String> {
     let target = app.selected_harness_target().to_string();
     let mut lines = capture_cli(&["upgrade", "--harness", &target, "--force"]);
     lines.push(format!("Target Harness Scope: {target}"));
@@ -1106,4 +1111,51 @@ fn run_restore_backup_cmd(ctx: &Context, app: &mut App) -> Vec<String> {
 
 fn run_init_prj_cmd(_ctx: &Context) -> Vec<String> {
     capture_cli(&["init-prj"])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::Context;
+    use tempfile::TempDir;
+
+    fn ctx() -> (TempDir, Context) {
+        let tmp = TempDir::new().unwrap();
+        let ctx = Context::resolve(Some(tmp.path().join("ce-ai")), false, false, true).unwrap();
+        (tmp, ctx)
+    }
+
+    #[test]
+    fn failure_lines_carry_marker_and_remedy() {
+        let lines = workflow_failure_lines(&CeError::Runtime("state.json corrupt".into()));
+        let joined = lines.join("\n");
+        assert!(joined.contains('❌'));
+        assert!(joined.contains("state.json corrupt"));
+        assert!(joined.contains("ce-ai doctor"));
+    }
+
+    #[test]
+    fn stage_transition_confirms_and_persists_checkpoint() {
+        let (_tmp, ctx) = ctx();
+        let lines = workflow_stage_transition_lines(&ctx, 2);
+        let joined = lines.join("\n");
+        assert!(joined.contains("✅ Workflow Checkpoint Saved to Stage 2: OpenSpec Definition!"));
+        assert!(joined.contains("Stage transition recorded"));
+
+        let state = State::load(&ctx.config_dir.join("state.json")).unwrap();
+        assert!(state
+            .last_update_check
+            .unwrap()
+            .starts_with("Stage 2: OpenSpec Definition | "));
+    }
+
+    #[test]
+    fn stage_transition_failure_uses_failure_class() {
+        let (_tmp, ctx) = ctx();
+        std::fs::create_dir_all(&ctx.config_dir).unwrap();
+        std::fs::write(ctx.config_dir.join("state.json"), "{broken").unwrap();
+        let joined = workflow_stage_transition_lines(&ctx, 4).join("\n");
+        assert!(joined.contains('❌'));
+        assert!(!joined.contains("✅"));
+    }
 }
