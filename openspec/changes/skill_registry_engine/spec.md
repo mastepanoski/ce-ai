@@ -19,3 +19,7 @@ THEN `ce-ai` SHALL return the exact absolute `SKILL.md` path corresponding to th
 ### Requirement 3: Health Probe Integration
 WHEN `ce-ai doctor` is executed,
 THEN `ce-ai` SHALL audit `skills-registry.json` for missing files, SHA256 drift, and malformed frontmatter YAML.
+
+### Requirement 4: Uninstall Parity & .gitignore Maintenance
+WHEN `ce-ai uninstall` or `deinit-prj` is executed,
+THEN `ce-ai` SHALL clean up `skills-registry.json`, remove any generated workspace-local skill registry artifacts, and clean up `.gitignore` entries added by `ce-ai`.

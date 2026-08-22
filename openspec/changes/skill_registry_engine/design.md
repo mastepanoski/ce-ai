@@ -62,3 +62,20 @@ Audits `skills-registry.json` integrity:
 - Validates missing `SKILL.md` files on disk.
 - Verifies SHA256 hashes against actual file contents.
 - Flags malformed YAML frontmatter headers.
+
+---
+
+## 4. Uninstall & `.gitignore` Maintenance Lifecycle
+
+```
+[src/commands/uninstall.rs] ──> Remove ~/.ce-ai/skills-registry.json
+                            ──> Clean managed .gitignore entries
+[src/commands/deinit_prj.rs] ──> Remove project-local skill registry stubs (.ce-ai/skills-registry.json)
+```
+
+1. **`ce-ai uninstall` Lifecycle**:
+   - Deletes `~/.ce-ai/skills-registry.json` during complete uninstallation.
+   - Cleans up any managed entries added by `ce-ai` to `.gitignore` files.
+2. **`ce-ai deinit-prj` Lifecycle**:
+   - Strips workspace-local skill registry stubs (e.g. `.ce-ai/skills-registry.json`).
+   - Reverts any project `.gitignore` mutations created by `ce-ai`.
