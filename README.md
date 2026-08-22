@@ -67,6 +67,7 @@ That's it — your harnesses are ready for Compound Engineering. Run your first 
 | 🗂️ [Harness Matrix](docs/user-guide/harness-matrix.md) | Reference | Reference — all 12 harnesses, config paths, merge strategies |
 | 🏛️ [Architectural & Conceptual Guide](docs/user-guide/architectural-and-conceptual-guide.md) | **Senior** | Explanation — adapter traits, scope hierarchy, atomic writes |
 | 🎮 [FSM & Checkpoints Masterclass](docs/user-guide/fsm-and-checkpoints-explained.md) | **Senior** | Explanation — 7-stage cycle, savegames, sub-loops |
+| 🧭 [Workflow Panel: Native vs Agent Skills](docs/user-guide/workflow-panel-native-vs-agent-skills.md) | **Beginner** | Explanation — why the TUI dashboard runs some actions and only points to others |
 | 📐 [OpenSpec specifications](openspec/changes/ce-ai/) | **Senior** | Reference — design, requirements matrix, proposal, roadmap |
 
 ## Security, Governance & Quality Gates
