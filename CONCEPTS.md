@@ -36,3 +36,6 @@ A performance test suite (`benches/benchmarks.rs`) guaranteeing that state resol
 
 ### Project Adoption Engine
 A non-destructive, fully reversible CLI mechanism (`ce-ai init-prj` / `ce-ai deinit-prj`) that injects marker-delimited workflow instruction blocks (`<!-- ce-ai:block begin ... -->`) into `AGENTS.md` and generates derived reference stubs (`CLAUDE.md`) without overwriting pre-existing user documentation or custom agent settings.
+
+### Context-Exhaustion Resilience
+A 3-tier defense-in-depth governance pattern (GitHub REST API Branch Protection + `ce-ai doctor` Health Probes + Hard-Gate Invariant Index) that replaces probabilistic prose prompt instructions with fail-closed deterministic platform boundaries to eliminate LLM token dilution and compaction loss in long sessions.
