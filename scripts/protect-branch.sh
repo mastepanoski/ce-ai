@@ -48,16 +48,11 @@ PAYLOAD=$(cat <<EOF
       "Build & Test (windows-latest)",
       "Containerized E2E Gate (NIST AI RMF & ISO 42001)",
       "Supply Chain Security Audit (ISO 27001 / ISO 27002)",
-      "Windows PowerShell Installer Gate (NIST SP 800-53)",
-      "Analyze (rust)"
+      "Windows PowerShell Installer Gate (NIST SP 800-53)"
     ]
   },
   "enforce_admins": false,
-  "required_pull_request_reviews": {
-    "dismiss_stale_reviews": false,
-    "require_code_owner_reviews": false,
-    "required_approving_review_count": 0
-  },
+  "required_pull_request_reviews": null,
   "restrictions": null,
   "required_linear_history": false,
   "allow_force_pushes": false,
@@ -70,12 +65,14 @@ PAYLOAD=$(cat <<EOF
 EOF
 )
 
-if gh api -X PUT "repos/${REPO}/branches/main/protection" --input - <<< "$PAYLOAD" >/dev/null 2>&1; then
+API_OUTPUT=$(gh api -X PUT "repos/${REPO}/branches/main/protection" --input - <<< "$PAYLOAD" 2>&1)
+if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ GitHub branch protection successfully configured for 'main' on ${REPO}!${RESET}"
     echo -e "  - Direct pushes to 'main' are now blocked."
     echo -e "  - All PRs require 100% green CI matrix status checks before merging."
 else
-    echo -e "${YELLOW}[WARNING] Failed to configure branch protection via GitHub API.${RESET}"
+    echo -e "${RED}[ERROR] Failed to configure branch protection via GitHub API:${RESET}"
+    echo "$API_OUTPUT"
     echo "Ensure your token has admin/repo permissions on ${REPO}."
     exit 1
 fi

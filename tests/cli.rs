@@ -642,6 +642,7 @@ fn doctor_clean_install_reports_ok() {
     install(&config_dir, &home, &source);
 
     ceai(&config_dir, &home)
+        .current_dir(tmp.path())
         .arg("doctor")
         .assert()
         .success()
@@ -657,6 +658,7 @@ fn doctor_reports_diff_finding_with_non_zero_exit() {
     fs::write(loader_path(&home), "tampered").unwrap();
 
     ceai(&config_dir, &home)
+        .current_dir(tmp.path())
         .arg("doctor")
         .assert()
         .failure()
@@ -679,6 +681,7 @@ fn doctor_reports_config_invalid_finding() {
     .unwrap();
 
     ceai(&config_dir, &home)
+        .current_dir(tmp.path())
         .arg("doctor")
         .assert()
         .failure()
@@ -695,6 +698,7 @@ fn doctor_reports_state_inconsistency_finding() {
     fs::remove_file(manifest_path(&home)).unwrap();
 
     ceai(&config_dir, &home)
+        .current_dir(tmp.path())
         .arg("doctor")
         .assert()
         .failure()
