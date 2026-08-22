@@ -15,7 +15,8 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 use crate::commands::{
-    backups, doctor, install, models, status, sync, tools, uninstall, upgrade, workflow, Context,
+    backups, deinit_prj, doctor, init_prj, install, models, status, sync, tools, uninstall,
+    upgrade, workflow, Context,
 };
 use crate::error::result_exit_code;
 
@@ -60,6 +61,24 @@ enum Commands {
     Tools(tools::Args),
     /// Workflow FSM & progress recovery system across 7 development stages.
     Workflow(workflow::Args),
+    /// Adopt a project repository by injecting managed Compound Engineering workflow blocks into AGENTS.md.
+    #[command(name = "init-prj")]
+    InitPrj {
+        /// Target project directory path (default: current working directory)
+        path: Option<PathBuf>,
+        /// Adoption tier: full, minimal, orchestrator
+        #[arg(long, default_value = "full")]
+        tier: String,
+        /// Force overwrite of modified managed blocks
+        #[arg(long)]
+        force: bool,
+    },
+    /// Remove managed Compound Engineering workflow blocks from a project repository cleanly.
+    #[command(name = "deinit-prj")]
+    DeinitPrj {
+        /// Target project directory path (default: current working directory)
+        path: Option<PathBuf>,
+    },
 }
 
 fn main() {
@@ -82,6 +101,8 @@ fn main() {
         Some(Commands::Backups(args)) => backups::run(&ctx, &args),
         Some(Commands::Tools(args)) => tools::run(&ctx, &args),
         Some(Commands::Workflow(args)) => workflow::run(&ctx, &args),
+        Some(Commands::InitPrj { path, tier, force }) => init_prj::run(&ctx, path, &tier, force),
+        Some(Commands::DeinitPrj { path }) => deinit_prj::run(&ctx, path),
         None => tui::run_interactive(&ctx),
     };
     if let Err(err) = &result {

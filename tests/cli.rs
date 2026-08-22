@@ -887,3 +887,80 @@ fn uninstall_harness_all_with_yes_flag_test() {
             "Uninstalled all target harnesses cleanly",
         ));
 }
+
+#[test]
+fn init_prj_and_deinit_prj_roundtrip_fresh_repo() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("my-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    // 1. Run init-prj
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Adopted project"));
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    let claude_stub = prj_dir.join("CLAUDE.md");
+    assert!(agents_file.exists());
+    assert!(claude_stub.exists());
+
+    let agents_text = fs::read_to_string(&agents_file).unwrap();
+    assert!(agents_text.contains("<!-- ce-ai:block begin v=1 tier=full"));
+    assert!(agents_text.contains("<!-- ce-ai:block end -->"));
+
+    let claude_text = fs::read_to_string(&claude_stub).unwrap();
+    assert_eq!(claude_text.trim(), "@AGENTS.md");
+
+    // 2. Run init-prj second time (idempotency check)
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("already adopted"));
+
+    // 3. Run deinit-prj
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Removed project adoption block"));
+
+    // Fresh repo files should be removed since they were created by ce-ai and empty after deinit
+    assert!(!agents_file.exists());
+    assert!(!claude_stub.exists());
+}
+
+#[test]
+fn init_prj_preserves_preexisting_content_and_crlf() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("existing-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    let initial_content = "# My Existing Project\r\n\r\nCustom developer notes.\r\n";
+    fs::write(&agents_file, initial_content).unwrap();
+
+    // 1. Run init-prj
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "minimal"])
+        .assert()
+        .success();
+
+    let updated_text = fs::read_to_string(&agents_file).unwrap();
+    assert!(updated_text.starts_with("# My Existing Project\r\n"));
+    assert!(updated_text.contains("<!-- ce-ai:block begin v=1 tier=minimal"));
+    assert!(updated_text.contains("\r\n"));
+
+    // 2. Run deinit-prj
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success();
+
+    let restored_text = fs::read_to_string(&agents_file).unwrap();
+    assert_eq!(restored_text, initial_content);
+}
