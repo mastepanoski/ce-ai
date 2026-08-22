@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.2] - 2026-08-22
+
+### Fixed
+- **Model Assignment Drift Reconciliation (Issue #111)**: Fixed silent state desynchronization where `agent.<slot>` assignments existed in `opencode.json` but were unrecorded in `state.json`. `ce-ai sync` now bidirectionally reconciles model assignments without data loss.
+- **Default Model Assignments**: `ce-ai install` automatically populates documented default model assignments for `ce-ai` (orchestrator slot) and stage slots (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-code-review`, `ce-doc-review`) on fresh installs.
+- **`ce-ai doctor` Model Drift Probe**: Extended `ce-ai doctor` with `model-assignment-drift` probe flagging desynchronized slots.
+- **Interactive TUI Models Tab**: Models tab in Ratatui dashboard now features interactive slot navigation and cursor selection.
+
+---
+
 ## [1.2.1] - 2026-08-22
 
 ### Added
