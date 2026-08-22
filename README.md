@@ -45,6 +45,7 @@ That's it — your harnesses are ready for Compound Engineering. Run your first 
 | `ce-ai deinit-prj [path]` | Surgically restore pre-adoption file state | [Project Adoption Guide](docs/user-guide/project-adoption-guide.md) |
 | `ce-ai install [--scope workspace\|--scope global]` | Install per harness or workspace-isolated | [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) |
 | `ce-ai status` / `ce-ai doctor` | Inspect installed harnesses, adoption & health | — |
+| `ce-ai skills list/resolve/doctor` | Query, resolve skills & check registry health | [Skill Registry Guide](docs/user-guide/skill-registry-guide.md) |
 | `ce-ai sync` | Reconcile drift against the SHA256 manifest | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
 | `ce-ai upgrade --to <tag>` | Upgrade the plugin to a release tag | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
 | `ce-ai models set/list/profile …` | Assign models per agent slot, snapshot profiles | [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) |
@@ -60,6 +61,7 @@ That's it — your harnesses are ready for Compound Engineering. Run your first 
 | 🎓 [Harnesses, Loops & Context Masterclass](docs/user-guide/harnesses-loops-and-context-masterclass.md) | **Beginner** | Explanation — what a harness is, MCP sidecars, token economics |
 | 🔧 [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) | Both | How-to — scopes, non-destructive JSON merging, discovery |
 | 🔄 [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) | Both | How-to — drift repair, upgrades, rollbacks |
+| ⚡ [Skill Registry Guide](docs/user-guide/skill-registry-guide.md) | Both | How-to / Reference — skill index, 4-tier precedence, resolution |
 | 💾 [Backup & Uninstall](docs/user-guide/backup-and-uninstall.md) | Both | How-to — backups, clean uninstall, state cleanup |
 | 🗂️ [Harness Matrix](docs/user-guide/harness-matrix.md) | Reference | Reference — all 12 harnesses, config paths, merge strategies |
 | 🏛️ [Architectural & Conceptual Guide](docs/user-guide/architectural-and-conceptual-guide.md) | **Senior** | Explanation — adapter traits, scope hierarchy, atomic writes |
