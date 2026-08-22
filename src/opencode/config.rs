@@ -17,20 +17,9 @@ pub struct ConfigMutation {
     pub keys: Vec<String>,
 }
 
-/// Reads `opencode.json`. Missing file → empty object; invalid JSON → hard-fail
-/// with fix guidance (D4) — never silently overwrite broken config.
-pub fn read_config(path: &Path) -> Result<serde_json::Value, CeError> {
-    match std::fs::read_to_string(path) {
-        Ok(text) => serde_json::from_str(&text).map_err(|err| {
-            CeError::Runtime(format!(
-                "{} is not valid JSON: {err}. Refusing to overwrite it. Fix the file manually, then re-run.",
-                path.display()
-            ))
-        }),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(serde_json::json!({})),
-        Err(err) => Err(err.into()),
-    }
-}
+/// Reads a harness JSON config. Kept as a thin alias over the neutral
+/// `state::read_config` for opencode-specific callers.
+pub use crate::state::read_config;
 
 /// Appends `plugin_entry` to `plugin` unless already present (OI-2). Fails
 /// instead of clobbering when `plugin` exists but is not an array.
@@ -83,11 +72,11 @@ fn merge_skills_path(config: &mut serde_json::Value, skills_path: &str) -> Resul
     Ok(())
 }
 
-/// Applies a model assignment to `agent.<slot>.model`/`variant` (MM-2),
-/// preserving every other key on the slot and every other agent entry.
-/// `model_value` is the full `provider/model` string; `variant` always mirrors
-/// the gentle-ai convention. Hard-fails instead of clobbering a non-object
-/// `agent` map or a non-object slot entry (D4).
+/// Applies a model assignment to `agent.<slot>.model` (MM-2), preserving
+/// every other key on the slot and every other agent entry. `model_value`
+/// is the full `provider/model` string. Never writes `variant` — that
+/// customization belongs to the user (#111). Hard-fails instead of
+/// clobbering a non-object `agent` map or a non-object slot entry (D4).
 pub fn apply_model_assignment(
     config_path: &Path,
     slot: &str,
@@ -98,7 +87,7 @@ pub fn apply_model_assignment(
         None => {
             config["agent"] = serde_json::json!({});
             let agents = config["agent"].as_object_mut().expect("agent is an object");
-            agents.insert(slot.to_string(), serde_json::json!({ "model": model_value, "variant": "" }));
+            agents.insert(slot.to_string(), serde_json::json!({ "model": model_value }));
         }
         Some(serde_json::Value::Object(agents)) => {
             let entry = agents.entry(slot.to_string()).or_insert_with(|| serde_json::json!({}));
@@ -108,7 +97,6 @@ pub fn apply_model_assignment(
                 )));
             }
             entry["model"] = serde_json::Value::String(model_value.to_string());
-            entry["variant"] = serde_json::Value::String(String::new());
         }
         Some(_) => {
             return Err(CeError::Runtime(

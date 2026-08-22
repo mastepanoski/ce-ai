@@ -2,7 +2,6 @@
 //! Provides a modern, rich, split-panel terminal interface with live status,
 //! keyboard navigation, model slot tables, and one-key action execution.
 
-use std::collections::BTreeMap;
 use std::io::{stdout, IsTerminal};
 use std::time::Duration;
 
@@ -18,10 +17,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap};
 use ratatui::Terminal;
 
-use crate::commands::{doctor, install, sync, uninstall, upgrade, Context};
+use crate::commands::Context;
 use crate::error::CeError;
 use crate::harness::HarnessKind;
-use crate::opencode::manifest::InstallManifest;
 use crate::state::state::State;
 
 #[allow(dead_code)]
@@ -192,9 +190,9 @@ impl App {
             }
         }
 
-        // Editable slot list: documented defaults first, then any extra
-        // tracked slots (models-defaults-tui-orchestrator).
-        for (slot, _) in crate::commands::models::DEFAULT_MODEL_ASSIGNMENTS {
+        // Editable slot list: CE workflow slots first (structural orchestrator
+        // + tracked stage slots), then any extra user-assigned slot.
+        for slot in crate::harness::agents::CE_AGENT_SLOTS {
             self.model_slots.push(slot.to_string());
         }
         for (slot, _) in &self.model_assignments {
@@ -771,7 +769,7 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
                         .iter()
                         .find(|(s, _)| s == slot)
                         .map(|(_, m)| m.clone())
-                        .unwrap_or_else(|| "(unset)".to_string());
+                        .unwrap_or_else(|| "(not assigned — press m to pick)".to_string());
                     lines.push(Line::from(vec![
                         Span::styled(prefix, Style::default().fg(Color::Green)),
                         Span::styled(
@@ -975,171 +973,92 @@ where
     app.output_modal = Some((title.to_string(), lines));
 }
 
-fn run_status_cmd(ctx: &Context) -> Vec<String> {
-    let mut out = Vec::new();
-    let state_path = ctx.config_dir.join("state.json");
-    if let Ok(state) = State::load(&state_path) {
-        if state.installed_harnesses.is_empty() {
-            out.push("Installed: None".into());
-        } else {
-            for h in &state.installed_harnesses {
-                out.push(format!(
-                    "Installed: {} ({}, source: {})",
-                    h["name"].as_str().unwrap_or("?"),
-                    h["version"].as_str().unwrap_or("?"),
-                    h["source"]["kind"].as_str().unwrap_or("?")
-                ));
-            }
-        }
-    }
-    let managed = ctx.opencode_config_dir.join("compound-engineering");
-    if let Ok(manifest) = InstallManifest::load(&ctx.opencode_config_dir) {
-        let desired: BTreeMap<String, String> = manifest
-            .files
-            .iter()
-            .map(|f| (f.path.clone(), f.sha256.clone()))
-            .collect();
-        let drift = crate::state::diff::diff(&desired, &desired, &managed);
-        if drift.actions.is_empty() {
-            out.push("Drift: None (All managed files healthy)".into());
-        } else {
-            out.push(format!("Drift: {} changes detected", drift.actions.len()));
-        }
-    } else {
-        out.push("Drift: Unknown (No install manifest)".into());
-    }
-    out
-}
-
-fn run_install_cmd(ctx: &Context, app: &App, dry_run: bool) -> Vec<String> {
-    let mut install_ctx = ctx.clone();
-    install_ctx.dry_run = dry_run;
-
-    let selected = app.selected_harness_target();
-    let target_harnesses: Vec<String> = if selected == "all" {
-        if app.detected_harnesses.is_empty() {
-            vec!["opencode".into()]
-        } else {
-            app.detected_harnesses
-                .iter()
-                .map(|h| h.to_string())
-                .collect()
-        }
-    } else {
-        vec![selected.to_string()]
-    };
-
-    let mut out = vec![
-        format!("✅ Installation completed for target: [{selected}]"),
-        "".to_string(),
-    ];
-    for harness_str in &target_harnesses {
-        let args = install::Args {
-            harness: harness_str.clone(),
-            source: None,
-            scope: "global".into(),
-        };
-        match install::run(&install_ctx, &args) {
-            Ok(_) => out.push(format!("  • {harness_str}: OK")),
-            Err(err) => out.push(format!("  • {harness_str}: {err}")),
-        }
-    }
-    out.push("".to_string());
-    out.push(format!(
-        "Mode: {}",
-        if dry_run {
-            "Dry-run (Preview)"
-        } else {
-            "Applied"
-        }
-    ));
-    out
-}
-
-fn run_models_cmd(ctx: &Context) -> Vec<String> {
-    let mut out = vec!["Current Model Assignments:".to_string(), "".to_string()];
-    let state_path = ctx.config_dir.join("state.json");
-    if let Ok(state) = State::load(&state_path) {
-        if state.model_assignments.is_empty() {
-            out.push("  (No custom slot assignments)".into());
-        } else {
-            for (slot, info) in &state.model_assignments {
-                out.push(format!(
-                    "  • {slot}: {}/{}",
-                    info.provider_id, info.model_id
-                ));
-            }
-        }
-    }
-    out.push("".to_string());
-    out.push("To assign a slot or save/load profiles, use command line:".to_string());
-    out.push("  ce-ai models set <slot> <provider/model>".to_string());
-    out.push("  ce-ai models profile save <name>".to_string());
-    out
-}
-
-fn run_sync_cmd(ctx: &Context, dry_run: bool) -> Vec<String> {
-    let mut sync_ctx = ctx.clone();
-    sync_ctx.dry_run = dry_run;
-    match sync::run(&sync_ctx, &sync::Args::default()) {
-        Ok(_) => vec![
-            "✅ Sync completed!".to_string(),
-            format!(
-                "Mode: {}",
-                if dry_run {
-                    "Dry-run (Preview)"
+/// Runs the installed ce-ai binary as a subprocess and captures its output.
+/// Commands that `println!` would otherwise paint straight onto the
+/// alternate screen and corrupt the dashboard layout (#72-class breakage).
+fn capture_cli(args: &[&str]) -> Vec<String> {
+    let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("ce-ai"));
+    match std::process::Command::new(&exe).args(args).output() {
+        Ok(out) => {
+            let mut lines: Vec<String> = String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .map(str::to_string)
+                .collect();
+            lines.extend(
+                String::from_utf8_lossy(&out.stderr)
+                    .lines()
+                    .map(str::to_string),
+            );
+            if lines.is_empty() {
+                lines.push(if out.status.success() {
+                    "(no output)".to_string()
                 } else {
-                    "Applied"
-                }
-            ),
-        ],
-        Err(err) => vec![format!("❌ Sync failed: {err}")],
+                    format!("❌ exit code {}", out.status.code().unwrap_or(-1))
+                });
+            }
+            if !out.status.success() {
+                lines.push(format!("❌ command failed: ce-ai {}", args.join(" ")));
+            }
+            lines
+        }
+        Err(err) => vec![format!("❌ failed to launch {}: {err}", exe.display())],
     }
 }
 
-fn run_workflow_cmd(ctx: &Context) -> Vec<String> {
-    let args = crate::commands::workflow::Args {
-        action: crate::commands::workflow::Action::Status,
-    };
-    match crate::commands::workflow::run(ctx, &args) {
-        Ok(_) => vec![
-            "✅ Workflow FSM Status checked cleanly!".to_string(),
-            "Use 'ce-ai workflow checkpoint' or 'resume' to manage progress.".to_string(),
-        ],
-        Err(err) => vec![format!("❌ Workflow check failed: {err}")],
+fn run_status_cmd(_ctx: &Context) -> Vec<String> {
+    capture_cli(&["status"])
+}
+
+fn run_install_cmd(_ctx: &Context, app: &App, dry_run: bool) -> Vec<String> {
+    let mut args = vec!["install", "--harness", app.selected_harness_target()];
+    if dry_run {
+        args.push("--dry-run");
+    }
+    capture_cli(&args)
+}
+
+fn run_models_cmd(_ctx: &Context) -> Vec<String> {
+    let mut lines = capture_cli(&["models", "list"]);
+    lines.push(String::new());
+    lines.push("Assign a slot or manage profiles:".to_string());
+    lines.push("  ce-ai models set <slot> <provider/model>".to_string());
+    lines.push("  ce-ai models profile save|load <name>".to_string());
+    lines.push(
+        "In this tab: [n/p] select slot · [m] pick a model from the harness catalog.".to_string(),
+    );
+    lines
+}
+
+fn run_sync_cmd(_ctx: &Context, dry_run: bool) -> Vec<String> {
+    if dry_run {
+        capture_cli(&["sync", "--dry-run"])
+    } else {
+        capture_cli(&["sync"])
     }
 }
 
-fn run_upgrade_cmd(ctx: &Context, app: &App) -> Vec<String> {
+fn run_workflow_cmd(_ctx: &Context) -> Vec<String> {
+    capture_cli(&["workflow", "status"])
+}
+
+fn run_upgrade_cmd(_ctx: &Context, app: &App) -> Vec<String> {
     let target = app.selected_harness_target().to_string();
-    let args = upgrade::Args {
-        to: None,
-        source: None,
-        harness: target.clone(),
-        force: true,
-    };
-    match upgrade::run(ctx, &args) {
-        Ok(_) => vec![
-            "✅ Upgrade completed successfully!".to_string(),
-            format!("Target Harness Scope: {target}"),
-            format!("Updated to version: v{}", env!("CARGO_PKG_VERSION")),
-        ],
-        Err(err) => vec![format!("❌ Upgrade failed: {err}")],
-    }
+    let mut lines = capture_cli(&["upgrade", "--harness", &target, "--force"]);
+    lines.push(format!("Target Harness Scope: {target}"));
+    lines
 }
 
-fn run_doctor_cmd(ctx: &Context) -> Vec<String> {
-    match doctor::run(ctx) {
-        Ok(_) => vec![
-            "✅ Doctor check: OK!".to_string(),
-            "All configuration files, state integrity, and managed assets are clean.".to_string(),
-        ],
-        Err(err) => vec![format!("❌ Doctor check failed: {err}")],
+fn run_doctor_cmd(_ctx: &Context) -> Vec<String> {
+    let mut lines = capture_cli(&["doctor"]);
+    if !lines.iter().any(|l| l.contains("doctor: ok")) {
+        lines.push("❌ doctor reported findings (exit non-zero)".to_string());
     }
+    lines
 }
 
-fn run_uninstall_cmd(ctx: &Context, app: &App) -> Vec<String> {
-    let selected = app.selected_harness_target();
+fn run_uninstall_cmd(_ctx: &Context, app: &App) -> Vec<String> {
+    let selected = app.selected_harness_target().to_string();
+    let mut out = vec![format!("Uninstalling target: [{selected}]")];
     let target_harnesses: Vec<String> = if selected == "all" {
         if app.harnesses.is_empty() {
             vec!["opencode".to_string()]
@@ -1147,25 +1066,11 @@ fn run_uninstall_cmd(ctx: &Context, app: &App) -> Vec<String> {
             app.harnesses.iter().map(|(n, _, _)| n.clone()).collect()
         }
     } else {
-        vec![selected.to_string()]
+        vec![selected]
     };
 
-    let mut out = vec![
-        format!("✅ Uninstallation completed for target: [{selected}]"),
-        "".to_string(),
-    ];
     for harness in &target_harnesses {
-        let args = uninstall::Args {
-            harness: harness.clone(),
-            all: false,
-            yes: true,
-        };
-        match uninstall::run(ctx, &args) {
-            Ok(_) => out.push(format!(
-                "  • {harness}: Uninstalled & pre-install config restored"
-            )),
-            Err(err) => out.push(format!("  • {harness}: {err}")),
-        }
+        out.extend(capture_cli(&["uninstall", "--harness", harness, "--yes"]));
     }
     out
 }
@@ -1199,13 +1104,6 @@ fn run_restore_backup_cmd(ctx: &Context, app: &mut App) -> Vec<String> {
     }
 }
 
-fn run_init_prj_cmd(ctx: &Context) -> Vec<String> {
-    match crate::commands::init_prj::run(ctx, None, "full", false) {
-        Ok(_) => vec![
-            "✓ Project Adoption Complete!".into(),
-            "".into(),
-            "Injected managed block into AGENTS.md and updated state.json.".into(),
-        ],
-        Err(err) => vec![format!("❌ Failed to adopt project: {err}")],
-    }
+fn run_init_prj_cmd(_ctx: &Context) -> Vec<String> {
+    capture_cli(&["init-prj"])
 }

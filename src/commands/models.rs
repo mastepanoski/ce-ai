@@ -1,6 +1,7 @@
 //! `ce-ai models`: persist model assignments in state.json (MM-1), apply them
-//! to opencode.json `agent.<slot>.model`/`variant` (MM-2), and manage named
-//! profiles with append-only snapshots (MM-3, MM-4).
+//! to opencode.json `agent.<slot>.model` (MM-2), and manage named profiles
+//! with append-only snapshots (MM-3, MM-4). Model assignment is always
+//! user-driven; ce-ai never seeds default models (#111).
 
 use std::collections::BTreeMap;
 
@@ -8,12 +9,10 @@ use chrono::Utc;
 
 use crate::commands::Context;
 use crate::error::CeError;
-use crate::opencode::config::{apply_model_assignment, read_config};
+use crate::opencode::config::apply_model_assignment;
 use crate::state::profiles::{load_profile, save_profile, save_snapshot, Profile};
+use crate::state::read_config;
 use crate::state::state::State;
-
-/// Orchestrator agent slot (model-defaults-tui-orchestrator).
-pub const ORCHESTRATOR_SLOT: &str = "ce-ai";
 
 /// Parses harness CLI `models` output into sorted, deduped
 /// `provider/model` identifiers (one per line; extra annotations after
@@ -160,32 +159,6 @@ pub(crate) fn set(ctx: &Context, slot: &str, model: &str) -> Result<(), CeError>
     Ok(())
 }
 
-/// Seeds the documented defaults (`State::default_model_assignments`) into
-/// slots that have no model yet, skipping any slot already configured in
-/// `opencode.json` or `state.json` so user customization is never clobbered
-/// (#111). Returns the seeded `(slot, model)` pairs.
-pub fn apply_defaults(ctx: &Context) -> Result<Vec<(String, String)>, CeError> {
-    let state = State::load(&ctx.config_dir.join("state.json"))?;
-    let opencode_json = ctx.opencode_config_dir.join("opencode.json");
-    let config = read_config(&opencode_json)?;
-    let mut seeded = Vec::new();
-    for (slot, assignment) in State::default_model_assignments() {
-        let model = format!("{}/{}", assignment.provider_id, assignment.model_id);
-        let has_config_model = config
-            .get("agent")
-            .and_then(|agents| agents.get(&slot))
-            .and_then(|entry| entry.get("model"))
-            .and_then(|m| m.as_str())
-            .is_some_and(|m| !m.is_empty());
-        if has_config_model || state.model_assignments.contains_key(&slot) {
-            continue;
-        }
-        set(ctx, &slot, &model)?;
-        seeded.push((slot, model));
-    }
-    Ok(seeded)
-}
-
 /// Compares `state.json` assignments against the `opencode.json` agent map
 /// and returns human-readable drift findings (doctor; issue #111):
 /// - state slot missing from config
@@ -221,8 +194,7 @@ pub fn model_drift_findings(state: &State, config: &serde_json::Value) -> Vec<St
     }
     if let Some(serde_json::Value::Object(map)) = agents {
         for slot in map.keys() {
-            let is_ce_slot = slot == ORCHESTRATOR_SLOT
-                || State::default_model_assignments().contains_key(slot);
+            let is_ce_slot = crate::harness::agents::CE_AGENT_SLOTS.contains(&slot.as_str());
             if is_ce_slot
                 && !state.model_assignments.contains_key(slot)
                 && config_model(slot).is_some()
@@ -323,6 +295,7 @@ fn load(ctx: &Context, name: &str) -> Result<(), CeError> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::harness::agents::ORCHESTRATOR_AGENT as ORCHESTRATOR_SLOT;
     use tempfile::TempDir;
 
     /// Builds a fully hermetic Context pointing at temp dirs; avoids
@@ -359,62 +332,6 @@ pub mod tests {
                 .model_id,
             "claude-3-5-sonnet"
         );
-    }
-
-    fn ctx_with_config(config: &str) -> (TempDir, Context) {
-        let tmp = TempDir::new().unwrap();
-        let ctx = hermetic_ctx(&tmp);
-        std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
-        std::fs::write(ctx.opencode_config_dir.join("opencode.json"), config).unwrap();
-        (tmp, ctx)
-    }
-    #[test]
-    fn apply_defaults_seeds_all_slots_on_empty_config() {
-        let (_tmp, ctx) = ctx_with_config("{}");
-        let seeded = apply_defaults(&ctx).unwrap();
-        assert_eq!(seeded.len(), State::default_model_assignments().len());
-        assert!(seeded.iter().any(|(slot, _)| slot == ORCHESTRATOR_SLOT));
-        let state = State::load(&ctx.config_dir.join("state.json")).unwrap();
-        for (slot, default_assignment) in State::default_model_assignments() {
-            let assignment = state.model_assignments.get(&slot).unwrap();
-            assert_eq!(
-                format!("{}/{}", assignment.provider_id, assignment.model_id),
-                format!(
-                    "{}/{}",
-                    default_assignment.provider_id, default_assignment.model_id
-                )
-            );
-        }
-    }
-
-    #[test]
-    fn apply_defaults_never_overwrites_existing_user_models() {
-        let (_tmp, ctx) =
-            ctx_with_config(r#"{"agent":{"ce-brainstorm":{"model":"user/custom-model"}}}"#);
-        apply_defaults(&ctx).unwrap();
-        let config =
-            read_config(&ctx.opencode_config_dir.join("opencode.json")).unwrap();
-        assert_eq!(
-            config["agent"]["ce-brainstorm"]["model"],
-            "user/custom-model"
-        );
-        // The remaining unset slots are still seeded.
-        let seeded_model = &State::default_model_assignments()[ORCHESTRATOR_SLOT];
-        assert_eq!(
-            config["agent"][ORCHESTRATOR_SLOT]["model"],
-            format!("{}/{}", seeded_model.provider_id, seeded_model.model_id)
-        );
-        let state = State::load(&ctx.config_dir.join("state.json")).unwrap();
-        assert!(!state.model_assignments.contains_key("ce-brainstorm"));
-    }
-
-    #[test]
-    fn apply_defaults_skips_slots_tracked_in_state() {
-        let (_tmp, ctx) = ctx_with_config("{}");
-        set(&ctx, "ce-work", "openai/gpt-5").unwrap();
-        apply_defaults(&ctx).unwrap();
-        let config = read_config(&ctx.opencode_config_dir.join("opencode.json")).unwrap();
-        assert_eq!(config["agent"]["ce-work"]["model"], "openai/gpt-5");
     }
 
     #[test]

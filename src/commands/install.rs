@@ -156,6 +156,18 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         )?;
         mutation.backup = backup.map(|p| p.display().to_string());
 
+        // Ensure the structural `ce-ai` orchestrator agent exists — never
+        // model/variant; users customize those (#111).
+        let agent_ensured = !ctx.dry_run
+            && crate::harness::agents::ensure_orchestrator_agent(&target_config, harness_kind)?;
+        if agent_ensured && !ctx.quiet {
+            println!(
+                "install: orchestrator agent '{}' ensured for {}",
+                crate::harness::agents::ORCHESTRATOR_AGENT,
+                harness_kind
+            );
+        }
+
         // Record managed files and the config mutation (OI-5).
         InstallManifest {
             version: version.clone(),
@@ -192,13 +204,6 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     if !ctx.dry_run {
         state.save(&state_path)?;
-        // Seed documented default model assignments (incl. orchestrator slot
-        // `ce-ai`) into slots the user has not configured (#111).
-        for (slot, model) in crate::commands::models::apply_defaults(ctx)? {
-            if !ctx.quiet {
-                println!("install: default model {slot} = {model}");
-            }
-        }
     }
 
     if let Some(tmp) = tmp_dir {

@@ -10,12 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`ce-ai` Orchestrator Agent Definition**: `install` seeds the structural agent entry (description, `mode: primary`, permissions) into harness configs that support agent maps — **without** `model` or `variant`; those belong to the user (#111).
 - **Harness-Driven Model Discovery**: The TUI model picker lists what the active harness actually offers by querying `opencode models` at runtime; discovery failures surface explicit errors instead of a stale static catalog.
-- **Editable TUI Models Tab**: Slot navigation (`n`/`p`) and live model picker (`m`) applying assignments through the same atomic path as `ce-ai models set`.
+- **Editable TUI Models Tab**: Slot navigation (`n`/`p`) and live model picker (`m`) applying assignments through the same atomic path as `ce-ai models set`; shows only real assignments plus clear "(not assigned)" placeholders.
+- **TUI Output Capture**: Dashboard actions now run as captured subprocesses — `println!`-based commands can no longer paint over the alternate screen and break the layout.
+
+### Changed
+- `models set` no longer writes `variant` into `opencode.json`; that key is user-owned.
 
 ### Fixed
-- **Never-Clobber Defaults on Install**: Install no longer overwrites user-configured `agent.<slot>` models when seeding defaults — slots already present in `opencode.json` or tracked in `state.json` are skipped (#111).
-- **Config-Wins Drift Import**: `ce-ai sync` no longer pushes stale state back over user-edited `opencode.json`; it only imports effective config assignments into state (config is the live truth) (#111).
+- **Config-Wins Drift Import**: `ce-ai sync` imports effective `opencode.json` assignments into state without pushing stale state back over user-edited config; `doctor` reports `model-assignment-drift` for CE-known slots (#111).
 
 ---
 

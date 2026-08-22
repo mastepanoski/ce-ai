@@ -11,10 +11,11 @@ Refs: GitHub issue #111.
 
 ## In scope
 
-- Documented default model assignments (including orchestrator slot `ce-ai`) applied by `install`, never overwriting existing user config.
-- Editable Models tab in the TUI (slot navigation + model picker applying through the existing atomic path). The picker lists what the active harness actually offers via its CLI (`opencode models`) — no hardcoded catalog.
-- `doctor` detects drift between `state.json` and `opencode.json` model assignments.
-- `sync` repairs desync by importing live `opencode.json` assignments into `state.json`.
+- Structural `ce-ai` orchestrator agent definition seeded by `install` into harness configs that support agent entries (description, mode `primary`, permissions) — **never** `model` or `variant`; users customize those.
+- No default model seeding anywhere: assignments are always user-driven via CLI/TUI.
+- Editable Models tab in the TUI (slot navigation + model picker backed by live harness discovery via `opencode models`).
+- All TUI action output captured through a subprocess so `println!`-based commands can no longer corrupt the alternate-screen layout.
+- `doctor` detects drift between `state.json` and `opencode.json` model assignments (CE-known slots); `sync` repairs desync by importing config→state.
 
 ## Out of scope
 
