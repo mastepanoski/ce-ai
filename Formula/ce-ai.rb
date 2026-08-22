@@ -1,17 +1,17 @@
 class CeAi < Formula
   desc "CLI for managing the compound-engineering plugin across AI harnesses"
   homepage "https://github.com/mastepanoski/ce-ai"
-  version "1.1.0"
+  version "1.2.0"
   license "MIT"
 
   if OS.mac? && Hardware::CPU.intel?
-    url "https://github.com/mastepanoski/ce-ai/releases/download/v1.1.0/ce-ai-x86_64-apple-darwin.tar.gz"
+    url "https://github.com/mastepanoski/ce-ai/releases/download/v1.2.0/ce-ai-x86_64-apple-darwin.tar.gz"
   elsif OS.mac? && Hardware::CPU.arm?
-    url "https://github.com/mastepanoski/ce-ai/releases/download/v1.1.0/ce-ai-aarch64-apple-darwin.tar.gz"
+    url "https://github.com/mastepanoski/ce-ai/releases/download/v1.2.0/ce-ai-aarch64-apple-darwin.tar.gz"
   elsif OS.linux? && Hardware::CPU.intel?
-    url "https://github.com/mastepanoski/ce-ai/releases/download/v1.1.0/ce-ai-x86_64-unknown-linux-gnu.tar.gz"
+    url "https://github.com/mastepanoski/ce-ai/releases/download/v1.2.0/ce-ai-x86_64-unknown-linux-gnu.tar.gz"
   elsif OS.linux? && Hardware::CPU.arm?
-    url "https://github.com/mastepanoski/ce-ai/releases/download/v1.1.0/ce-ai-aarch64-unknown-linux-gnu.tar.gz"
+    url "https://github.com/mastepanoski/ce-ai/releases/download/v1.2.0/ce-ai-aarch64-unknown-linux-gnu.tar.gz"
   end
 
   def install
