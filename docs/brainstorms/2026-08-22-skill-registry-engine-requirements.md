@@ -1,6 +1,6 @@
 # Requirements Document: Multi-Harness Skill Registry Engine (`ce-ai skills`)
 
-- **Document Version**: 1.0.0
+- **Document Version**: 1.1.0
 - **Date**: 2026-08-22
 - **OpenSpec Change Reference**: `openspec/changes/skill_registry_engine/`
 - **Issue Reference**: #96
@@ -23,20 +23,22 @@ Provide a native, multi-harness **Skill Registry Engine** within `ce-ai` that in
 
 ---
 
-## 2. Scope Boundaries
+## 2. Scope Boundaries & Requirements Index
 
-### In-Scope
-- **Central Storage (`~/.ce-ai/skills-registry.json`)**: Harness-neutral master index managed via `crate::state::write_atomic`.
-- **Multi-Harness Path Resolution**: Indexing skills across global managed paths (`~/.ce-ai/skills/`), global user paths (`~/.config/<harness>/skills/`), and adopted workspace repositories (`.ce-ai/skills/`, `.opencode/skills/`).
-- **YAML Frontmatter Parsing**: Extracting `name`, `description`, `triggers`, `scope`, and `harness_paths` from `SKILL.md` files.
-- **Subcommand Suite (`ce-ai skills`)**:
+### In-Scope Requirements
+
+- **R1: Central Storage (`~/.ce-ai/skills-registry.json`)**: Harness-neutral master index managed via `crate::state::write_atomic` with restrictive permissions (mode `0600`/`0644`).
+- **R2: Multi-Harness Path Resolution**: Indexing skills across global managed paths (`~/.ce-ai/skills/`), global user paths (`~/.config/<harness>/skills/`), and adopted workspace repositories (`.ce-ai/skills/`, `.opencode/skills/`).
+- **R3: Security Boundary & Path Traversal Rejection**: All indexed paths must be canonicalized and validated within authorized skill roots (`~/.ce-ai/skills/`, `~/.config/<harness>/skills/`, `<workspace>/.ce-ai/skills/`). Relative parent traversals (`../`) or symlinks escaping authorized roots must be strictly rejected.
+- **R4: YAML Frontmatter Parsing**: Extracting `name`, `description`, `triggers`, `scope`, and `harness_paths` from `SKILL.md` headers using a lightweight frontmatter parser in `src/source/registry.rs`.
+- **R5: Subcommand Suite (`ce-ai skills`)**:
   - `ce-ai skills list`: Full catalog display with SHA256 health status.
-  - `ce-ai skills resolve --harness <kind> --query "<task>"`: Dual-format resolution output (Markdown prompt block + JSON).
-  - `ce-ai skills doctor`: Diagnostic probe for missing files, invalid frontmatter, or corrupted digests.
-- **Lifecycle & Uninstall Parity**:
-  - Auto-refresh on `ce-ai install`, `sync`, `upgrade`.
-  - Complete removal of `~/.ce-ai/skills-registry.json` on `ce-ai uninstall`.
-  - Removal of project stubs and managed `.gitignore` entries on `ce-ai deinit-prj`.
+  - `ce-ai skills resolve --harness <kind> --query "<task>"`: Dual-format resolution output (Markdown prompt block + JSON) with resolution-time SHA256 verification.
+  - `ce-ai skills doctor`: Subcommand alias invoking the shared `skill-registry-integrity` probe.
+- **R6: Lifecycle & Uninstall Parity**:
+  - Auto-refresh on `ce-ai install`, `sync`, `upgrade`, and `init-prj`.
+  - Complete removal of `~/.ce-ai/skills-registry.json` and temporary write artifacts (`.tmp*`) on `ce-ai uninstall`.
+  - Removal of project stubs and sentinel-bounded `.gitignore` entries (`# BEGIN CE-AI MANAGED BLOCK` / `# END CE-AI MANAGED BLOCK`) on `ce-ai deinit-prj`.
 
 ### Out-of-Scope
 - Remote network skill downloading (skills remain local or fetched via release tarballs).
@@ -49,9 +51,11 @@ Provide a native, multi-harness **Skill Registry Engine** within `ce-ai` that in
 | Decision ID | Topic | Decision Made | Rationale |
 |-------------|-------|---------------|-----------|
 | **DEC-01** | Output Format | Dual Format: Markdown prompt block + JSON (`--json`) | Allows direct sub-agent prompt injection (`## Skills to load...`) while remaining machine-parseable for CLI tools. |
-| **DEC-02** | Conflict Precedence | Local Override with Global Fallback | Workspace-local skills (`.ce-ai/skills/`) override global skills (`~/.ce-ai/skills/`) of the same name, preserving non-conflicting global skills. |
+| **DEC-02** | Conflict Precedence | 4-Tier Precedence Hierarchy: Local Workspace (`.ce-ai/skills/` > `.opencode/skills/`) > Global User (`~/.config/<harness>/skills/`) > Global Managed (`~/.ce-ai/skills/`) | Local workspace skills override global skills of the same name, preserving non-conflicting global skills. |
 | **DEC-03** | Degradation Handling | Explicit Degradation Tag (`paths-injected` \| `fallback-fuzzy` \| `none`) + `stderr` Warning | Prevents fatal crashes during prompt resolution while providing clear observability of missing or corrupted skills. |
 | **DEC-04** | Harness Neutrality | Global Master Index at `~/.ce-ai/skills-registry.json` | Ensures `ce-ai` remains neutral across all 12 supported AI coding agent harnesses. |
+| **DEC-05** | Diagnostic Probe Alignment | Shared `skill-registry-integrity` Probe | `ce-ai skills doctor` acts as a direct alias to the probe shared with `ce-ai doctor`. |
+| **DEC-06** | Sentinel Boundaries | `.gitignore` Delimiters (`# BEGIN CE-AI MANAGED BLOCK` / `# END CE-AI MANAGED BLOCK`) | Guarantees idempotent gitignore updates and lossless removal on `deinit-prj`. |
 
 ---
 
@@ -62,14 +66,14 @@ Provide a native, multi-harness **Skill Registry Engine** within `ce-ai` that in
 ce-ai skills resolve --harness <harness-kind> --query "<task-or-trigger>" [--json]
 ```
 
-### Output Formats
+### Output Formats (Consistent Workspace-Local Example)
 
 #### Default Markdown Output (Ready for Sub-Agent Prompt Injection)
 ```markdown
 <!-- ce-ai:skill_resolution status=paths-injected timestamp=2026-08-22T14:30:00Z -->
 ## Skills to load before work:
 - **ce-brainstorm**: Explore vague or ambitious ideas into right-sized requirements
-  Path: `file:///Users/user/.config/opencode/compound-engineering/skills/ce-brainstorm/SKILL.md`
+  Path: `file:///Users/user/project/.ce-ai/skills/ce-brainstorm/SKILL.md`
 ```
 
 #### JSON Output (`--json`)
@@ -94,11 +98,13 @@ ce-ai skills resolve --harness <harness-kind> --query "<task-or-trigger>" [--jso
 
 ## 5. Success Criteria
 
-- [ ] `skills-registry.json` is generated under `~/.ce-ai/` on `ce-ai install` and `ce-ai sync`.
-- [ ] `ce-ai skills list` displays catalog for any specified host harness.
-- [ ] `ce-ai skills resolve --harness <kind> --query "<query>"` outputs dual-format prompt blocks.
-- [ ] Local workspace skills (`.ce-ai/skills/`) cleanly override global skills of the same name.
-- [ ] Resolution degradation is explicitly tagged (`paths-injected` vs `fallback-fuzzy` vs `none`).
-- [ ] `ce-ai uninstall` removes `~/.ce-ai/skills-registry.json` and reverts `.gitignore` entries.
-- [ ] `ce-ai doctor` includes `skill-registry-integrity` probe flagging missing or corrupted files.
-- [ ] 100% green unit, CLI integration, and security test coverage (`cargo test`).
+- [ ] **[R1, R6]**: `skills-registry.json` is generated/refreshed under `~/.ce-ai/` on `ce-ai install`, `ce-ai sync`, `ce-ai upgrade`, and `ce-ai init-prj`.
+- [ ] **[R2, R5]**: `ce-ai skills list` displays catalog for any specified host harness.
+- [ ] **[R2, R5]**: `ce-ai skills resolve --harness <kind> --query "<query>"` outputs dual-format prompt blocks with resolution-time SHA256 checksum verification.
+- [ ] **[R2, DEC-02]**: 4-tier precedence hierarchy applies correctly (local workspace skills override global skills of the same name).
+- [ ] **[R3]**: Path traversal attempts (`../`) and external symlinks are strictly rejected during scan and resolution.
+- [ ] **[DEC-03]**: Resolution degradation is explicitly tagged (`paths-injected` vs `fallback-fuzzy` vs `none`) with stderr warnings.
+- [ ] **[R6]**: `ce-ai uninstall` removes `~/.ce-ai/skills-registry.json` and temporary write artifacts.
+- [ ] **[R6]**: `ce-ai deinit-prj` removes project stubs and reverts sentinel-bounded `.gitignore` entries cleanly.
+- [ ] **[R5, DEC-05]**: `ce-ai doctor` and `ce-ai skills doctor` run the shared `skill-registry-integrity` probe flagging missing or corrupted files.
+- [ ] **[R1-R6]**: 100% green unit, CLI integration, and security test coverage (`cargo test`).
