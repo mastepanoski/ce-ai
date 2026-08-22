@@ -16,3 +16,7 @@
 - [ ] **Task 4: Unit & Integration Testing (`tests/cli.rs`)**
   - Add unit tests for frontmatter parsing and registry round-tripping.
   - Add CLI integration tests for `ce-ai skills list` and `ce-ai skills resolve`.
+
+- [ ] **Task 5: Uninstall Parity & `.gitignore` Maintenance (`uninstall.rs`, `deinit_prj.rs`)**
+  - Add `skills-registry.json` removal to `ce-ai uninstall`.
+  - Add project-local registry stub and `.gitignore` entry cleanup to `ce-ai deinit-prj`.
