@@ -148,6 +148,18 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             });
         }
 
+        // If state has no model assignments yet, populate documented defaults.
+        if state.model_assignments.is_empty() {
+            state.model_assignments = State::default_model_assignments();
+        }
+
+        // Apply state model assignments to target harness config.
+        for (slot, assignment) in &state.model_assignments {
+            let model_str = format!("{}/{}", assignment.provider_id, assignment.model_id);
+            let _ =
+                crate::opencode::config::apply_model_assignment(&target_config, slot, &model_str);
+        }
+
         // Merge plugin entry + skills path into target harness config (OI-2, OI-4).
         let mut mutation = ensure_plugin_and_skills(
             &target_config,
