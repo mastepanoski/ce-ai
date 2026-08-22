@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Adoption Block v2 — Single Source of Truth Guidance**: `init-prj` full-tier blocks now include the SSOT rule (ideation artifacts in `docs/brainstorms/` / `docs/ideation/` are disposable inputs to distill into OpenSpec, never parallel specifications), orchestrator blocks carry a one-line distillation directive, and the block header/state version moved to a shared `BLOCK_VERSION` constant (`v=2`). Re-run `ce-ai init-prj <project> --tier <t>` to upgrade adopted projects; `doctor`/`status` report SHA drift for stale v1 blocks until re-adopted (#adoption-block-ssot-v2).
 - **`ce-ai` Orchestrator Agent Definition**: `install` seeds the structural agent entry (description, `mode: primary`, permissions) into harness configs that support agent maps — **without** `model` or `variant`; those belong to the user (#111).
 - **Harness-Driven Model Discovery**: The TUI model picker lists what the active harness actually offers by querying `opencode models` at runtime; discovery failures surface explicit errors instead of a stale static catalog.
 - **Editable TUI Models Tab**: Slot navigation (`n`/`p`) and live model picker (`m`) applying assignments through the same atomic path as `ce-ai models set`; shows only real assignments plus clear "(not assigned)" placeholders.
