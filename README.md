@@ -41,8 +41,10 @@ That's it — your harnesses are ready for Compound Engineering. Run your first 
 
 | Command | Purpose | Full guide |
 | :--- | :--- | :--- |
+| `ce-ai init-prj [path] [--tier full\|minimal]` | Adopt project with marker-delimited `AGENTS.md` block | [Project Adoption Guide](docs/user-guide/project-adoption-guide.md) |
+| `ce-ai deinit-prj [path]` | Surgically restore pre-adoption file state | [Project Adoption Guide](docs/user-guide/project-adoption-guide.md) |
 | `ce-ai install [--scope workspace\|--scope global]` | Install per harness or workspace-isolated | [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) |
-| `ce-ai status` / `ce-ai doctor` | Inspect installed harnesses and health | — |
+| `ce-ai status` / `ce-ai doctor` | Inspect installed harnesses, adoption & health | — |
 | `ce-ai sync` | Reconcile drift against the SHA256 manifest | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
 | `ce-ai upgrade --to <tag>` | Upgrade the plugin to a release tag | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
 | `ce-ai models set/list/profile …` | Assign models per agent slot, snapshot profiles | [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) |
@@ -54,6 +56,7 @@ That's it — your harnesses are ready for Compound Engineering. Run your first 
 | Document | Audience | Intent |
 | :--- | :--- | :--- |
 | 🚀 [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) | **Beginner** | Tutorial — greenfield setup, first feature, bug fix, resumption |
+| 📁 [Project Adoption Guide](docs/user-guide/project-adoption-guide.md) | Both | How-to — non-destructive AGENTS.md adoption, de-init, tiers |
 | 🎓 [Harnesses, Loops & Context Masterclass](docs/user-guide/harnesses-loops-and-context-masterclass.md) | **Beginner** | Explanation — what a harness is, MCP sidecars, token economics |
 | 🔧 [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) | Both | How-to — scopes, non-destructive JSON merging, discovery |
 | 🔄 [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) | Both | How-to — drift repair, upgrades, rollbacks |

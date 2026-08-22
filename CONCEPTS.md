@@ -33,3 +33,6 @@ A dedicated security threat matrix test suite (`tests/security.rs`) validating p
 
 ### Sub-50ms Performance Benchmark
 A performance test suite (`benches/benchmarks.rs`) guaranteeing that state resolution, workspace override merging, and SHA256 integrity hash calculation complete in under 50 milliseconds.
+
+### Project Adoption Engine
+A non-destructive, fully reversible CLI mechanism (`ce-ai init-prj` / `ce-ai deinit-prj`) that injects marker-delimited workflow instruction blocks (`<!-- ce-ai:block begin ... -->`) into `AGENTS.md` and generates derived reference stubs (`CLAUDE.md`) without overwriting pre-existing user documentation or custom agent settings.
