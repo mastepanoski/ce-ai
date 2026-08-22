@@ -43,28 +43,22 @@ $ProgressPreference = 'SilentlyContinue'
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
 if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-    & curl.exe -fsSL -H "User-Agent: ce-ai-installer/1.0" -o "$TempZip" "$DownloadUrl"
+    & curl.exe -L -A "ce-ai-installer/1.0" -o "$TempZip" "$DownloadUrl"
 }
 
 if (-not (Test-ValidZipFile $TempZip)) {
-    Write-Host "  Trying PowerShell Invoke-WebRequest fallback..." -ForegroundColor Yellow
+    Write-Host "  Trying PowerShell System.Net.WebClient fallback..." -ForegroundColor Yellow
     try {
-        Invoke-WebRequest -Uri "$DownloadUrl" -OutFile "$TempZip" -UserAgent "ce-ai-installer/1.0" -UseBasicParsing -ErrorAction SilentlyContinue
-    } catch {}
+        $WebClient = New-Object System.Net.WebClient
+        $WebClient.Headers.Add("User-Agent", "ce-ai-installer/1.0")
+        $WebClient.DownloadFile($DownloadUrl, $TempZip)
+    } catch {
+        Write-Host "  WebClient Download Error: $_" -ForegroundColor Red
+    }
 }
 
 if (-not (Test-ValidZipFile $TempZip)) {
-    Write-Host "  Trying System.Net.WebClient fallback..." -ForegroundColor Yellow
-    try {
-        $wc = New-Object System.Net.WebClient
-        $wc.Headers.Add("User-Agent", "ce-ai-installer/1.0")
-        $wc.DownloadFile($DownloadUrl, $TempZip)
-    } catch {}
-}
-
-if (-not (Test-ValidZipFile $TempZip)) {
-    Write-Error "❌ Failed to download valid release asset from $DownloadUrl"
-    exit 1
+    throw "❌ Failed to download valid release asset from $DownloadUrl"
 }
 
 Write-Host "📂 Extracting to $InstallDir..." -ForegroundColor Yellow
