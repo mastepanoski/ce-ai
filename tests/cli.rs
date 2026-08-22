@@ -1192,7 +1192,8 @@ fn init_prj_replaces_v1_block_with_v2_preserving_content_and_crlf() {
     assert!(updated_text.contains("### Single Source of Truth Rule"));
 
     let state_text = fs::read_to_string(config_dir.join("state.json")).unwrap();
-    assert!(state_text.contains("\"block_version\":2"));
+    let state_val: serde_json::Value = serde_json::from_str(&state_text).unwrap();
+    assert_eq!(state_val["projects"][0]["block_version"], 2);
 }
 
 #[test]
