@@ -5,18 +5,24 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.0] - 2026-08-22
+## [1.6.0] - 2026-08-22
 
 ### Added
 - **TUI Workflow Panel — Native Action Execution (Issue #76)**: `[Enter]` on the Workflow tab now renders the **real** `ce-ai workflow status` output in the result modal, replacing the previous canned success message. Workflow commands (`status`, `checkpoint`, `resume`) were refactored to return output lines so CLI and TUI share a single source of truth.
 - **Failure-Class Modal**: Native command failures (`CeError`) render as a distinct failure block with an actionable remedy hint instead of failing silently.
 - **Native-vs-Skill Guide Markers**: Stage rows now carry text markers — `[run]` for actions executable inside the dashboard, `skill:` for agent-session stages with their mapped skills — perceivable without color support. The Verify stage copy is tech-neutral ("your project's test/e2e commands").
-- **Adoption Block v2 — Single Source of Truth Guidance**: `init-prj` full-tier blocks now include the SSOT rule (ideation artifacts in `docs/brainstorms/` / `docs/ideation/` are disposable inputs to distill into OpenSpec, never parallel specifications), orchestrator blocks carry a one-line distillation directive, and the block header/state version moved to a shared `BLOCK_VERSION` constant (`v=2`). Re-run `ce-ai init-prj <project> --tier <t>` to upgrade adopted projects; `doctor`/`status` report SHA drift for stale v1 blocks until re-adopted (#adoption-block-ssot-v2).
 - **Teacher-Style Docs**: New explanation page [Workflow Panel: Native vs Agent Skills](docs/user-guide/workflow-panel-native-vs-agent-skills.md) covering why agent stages are guide-only.
 - **OpenSpec Specification**: Documented under `openspec/changes/tui_workflow_stage_exec/`.
 
 ### Changed
 - **Resume keybinding deliberately excluded**: `workflow resume` is currently print-only and adds nothing over `[1-7]` stage checkpoints; binding it would show false success. Real checkpoint-based recovery is recorded as a candidate follow-up.
+
+---
+
+## [1.5.0] - 2026-08-22
+
+### Added
+- **Adoption Block v2 — Single Source of Truth Guidance**: `init-prj` full-tier blocks now include the SSOT rule (ideation artifacts in `docs/brainstorms/` / `docs/ideation/` are disposable inputs to distill into OpenSpec, never parallel specifications), orchestrator blocks carry a one-line distillation directive, and the block header/state version moved to a shared `BLOCK_VERSION` constant (`v=2`). Re-run `ce-ai init-prj <project> --tier <t>` to upgrade adopted projects; `doctor`/`status` report SHA drift for stale v1 blocks until re-adopted (#adoption-block-ssot-v2).
 
 ---
 
