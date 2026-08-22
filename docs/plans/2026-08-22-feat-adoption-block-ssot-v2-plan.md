@@ -1,7 +1,7 @@
 ---
 title: "feat: Adoption Block SSOT Guidance (v2)"
 type: feat
-status: active
+status: completed
 date: 2026-08-22
 origin: docs/brainstorms/2026-08-22-openspec-ssot-adoption-block-requirements.md
 ---
