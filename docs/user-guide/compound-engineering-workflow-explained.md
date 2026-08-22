@@ -81,7 +81,9 @@ flowchart TD
     STAGE2["Stage 2: Specifying"] -->|"Creates design.md and spec.md"| OPENSPEC_DIR
     STAGE3["Stage 3: ce-plan"] -->|"Generates tasks.md checklist"| OPENSPEC_DIR
     STAGE4["Stage 4: ce-work"] -->|"Updates tasks.md and records Spec Deltas"| OPENSPEC_DIR
+    STAGE5["Stage 5: Verification"] -->|"Proves every spec.md WHEN/THEN scenario green"| GATE["Mandatory gate: no ship without green tests"]
     STAGE6["Stage 6: ce-compound"] -->|"Consolidates solution into docs/solutions/"| DOCS_SOLUTIONS["docs/solutions/"]
+    STAGE4 --> STAGE5 --> STAGE6
 ```
 
 | Lifecycle Phase | Active Agent / Command | Files Added / Updated in `openspec/changes/<feature>/` |
@@ -90,6 +92,7 @@ flowchart TD
 | **Specification** | OpenSpec Definition | Creates `design.md` (Structs/APIs) & `spec.md` (`WHEN..THEN`) |
 | **Planning** | `ce-plan` | Reads `spec.md`/`design.md` and generates `tasks.md` |
 | **Development** | `ce-work` | Updates `tasks.md` (`- [x]`) and updates `spec.md` if design changes |
+| **Verification** | Tests / `cargo test` / E2E gates | Proves every `spec.md` WHEN/THEN scenario — non-negotiable before shipping |
 | **Capitalization** | `ce-compound` | Consolidates learnings into permanent `docs/solutions/` |
 
 ---
@@ -106,5 +109,5 @@ flowchart LR
     WORKFLOW_LEVEL["2. Orchestration Level: ce-ai status / TUI Workflow FSM"]
 ```
 
-1. **Granular Task & Code Progress**: Followed directly in `openspec/changes/<feature_name>/tasks.md`. As `ce-work` completes TDD tasks, checkboxes are marked `- [x]`.
+1. **Granular Task & Code Progress**: Followed directly in `openspec/changes/<feature_name>/tasks.md`. As `ce-work` completes TDD tasks, checkboxes are marked `- [x]`. (Checkbox marks inside `docs/plans/*.md` bodies are not progress state — the OpenSpec ledger and git history are.)
 2. **High-Level Workflow Progress**: Followed using `ce-ai status` or the **Workflow (FSM)** tab in the `ce-ai` TUI dashboard, showing which of the 7 stages the project is currently executing.
