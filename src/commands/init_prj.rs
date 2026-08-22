@@ -216,9 +216,7 @@ pub fn run(
             let _ = crate::state::write_atomic(&gitignore_file, updated_gi.as_bytes());
         }
 
-        if let Ok(registry) = crate::source::registry::SkillRegistry::build(ctx) {
-            let _ = registry.save(&ctx.config_dir.join("skills-registry.json"));
-        }
+        let _ = crate::source::registry::SkillRegistry::sync_registry(ctx);
     }
 
     if !ctx.quiet {

@@ -1,3 +1,4 @@
+<!-- Diátaxis Quadrant: Explanation | Audience: Senior / Architecture -->
 # Issue #96: Multi-Harness Skill Registry Engine
 
 ## 1. Overview & Problem

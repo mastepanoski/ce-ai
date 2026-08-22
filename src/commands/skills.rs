@@ -83,8 +83,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                             continue;
                         }
                     }
-                    let desc = if skill.description.len() > 37 {
-                        format!("{}...", &skill.description[..37])
+                    let desc_chars: String = skill.description.chars().take(37).collect();
+                    let desc = if skill.description.chars().count() > 37 {
+                        format!("{}...", desc_chars)
                     } else {
                         skill.description.clone()
                     };
