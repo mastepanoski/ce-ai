@@ -33,9 +33,20 @@ $TempZip = Join-Path $env:TEMP $AssetName
 
 function Test-ValidZipFile($Path) {
     if (-not (Test-Path $Path)) { return $false }
-    $item = Get-Item $Path -ErrorAction SilentlyContinue
-    if ($null -eq $item -or $item.Length -lt 1000) { return $false }
-    return $true
+    try {
+        $item = Get-Item $Path -ErrorAction SilentlyContinue
+        if ($null -eq $item -or $item.Length -lt 1000) { return $false }
+        $fs = [System.IO.File]::OpenRead($Path)
+        $buffer = New-Object byte[] 2
+        $bytesRead = $fs.Read($buffer, 0, 2)
+        $fs.Close()
+        if ($bytesRead -eq 2 -and $buffer[0] -eq 80 -and $buffer[1] -eq 75) {
+            return $true
+        }
+        return $false
+    } catch {
+        return $false
+    }
 }
 
 Write-Host "📦 Downloading $AssetName from $DownloadUrl..." -ForegroundColor Yellow
@@ -43,12 +54,13 @@ $ProgressPreference = 'SilentlyContinue'
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
 if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-    & curl.exe -L -A "ce-ai-installer/1.0" -o "$TempZip" "$DownloadUrl"
+    & curl.exe -fsSL -o "$TempZip" "$DownloadUrl"
 }
 
 if (-not (Test-ValidZipFile $TempZip)) {
     Write-Host "  Trying PowerShell System.Net.WebClient fallback..." -ForegroundColor Yellow
     try {
+        if (Test-Path $TempZip) { Remove-Item $TempZip -Force }
         $WebClient = New-Object System.Net.WebClient
         $WebClient.Headers.Add("User-Agent", "ce-ai-installer/1.0")
         $WebClient.DownloadFile($DownloadUrl, $TempZip)
