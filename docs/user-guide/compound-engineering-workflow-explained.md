@@ -77,11 +77,11 @@ OpenSpec is **not a static document written once**. It is a **living directory (
 
 ```mermaid
 flowchart TD
-    STAGE1["Stage 1: ce-brainstorm"] -->|Creates proposal.md & exploration.md| OPENSPEC_DIR["openspec/changes/&lt;feature_name&gt;/"]
-    STAGE2["Stage 2: Specifying"] -->|Creates design.md & spec.md (WHEN...THEN)| OPENSPEC_DIR
-    STAGE3["Stage 3: ce-plan"] -->|Generates tasks.md checklist| OPENSPEC_DIR
-    STAGE4["Stage 4: ce-work"] -->|Updates tasks.md [-x] & records Spec Deltas| OPENSPEC_DIR
-    STAGE6["Stage 6: ce-compound"] -->|Consolidates solution into docs/solutions/| DOCS_SOLUTIONS["docs/solutions/"]
+    STAGE1["Stage 1: ce-brainstorm"] -->|"Creates proposal.md and exploration.md"| OPENSPEC_DIR["openspec/changes/feature_name/"]
+    STAGE2["Stage 2: Specifying"] -->|"Creates design.md and spec.md"| OPENSPEC_DIR
+    STAGE3["Stage 3: ce-plan"] -->|"Generates tasks.md checklist"| OPENSPEC_DIR
+    STAGE4["Stage 4: ce-work"] -->|"Updates tasks.md and records Spec Deltas"| OPENSPEC_DIR
+    STAGE6["Stage 6: ce-compound"] -->|"Consolidates solution into docs/solutions/"| DOCS_SOLUTIONS["docs/solutions/"]
 ```
 
 | Lifecycle Phase | Active Agent / Command | Files Added / Updated in `openspec/changes/<feature>/` |
@@ -94,7 +94,7 @@ flowchart TD
 
 ---
 
-## 📊 4. How Do I Track Progress?
+## 📊 5. How Do I Track Progress?
 
 Newcomers often ask: *"Where do I check the progress of my feature?"*
 
@@ -102,8 +102,8 @@ Progress is tracked at **two complementary levels**:
 
 ```mermaid
 flowchart LR
-    TASK_LEVEL["1. Task & Code Level<br/>openspec/changes/&lt;feature&gt;/tasks.md<br/>(Checklist items - [x] Task completed)"]
-    WORKFLOW_LEVEL["2. Orchestration Level<br/>ce-ai status / TUI Workflow FSM<br/>(7-Stage Lifecycle Position)"]
+    TASK_LEVEL["1. Task & Code Level: openspec/changes/feature/tasks.md"]
+    WORKFLOW_LEVEL["2. Orchestration Level: ce-ai status / TUI Workflow FSM"]
 ```
 
 1. **Granular Task & Code Progress**: Followed directly in `openspec/changes/<feature_name>/tasks.md`. As `ce-work` completes TDD tasks, checkboxes are marked `- [x]`.
