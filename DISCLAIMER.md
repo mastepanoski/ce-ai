@@ -19,7 +19,7 @@ As a result, some capabilities may reflect opinions tuned for specific workflows
 - **No warranty of fitness**: `ce-ai` modifies files under your AI harness configuration directories (`opencode.json`, `AGENTS.md`, plugin folders). While every mutation is backed up and reversible (`--dry-run`, `ce-ai uninstall`), you use this tool at your own risk.
 - **Verify before trusting**: Always review diffs before applying changes, especially on machines with hand-tuned agent configurations.
 - **Human accountability remains yours**: Per our [AI Policy](./AI_POLICY.md), the human operator retains ultimate authority and responsibility over all changes applied by or through AI agents.
-- **Expect breaking changes**: Until a stable 1.0 release, SemVer bumps may introduce breaking changes between minor versions.
+- **Version numbers do not imply stability**: although `ce-ai` follows SemVer and has passed the 1.0 mark, it remains experimental software; breaking changes may land in any release regardless of whether the version bump is major or minor. Review the [CHANGELOG](./CHANGELOG.md) before upgrading.
 
 ## Transparency Statement
 
