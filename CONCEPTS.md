@@ -26,7 +26,7 @@ A real-time background watcher loop (`ce-ai sync --watch`) that monitors managed
 A repository-local configuration file located in the working directory or Git root that overrides specific global settings (e.g. model assignments per slot) with higher precedence than `~/.config/ce-ai/state.json`.
 
 ### Universal One-Line Installer
-A zero-dependency installation script (`scripts/install.sh` / `scripts/install.ps1`) that auto-detects host OS and CPU architecture, fetches pre-compiled release binaries from GitHub, and installs them directly into `~/.ce-ai/bin/`.
+A zero-dependency installation script (`scripts/install.sh` / `scripts/install.ps1`) that auto-detects host OS and CPU architecture, fetches pre-compiled release binaries from GitHub via `.NET HttpWebRequest` stream copying with auto-redirect handling, uses 100% ASCII-compatible encoding for legacy PowerShell 5.1 stability, and installs them directly into `~/.ce-ai/bin/`.
 
 ### ISO 27001 Security Audit Suite
 A dedicated security threat matrix test suite (`tests/security.rs`) validating path traversal payload rejection and zero-byte tempfile residue across atomic file operations.
