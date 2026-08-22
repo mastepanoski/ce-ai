@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-08-22
+
+### Added
+- **Multi-Harness Skill Registry Engine (`ce-ai skills`)**: Harness-neutral JSON index (`~/.ce-ai/skills-registry.json`) indexing and resolving skills across 12 AI coding agent harnesses (Issue #96).
+- **Dual-Format Prompt Resolution**: `ce-ai skills resolve --harness <kind> --query <query> [--json]` generating sub-agent prompt blocks (`## Skills to load...`) with resolution-time SHA256 integrity checks and explicit degradation tags (`paths-injected` | `fallback-fuzzy` | `none`).
+- **Security Canonicalization Boundary**: Strict path canonicalization rejecting relative path traversals (`../`) or symlinks escaping authorized skill roots (`R3`).
+- **YAML Frontmatter Extraction**: Header parser for `SKILL.md` files supporting YAML list bullet syntax (`- trigger`).
+- **Lifecycle Integration & `--dry-run` Invariants**: Automatic index building and refresh during `install`, `sync`, `upgrade`, and `init-prj` (gated behind `if !ctx.dry_run`).
+- **Sentinel `.gitignore` & Uninstall Parity**: `deinit-prj` and `uninstall` cleanly remove registry files, temporary `.tmp*` artifacts, project stubs, and sentinel-bounded `.gitignore` entries (`# BEGIN CE-AI MANAGED BLOCK` / `# END CE-AI MANAGED BLOCK`).
+- **Diagnostic Health Probes**: Wired `skill-registry-integrity` probe into `ce-ai doctor` and created `ce-ai skills doctor` alias.
+
 ---
 
 ## [1.3.0] - 2026-08-22
