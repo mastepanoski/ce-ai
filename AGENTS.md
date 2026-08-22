@@ -37,6 +37,8 @@ src/
 └── commands/          # Subcommand implementations
     ├── mod.rs         # Shared Context struct
     ├── install.rs     # ce-ai install implementation
+    ├── init_prj.rs    # ce-ai init-prj project adoption implementation
+    ├── deinit_prj.rs  # ce-ai deinit-prj project de-adoption implementation
     ├── sync.rs        # ce-ai sync implementation
     ├── upgrade.rs     # ce-ai upgrade implementation
     ├── models.rs      # ce-ai models set/list/profile implementation

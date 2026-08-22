@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-08-22
+
+### Added
+- **Project Adoption Engine (`ce-ai init-prj` / `ce-ai deinit-prj`)**: Implemented non-destructive, reversible project adoption engine injecting HTML marker-delimited managed blocks (`<!-- ce-ai:block begin ... -->`) into `AGENTS.md` without modifying pre-existing user documentation.
+- **Derived Harness Stubs**: Automatically generates derived `CLAUDE.md` reference stubs (`@AGENTS.md`) for sub-harnesses that support file inclusion primitives.
+- **Adoption Registry & Backward Compatibility**: Extended `State` in `state.json` with `pub projects: Vec<ProjectAdoptionEntry>` using `#[serde(default, skip_serializing_if = "Vec::is_empty")]` for zero schema breakage.
+- **Observability & Diagnostics**: Integrated project adoption health probes and SHA256 block drift detection into `ce-ai status` and `ce-ai doctor`.
+- **TUI Shortcut**: Added `[I] Init Prj` shortcut in the interactive TUI dashboard.
+- **Documentation**: Published educational [Project Adoption Engine User Guide](docs/user-guide/project-adoption-guide.md) and technical solution doc [`project-adoption-engine-init-and-deinit-prj.md`](docs/solutions/architecture/project-adoption-engine-init-and-deinit-prj.md).
+
+---
+
 ## [1.0.8] - 2026-08-21
 
 ### Fixed
