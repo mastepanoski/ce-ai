@@ -89,9 +89,92 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
             let root_str = String::from_utf8_lossy(&repo_root.stdout)
                 .trim()
                 .to_string();
-            let codegraph_dir = std::path::Path::new(&root_str).join(".codegraph");
+            let root_path = std::path::Path::new(&root_str);
+
+            let codegraph_dir = root_path.join(".codegraph");
             if !codegraph_dir.exists() {
                 println!("doctor-info: codegraph index (.codegraph/) not initialized");
+            }
+
+            // Git Hooks Health Probe
+            if let Ok(hooks_output) = std::process::Command::new("git")
+                .args(["config", "--get", "core.hooksPath"])
+                .current_dir(root_path)
+                .output()
+            {
+                if hooks_output.status.success() {
+                    let hooks_val = String::from_utf8_lossy(&hooks_output.stdout)
+                        .trim()
+                        .to_string();
+                    let hooks_path = std::path::Path::new(&hooks_val);
+                    if !hooks_val.ends_with(".githooks")
+                        && hooks_path.file_name() != Some(std::ffi::OsStr::new(".githooks"))
+                    {
+                        findings.push(format!(
+                            "git-hooks: core.hooksPath set to '{}', expected '.githooks'",
+                            hooks_val
+                        ));
+                    } else {
+                        let pre_commit = root_path.join(".githooks").join("pre-commit");
+                        if !pre_commit.exists() {
+                            findings.push("git-hooks: .githooks/pre-commit missing".into());
+                        }
+                    }
+                } else {
+                    println!("doctor-info: git-hooks core.hooksPath not set");
+                }
+            }
+
+            // GitHub Branch Protection Health Probe
+            let remote_url = std::process::Command::new("git")
+                .args(["remote", "get-url", "origin"])
+                .current_dir(root_path)
+                .output();
+
+            let is_github = remote_url
+                .map(|o| {
+                    o.status.success() && String::from_utf8_lossy(&o.stdout).contains("github.com")
+                })
+                .unwrap_or(false);
+
+            let gh_authenticated = std::process::Command::new("gh")
+                .args(["auth", "status"])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+
+            if is_github && gh_authenticated {
+                let repo_name = std::process::Command::new("gh")
+                    .args([
+                        "repo",
+                        "view",
+                        "--json",
+                        "nameWithOwner",
+                        "-q",
+                        ".nameWithOwner",
+                    ])
+                    .current_dir(root_path)
+                    .output();
+
+                if let Ok(repo_out) = repo_name {
+                    if repo_out.status.success() {
+                        let repo_str = String::from_utf8_lossy(&repo_out.stdout).trim().to_string();
+                        let prot_check = std::process::Command::new("gh")
+                            .args([
+                                "api",
+                                &format!("repos/{}/branches/main/protection", repo_str),
+                            ])
+                            .output();
+
+                        if let Ok(prot_out) = prot_check {
+                            if !prot_out.status.success() {
+                                findings.push(format!("branch-protection: main branch protection missing or unconfigured on {}", repo_str));
+                            }
+                        }
+                    }
+                }
+            } else if is_github {
+                println!("doctor-info: gh CLI unauthenticated or offline, skipping branch protection probe");
             }
         }
     }
