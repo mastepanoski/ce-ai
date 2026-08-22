@@ -201,6 +201,11 @@ pub(crate) fn sync_with(
             println!("sync: imported model {slot} = {model}");
         }
     }
+    for slot in crate::commands::models::purge_stale_assignments(&mut state, &config) {
+        if !ctx.quiet {
+            println!("sync: purged stale assignment {slot}");
+        }
+    }
     state.save(&state_path)?;
 
     if !ctx.dry_run {

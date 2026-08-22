@@ -86,8 +86,8 @@ struct App {
     dry_run: bool,
     harnesses: Vec<(String, String, String)>, // (name, version, source)
     detected_harnesses: Vec<HarnessKind>,
-    model_assignments: Vec<(String, String)>, // (slot, model)
-    model_slots: Vec<String>,                 // editable slots (defaults + tracked)
+    model_scope: Vec<(String, String)>, // live agent.<slot>.model for the selected harness
+    model_slots: Vec<String>,           // editable slots (CE slots ∪ scoped config slots)
     selected_model_idx: usize,
     model_picker_open: bool,
     picker_items: Vec<String>,
@@ -106,7 +106,7 @@ impl App {
             dry_run: ctx.dry_run,
             harnesses: Vec::new(),
             detected_harnesses: Vec::new(),
-            model_assignments: Vec::new(),
+            model_scope: Vec::new(),
             model_slots: Vec::new(),
             selected_model_idx: 0,
             model_picker_open: false,
@@ -162,7 +162,7 @@ impl App {
     fn reload_state(&mut self, ctx: &Context) {
         self.harnesses.clear();
         self.detected_harnesses.clear();
-        self.model_assignments.clear();
+        self.model_scope.clear();
         self.model_slots.clear();
 
         if let Ok(home) = std::env::var("HOME") {
@@ -182,20 +182,19 @@ impl App {
                 seen.insert(name.clone());
                 self.harnesses.push((name, version, source));
             }
-            for (slot, model_info) in &state.model_assignments {
-                self.model_assignments.push((
-                    slot.clone(),
-                    format!("{}/{}", model_info.provider_id, model_info.model_id),
-                ));
-            }
         }
 
+        // Models tab reflects the LIVE config of the selected harness — the
+        // display source of truth is the harness config, never stale state.
+        let scope = self.selected_harness_target().to_string();
+        self.model_scope = crate::commands::models::config_assignments(ctx, &scope);
+
         // Editable slot list: CE workflow slots first (structural orchestrator
-        // + tracked stage slots), then any extra user-assigned slot.
+        // + tracked stage slots), then any extra slot present in the config.
         for slot in crate::harness::agents::CE_AGENT_SLOTS {
             self.model_slots.push(slot.to_string());
         }
-        for (slot, _) in &self.model_assignments {
+        for (slot, _) in &self.model_scope {
             if !self.model_slots.contains(slot) {
                 self.model_slots.push(slot.clone());
             }
@@ -296,15 +295,17 @@ fn run_app(
                         KeyCode::Enter => {
                             let slot = app.model_slots[app.selected_model_idx].clone();
                             let model = app.picker_items[app.picker_selected].clone();
+                            let harness = app.selected_harness_target().to_string();
                             app.model_picker_open = false;
-                            let lines = match crate::commands::models::set(ctx, &slot, &model) {
-                                Ok(()) => vec![
-                                    format!("✅ Set {slot} = {model}"),
-                                    "Applied atomically to opencode.json and state.json."
-                                        .to_string(),
-                                ],
-                                Err(err) => vec![format!("❌ Failed to set {slot}: {err}")],
-                            };
+                            let lines =
+                                match crate::commands::models::set(ctx, &harness, &slot, &model) {
+                                    Ok(()) => vec![
+                                        format!("✅ Set {harness}/{slot} = {model}"),
+                                        "Applied atomically to the harness config and state.json."
+                                            .to_string(),
+                                    ],
+                                    Err(err) => vec![format!("❌ Failed to set {slot}: {err}")],
+                                };
                             execute_action(app, "Model Assignment", move || lines);
                         }
                         _ => {}
@@ -324,31 +325,34 @@ fn run_app(
                         KeyCode::Char('p') | KeyCode::Char('K') => {
                             app.selected_model_idx = app.selected_model_idx.saturating_sub(1);
                         }
-                        KeyCode::Char('m') => match crate::commands::models::discover_models() {
-                            Ok(mut models) => {
-                                if let Some((_, current)) =
-                                    app.model_assignments.iter().find(|(s, _)| {
-                                        Some(s.as_str())
-                                            == app
-                                                .model_slots
-                                                .get(app.selected_model_idx)
-                                                .map(String::as_str)
-                                    })
-                                {
-                                    if !models.contains(current) {
-                                        models.insert(0, current.clone());
+                        KeyCode::Char('m') => {
+                            let harness = app.selected_harness_target().to_string();
+                            match crate::commands::models::discover_models(&harness) {
+                                Ok(mut models) => {
+                                    if let Some((_, current)) =
+                                        app.model_scope.iter().find(|(s, _)| {
+                                            Some(s.as_str())
+                                                == app
+                                                    .model_slots
+                                                    .get(app.selected_model_idx)
+                                                    .map(String::as_str)
+                                        })
+                                    {
+                                        if !models.contains(current) {
+                                            models.insert(0, current.clone());
+                                        }
                                     }
+                                    app.picker_items = models;
+                                    app.picker_selected = 0;
+                                    app.model_picker_open = true;
                                 }
-                                app.picker_items = models;
-                                app.picker_selected = 0;
-                                app.model_picker_open = true;
+                                Err(err) => {
+                                    execute_action(app, "Model Discovery Failed", move || {
+                                        vec![format!("❌ {err}")]
+                                    });
+                                }
                             }
-                            Err(err) => {
-                                execute_action(app, "Model Discovery Failed", move || {
-                                    vec![format!("❌ {err}")]
-                                });
-                            }
-                        },
+                        }
                         _ => {}
                     }
                 }
@@ -574,7 +578,10 @@ fn render_picker(f: &mut ratatui::Frame, app: &App) {
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(" Pick model for '{slot}' "))
+        .title(format!(
+            " Pick model for '{slot}' ({}) ",
+            app.selected_harness_target()
+        ))
         .border_style(Style::default().fg(Color::Cyan));
 
     let items: Vec<Line> = app
@@ -688,10 +695,29 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
             )),
         ],
         MenuTab::Models => {
+            let harness = app.selected_harness_target().to_string();
             let mut lines = vec![
                 Line::from(Span::styled("Agent Model Assignments (editable):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+                Line::from(vec![
+                    Span::raw("  Harness scope: "),
+                    Span::styled(
+                        format!("[ {harness} ]"),
+                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        "  (switch with ◄/► or h/l)",
+                        Style::default().fg(Color::Gray),
+                    ),
+                ]),
                 Line::from(""),
             ];
+            if !crate::commands::models::discovery_supported(&harness) {
+                lines.push(Line::from(Span::styled(
+                    "  ⚠ no live catalog discovery for this harness yet; assign via CLI",
+                    Style::default().fg(Color::Yellow),
+                )));
+                lines.push(Line::from(""));
+            }
             if app.model_slots.is_empty() {
                 lines.push(Line::from(Span::raw("  (No editable slots — run install first)")));
             } else {
@@ -699,7 +725,7 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
                     let selected = idx == app.selected_model_idx;
                     let prefix = if selected { "👉 " } else { "   " };
                     let model = app
-                        .model_assignments
+                        .model_scope
                         .iter()
                         .find(|(s, _)| s == slot)
                         .map(|(_, m)| m.clone())
@@ -722,7 +748,7 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
                 Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
             )));
             lines.push(Line::from(Span::styled(
-                "CLI: ce-ai models set <slot> <provider/model>",
+                "CLI: ce-ai models set --harness <harness> <slot> <provider/model>",
                 Style::default().fg(Color::Gray),
             )));
             lines

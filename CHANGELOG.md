@@ -51,6 +51,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- **Models Tab Shows Live Harness Config**: The TUI Models tab now reads assignments from the selected harness's config file (switch scope with ◄/►) instead of stale `state.json` entries — deleting a model from `opencode.json` is immediately reflected (#111).
+- **Per-Harness Model Picker**: Pressing `m` discovers models for the harness in scope; harnesses without a catalog CLI fail explicitly instead of showing opencode's list.
+- **`models set` Harness Targeting**: New `--harness` flag writes the assignment to the chosen harness's agent-capable config (`ce-ai models set --harness claude <slot> <provider/model>`).
+- **Stale State Purge on Sync**: `sync` now removes state assignments whose slot was deleted from the harness config — config wins in both directions.
+
+---
+
 ## [1.3.0] - 2026-08-22
 
 ### Added
