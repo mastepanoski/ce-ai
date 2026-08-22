@@ -89,9 +89,13 @@ struct App {
     harnesses: Vec<(String, String, String)>, // (name, version, source)
     detected_harnesses: Vec<HarnessKind>,
     model_assignments: Vec<(String, String)>, // (slot, model)
+    model_slots: Vec<String>,                 // editable slots (defaults + tracked)
+    selected_model_idx: usize,
+    model_picker_open: bool,
+    picker_items: Vec<String>,
+    picker_selected: usize,
     output_modal: Option<(String, Vec<String>)>, // (title, lines)
     selected_harness_idx: usize,
-    selected_model_idx: usize,
     harness_targets: Vec<String>,
     selected_backup_idx: usize,
     backups: Vec<crate::state::backups::BackupEntry>,
@@ -105,9 +109,13 @@ impl App {
             harnesses: Vec::new(),
             detected_harnesses: Vec::new(),
             model_assignments: Vec::new(),
+            model_slots: Vec::new(),
+            selected_model_idx: 0,
+            model_picker_open: false,
+            picker_items: Vec::new(),
+            picker_selected: 0,
             output_modal: None,
             selected_harness_idx: 0,
-            selected_model_idx: 0,
             selected_backup_idx: 0,
             backups: Vec::new(),
             harness_targets: vec![
@@ -157,6 +165,7 @@ impl App {
         self.harnesses.clear();
         self.detected_harnesses.clear();
         self.model_assignments.clear();
+        self.model_slots.clear();
 
         if let Ok(home) = std::env::var("HOME") {
             self.detected_harnesses =
@@ -181,6 +190,20 @@ impl App {
                     format!("{}/{}", model_info.provider_id, model_info.model_id),
                 ));
             }
+        }
+
+        // Editable slot list: documented defaults first, then any extra
+        // tracked slots (models-defaults-tui-orchestrator).
+        for (slot, _) in crate::commands::models::DEFAULT_MODEL_ASSIGNMENTS {
+            self.model_slots.push(slot.to_string());
+        }
+        for (slot, _) in &self.model_assignments {
+            if !self.model_slots.contains(slot) {
+                self.model_slots.push(slot.clone());
+            }
+        }
+        if self.selected_model_idx >= self.model_slots.len() {
+            self.selected_model_idx = self.model_slots.len().saturating_sub(1);
         }
 
         // Auto-probe host harnesses for compound-engineering installations
@@ -259,6 +282,77 @@ fn run_app(
                     app.output_modal = None;
                     app.reload_state(ctx);
                     continue;
+                }
+
+                if app.model_picker_open {
+                    match key.code {
+                        KeyCode::Esc => app.model_picker_open = false,
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            app.picker_selected = app.picker_selected.saturating_sub(1);
+                        }
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            if app.picker_selected + 1 < app.picker_items.len() {
+                                app.picker_selected += 1;
+                            }
+                        }
+                        KeyCode::Enter => {
+                            let slot = app.model_slots[app.selected_model_idx].clone();
+                            let model = app.picker_items[app.picker_selected].clone();
+                            app.model_picker_open = false;
+                            let lines = match crate::commands::models::set(ctx, &slot, &model) {
+                                Ok(()) => vec![
+                                    format!("✅ Set {slot} = {model}"),
+                                    "Applied atomically to opencode.json and state.json."
+                                        .to_string(),
+                                ],
+                                Err(err) => vec![format!("❌ Failed to set {slot}: {err}")],
+                            };
+                            execute_action(app, "Model Assignment", move || lines);
+                        }
+                        _ => {}
+                    }
+                    continue;
+                }
+
+                if app.current_tab() == MenuTab::Models {
+                    match key.code {
+                        KeyCode::Char('n') | KeyCode::Char('J') => {
+                            if !app.model_slots.is_empty()
+                                && app.selected_model_idx + 1 < app.model_slots.len()
+                            {
+                                app.selected_model_idx += 1;
+                            }
+                        }
+                        KeyCode::Char('p') | KeyCode::Char('K') => {
+                            app.selected_model_idx = app.selected_model_idx.saturating_sub(1);
+                        }
+                        KeyCode::Char('m') => match crate::commands::models::discover_models() {
+                            Ok(mut models) => {
+                                if let Some((_, current)) =
+                                    app.model_assignments.iter().find(|(s, _)| {
+                                        Some(s.as_str())
+                                            == app
+                                                .model_slots
+                                                .get(app.selected_model_idx)
+                                                .map(String::as_str)
+                                    })
+                                {
+                                    if !models.contains(current) {
+                                        models.insert(0, current.clone());
+                                    }
+                                }
+                                app.picker_items = models;
+                                app.picker_selected = 0;
+                                app.model_picker_open = true;
+                            }
+                            Err(err) => {
+                                execute_action(app, "Model Discovery Failed", move || {
+                                    vec![format!("❌ {err}")]
+                                });
+                            }
+                        },
+                        _ => {}
+                    }
                 }
 
                 match key.code {
@@ -500,6 +594,49 @@ fn ui(f: &mut ratatui::Frame, app: &App, ctx: &Context) {
     if let Some((ref title, ref lines)) = app.output_modal {
         render_modal(f, title, lines);
     }
+
+    // 5. Model Picker Modal (if active)
+    if app.model_picker_open {
+        render_picker(f, app);
+    }
+}
+
+fn render_picker(f: &mut ratatui::Frame, app: &App) {
+    let slot = app
+        .model_slots
+        .get(app.selected_model_idx)
+        .cloned()
+        .unwrap_or_default();
+    let area = centered_rect(60, 70, f.area());
+    f.render_widget(Clear, area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" Pick model for '{slot}' "))
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let items: Vec<Line> = app
+        .picker_items
+        .iter()
+        .enumerate()
+        .map(|(idx, model)| {
+            let selected = idx == app.picker_selected;
+            Line::from(Span::styled(
+                format!(" {model}"),
+                if selected {
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::White)
+                },
+            ))
+        })
+        .collect();
+
+    let p = Paragraph::new(items).block(block);
+    f.render_widget(p, area);
 }
 
 fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Context) {
@@ -620,29 +757,42 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
         ],
         MenuTab::Models => {
             let mut lines = vec![
-                Line::from(Span::styled("Current Agent Model Assignments:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+                Line::from(Span::styled("Agent Model Assignments (editable):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
                 Line::from(""),
             ];
-            if app.model_assignments.is_empty() {
-                lines.push(Line::from(Span::raw("  (Default harness model configurations)")));
+            if app.model_slots.is_empty() {
+                lines.push(Line::from(Span::raw("  (No editable slots — run install first)")));
             } else {
-                for (idx, (slot, model)) in app.model_assignments.iter().enumerate() {
+                for (idx, slot) in app.model_slots.iter().enumerate() {
                     let selected = idx == app.selected_model_idx;
-                    let prefix = if selected { " 👉 " } else { "    " };
-                    let style = if selected {
-                        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default().fg(Color::White)
-                    };
+                    let prefix = if selected { "👉 " } else { "   " };
+                    let model = app
+                        .model_assignments
+                        .iter()
+                        .find(|(s, _)| s == slot)
+                        .map(|(_, m)| m.clone())
+                        .unwrap_or_else(|| "(unset)".to_string());
                     lines.push(Line::from(vec![
                         Span::styled(prefix, Style::default().fg(Color::Green)),
-                        Span::styled(format!("{slot}: "), Style::default().fg(Color::Cyan)),
-                        Span::styled(model, style),
+                        Span::styled(
+                            format!("{slot}: "),
+                            Style::default()
+                                .fg(Color::Cyan)
+                                .add_modifier(if selected { Modifier::BOLD } else { Modifier::empty() }),
+                        ),
+                        Span::styled(model, Style::default().fg(Color::White)),
                     ]));
                 }
             }
             lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled("Press [↑/↓/j/k] to navigate slots, [Enter] to run models list/set.", Style::default().fg(Color::Gray))));
+            lines.push(Line::from(Span::styled(
+                "Keys: [n/p] select slot · [m] pick model from harness catalog · [Enter] list assignments",
+                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(Span::styled(
+                "CLI: ce-ai models set <slot> <provider/model>",
+                Style::default().fg(Color::Gray),
+            )));
             lines
         }
         MenuTab::Sync => vec![

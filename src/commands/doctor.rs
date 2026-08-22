@@ -50,27 +50,12 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
             .push("state-inconsistent: opencode state entry and install manifest disagree".into());
     }
 
-    // Model Assignment Drift Probe
-    if opencode_json.exists() {
-        if let Ok(config_json) = read_config(&opencode_json) {
-            if let Some(agents) = config_json.get("agent").and_then(|a| a.as_object()) {
-                for (slot, val) in agents {
-                    if let Some(model_str) = val.get("model").and_then(|m| m.as_str()) {
-                        if !model_str.is_empty() {
-                            let state_model = state
-                                .model_assignments
-                                .get(slot)
-                                .map(|a| format!("{}/{}", a.provider_id, a.model_id));
-                            if state_model.as_deref() != Some(model_str) {
-                                findings.push(format!(
-                                    "model-assignment-drift: slot '{slot}' configured as '{model_str}' in opencode.json but unrecorded or mismatched in state.json (run 'ce-ai sync' to reconcile)"
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    // Model assignment drift between state.json and opencode.json (#111).
+    // An invalid config is already reported above; treat it as empty here.
+    if let Ok(config) = read_config(&opencode_json) {
+        findings.extend(crate::commands::models::model_drift_findings(
+            &state, &config,
+        ));
     }
 
     // Project adoption health checks

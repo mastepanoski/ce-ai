@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Harness-Driven Model Discovery**: The TUI model picker lists what the active harness actually offers by querying `opencode models` at runtime; discovery failures surface explicit errors instead of a stale static catalog.
+- **Editable TUI Models Tab**: Slot navigation (`n`/`p`) and live model picker (`m`) applying assignments through the same atomic path as `ce-ai models set`.
+
+### Fixed
+- **Never-Clobber Defaults on Install**: Install no longer overwrites user-configured `agent.<slot>` models when seeding defaults — slots already present in `opencode.json` or tracked in `state.json` are skipped (#111).
+- **Config-Wins Drift Import**: `ce-ai sync` no longer pushes stale state back over user-edited `opencode.json`; it only imports effective config assignments into state (config is the live truth) (#111).
+
+---
+
 ## [1.2.2] - 2026-08-22
 
 ### Fixed
