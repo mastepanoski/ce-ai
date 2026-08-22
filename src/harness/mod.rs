@@ -294,6 +294,16 @@ impl fmt::Display for HarnessKind {
 pub trait HarnessAdapter {
     fn kind(&self) -> HarnessKind;
     fn default_config_path(&self, home: &Path) -> PathBuf;
+
+    /// Primary instruction file name managed by this harness (default: AGENTS.md).
+    fn canonical_instruction_file(&self) -> PathBuf {
+        PathBuf::from("AGENTS.md")
+    }
+
+    /// Derived reference stub files (e.g. CLAUDE.md) associated with this harness.
+    fn derived_stub_files(&self) -> Vec<PathBuf> {
+        vec![]
+    }
 }
 
 #[cfg(test)]
