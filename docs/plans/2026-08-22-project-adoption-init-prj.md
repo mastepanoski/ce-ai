@@ -30,13 +30,13 @@ src/
 
 ### Stage 1: Core Schemas & Harness Trait Extensions
 - [ ] Add `AdoptionTier` enum and `ProjectAdoptionEntry` struct to `src/state/state.rs`.
-- [ ] Add `projects: Vec<ProjectAdoptionEntry>` array to `State` struct in `src/state/state.rs`.
-- [ ] Extend `HarnessAdapter` trait in `src/harness/mod.rs` with `canonical_instruction_file()` and `derived_stub_files()`.
+- [ ] Add `pub projects: Vec<ProjectAdoptionEntry>` array to `State` struct in `src/state/state.rs` decorated with `#[serde(default, skip_serializing_if = "Vec::is_empty")]` for 100% backwards compatibility with legacy state files.
+- [ ] Extend `HarnessAdapter` trait in `src/harness/mod.rs` with `canonical_instruction_file()` and `derived_stub_files()`, providing sensible default trait implementations (`AGENTS.md` and `vec![]`).
 
 ### Stage 2: Subcommands `ce-ai init-prj` & `ce-ai deinit-prj`
 - [ ] Implement CLI flag parsing for `InitPrj` (`--tier`, `--force`) and `DeinitPrj` in `src/main.rs`.
 - [ ] Implement `src/commands/init_prj.rs`:
-  - Resolve project root via `git rev-parse`.
+  - Resolve project root via `git rev-parse` and enforce `PathBuf::canonicalize` boundary checks.
   - Enclose template block in `<!-- ce-ai:block begin v=1 tier=... -->` and `<!-- ce-ai:block end -->`.
   - Write files and update `state.json` via `write_atomic`.
 - [ ] Implement `src/commands/deinit_prj.rs`:
@@ -53,6 +53,6 @@ src/
 - [ ] Package slash command `/ce-ai-init-prj` and skill `ce-ai-init-prj` for OpenCode harness.
 
 ### Stage 5: Verification & Governance
-- [ ] Add CLI integration tests in `tests/cli.rs` verifying byte-for-byte roundtrip `init-prj` ➔ `deinit-prj`.
+- [ ] Add CLI integration tests in `tests/cli.rs` verifying byte-for-byte roundtrip `init-prj` ➔ `deinit-prj`, including CRLF line ending preservation, pre-existing content isolation, and zero-diff idempotency.
 - [ ] Run `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test`, and `make e2e`.
 - [ ] Update `README.md`, `ROADMAP.md`, `CONCEPTS.md`, and `CHANGELOG.md`.
