@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.8] - 2026-08-21
+
+### Fixed
+- **Windows PowerShell Installer (`scripts/install.ps1`)**: Added `.NET` `HttpWebRequest` stream copy fallback with `AllowAutoRedirect` and replaced non-ASCII multi-byte emojis to prevent encoding syntax corruption in Windows PowerShell 5.1.
+
+---
+
 ## [1.0.7] - 2026-08-21
 
 ### Fixed
