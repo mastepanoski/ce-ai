@@ -10,12 +10,12 @@ Forgetting this step leaves Homebrew users pinned to stale versions.
 
 ## In Scope
 
-- A GitHub Actions workflow (`.github/workflows/bump-homebrew.yml`) that runs
-  when a release is published.
-- The workflow downloads the four platform tarballs from the release,
-  computes their SHA256 digests, renders `Formula/ce-ai.rb`, and pushes it to
-  the tap repository.
-- Manual re-run support via `workflow_dispatch` with an explicit tag input.
+- A self-updating workflow in the tap repository
+  (`homebrew-ce-ai/.github/workflows/self-update.yml`) that polls ce-ai
+  releases on a schedule and updates the formula using the tap's own
+  `GITHUB_TOKEN` — no cross-repo PAT required.
+- Pinning the v1.0.8 SHA256 checksums in this repo's local
+  `Formula/ce-ai.rb` (source of truth for the template).
 
 ## Out of Scope
 
@@ -26,14 +26,15 @@ Forgetting this step leaves Homebrew users pinned to stale versions.
 
 ## Risks
 
-- Cross-repo push requires a fine-grained PAT stored as the repository
-  secret `TAP_TOKEN`. If missing, the workflow fails loudly instead of
-  silently skipping.
+- Update latency: the tap polls every 30 minutes, so a new release can take
+  up to ~30 minutes to reach Homebrew users. Accepted tradeoff vs. minting
+  a cross-repo PAT.
 - Checksum mismatch or missing asset fails the workflow before any push,
   so a broken formula can never reach users.
 
 ## Success Criteria
 
-- Publishing a release automatically updates the tap formula within minutes.
+- Publishing a release automatically updates the tap formula within 30
+  minutes, with zero secrets configured in either repository.
 - `brew upgrade mastepanoski/ce-ai/ce-ai` picks up the new version.
 - No manual SHA256 computation is ever needed again.
