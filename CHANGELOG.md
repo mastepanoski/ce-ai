@@ -11,6 +11,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.8] - 2026-08-21
+
+### Fixed
+- **Windows PowerShell Installer (`scripts/install.ps1`)**: Added `.NET` `HttpWebRequest` stream copy fallback with `AllowAutoRedirect` and replaced non-ASCII multi-byte emojis to prevent encoding syntax corruption in Windows PowerShell 5.1.
+
+---
+
+## [1.0.7] - 2026-08-21
+
+### Fixed
+- **Windows PowerShell Installer (`scripts/install.ps1`)**: Added ZIP magic byte header validation (`PK` / `80, 75`) to detect and reject HTML 302 redirect responses before `Expand-Archive`.
+
+---
+
+## [1.0.6] - 2026-08-21
+
+### Fixed
+- **Windows PowerShell Installer (`scripts/install.ps1`)**: Switched failure handling to `throw` to enforce instant termination and added diagnostic WebClient exception printing.
+
+---
+
+## [1.0.5] - 2026-08-21
+
+### Fixed
+- **Windows PowerShell Installer (`scripts/install.ps1`)**: Fixed `curl.exe` User-Agent flag formatting (`-A "ce-ai-installer/1.0"`) to prevent PowerShell space-splitting argument errors.
+
+---
+
 ## [1.0.4] - 2026-08-21
 
 ### Fixed
