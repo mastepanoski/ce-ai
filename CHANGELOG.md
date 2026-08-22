@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.3.0] - 2026-08-22
 
 ### Added
 - **`ce-ai` Orchestrator Agent Definition**: `install` seeds the structural agent entry (description, `mode: primary`, permissions) into harness configs that support agent maps — **without** `model` or `variant`; those belong to the user (#111).
