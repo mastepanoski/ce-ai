@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.1] - 2026-08-22
+
+### Added
+- **Worktree Safety Protection**: Added Rule #8 to `AGENTS.md` Hard-Gate Invariant Index prohibiting automated or unconfirmed deletion of sibling worktrees in `<repo>-worktrees/`.
+- **Sibling Worktree Doctor Probe**: Extended `ce-ai doctor` with automated discovery (`git worktree list --porcelain`) reporting active sibling worktree paths as advisory `doctor-info:` diagnostic output.
+- **OpenSpec Specification**: Documented specification under `openspec/changes/worktree_safety_protection/`.
+
+---
+
 ## [1.2.0] - 2026-08-22
 
 ### Added
