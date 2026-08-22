@@ -180,6 +180,34 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
             } else if is_github {
                 println!("doctor-info: gh CLI unauthenticated or offline, skipping branch protection probe");
             }
+
+            // Git Sibling Worktree Probe
+            if let Ok(wt_output) = std::process::Command::new("git")
+                .args(["worktree", "list", "--porcelain"])
+                .current_dir(root_path)
+                .output()
+            {
+                if wt_output.status.success() {
+                    let canonical_root = root_path
+                        .canonicalize()
+                        .unwrap_or_else(|_| root_path.to_path_buf());
+                    let stdout = String::from_utf8_lossy(&wt_output.stdout);
+                    for line in stdout.lines() {
+                        if let Some(path_str) = line.strip_prefix("worktree ") {
+                            let wt_path = std::path::Path::new(path_str);
+                            let canonical_wt = wt_path
+                                .canonicalize()
+                                .unwrap_or_else(|_| wt_path.to_path_buf());
+                            if canonical_wt != canonical_root {
+                                println!(
+                                    "doctor-info: active sibling worktree detected at '{}'",
+                                    path_str
+                                );
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

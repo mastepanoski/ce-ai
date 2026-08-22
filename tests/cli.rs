@@ -736,6 +736,91 @@ fn doctor_reports_git_hooks_misconfigured_finding() {
         ));
 }
 
+#[test]
+fn doctor_reports_sibling_worktree_info() {
+    let tmp = TempDir::new().unwrap();
+    let tmp_path = if cfg!(windows) {
+        tmp.path().to_path_buf()
+    } else {
+        tmp.path()
+            .canonicalize()
+            .unwrap_or_else(|_| tmp.path().to_path_buf())
+    };
+    let (config_dir, home) = (tmp_path.join("ce-ai"), tmp_path.join("home"));
+    let source = ce_source(&tmp_path);
+    install(&config_dir, &home, &source);
+
+    let repo = tmp_path.join("repo");
+    let wt_dir = tmp_path.join("worktrees");
+    fs::create_dir_all(&repo).unwrap();
+    fs::create_dir_all(&wt_dir).unwrap();
+
+    let clean_git = |cwd: &Path| {
+        let mut cmd = std::process::Command::new("git");
+        cmd.current_dir(cwd)
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
+            .env_remove("GIT_PREFIX");
+        cmd
+    };
+
+    let _ = clean_git(&repo).args(["init", "-b", "main"]).output();
+
+    let _ = clean_git(&repo)
+        .args(["config", "core.hooksPath", ".githooks"])
+        .output();
+    let _ = clean_git(&repo)
+        .args(["config", "user.name", "Test"])
+        .output();
+    let _ = clean_git(&repo)
+        .args(["config", "user.email", "test@test.com"])
+        .output();
+
+    fs::create_dir_all(repo.join(".githooks")).unwrap();
+    let pre_commit_path = repo.join(".githooks/pre-commit");
+    fs::write(&pre_commit_path, "#!/bin/sh\nexit 0").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&pre_commit_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&pre_commit_path, perms).unwrap();
+    }
+
+    let commit_out = clean_git(&repo)
+        .args(["commit", "--allow-empty", "-m", "initial"])
+        .output()
+        .unwrap();
+    assert!(commit_out.status.success());
+
+    let wt_path = wt_dir.join("sibling");
+    let wt_arg = wt_path.to_str().unwrap();
+    let wt_out = clean_git(&repo)
+        .args(["worktree", "add", "-b", "wt-branch", wt_arg])
+        .output()
+        .unwrap();
+    if !wt_out.status.success() {
+        panic!(
+            "git worktree add failed: {}",
+            String::from_utf8_lossy(&wt_out.stderr)
+        );
+    }
+
+    let mut cmd = ceai(&config_dir, &home);
+    cmd.current_dir(&repo)
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env_remove("GIT_INDEX_FILE")
+        .env_remove("GIT_PREFIX")
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "doctor-info: active sibling worktree detected",
+        ));
+}
+
 // ---- CLI completion (CC-1) ----
 
 #[test]
