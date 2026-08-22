@@ -9,7 +9,7 @@ use chrono::Utc;
 
 use crate::commands::Context;
 use crate::error::CeError;
-use crate::opencode::config::apply_model_assignment;
+use crate::harness::agents::apply_agent_model;
 use crate::state::profiles::{load_profile, save_profile, save_snapshot, Profile};
 use crate::state::read_config;
 use crate::state::state::State;
@@ -34,10 +34,23 @@ fn parse_models_output(text: &str) -> Vec<String> {
     models
 }
 
-/// Discovers the models offered by the active opencode installation by
-/// querying its CLI (`opencode models`), so pickers reflect what the
-/// configured providers actually offer instead of a hardcoded list (#111).
-pub fn discover_models() -> Result<Vec<String>, CeError> {
+/// Reports whether a harness exposes a discoverable model catalog. Only
+/// opencode ships a `models` CLI today; others fail explicitly instead of
+/// showing another harness's list (#111).
+pub fn discovery_supported(harness: &str) -> bool {
+    harness.eq_ignore_ascii_case("opencode")
+}
+
+/// Discovers the models offered by the given harness installation.
+/// opencode is queried via its CLI (`opencode models`) so pickers reflect
+/// what the configured providers actually offer; unsupported harnesses
+/// fail explicitly rather than fabricating data (#111).
+pub fn discover_models(harness: &str) -> Result<Vec<String>, CeError> {
+    if !discovery_supported(harness) {
+        return Err(CeError::Usage(format!(
+            "model discovery is not supported for harness '{harness}' yet; assign with `ce-ai models set --harness {harness} <slot> <provider/model>`"
+        )));
+    }
     let output = std::process::Command::new("opencode")
         .arg("models")
         .output()
@@ -55,6 +68,31 @@ pub fn discover_models() -> Result<Vec<String>, CeError> {
         ));
     }
     Ok(models)
+}
+
+/// Reads the effective `agent.<slot>.model` assignments for CE-known slots
+/// from the given harness's live config (the display source of truth).
+pub fn config_assignments(ctx: &Context, harness: &str) -> Vec<(String, String)> {
+    let Ok(kind) = harness.parse::<crate::harness::HarnessKind>() else {
+        return Vec::new();
+    };
+    let config_path = kind.config_path(&ctx.opencode_config_dir);
+    let Ok(config) = read_config(&config_path) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for slot in crate::harness::agents::CE_AGENT_SLOTS {
+        if let Some(model) = config
+            .get("agent")
+            .and_then(|a| a.get(slot))
+            .and_then(|e| e.get("model"))
+            .and_then(|m| m.as_str())
+            .filter(|m| !m.is_empty())
+        {
+            out.push((slot.to_string(), model.to_string()));
+        }
+    }
+    out
 }
 
 #[derive(clap::Args)]
@@ -79,6 +117,9 @@ pub struct SetArgs {
     pub slot: String,
     /// Model as provider/model, e.g. opencode-go/kimi-k2.6.
     pub model: String,
+    /// Target harness config (opencode, claude, ...).
+    #[arg(long, default_value = "opencode")]
+    pub harness: String,
 }
 
 #[derive(clap::Args)]
@@ -102,7 +143,7 @@ pub struct ProfileNameArgs {
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     match &args.command {
-        ModelsCommand::Set(args) => set(ctx, &args.slot, &args.model),
+        ModelsCommand::Set(args) => set(ctx, &args.harness, &args.slot, &args.model),
         ModelsCommand::List => list(ctx),
         ModelsCommand::Profile(profile) => match &profile.command {
             ProfileCommand::Save(args) => save(ctx, &args.name),
@@ -125,19 +166,27 @@ fn assignments_map(state: &State) -> BTreeMap<String, String> {
         .collect()
 }
 
-pub(crate) fn set(ctx: &Context, slot: &str, model: &str) -> Result<(), CeError> {
+pub(crate) fn set(ctx: &Context, harness: &str, slot: &str, model: &str) -> Result<(), CeError> {
     let (provider_id, model_id) = model
         .split_once('/')
         .filter(|(provider, model)| !provider.is_empty() && !model.is_empty())
         .ok_or_else(|| CeError::Usage(format!("model must be provider/model, got {model:?}")))?;
 
+    let kind = harness.parse::<crate::harness::HarnessKind>()?;
+    if !crate::harness::agents::supports_agent_definitions(&kind) {
+        return Err(CeError::Usage(format!(
+            "harness '{harness}' has no agent-map config; cannot assign models"
+        )));
+    }
+    let config_path = kind.config_path(&ctx.opencode_config_dir);
+
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
     let before = assignments_map(&state);
 
-    // Merge into opencode.json first so a config failure leaves state untouched.
-    let opencode_json = ctx.opencode_config_dir.join("opencode.json");
-    let config = read_config(&opencode_json)?;
+    // Merge into the target harness config first so a config failure leaves
+    // state untouched.
+    let config = read_config(&config_path)?;
     if !config
         .get("agent")
         .and_then(|agents| agents.get(slot))
@@ -145,7 +194,7 @@ pub(crate) fn set(ctx: &Context, slot: &str, model: &str) -> Result<(), CeError>
     {
         eprintln!("warning: unknown agent slot {slot:?}; assignment persisted");
     }
-    apply_model_assignment(&opencode_json, slot, model)?;
+    crate::harness::agents::apply_agent_model(&config_path, slot, model)?;
 
     state.set_model_assignment(slot, provider_id, model_id);
     state.save(&state_path)?;
@@ -154,7 +203,7 @@ pub(crate) fn set(ctx: &Context, slot: &str, model: &str) -> Result<(), CeError>
     // Append-only snapshot around the change (MM-4).
     save_snapshot(&ctx.config_dir.join("profiles"), "state", &before, &after)?;
     if !ctx.quiet {
-        println!("models: set {slot} = {model}");
+        println!("models: set {harness}/{slot} = {model}");
     }
     Ok(())
 }
@@ -241,6 +290,27 @@ pub fn import_config_assignments(
     imported
 }
 
+/// Removes state assignments whose slot no longer exists in the harness
+/// config agent map — config wins in both directions (additions AND
+/// deletions). Returns the purged slots. No-op when the config has no
+/// `agent` map at all (conservative: an absent section is not treated as
+/// a bulk deletion).
+pub fn purge_stale_assignments(state: &mut State, config: &serde_json::Value) -> Vec<String> {
+    let Some(serde_json::Value::Object(agents)) = config.get("agent") else {
+        return Vec::new();
+    };
+    let stale: Vec<String> = state
+        .model_assignments
+        .keys()
+        .filter(|slot| !agents.contains_key(*slot))
+        .cloned()
+        .collect();
+    for slot in &stale {
+        state.model_assignments.remove(slot);
+    }
+    stale
+}
+
 fn list(ctx: &Context) -> Result<(), CeError> {
     let state = State::load(&ctx.config_dir.join("state.json"))?;
     if state.model_assignments.is_empty() {
@@ -283,7 +353,7 @@ fn load(ctx: &Context, name: &str) -> Result<(), CeError> {
             CeError::Runtime(format!("profile {name} holds a malformed model {model:?}"))
         })?;
         state.set_model_assignment(slot, provider_id, model_id);
-        apply_model_assignment(&opencode_json, slot, model)?;
+        apply_agent_model(&opencode_json, slot, model)?;
     }
     state.save(&state_path)?;
     if !ctx.quiet {
@@ -310,6 +380,14 @@ pub mod tests {
         }
     }
 
+    fn ctx_with_config(config: &str) -> (TempDir, Context) {
+        let tmp = TempDir::new().unwrap();
+        let ctx = hermetic_ctx(&tmp);
+        std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+        std::fs::write(ctx.opencode_config_dir.join("opencode.json"), config).unwrap();
+        (tmp, ctx)
+    }
+
     #[test]
     fn syncs_across_all_active_harnesses() {
         let tmp = TempDir::new().unwrap();
@@ -321,7 +399,13 @@ pub mod tests {
         )
         .unwrap();
 
-        set(&ctx, "ce-brainstorm", "anthropic/claude-3-5-sonnet").unwrap();
+        set(
+            &ctx,
+            "opencode",
+            "ce-brainstorm",
+            "anthropic/claude-3-5-sonnet",
+        )
+        .unwrap();
         let state = State::load(&ctx.config_dir.join("state.json")).unwrap();
         assert_eq!(state.model_assignments.len(), 1);
         assert_eq!(
@@ -407,5 +491,71 @@ also/bad/
         assert_eq!(state.model_assignments["ce-plan"].provider_id, "new");
         // Re-import is a no-op once state matches config.
         assert!(import_config_assignments(&mut state, &config).is_empty());
+    }
+
+    #[test]
+    fn purge_stale_assignments_removes_deleted_slots() {
+        let mut state = State::new();
+        state.set_model_assignment("ce-plan", "old", "model");
+        state.set_model_assignment("ce-work", "kept", "model");
+        // Config no longer has ce-plan: user deleted it there.
+        let config = serde_json::json!({
+            "agent": { "ce-work": { "model": "kept/model" } }
+        });
+        let purged = purge_stale_assignments(&mut state, &config);
+        assert_eq!(purged, vec!["ce-plan".to_string()]);
+        assert!(!state.model_assignments.contains_key("ce-plan"));
+        assert!(state.model_assignments.contains_key("ce-work"));
+    }
+
+    #[test]
+    fn purge_stale_assignments_noop_without_agent_map() {
+        let mut state = State::new();
+        state.set_model_assignment("ce-plan", "p", "m");
+        let purged = purge_stale_assignments(&mut state, &serde_json::json!({}));
+        assert!(purged.is_empty());
+        assert_eq!(state.model_assignments.len(), 1);
+    }
+
+    #[test]
+    fn set_writes_selected_harness_config() {
+        let tmp = TempDir::new().unwrap();
+        let ctx = hermetic_ctx(&tmp);
+        std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+
+        set(&ctx, "claude", "ce-brainstorm", "user/custom-model").unwrap();
+        let claude_config = read_config(&ctx.opencode_config_dir.join("claude.json")).unwrap();
+        assert_eq!(
+            claude_config["agent"]["ce-brainstorm"]["model"],
+            "user/custom-model"
+        );
+        // opencode.json must stay untouched.
+        let opencode_config = read_config(&ctx.opencode_config_dir.join("opencode.json")).unwrap();
+        assert!(opencode_config.get("agent").is_none());
+
+        // Markdown-based harnesses reject assignment explicitly.
+        let err = set(&ctx, "cursor", "ce-brainstorm", "a/b").unwrap_err();
+        assert!(err.to_string().contains("no agent-map config"));
+    }
+
+    #[test]
+    fn config_assignments_reads_live_harness_config() {
+        let (_tmp, ctx) = ctx_with_config(
+            r#"{"agent":{"ce-brainstorm":{"model":"live/one"},"other":{"model":"x/y"}}}"#,
+        );
+        let scoped = config_assignments(&ctx, "opencode");
+        assert_eq!(
+            scoped,
+            vec![("ce-brainstorm".to_string(), "live/one".to_string())]
+        );
+        // A harness with no config file yields nothing — never another
+        // harness's list.
+        assert!(config_assignments(&ctx, "kimi").is_empty());
+    }
+
+    #[test]
+    fn discovery_supported_only_for_opencode() {
+        assert!(discovery_supported("opencode"));
+        assert!(!discovery_supported("claude"));
     }
 }
