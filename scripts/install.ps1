@@ -1,7 +1,7 @@
 # PowerShell Universal Installer Script for ce-ai (Windows)
 $ErrorActionPreference = "Stop"
 
-Write-Host "🚀 Installing ce-ai (Compound Engineering AI CLI)..." -ForegroundColor Cyan
+Write-Host "[ce-ai] Installing ce-ai (Compound Engineering AI CLI)..." -ForegroundColor Cyan
 
 $Arch = (Get-CimInstance Win32_Processor).Architecture
 switch ($Arch) {
@@ -15,7 +15,7 @@ $AssetName = "ce-ai-$Target.zip"
 $DownloadUrl = "https://github.com/mastepanoski/ce-ai/releases/latest/download/$AssetName"
 try {
     $ReleaseApi = "https://api.github.com/repos/mastepanoski/ce-ai/releases/latest"
-    $ReleaseInfo = Invoke-RestMethod -Uri $ReleaseApi -Headers @{"User-Agent"="ce-ai-installer"} -UseBasicParsing
+    $ReleaseInfo = Invoke-RestMethod -Uri $ReleaseApi -Headers @{"User-Agent"="ce-ai-installer/1.0"} -UseBasicParsing
     $MatchedAsset = $ReleaseInfo.assets | Where-Object { $_.name -eq $AssetName }
     if ($MatchedAsset -and $MatchedAsset.browser_download_url) {
         $DownloadUrl = $MatchedAsset.browser_download_url
@@ -49,7 +49,7 @@ function Test-ValidZipFile($Path) {
     }
 }
 
-Write-Host "📦 Downloading $AssetName from $DownloadUrl..." -ForegroundColor Yellow
+Write-Host "[ce-ai] Downloading $AssetName from $DownloadUrl..." -ForegroundColor Yellow
 $ProgressPreference = 'SilentlyContinue'
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
