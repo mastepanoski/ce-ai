@@ -57,20 +57,40 @@ A common beginner question is: *"Why do we need OpenSpec if we already did a bra
   - `ce-brainstorm` is **narrative and conversational** (the story of why and how options were evaluated).
   - OpenSpec is **contractual and testable**. It converts the brainstorm into formal, verifiable specifications in `openspec/changes/<feature_name>/`:
     - `proposal.md`: Strict In-Scope vs. Out-of-Scope boundaries.
+    - `exploration.md`: Technical investigation and tradeoff analysis.
     - `design.md`: Component architecture, structs, and API contracts.
     - `spec.md`: Formal behavioral rules written in `WHEN [condition] THEN [expected result]` format.
-    - `tasks.md`: Atomic, step-by-step TDD checklist.
 
 ### ⚡ Level 4: `ce-plan` & `ce-work` (Sprint Backlog & TDD Execution)
-- **Role**: Reads the `spec.md` and `tasks.md` contracts from OpenSpec to execute the code using strict Test-Driven Development (TDD).
-- **Execution Loop**:
-  1. Write a failing test (**Red**).
-  2. Implement the minimal code to pass (**Green**).
-  3. Simplify and refactor while keeping tests passing (**Refactor**).
+- **Where does `/ce-plan` fit relative to OpenSpec?**
+  - **`/ce-plan` runs AFTER OpenSpec specification (`proposal.md`, `design.md`, `spec.md`).**
+  - You cannot plan the construction sequence (the *HOW*) without freezing the business rules (`spec.md`) and technical design (`design.md`) (the *WHAT*).
+  - `/ce-plan` takes `spec.md` and `design.md` as inputs and **writes the executable checklist into `openspec/changes/<feature_name>/tasks.md`**.
+- **`/ce-work` Execution Loop**:
+  - Reads `tasks.md`, executes TDD (Red-Green-Refactor), and marks checkboxes (`- [x] Task 1`).
 
-### 📚 Level 5: `ce-compound` (Capitalizing Knowledge)
-- **Role**: Captures technical learnings, root-cause analyses, and architecture patterns into `docs/solutions/`.
-- **Why it compounds**: The first time a problem is solved, it takes research. By documenting the solution with structured metadata, the next time the problem arises, agents resolve it in seconds.
+---
+
+## 🔄 4. OpenSpec is a Living, Progressive Directory
+
+OpenSpec is **not a static document written once**. It is a **living directory (`openspec/changes/<feature_name>/`) that evolves progressively across Compound Engineering stages**:
+
+```mermaid
+flowchart TD
+    STAGE1["Stage 1: ce-brainstorm"] -->|Creates proposal.md & exploration.md| OPENSPEC_DIR["openspec/changes/&lt;feature_name&gt;/"]
+    STAGE2["Stage 2: Specifying"] -->|Creates design.md & spec.md (WHEN...THEN)| OPENSPEC_DIR
+    STAGE3["Stage 3: ce-plan"] -->|Generates tasks.md checklist| OPENSPEC_DIR
+    STAGE4["Stage 4: ce-work"] -->|Updates tasks.md [-x] & records Spec Deltas| OPENSPEC_DIR
+    STAGE6["Stage 6: ce-compound"] -->|Consolidates solution into docs/solutions/| DOCS_SOLUTIONS["docs/solutions/"]
+```
+
+| Lifecycle Phase | Active Agent / Command | Files Added / Updated in `openspec/changes/<feature>/` |
+| :--- | :--- | :--- |
+| **Ideation & Framing** | `ce-brainstorm` | Creates `proposal.md` (Scope) & `exploration.md` (Tradeoffs) |
+| **Specification** | OpenSpec Definition | Creates `design.md` (Structs/APIs) & `spec.md` (`WHEN..THEN`) |
+| **Planning** | `ce-plan` | Reads `spec.md`/`design.md` and generates `tasks.md` |
+| **Development** | `ce-work` | Updates `tasks.md` (`- [x]`) and updates `spec.md` if design changes |
+| **Capitalization** | `ce-compound` | Consolidates learnings into permanent `docs/solutions/` |
 
 ---
 
