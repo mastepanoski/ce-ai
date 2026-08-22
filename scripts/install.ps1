@@ -88,4 +88,4 @@ Expand-Archive -Path $TempZip -DestinationPath $InstallDir -Force
 Remove-Item -Path $TempZip -Force
 
 Write-Host "[ce-ai] ce-ai successfully installed to $InstallDir\ce-ai.exe" -ForegroundColor Green
-Write-Host "[ce-ai] Add '$InstallDir' to your System PATH to run 'ce-ai' from anywhere." -ForegroundColor Cyan
+Write-Host "[ce-ai] Add $InstallDir to your System PATH to run ce-ai from anywhere." -ForegroundColor Cyan
