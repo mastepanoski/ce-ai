@@ -431,13 +431,16 @@ fn models_set_reflects_in_state_and_opencode_config() {
         state["model_assignments"]["ce-brainstorm"]["model_id"],
         "kimi-k2.6"
     );
-    // MM-2: applied to opencode.json agent.<slot>.model/variant without clobbering user keys.
+    // MM-2: applied to opencode.json agent.<slot>.model without clobbering user keys.
     let config = read_json(&home.join(".config/opencode/opencode.json"));
     assert_eq!(
         config["agent"]["ce-brainstorm"]["model"],
         "opencode-go/kimi-k2.6"
     );
-    assert_eq!(config["agent"]["ce-brainstorm"]["variant"], "");
+    assert!(
+        config["agent"]["ce-brainstorm"].get("variant").is_none(),
+        "ce-ai never writes variant; that is user customization"
+    );
     assert_eq!(
         config["agent"]["ce-brainstorm"]["temperature"], 0.7,
         "user agent keys preserved"

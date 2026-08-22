@@ -1,5 +1,6 @@
 //! Harness abstraction module for multi-harness support.
 
+pub mod agents;
 pub mod claude;
 pub mod copilot;
 pub mod cursor;

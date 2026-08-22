@@ -148,18 +148,6 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             });
         }
 
-        // If state has no model assignments yet, populate documented defaults.
-        if state.model_assignments.is_empty() {
-            state.model_assignments = State::default_model_assignments();
-        }
-
-        // Apply state model assignments to target harness config.
-        for (slot, assignment) in &state.model_assignments {
-            let model_str = format!("{}/{}", assignment.provider_id, assignment.model_id);
-            let _ =
-                crate::opencode::config::apply_model_assignment(&target_config, slot, &model_str);
-        }
-
         // Merge plugin entry + skills path into target harness config (OI-2, OI-4).
         let mut mutation = ensure_plugin_and_skills(
             &target_config,
@@ -167,6 +155,18 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             &skills_path(config_dir).to_string_lossy(),
         )?;
         mutation.backup = backup.map(|p| p.display().to_string());
+
+        // Ensure the structural `ce-ai` orchestrator agent exists — never
+        // model/variant; users customize those (#111).
+        let agent_ensured = !ctx.dry_run
+            && crate::harness::agents::ensure_orchestrator_agent(&target_config, harness_kind)?;
+        if agent_ensured && !ctx.quiet {
+            println!(
+                "install: orchestrator agent '{}' ensured for {}",
+                crate::harness::agents::ORCHESTRATOR_AGENT,
+                harness_kind
+            );
+        }
 
         // Record managed files and the config mutation (OI-5).
         InstallManifest {
