@@ -1222,6 +1222,48 @@ fn init_prj_second_run_is_byte_identical() {
 }
 
 #[test]
+fn init_prj_upgrade_rerun_preserves_created_file_flag() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("upgrade-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    // Fresh adoption: ce-ai creates AGENTS.md and CLAUDE.md (created_file=true).
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    // Simulate a stale managed block so the re-run takes the replacement path.
+    let agents_file = prj_dir.join("AGENTS.md");
+    let text = fs::read_to_string(&agents_file).unwrap();
+    fs::write(
+        &agents_file,
+        text.replace("## 🔄 Mandatory", "## 🔄 STALE Mandatory"),
+    )
+    .unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let state_val: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(config_dir.join("state.json")).unwrap()).unwrap();
+    assert_eq!(state_val["projects"][0]["created_file"], true);
+
+    // deinit-prj must clean up agent-created files, not leave orphans.
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Removed project adoption block"));
+
+    assert!(!agents_file.exists());
+    assert!(!prj_dir.join("CLAUDE.md").exists());
+}
+
+#[test]
 fn doctor_reports_model_assignment_drift_and_sync_reconciles() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));

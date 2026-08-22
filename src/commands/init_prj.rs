@@ -187,7 +187,7 @@ pub fn run(
         let mut state = State::load(&global_state_path)?;
 
         let now = chrono::Utc::now().to_rfc3339();
-        let entry = ProjectAdoptionEntry {
+        let mut entry = ProjectAdoptionEntry {
             path: target_dir.clone(),
             file: "AGENTS.md".into(),
             tier,
@@ -197,10 +197,17 @@ pub fn run(
             adopted_at: now,
         };
 
-        if let Some(pos) = state.projects.iter().position(|p| p.path == target_dir) {
-            state.projects[pos] = entry;
-        } else {
-            state.projects.push(entry);
+        match state.projects.iter().position(|p| p.path == target_dir) {
+            Some(pos) => {
+                // Preserve who originally created the file: an upgrade
+                // re-run replaces the entry, and deinit-prj relies on this
+                // flag to clean up agent-created AGENTS.md/CLAUDE.md.
+                entry.created_file = state.projects[pos].created_file;
+                state.projects[pos] = entry;
+            }
+            None => {
+                state.projects.push(entry);
+            }
         }
 
         state.save(&global_state_path)?;
