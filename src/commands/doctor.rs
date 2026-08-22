@@ -72,7 +72,7 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
     }
 
     // Companion tool health checks.
-    if let Ok(home) = std::env::var("HOME") {
+    if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
         let engram_db = std::path::Path::new(&home)
             .join(".engram")
             .join("engram.db");
@@ -103,10 +103,9 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
                 .output()
             {
                 if hooks_output.status.success() {
-                    let hooks_val = String::from_utf8_lossy(&hooks_output.stdout)
-                        .trim()
-                        .to_string();
-                    let hooks_path = std::path::Path::new(&hooks_val);
+                    let raw_val = String::from_utf8_lossy(&hooks_output.stdout);
+                    let hooks_val = raw_val.trim().trim_end_matches('/').trim_end_matches('\\');
+                    let hooks_path = std::path::Path::new(hooks_val);
                     if !hooks_val.ends_with(".githooks")
                         && hooks_path.file_name() != Some(std::ffi::OsStr::new(".githooks"))
                     {
@@ -168,7 +167,12 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
 
                         if let Ok(prot_out) = prot_check {
                             if !prot_out.status.success() {
-                                findings.push(format!("branch-protection: main branch protection missing or unconfigured on {}", repo_str));
+                                let stderr = String::from_utf8_lossy(&prot_out.stderr);
+                                if stderr.contains("403") {
+                                    println!("doctor-info: token lacks admin permissions for branch protection API on {}", repo_str);
+                                } else {
+                                    findings.push(format!("branch-protection: main branch protection missing or unconfigured on {}", repo_str));
+                                }
                             }
                         }
                     }
@@ -179,7 +183,8 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
         }
     }
 
-    let rtk_on_path = std::process::Command::new("which")
+    let which_tool = if cfg!(windows) { "where" } else { "which" };
+    let rtk_on_path = std::process::Command::new(which_tool)
         .arg("rtk")
         .output()
         .map(|o| o.status.success())
