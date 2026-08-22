@@ -35,15 +35,11 @@ Write-Host "📦 Downloading $AssetName from $DownloadUrl..." -ForegroundColor Y
 $ProgressPreference = 'SilentlyContinue'
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
-$Downloaded = $false
 if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
     & curl.exe -fsSL -o "$TempZip" "$DownloadUrl"
-    if ((Test-Path $TempZip) -and (Get-Item $TempZip).Length -gt 1000) {
-        $Downloaded = $true
-    }
 }
 
-if (-not $Downloaded) {
+if (-not (Test-Path $TempZip) -or (Get-Item $TempZip).Length -lt 1000) {
     Write-Host "  Trying PowerShell Invoke-WebRequest fallback..." -ForegroundColor Yellow
     Invoke-WebRequest -Uri "$DownloadUrl" -OutFile "$TempZip" -UserAgent "ce-ai-installer/1.0" -UseBasicParsing
 }
