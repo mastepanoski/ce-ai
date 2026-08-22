@@ -702,6 +702,36 @@ fn doctor_reports_state_inconsistency_finding() {
         .stdout(predicate::str::contains("state-inconsistent"));
 }
 
+#[test]
+fn doctor_reports_git_hooks_misconfigured_finding() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Initialize git repo in tmp dir with invalid core.hooksPath
+    let repo = tmp.path().join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    let _ = std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(&repo)
+        .output();
+    let _ = std::process::Command::new("git")
+        .args(["config", "core.hooksPath", "invalid_hooks"])
+        .current_dir(&repo)
+        .output();
+
+    let mut cmd = ceai(&config_dir, &home);
+    cmd.current_dir(&repo)
+        .arg("doctor")
+        .assert()
+        .failure()
+        .code(1)
+        .stdout(predicate::str::contains(
+            "git-hooks: core.hooksPath set to 'invalid_hooks'",
+        ));
+}
+
 // ---- CLI completion (CC-1) ----
 
 #[test]
