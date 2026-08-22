@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Homebrew Tap Automation**: Self-updating tap (`mastepanoski/homebrew-ce-ai`) polls ce-ai releases every 30 minutes and publishes the formula with verified SHA256 checksums — zero secrets, no manual maintenance.
+
+### Fixed
+- **README Homebrew Install Command**: Corrected broken `brew tap`/`brew install` instructions to the canonical `brew install mastepanoski/ce-ai/ce-ai`, which auto-taps and installs from the dedicated tap repository.
+
 ---
 
 ## [1.0.8] - 2026-08-21
