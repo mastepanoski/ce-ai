@@ -14,7 +14,7 @@ This policy establishes our AI Governance System, adhering strictly to:
 ### 1.1 Organizational Principles
 - **Human Agency & Oversight**: AI agents managed by `ce-ai` act strictly under explicit human direction. No autonomous modification of critical system parameters occurs without user approval.
 - **Accountability**: The human engineer operating `ce-ai` retains ultimate authority and responsibility over all code generated or modified by AI tools.
-- **Transparency**: All agent slot assignments, model providers, and prompt skills installed by `ce-ai` are inspectable in readable JSON (`state.json`, `opencode.json`) and markdown format.
+- **Transparency**: All agent slot assignments, model providers, and prompt skills installed by `ce-ai` are inspectable in readable JSON (`state.json` plus each harness's own configuration file, e.g. `opencode.json`) and markdown format.
 
 ### 1.2 Model & Provider Neutrality
 - `ce-ai` provides model-agnostic assignment capabilities across multi-vendor LLMs (e.g. OpenAI, Anthropic, Kimi, DeepSeek, Google Gemini).

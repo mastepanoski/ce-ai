@@ -17,7 +17,7 @@ Every installed plugin asset (JS loaders, skill markdown definitions, configurat
 - `ce-ai sync` and `ce-ai doctor` re-hash managed files on disk and flag any unexpected modification, deletion, or tampering before execution.
 
 ### 2. Atomic File Operations & System Restoration (NIST SP 800-53 CP-9, CP-10)
-- **Atomic Writes**: State updates (`state.json`) and configuration edits (`opencode.json`) write to temporary files first (`.tmp-XYZ`) and execute atomic renames (`std::fs::rename`) to guarantee zero partial-write corruption.
+- **Atomic Writes**: State updates (`state.json`) and managed configuration edits (e.g., `opencode.json`) write to temporary files first (`.tmp-XYZ`) and execute atomic renames (`std::fs::rename`) to guarantee zero partial-write corruption.
 - **Automated Pre-Install Backups**: Before modifying any harness configuration, `ce-ai` creates a timestamped backup in `~/.ce-ai/backups/`.
 - **Zero-Downtime Rollback**: `ce-ai uninstall` restores the original pre-install harness configuration cleanly without leaving dangling artifacts.
 
@@ -28,7 +28,7 @@ Every installed plugin asset (JS loaders, skill markdown definitions, configurat
 
 ### 4. Zero Telemetry & Data Confidentiality (ISO 27001 Clause 7.5)
 - `ce-ai` collects **zero analytics, zero telemetry, and zero remote tracking**.
-- All state, model profiles, and backups remain 100% local on the user's workstation (`~/.ce-ai` and `~/.config/opencode`).
+- All state, model profiles, and backups remain 100% local on the user's workstation (`~/.ce-ai` for cache & backups, `~/.config/ce-ai` for registry state, plus each target harness's own configuration directory — see the [Harness Matrix](docs/user-guide/harness-matrix.md)).
 
 ---
 
@@ -52,7 +52,7 @@ To understand why `ce-ai` implements these specific controls, let's explore the 
 - **Our Guarantee**: `safe_extract` scans 100% of archive headers *in memory* before performing a single disk write.
 
 ### 2. The Ink Scratchpad: Why `write_atomic` Uses Temporary Files & Renames
-- **The Threat**: If a computer loses power, crashes, or runs out of disk space while writing to `state.json` or `opencode.json`, the file gets cut in half, corrupting the user's configurations and active agent model profiles.
+- **The Threat**: If a computer loses power, crashes, or runs out of disk space while writing to `state.json`, `opencode.json`, or any other managed harness configuration file, the file gets cut in half, corrupting the user's configurations and active agent model profiles.
 - **The Teacher Analogy**: Imagine writing a legal deed with permanent ink directly on the original document. If your pen leaks halfway through, the deed is ruined forever. Instead, you draft on a separate scratchpad first (`.state.json.tmp-12345`). Once every letter is complete and verified, you swap the scratchpad for the final document in one instantaneous, un-interruptible motion (`std::fs::rename`).
 - **Our Guarantee**: File states in `ce-ai` are mathematically binary: they are either 100% up-to-date or unchanged. Partial corruption is impossible.
 
