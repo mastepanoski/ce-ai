@@ -39,3 +39,7 @@ A non-destructive, fully reversible CLI mechanism (`ce-ai init-prj` / `ce-ai dei
 
 ### Context-Exhaustion Resilience
 A 3-tier defense-in-depth governance pattern (GitHub REST API Branch Protection + `ce-ai doctor` Health Probes + Hard-Gate Invariant Index) that replaces probabilistic prose prompt instructions with fail-closed deterministic platform boundaries to eliminate LLM token dilution and compaction loss in long sessions.
+
+### Model Assignment Drift Reconciliation
+A multi-layered self-healing architecture (`ce-ai install` defaults + `ce-ai doctor` drift probe + `ce-ai sync` bidirectional reconciliation) that eliminates state desynchronization between host harness configs (`opencode.json`) and global state tracking (`state.json`), preserving model assignments across reinstalls and resets using `write_atomic`.
+
