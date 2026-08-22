@@ -739,7 +739,13 @@ fn doctor_reports_git_hooks_misconfigured_finding() {
 #[test]
 fn doctor_reports_sibling_worktree_info() {
     let tmp = TempDir::new().unwrap();
-    let tmp_path = tmp.path().canonicalize().unwrap();
+    let tmp_path = if cfg!(windows) {
+        tmp.path().to_path_buf()
+    } else {
+        tmp.path()
+            .canonicalize()
+            .unwrap_or_else(|_| tmp.path().to_path_buf())
+    };
     let (config_dir, home) = (tmp_path.join("ce-ai"), tmp_path.join("home"));
     let source = ce_source(&tmp_path);
     install(&config_dir, &home, &source);
@@ -789,17 +795,17 @@ fn doctor_reports_sibling_worktree_info() {
     assert!(commit_out.status.success());
 
     let wt_path = wt_dir.join("sibling");
+    let wt_arg = wt_path.to_str().unwrap();
     let wt_out = clean_git(&repo)
-        .args([
-            "worktree",
-            "add",
-            "-b",
-            "wt-branch",
-            wt_path.to_str().unwrap(),
-        ])
+        .args(["worktree", "add", "-b", "wt-branch", wt_arg])
         .output()
         .unwrap();
-    assert!(wt_out.status.success());
+    if !wt_out.status.success() {
+        panic!(
+            "git worktree add failed: {}",
+            String::from_utf8_lossy(&wt_out.stderr)
+        );
+    }
 
     let mut cmd = ceai(&config_dir, &home);
     cmd.current_dir(&repo)
