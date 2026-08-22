@@ -14,6 +14,10 @@ pub const BLOCK_END_MARKER: &str = "<!-- ce-ai:block end -->";
 pub const GITIGNORE_BEGIN_MARKER: &str = "# BEGIN CE-AI MANAGED BLOCK";
 pub const GITIGNORE_END_MARKER: &str = "# END CE-AI MANAGED BLOCK";
 
+/// Managed block schema version, shared by the on-disk header and the
+/// `state.json` adoption entry so the two cannot drift apart.
+pub const BLOCK_VERSION: u32 = 2;
+
 /// Renders the managed block content based on tier.
 pub fn render_block_content(tier: AdoptionTier) -> &'static str {
     match tier {
@@ -31,7 +35,10 @@ Before creating PRs or writing feature code, agents MUST verify `openspec/change
 - `exploration.md`: Technical investigation and architectural tradeoffs.
 - `design.md`: Technical design, system architecture, structs, and API/CLI contracts.
 - `spec.md`: Formal requirements using `WHEN ... THEN ...` format and explicit acceptance criteria.
-- `tasks.md`: Atomic, executable task checklist with TDD verification steps."#
+- `tasks.md`: Atomic, executable task checklist with TDD verification steps.
+
+### Single Source of Truth Rule
+Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into the OpenSpec files above (`proposal.md`, `exploration.md`) and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with OpenSpec. Skip ideation skills entirely when requirements and approach are already clear."#
         }
         AdoptionTier::Minimal => {
             r#"## 🔄 Compound Engineering Workflow Guidelines
@@ -48,7 +55,8 @@ Orchestrator agents MUST delegate domain tasks to specialized subagents:
 - Use `ce-brainstorm` for scope exploration.
 - Use `ce-plan` for implementation unit breakdown.
 - Use `ce-code-review` before opening Pull Requests.
-- Enforce strict PR CI status check gates before merging."#
+- Enforce strict PR CI status check gates before merging.
+- Ideation outputs (`docs/brainstorms/`, `docs/ideation/`) are disposable inputs: distill them into the specs before delegation; never maintain them in parallel."#
         }
     }
 }
@@ -113,7 +121,8 @@ pub fn run(
     let newline = if is_crlf { "\r\n" } else { "\n" };
 
     let block_header = format!(
-        "<!-- ce-ai:block begin v=1 tier={} sha256={} -->",
+        "<!-- ce-ai:block begin v={} tier={} sha256={} -->",
+        BLOCK_VERSION,
         tier_str.to_lowercase(),
         body_sha256
     );
@@ -178,20 +187,27 @@ pub fn run(
         let mut state = State::load(&global_state_path)?;
 
         let now = chrono::Utc::now().to_rfc3339();
-        let entry = ProjectAdoptionEntry {
+        let mut entry = ProjectAdoptionEntry {
             path: target_dir.clone(),
             file: "AGENTS.md".into(),
             tier,
-            block_version: 1,
+            block_version: BLOCK_VERSION,
             block_sha256: body_sha256.clone(),
             created_file: !file_existed,
             adopted_at: now,
         };
 
-        if let Some(pos) = state.projects.iter().position(|p| p.path == target_dir) {
-            state.projects[pos] = entry;
-        } else {
-            state.projects.push(entry);
+        match state.projects.iter().position(|p| p.path == target_dir) {
+            Some(pos) => {
+                // Preserve who originally created the file: an upgrade
+                // re-run replaces the entry, and deinit-prj relies on this
+                // flag to clean up agent-created AGENTS.md/CLAUDE.md.
+                entry.created_file = state.projects[pos].created_file;
+                state.projects[pos] = entry;
+            }
+            None => {
+                state.projects.push(entry);
+            }
         }
 
         state.save(&global_state_path)?;

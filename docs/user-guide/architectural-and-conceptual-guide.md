@@ -90,7 +90,7 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
 ### 💡 Architectural Rationale
 - **Compound Engineering Alignment**: Compound Engineering dictates that software development must act as a self-reinforcing flywheel: every solved bug, design decision, and feature must compound knowledge over time. The FSM strictly mandates **Stage 6: Compound (`ce-compound`)**, ensuring agents document learnings in `docs/solutions/` and `CONCEPTS.md` before any task can close.
 - **FSM Sub-Loops & Diagnostic Interrupts**:
-  - *Exploration Sub-Loop (`ce-ideate` in Stage 1)*: Generates and evaluates unconstrained architectural ideas before transitioning to `ce-brainstorm` for structured requirements framing.
+  - *Idea Discovery Sub-Loop (`ce-ideate` in Stage 1)*: Generates and ranks candidate directions into a `docs/ideation/` dossier (no code, no requirements) before transitioning to `ce-brainstorm` for structured requirements framing; the chosen idea and rejected alternatives distill into OpenSpec's `exploration.md`.
   - *Diagnostic Interrupt Sub-Loop (`ce-debug` in Stage 4/5)*: Triggered on test failure or bug detection. Freezes task state, enters an iterative diagnosis loop (hypothesis ➔ log extraction ➔ minimal reproducer ➔ root cause fix), and once verified, transitions control back to `ce-work` or `Verify` while tagging `ce-compound` if a non-obvious learning was uncovered.
   - *Refactoring Sub-Loop (`ce-simplify-code` in Stage 4)*: Executes non-behavioral code tidying and simplification passes post-Green TDD implementation.
 - **Determinism over Probability**: Code generation with LLMs is inherently probabilistic. Without an FSM enforcing formal specifications (`OpenSpec`), plans (`Plan`), and test-driven verification (`TDD`), execution degrades into superficial patches.
@@ -105,7 +105,7 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
   - *Solution*: Stage 2 of `ce-ai` natively consumes OpenSpec format without breaking changes. Compound Engineering upgrades SDD by appending **Stage 6 (`ce-compound`)**, turning linear spec execution into a self-reinforcing knowledge flywheel.
 - **Methodology Flexibility (TDD, Code-First, BDD, Spikes)**:
   - *Problem*: Teams using Code-First, Behavior-Driven Development (BDD), or R&D Spikes may feel restricted by strict TDD.
-  - *Solution*: The FSM decouples *creation order* from *verification rigor*. Developers can write code before tests (Code-First) or explore fast prototypes (`ce-ideate` spikes), provided that **Stage 5 (Empirical Verification)** passes 100% green before shipping.
+  - *Solution*: The FSM decouples *creation order* from *verification rigor*. Developers can write code before tests (Code-First) or explore fast prototypes (`ce-ideate` to rank directions, then a throwaway PoC on a scratch branch), provided that **Stage 5 (Empirical Verification)** passes 100% green before shipping.
 
 ---
 

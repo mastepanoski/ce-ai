@@ -123,6 +123,9 @@ Before creating any PR or writing feature code, agents MUST verify that `openspe
 - `spec.md`: Formal requirements using `WHEN ... THEN ...` format and explicit acceptance criteria.
 - `tasks.md`: Atomic, executable task checklist with TDD (Red-Green-Refactor) verification steps.
 
+### Single Source of Truth Rule
+Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into the OpenSpec files above (`proposal.md`, `exploration.md`) and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with OpenSpec — that duplicates work and burns tokens. Skip ideation skills entirely when requirements and approach are already clear.
+
 ## ✅ Definition of Done (DoD) & Technical Justifications
 
 Before declaring any task or issue completed, an AI agent MUST satisfy all criteria of the **Definition of Done**:
