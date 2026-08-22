@@ -204,6 +204,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     if !ctx.dry_run {
         state.save(&state_path)?;
+        if let Ok(registry) = crate::source::registry::SkillRegistry::build(ctx) {
+            let _ = registry.save(&ctx.config_dir.join("skills-registry.json"));
+        }
     }
 
     if let Some(tmp) = tmp_dir {

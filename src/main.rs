@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 use crate::commands::{
-    backups, deinit_prj, doctor, init_prj, install, models, status, sync, tools, uninstall,
+    backups, deinit_prj, doctor, init_prj, install, models, skills, status, sync, tools, uninstall,
     upgrade, workflow, Context,
 };
 use crate::error::result_exit_code;
@@ -49,6 +49,8 @@ enum Commands {
     Upgrade(upgrade::Args),
     /// Manage model assignments and named profiles.
     Models(models::Args),
+    /// Multi-harness skill registry discovery, prompt resolution, and health diagnostics.
+    Skills(skills::Args),
     /// Show installed harnesses, versions, and drift.
     Status,
     /// Remove the CE plugin and restore the pre-install config.
@@ -95,6 +97,7 @@ fn main() {
         Some(Commands::Sync(args)) => sync::run(&ctx, &args),
         Some(Commands::Upgrade(args)) => upgrade::run(&ctx, &args),
         Some(Commands::Models(args)) => models::run(&ctx, &args),
+        Some(Commands::Skills(args)) => skills::run(&ctx, &args),
         Some(Commands::Status) => status::run(&ctx),
         Some(Commands::Uninstall(args)) => uninstall::run(&ctx, &args),
         Some(Commands::Doctor) => doctor::run(&ctx),

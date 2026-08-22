@@ -58,6 +58,11 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
         ));
     }
 
+    // Skill Registry Integrity Health Probe
+    if let Ok(skill_findings) = crate::source::registry::check_skill_registry_health(ctx) {
+        findings.extend(skill_findings);
+    }
+
     // Project adoption health checks
     for p in &state.projects {
         let agents_file = p.path.join(&p.file);
