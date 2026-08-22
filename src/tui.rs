@@ -91,6 +91,7 @@ struct App {
     model_assignments: Vec<(String, String)>, // (slot, model)
     output_modal: Option<(String, Vec<String>)>, // (title, lines)
     selected_harness_idx: usize,
+    selected_model_idx: usize,
     harness_targets: Vec<String>,
     selected_backup_idx: usize,
     backups: Vec<crate::state::backups::BackupEntry>,
@@ -106,6 +107,7 @@ impl App {
             model_assignments: Vec::new(),
             output_modal: None,
             selected_harness_idx: 0,
+            selected_model_idx: 0,
             selected_backup_idx: 0,
             backups: Vec::new(),
             harness_targets: vec![
@@ -624,15 +626,23 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
             if app.model_assignments.is_empty() {
                 lines.push(Line::from(Span::raw("  (Default harness model configurations)")));
             } else {
-                for (slot, model) in &app.model_assignments {
+                for (idx, (slot, model)) in app.model_assignments.iter().enumerate() {
+                    let selected = idx == app.selected_model_idx;
+                    let prefix = if selected { " 👉 " } else { "    " };
+                    let style = if selected {
+                        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(Color::White)
+                    };
                     lines.push(Line::from(vec![
-                        Span::styled(format!("  • {slot}: "), Style::default().fg(Color::Cyan)),
-                        Span::styled(model, Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                        Span::styled(prefix, Style::default().fg(Color::Green)),
+                        Span::styled(format!("{slot}: "), Style::default().fg(Color::Cyan)),
+                        Span::styled(model, style),
                     ]));
                 }
             }
             lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled("Press [Enter] to view assignments, set slots, or save profiles.", Style::default().fg(Color::Gray))));
+            lines.push(Line::from(Span::styled("Press [↑/↓/j/k] to navigate slots, [Enter] to run models list/set.", Style::default().fg(Color::Gray))));
             lines
         }
         MenuTab::Sync => vec![

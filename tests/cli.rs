@@ -1083,3 +1083,34 @@ fn init_prj_preserves_preexisting_content_and_crlf() {
     let restored_text = fs::read_to_string(&agents_file).unwrap();
     assert_eq!(restored_text, initial_content);
 }
+
+#[test]
+fn doctor_reports_model_assignment_drift_and_sync_reconciles() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Manually inject an unrecorded model assignment into opencode.json
+    let opencode_json = home.join(".config/opencode/opencode.json");
+    let content = fs::read_to_string(&opencode_json).unwrap();
+    let mut val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    val["agent"]["ce-brainstorm"] = serde_json::json!({
+        "model": "anthropic/claude-3-5-sonnet",
+        "variant": ""
+    });
+    fs::write(&opencode_json, serde_json::to_string_pretty(&val).unwrap()).unwrap();
+
+    // 1. Doctor should report model assignment drift
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("model-assignment-drift"));
+
+    // 2. Sync should reconcile model assignments bidirectionally
+    ceai(&config_dir, &home).arg("sync").assert().success();
+
+    // 3. Doctor should now pass cleanly
+    ceai(&config_dir, &home).arg("doctor").assert().success();
+}

@@ -191,6 +191,29 @@ pub(crate) fn sync_with(
             "last_synced_at": Utc::now().to_rfc3339(),
         }));
     }
+
+    // Reconcile model assignments bidirectionally between opencode.json and state.json
+    let opencode_json = ctx.opencode_config_dir.join("opencode.json");
+    if opencode_json.exists() {
+        if let Ok(config_json) = crate::opencode::config::read_config(&opencode_json) {
+            if let Some(agents) = config_json.get("agent").and_then(|a| a.as_object()) {
+                for (slot, val) in agents {
+                    if let Some(model_str) = val.get("model").and_then(|m| m.as_str()) {
+                        if !model_str.is_empty() && !state.model_assignments.contains_key(slot) {
+                            if let Some((provider, model_id)) = model_str.split_once('/') {
+                                state.set_model_assignment(slot, provider, model_id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for (slot, assignment) in &state.model_assignments {
+        let model_str = format!("{}/{}", assignment.provider_id, assignment.model_id);
+        let _ = crate::opencode::config::apply_model_assignment(&opencode_json, slot, &model_str);
+    }
+
     state.save(&state_path)?;
 
     if !ctx.quiet && !ctx.dry_run {
