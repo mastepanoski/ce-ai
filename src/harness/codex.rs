@@ -27,7 +27,7 @@ impl HarnessAdapter for CodexAdapter {
             return home.to_path_buf();
         }
 
-        if let Ok(config_env) = std::env::var("CODEX_CONFIG_DIR") {
+        if let Some(config_env) = std::env::var_os("CODEX_HOME") {
             return PathBuf::from(config_env).join("config.toml");
         }
 
@@ -110,14 +110,13 @@ pub fn register_codex_mcp_server(
     server_table.insert("args".to_string(), toml::Value::Array(args_vec));
 
     if !env.is_empty() {
-        let env_entry = server_table
-            .entry("env".to_string())
-            .or_insert_with(|| toml::Value::Table(toml::Table::new()));
-        if let Some(env_table) = env_entry.as_table_mut() {
-            for (k, v) in env {
-                env_table.insert(k.clone(), toml::Value::String(v.clone()));
-            }
+        let mut env_table = toml::Table::new();
+        for (k, v) in env {
+            env_table.insert(k.clone(), toml::Value::String(v.clone()));
         }
+        server_table.insert("env".to_string(), toml::Value::Table(env_table));
+    } else {
+        server_table.remove("env");
     }
 
     let toml_string = toml::to_string_pretty(&root_table).map_err(|e| {
@@ -271,6 +270,16 @@ mod tests {
     }
 
     #[test]
+    fn codex_adapter_respects_codex_home_env() {
+        let adapter = CodexAdapter;
+        let home = PathBuf::from("/tmp/home");
+        std::env::set_var("CODEX_HOME", "/custom/codex/dir");
+        let path = adapter.default_config_path(&home);
+        std::env::remove_var("CODEX_HOME");
+        assert_eq!(path, PathBuf::from("/custom/codex/dir/config.toml"));
+    }
+
+    #[test]
     fn registers_and_unregisters_native_codex_mcp_server() {
         let tmp = TempDir::new().unwrap();
         let config_path = tmp.path().join("config.toml");
@@ -357,5 +366,34 @@ enabled = true
         let stripped = strip_managed_block(&content);
         assert!(!stripped.contains(CE_MANAGED_BEGIN));
         assert_eq!(stripped.trim(), "# My Project");
+    }
+
+    #[test]
+    fn replaces_env_map_cleanly_on_re_registration() {
+        let tmp = TempDir::new().unwrap();
+        let config_path = tmp.path().join("config.toml");
+
+        let mut env1 = BTreeMap::new();
+        env1.insert("OLD_KEY".to_string(), "old_val".to_string());
+        register_codex_mcp_server(&config_path, "engram", "engram", &["serve"], &env1).unwrap();
+
+        let mut env2 = BTreeMap::new();
+        env2.insert("NEW_KEY".to_string(), "new_val".to_string());
+        register_codex_mcp_server(&config_path, "engram", "engram", &["serve"], &env2).unwrap();
+
+        let content = std::fs::read_to_string(&config_path).unwrap();
+        let root: toml::Table = content.parse().unwrap();
+        let engram_env = root["mcp_servers"]["engram"]["env"].as_table().unwrap();
+        assert!(!engram_env.contains_key("OLD_KEY"));
+        assert_eq!(engram_env["NEW_KEY"].as_str().unwrap(), "new_val");
+
+        // Re-register with empty env map -> removes env table
+        let empty_env = BTreeMap::new();
+        register_codex_mcp_server(&config_path, "engram", "engram", &["serve"], &empty_env)
+            .unwrap();
+        let content_empty = std::fs::read_to_string(&config_path).unwrap();
+        let root_empty: toml::Table = content_empty.parse().unwrap();
+        let engram_table = root_empty["mcp_servers"]["engram"].as_table().unwrap();
+        assert!(!engram_table.contains_key("env"));
     }
 }

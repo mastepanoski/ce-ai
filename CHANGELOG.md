@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.1] - 2026-08-23
+
+### Fixed
+- Adopted official `CODEX_HOME` environment variable override across Codex harness resolution (`src/harness/mod.rs`, `src/harness/codex.rs`).
+- Fixed TOML `env` table replacement in `register_codex_mcp_server` to cleanly overwrite or remove `env` entries.
+- Removed dead legacy generic JSON mapping for Codex (`.codex/config.json`) in `src/harness/generic_json.rs`.
+- Clarified OpenSpec R3 contract for `.codex/AGENTS.md` project adoption vs root `AGENTS.md`.
+
 ## [1.12.0] - 2026-08-23
 
 ### Added
