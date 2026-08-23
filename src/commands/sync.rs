@@ -174,14 +174,21 @@ pub(crate) fn sync_with(
         active_harnesses.push("opencode".to_string());
     }
 
+    let home_dir = crate::harness::home_dir_from_ctx(ctx);
+
     state.installed_harnesses.clear();
     for name in &active_harnesses {
         if let Ok(h_kind) = name.parse::<HarnessKind>() {
-            let target_config = h_kind.config_path(&ctx.opencode_config_dir);
+            let config_dir = if h_kind == HarnessKind::Opencode {
+                ctx.opencode_config_dir.clone()
+            } else {
+                h_kind.harness_dir(&home_dir)
+            };
+            let target_config = h_kind.config_path(&config_dir);
             let _ = crate::opencode::config::ensure_plugin_and_skills(
                 &target_config,
-                &crate::opencode::plugins::plugin_entry(&ctx.opencode_config_dir).to_string_lossy(),
-                &crate::opencode::plugins::skills_path(&ctx.opencode_config_dir).to_string_lossy(),
+                &crate::opencode::plugins::plugin_entry(&config_dir).to_string_lossy(),
+                &crate::opencode::plugins::skills_path(&config_dir).to_string_lossy(),
             );
         }
         state.installed_harnesses.push(serde_json::json!({

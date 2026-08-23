@@ -178,7 +178,13 @@ pub(crate) fn set(ctx: &Context, harness: &str, slot: &str, model: &str) -> Resu
             "harness '{harness}' has no agent-map config; cannot assign models"
         )));
     }
-    let config_path = kind.config_path(&ctx.opencode_config_dir);
+    let home_dir = crate::harness::home_dir_from_ctx(ctx);
+    let config_dir = if kind == crate::harness::HarnessKind::Opencode {
+        ctx.opencode_config_dir.clone()
+    } else {
+        kind.harness_dir(&home_dir)
+    };
+    let config_path = kind.config_path(&config_dir);
 
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
@@ -524,7 +530,9 @@ also/bad/
         std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
 
         set(&ctx, "claude", "ce-brainstorm", "user/custom-model").unwrap();
-        let claude_config = read_config(&ctx.opencode_config_dir.join("claude.json")).unwrap();
+        let home_dir = crate::harness::home_dir_from_ctx(&ctx);
+        let claude_dir = crate::harness::HarnessKind::Claude.harness_dir(&home_dir);
+        let claude_config = read_config(&claude_dir.join("claude.json")).unwrap();
         assert_eq!(
             claude_config["agent"]["ce-brainstorm"]["model"],
             "user/custom-model"

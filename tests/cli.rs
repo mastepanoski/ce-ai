@@ -1592,3 +1592,54 @@ fn audit_subcommand_runs_advisory_and_json_mode() {
         .failure()
         .stderr(predicate::str::contains("is below required threshold"));
 }
+
+#[test]
+fn install_cursor_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "cursor",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let cursor_dir = home.join(".cursor");
+    assert!(cursor_dir.join("mcp.json").exists());
+    assert!(cursor_dir.join("compound-engineering").exists());
+
+    // opencode directory must remain pristine / non-existent
+    assert!(!home.join(".config/opencode").exists());
+}
+
+#[test]
+fn uninstall_cursor_harness_cleans_native_dir_artifacts() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "cursor",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "cursor"])
+        .assert()
+        .success();
+
+    let cursor_dir = home.join(".cursor");
+    assert!(!cursor_dir.join("compound-engineering").exists());
+}

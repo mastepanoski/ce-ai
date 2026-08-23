@@ -53,21 +53,28 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
 
+    let home_dir = crate::harness::home_dir_from_ctx(ctx);
+
     for target in &targets {
-        if target == "opencode" {
-            let opencode_json = ctx.opencode_config_dir.join("opencode.json");
+        if let Ok(harness_kind) = target.parse::<HarnessKind>() {
+            let config_dir = if harness_kind == HarnessKind::Opencode {
+                ctx.opencode_config_dir.clone()
+            } else {
+                harness_kind.harness_dir(&home_dir)
+            };
+            let target_config = harness_kind.config_path(&config_dir);
             let backups = ctx.config_dir.join("backups");
             match newest_backup_dir(&backups)? {
                 Some(_) => {
-                    let _ = restore_latest(&backups, &opencode_json);
+                    let _ = restore_latest(&backups, &target_config);
                 }
                 None => {
-                    if opencode_json.exists() {
-                        let _ = std::fs::remove_file(&opencode_json);
+                    if target_config.exists() {
+                        let _ = std::fs::remove_file(&target_config);
                     }
                 }
             }
-            let managed_dir = ctx.opencode_config_dir.join(MANAGED_DIR);
+            let managed_dir = config_dir.join(MANAGED_DIR);
             if managed_dir.exists() {
                 let _ = std::fs::remove_dir_all(&managed_dir);
             }

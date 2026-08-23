@@ -243,14 +243,32 @@ impl HarnessKind {
         }
     }
 
+    /// Returns the native configuration directory root for this harness relative to `home_dir`.
+    pub fn harness_dir(&self, home_dir: &Path) -> PathBuf {
+        match self {
+            HarnessKind::Opencode => home_dir.join(".config").join("opencode"),
+            HarnessKind::Claude => home_dir.join(".config").join("claude"),
+            HarnessKind::Pi => home_dir.join(".pi"),
+            HarnessKind::Cursor => home_dir.join(".cursor"),
+            HarnessKind::Copilot => home_dir.join(".config").join("github-copilot"),
+            HarnessKind::Codex => home_dir.join(".config").join("codex"),
+            HarnessKind::Grok => home_dir.join(".config").join("grok"),
+            HarnessKind::Kimi => home_dir.join(".config").join("kimi"),
+            HarnessKind::Agy => home_dir.join(".gemini").join("antigravity-cli"),
+            HarnessKind::Deepseek => home_dir.join(".config").join("deepseek"),
+            HarnessKind::Fx => home_dir.join(".config").join("fx"),
+            HarnessKind::Custom => home_dir.join(".config").join("custom"),
+        }
+    }
+
     /// Resolves target configuration file path for the harness given a base config directory.
     pub fn config_path(&self, base_dir: &Path) -> PathBuf {
         match self {
             HarnessKind::Opencode => base_dir.join("opencode.json"),
             HarnessKind::Claude => base_dir.join("claude.json"),
             HarnessKind::Pi => base_dir.join("config.json"),
-            HarnessKind::Cursor => base_dir.join(".cursorrules"),
-            HarnessKind::Copilot => base_dir.join("copilot-instructions.md"),
+            HarnessKind::Cursor => base_dir.join("mcp.json"),
+            HarnessKind::Copilot => base_dir.join("config.json"),
             HarnessKind::Codex => base_dir.join("codex.json"),
             HarnessKind::Grok => base_dir.join("grok.json"),
             HarnessKind::Kimi => base_dir.join("kimi.json"),
@@ -260,6 +278,19 @@ impl HarnessKind {
             HarnessKind::Custom => base_dir.join("custom.json"),
         }
     }
+}
+
+/// Resolves the home/base directory from context for native harness directories.
+pub fn home_dir_from_ctx(ctx: &crate::commands::Context) -> PathBuf {
+    if let Some(config_dir) = ctx.opencode_config_dir.parent() {
+        if config_dir.file_name().and_then(|s| s.to_str()) == Some(".config") {
+            if let Some(home) = config_dir.parent() {
+                return home.to_path_buf();
+            }
+        }
+        return config_dir.to_path_buf();
+    }
+    ctx.opencode_config_dir.clone()
 }
 
 impl FromStr for HarnessKind {
@@ -398,5 +429,28 @@ mod tests {
         assert_eq!(ce_harnesses.len(), 2);
         assert!(ce_harnesses.contains(&HarnessKind::Opencode));
         assert!(ce_harnesses.contains(&HarnessKind::Claude));
+    }
+
+    #[test]
+    fn harness_dir_resolves_native_paths_for_all_kinds() {
+        let home = Path::new("/tmp/home");
+        assert_eq!(
+            HarnessKind::Opencode.harness_dir(home),
+            home.join(".config/opencode")
+        );
+        assert_eq!(
+            HarnessKind::Claude.harness_dir(home),
+            home.join(".config/claude")
+        );
+        assert_eq!(HarnessKind::Cursor.harness_dir(home), home.join(".cursor"));
+        assert_eq!(HarnessKind::Pi.harness_dir(home), home.join(".pi"));
+        assert_eq!(
+            HarnessKind::Copilot.harness_dir(home),
+            home.join(".config/github-copilot")
+        );
+        assert_eq!(
+            HarnessKind::Agy.harness_dir(home),
+            home.join(".gemini/antigravity-cli")
+        );
     }
 }
