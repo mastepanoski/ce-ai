@@ -1,6 +1,7 @@
 ---
 module: commands/prj
 date: "2026-08-22"
+last_updated: "2026-08-22"
 problem_type: architecture_pattern
 category: architecture
 component: tooling
@@ -37,9 +38,10 @@ When building managed configuration injection engines or project adoption tools,
 
 ### 1. Marker-Delimited Managed Blocks
 - Use HTML comment markers to encapsulate injected instructions inside markdown files (`AGENTS.md`).
-- Standardize the header format with explicit metadata attributes: `<!-- ce-ai:block begin v=1 tier={tier} sha256={sha} -->` and `<!-- ce-ai:block end -->`.
+- Standardize the header format with explicit metadata attributes: `<!-- ce-ai:block begin v={version} tier={tier} sha256={sha} -->` and `<!-- ce-ai:block end -->`.
+- Derive the version from a single shared constant (`pub const BLOCK_VERSION: u32 = 2;`) consumed by BOTH the on-disk header and the `state.json` entry (`block_version`) — two independent version literals drift silently (this bit us once: the header said `v=1` while the state literal was a separate `1`).
 - HTML comment markers render invisibly in standard GitHub Flavored Markdown (GFM) viewers while remaining fully parsable by CLI tools.
-- Include a cryptographic hash (`sha256`) of the managed block body within the marker to enable instant integrity verification and drift detection without re-rendering templates.
+- Include a cryptographic hash (`sha256`) of the managed block body within the marker to enable instant integrity verification and drift detection without re-rendering templates. Idempotent re-runs compare the whole rendered block, so content changes (e.g. block v2's Single Source of Truth guidance in `full`/`orchestrator` tiers) upgrade adopted projects in place — no migration command needed.
 
 ### 2. Derived Harness Stubs
 - Automatically generate minimal derived stub files (e.g., `CLAUDE.md` containing `@AGENTS.md`) for sub-harnesses that support file inclusion/import primitives.
@@ -48,6 +50,7 @@ When building managed configuration injection engines or project adoption tools,
 ### 3. Reversible Operation & Atomic Restoration (`deinit-prj`)
 - `ce-ai deinit-prj` must perform surgical extraction of the managed block between the begin and end markers, restoring surrounding content byte-for-byte (including preserving original line endings such as CRLF vs LF).
 - Track whether `ce-ai` created the instruction file (`created_file: true` in state). If `deinit-prj` strips the block and the file was created by `ce-ai` and is now empty, automatically delete the file and any empty derived stubs (`CLAUDE.md`).
+- **`created_file` is provenance, not current state**: upgrade re-runs that replace a registry entry must preserve the prior flag instead of recomputing it from `file_existed`. Recomputing flipped the flag to `false` for ce-ai-created files and left orphans behind after upgrade→deinit (see [the dedicated bug write-up](../logic-errors/init-prj-created-file-clobber-on-re-adoption-2026-08-22.md)).
 - If pre-existing user content surrounded the block, preserve that content untouched upon de-initialization.
 
 ### 4. Backward Compatible State Schemas
@@ -88,7 +91,7 @@ Apply these patterns when:
 # My Pre-Existing Project Notes
 User-written notes and repository docs remain untouched here.
 
-<!-- ce-ai:block begin v=1 tier=full sha256=a1b2c3d4e5f6... -->
+<!-- ce-ai:block begin v=2 tier=full sha256=a1b2c3d4e5f6... -->
 ## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement
 
 All AI agents MUST follow the 7-stage Compound Engineering development cycle:
@@ -127,6 +130,7 @@ pub struct ProjectAdoptionEntry {
     pub path: PathBuf,
     pub tier: AdoptionTier,
     pub created_file: bool,
+    pub block_version: u32,
     pub block_sha256: String,
     pub adopted_at: String,
 }
@@ -145,6 +149,10 @@ pub struct State {
 ```rust
 pub const BLOCK_BEGIN_MARKER: &str = "<!-- ce-ai:block begin";
 pub const BLOCK_END_MARKER: &str = "<!-- ce-ai:block end -->";
+
+/// Managed block schema version, shared by the on-disk header and the
+/// state.json adoption entry so the two cannot drift apart.
+pub const BLOCK_VERSION: u32 = 2;
 
 pub fn run(
     ctx: &Context,
@@ -171,7 +179,8 @@ pub fn run(
     let newline = if is_crlf { "\r\n" } else { "\n" };
 
     let block_header = format!(
-        "<!-- ce-ai:block begin v=1 tier={} sha256={} -->",
+        "<!-- ce-ai:block begin v={} tier={} sha256={} -->",
+        BLOCK_VERSION,
         tier_str.to_lowercase(),
         body_sha256
     );
@@ -191,7 +200,9 @@ pub fn run(
         write_atomic(&claude_stub, b"@AGENTS.md\n")?;
     }
 
-    // Register project in global state.json atomically
+    // Register project in global state.json atomically. On replacement,
+    // preserve the prior entry's created_file (provenance) instead of
+    // recomputing it — see Guidance §3 and the logic-errors write-up.
     update_state_register_project(ctx, &target_dir, tier, !file_existed, body_sha256)?;
 
     Ok(())
@@ -199,6 +210,8 @@ pub fn run(
 ```
 
 ### De-adoption Subcommand (`src/commands/deinit_prj.rs`)
+
+> Error handling elided for brevity in this excerpt; the real implementation maps filesystem failures to `CeError` instead of discarding them.
 
 ```rust
 pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeError> {
