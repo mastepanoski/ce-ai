@@ -5,6 +5,13 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-08-23
+
+### Fixed
+- **Atomic Tools Install Sidecar Registration (Issue #158)**: `ce-ai tools install <tool>` now performs atomic JSON config injection (`mcpServers.<tool>`) into `opencode.json` using `write_atomic`, preserving all pre-existing user MCP servers. Executes a mandatory post-install health probe, returning a non-zero exit code (`CeError::Runtime`) on failure and emitting NO false success messages.
+
+---
+
 ## [1.8.0] - 2026-08-23
 
 ### Added
