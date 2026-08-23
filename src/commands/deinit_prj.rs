@@ -88,14 +88,14 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
         let is_empty_now = cleaned_content.trim().is_empty();
 
         if created_file && is_empty_now {
-            let _ = fs::remove_file(&agents_file);
+            fs::remove_file(&agents_file)?;
 
             // Clean up derived CLAUDE.md stub if created and only contains @AGENTS.md
             let claude_stub = target_dir.join("CLAUDE.md");
             if claude_stub.exists() {
                 if let Ok(stub_text) = fs::read_to_string(&claude_stub) {
                     if stub_text.trim() == "@AGENTS.md" {
-                        let _ = fs::remove_file(&claude_stub);
+                        fs::remove_file(&claude_stub)?;
                     }
                 }
             }
@@ -103,35 +103,33 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             crate::state::write_atomic(&agents_file, cleaned_content.as_bytes())?;
         }
 
-        if let Some(idx) = registry_pos {
-            state.projects.remove(idx);
-            state.save(&global_state_path)?;
-        }
-
         // Clean up sentinel-bounded .gitignore block (DEC-06)
         let gitignore_file = target_dir.join(".gitignore");
         if gitignore_file.exists() {
-            if let Ok(gi_text) = fs::read_to_string(&gitignore_file) {
-                use crate::commands::init_prj::{GITIGNORE_BEGIN_MARKER, GITIGNORE_END_MARKER};
-                if let Some(start_idx) = gi_text.find(GITIGNORE_BEGIN_MARKER) {
-                    if let Some(end_rel) = gi_text[start_idx..].find(GITIGNORE_END_MARKER) {
-                        let end_idx = start_idx + end_rel + GITIGNORE_END_MARKER.len();
-                        let mut cleaned_gi = String::new();
-                        cleaned_gi.push_str(&gi_text[..start_idx]);
-                        let rest = &gi_text[end_idx..];
-                        let rest_trimmed = rest
-                            .strip_prefix("\r\n")
-                            .unwrap_or_else(|| rest.strip_prefix('\n').unwrap_or(rest));
-                        cleaned_gi.push_str(rest_trimmed);
-                        if cleaned_gi.trim().is_empty() {
-                            let _ = fs::remove_file(&gitignore_file);
-                        } else {
-                            let _ =
-                                crate::state::write_atomic(&gitignore_file, cleaned_gi.as_bytes());
-                        }
+            let gi_text = fs::read_to_string(&gitignore_file)?;
+            use crate::commands::init_prj::{GITIGNORE_BEGIN_MARKER, GITIGNORE_END_MARKER};
+            if let Some(start_idx) = gi_text.find(GITIGNORE_BEGIN_MARKER) {
+                if let Some(end_rel) = gi_text[start_idx..].find(GITIGNORE_END_MARKER) {
+                    let end_idx = start_idx + end_rel + GITIGNORE_END_MARKER.len();
+                    let mut cleaned_gi = String::new();
+                    cleaned_gi.push_str(&gi_text[..start_idx]);
+                    let rest = &gi_text[end_idx..];
+                    let rest_trimmed = rest
+                        .strip_prefix("\r\n")
+                        .unwrap_or_else(|| rest.strip_prefix('\n').unwrap_or(rest));
+                    cleaned_gi.push_str(rest_trimmed);
+                    if cleaned_gi.trim().is_empty() {
+                        fs::remove_file(&gitignore_file)?;
+                    } else {
+                        crate::state::write_atomic(&gitignore_file, cleaned_gi.as_bytes())?;
                     }
                 }
             }
+        }
+
+        if let Some(idx) = registry_pos {
+            state.projects.remove(idx);
+            state.save(&global_state_path)?;
         }
     }
 

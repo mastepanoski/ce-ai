@@ -155,6 +155,15 @@ pub fn list_backups(
     Ok(entries)
 }
 
+/// Returns the newest backup entry under `root` for a specific harness target, if any.
+pub fn newest_backup_for_harness(
+    root: &Path,
+    harness: &str,
+) -> Result<Option<BackupEntry>, CeError> {
+    let entries = list_backups(root, Some(harness))?;
+    Ok(entries.into_iter().next())
+}
+
 /// Restores a specific backup snapshot by ID onto `target`.
 pub fn restore_backup_by_id(root: &Path, id: &str, target: &Path) -> Result<BackupEntry, CeError> {
     // Path Traversal Security Hardening
@@ -177,7 +186,11 @@ pub fn restore_backup_by_id(root: &Path, id: &str, target: &Path) -> Result<Back
     let sub_entries: Vec<PathBuf> = std::fs::read_dir(&backup_dir)?
         .filter_map(Result::ok)
         .map(|e| e.path())
-        .filter(|p| p.is_file())
+        .filter(|p| {
+            std::fs::symlink_metadata(p)
+                .map(|m| m.file_type().is_file())
+                .unwrap_or(false)
+        })
         .collect();
 
     let backup_file_path = sub_entries.first().ok_or_else(|| {

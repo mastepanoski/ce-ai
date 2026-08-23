@@ -256,9 +256,6 @@ pub fn run(
                 state.projects.push(entry);
             }
         }
-
-        state.save(&global_state_path)?;
-
         // Inject sentinel-bounded .gitignore block (DEC-06)
         let gitignore_file = target_dir.join(".gitignore");
         let gitignore_block = format!(
@@ -266,7 +263,7 @@ pub fn run(
             GITIGNORE_BEGIN_MARKER, GITIGNORE_END_MARKER
         );
         let gitignore_text = if gitignore_file.exists() {
-            fs::read_to_string(&gitignore_file).unwrap_or_default()
+            fs::read_to_string(&gitignore_file)?
         } else {
             String::new()
         };
@@ -276,10 +273,16 @@ pub fn run(
                 updated_gi.push('\n');
             }
             updated_gi.push_str(&gitignore_block);
-            let _ = crate::state::write_atomic(&gitignore_file, updated_gi.as_bytes());
+            crate::state::write_atomic(&gitignore_file, updated_gi.as_bytes())?;
         }
 
-        let _ = crate::source::registry::SkillRegistry::sync_registry(ctx);
+        if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
+            if !ctx.quiet {
+                eprintln!("warning: skill registry sync failed: {e}");
+            }
+        }
+
+        state.save(&global_state_path)?;
     }
 
     if !ctx.quiet {

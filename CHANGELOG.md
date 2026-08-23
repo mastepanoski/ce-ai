@@ -5,7 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.8.2] - 2026-08-23
+## [1.8.4] - 2026-08-23
+
+### Fixed
+- **Transactional Error Propagation & State Commit Integrity (Issue #162)**: Replaced `let _ =` error swallowing in `uninstall`, `deinit-prj`, and `init-prj` with `?` error propagation for required filesystem operations (file deletion, backup restoration, atomic writes, `.gitignore` block updates). Delayed `state.save()` to run strictly after required filesystem work succeeds, preventing state corruption and false-positive completion messages when filesystem operations fail.
+
+---
+
+## [1.8.3] - 2026-08-23
 
 ### Fixed
 - **Code Review Hardening for Sidecar Probe & JSON Guarding (Issue #158)**: Refactored `install_tool` to probe actual binary availability on `PATH` (`is_in_path`) avoiding tautological false-positive success reporting when executables are missing. Added `config.is_object()` validation in `register_mcp_server` to prevent runtime panics on non-object JSON roots.

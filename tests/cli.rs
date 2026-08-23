@@ -1643,3 +1643,56 @@ fn uninstall_cursor_harness_cleans_native_dir_artifacts() {
     let cursor_dir = home.join(".cursor");
     assert!(!cursor_dir.join("compound-engineering").exists());
 }
+
+#[test]
+fn uninstall_failure_propagates_error_and_preserves_state() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "cursor",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let state_file = config_dir.join("state.json");
+    let initial_state = std::fs::read_to_string(&state_file).unwrap();
+    assert!(initial_state.contains("cursor"));
+
+    // Convert target_config (.cursor/mcp.json) into a non-empty directory to force IO failure cross-platform on Windows, macOS, and Linux
+    let target_config = home.join(".cursor").join("mcp.json");
+    std::fs::remove_file(&target_config).unwrap();
+    std::fs::create_dir_all(target_config.join("blocker")).unwrap();
+
+    let result = ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "cursor"])
+        .assert();
+
+    // 1. Assert non-zero exit status (must fail)
+    result.failure();
+
+    // 2. Unconditionally assert state preservation
+    let current_state = std::fs::read_to_string(&state_file).unwrap();
+    assert!(
+        current_state.contains("cursor"),
+        "state.json should preserve cursor harness entry when uninstall fails"
+    );
+}
+
+#[test]
+fn uninstall_invalid_harness_name_returns_usage_error() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "invalid-harness-xyz"])
+        .assert()
+        .failure()
+        .code(2);
+}
