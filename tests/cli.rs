@@ -1665,19 +1665,10 @@ fn uninstall_failure_propagates_error_and_preserves_state() {
     let initial_state = std::fs::read_to_string(&state_file).unwrap();
     assert!(initial_state.contains("cursor"));
 
-    // Lock target config file (.cursor/mcp.json) with open handle and read-only mode to force IO error on deletion cross-platform
+    // Convert target_config (.cursor/mcp.json) into a non-empty directory to force IO failure cross-platform on Windows, macOS, and Linux
     let target_config = home.join(".cursor").join("mcp.json");
-    let _open_file = std::fs::OpenOptions::new()
-        .write(true)
-        .open(&target_config)
-        .unwrap();
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ =
-            std::fs::set_permissions(home.join(".cursor"), std::fs::Permissions::from_mode(0o555));
-    }
+    std::fs::remove_file(&target_config).unwrap();
+    std::fs::create_dir_all(target_config.join("blocker")).unwrap();
 
     let result = ceai(&config_dir, &home)
         .args(["uninstall", "--harness", "cursor"])
@@ -1686,16 +1677,7 @@ fn uninstall_failure_propagates_error_and_preserves_state() {
     // 1. Assert non-zero exit status (must fail)
     result.failure();
 
-    // 2. Restore permissions for TempDir cleanup
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ =
-            std::fs::set_permissions(home.join(".cursor"), std::fs::Permissions::from_mode(0o755));
-    }
-    drop(_open_file);
-
-    // 3. Unconditionally assert state preservation
+    // 2. Unconditionally assert state preservation
     let current_state = std::fs::read_to_string(&state_file).unwrap();
     assert!(
         current_state.contains("cursor"),
