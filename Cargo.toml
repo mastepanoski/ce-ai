@@ -1,6 +1,6 @@
 [package]
 name = "ce-ai"
-version = "1.10.0"
+version = "1.11.0"
 edition = "2021"
 description = "CLI for managing the compound-engineering plugin across AI harnesses"
 license = "MIT"
@@ -17,6 +17,7 @@ chrono = "0.4"
 inquire = "0.7"
 ratatui = "0.30"
 crossterm = "0.28"
+toml = "0.8"
 
 [dev-dependencies]
 assert_cmd = "2"

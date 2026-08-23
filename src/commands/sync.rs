@@ -217,6 +217,41 @@ pub(crate) fn sync_with(
                     &["serve"],
                     &empty_env,
                 )?;
+                let claude_skills_dir = config_dir.join("skills");
+                let managed_skills_src = managed_dir.join("skills");
+                if managed_skills_src.exists() {
+                    let _ = crate::source::archive::copy_dir_all(
+                        &managed_skills_src,
+                        &claude_skills_dir,
+                    );
+                }
+            } else if h_kind == HarnessKind::Codex {
+                let empty_env = std::collections::BTreeMap::new();
+                crate::harness::codex::register_codex_mcp_server(
+                    &target_config,
+                    "codegraph",
+                    "codegraph",
+                    &["mcp"],
+                    &empty_env,
+                )?;
+                crate::harness::codex::register_codex_mcp_server(
+                    &target_config,
+                    "engram",
+                    "engram",
+                    &["serve"],
+                    &empty_env,
+                )?;
+                let codex_skills_dir = config_dir.join("skills");
+                let managed_skills_src = managed_dir.join("skills");
+                if managed_skills_src.exists() {
+                    crate::source::archive::copy_dir_all(&managed_skills_src, &codex_skills_dir)
+                        .map_err(|e| {
+                            CeError::Runtime(format!(
+                                "failed to copy managed skills to {}: {e}",
+                                codex_skills_dir.display()
+                            ))
+                        })?;
+                }
             } else {
                 let _ = crate::opencode::config::ensure_plugin_and_skills(
                     &target_config,

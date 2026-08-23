@@ -302,6 +302,13 @@ pub fn run(
             crate::harness::claude::update_claude_md(&claude_rule_path, inner_body)?;
         }
 
+        // Write Codex project rule .codex/AGENTS.md if .codex exists
+        let codex_dir = target_dir.join(".codex");
+        if codex_dir.exists() {
+            let codex_rule_path = codex_dir.join("AGENTS.md");
+            crate::harness::codex::update_codex_agents_md(&codex_rule_path, inner_body)?;
+        }
+
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
             if !ctx.quiet {
                 eprintln!("warning: skill registry sync failed: {e}");

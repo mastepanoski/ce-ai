@@ -1819,6 +1819,120 @@ fn uninstall_claude_harness_cleans_native_dir_artifacts() {
 }
 
 #[test]
+fn install_codex_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "codex",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let config_toml = home.join(".codex/config.toml");
+    assert!(config_toml.exists());
+    assert!(home.join(".codex/skills").exists());
+
+    let content = fs::read_to_string(&config_toml).unwrap();
+    let root: toml::Table = content.parse().unwrap();
+    assert!(!root.contains_key("plugin"));
+    assert!(!root.contains_key("skills"));
+
+    let mcp = root["mcp_servers"].as_table().unwrap();
+    let codegraph: ce_ai::harness::codex::CodexMcpServer =
+        mcp["codegraph"].clone().try_into().unwrap();
+    assert_eq!(codegraph.command, "codegraph");
+    assert_eq!(codegraph.args, vec!["mcp"]);
+
+    let engram: ce_ai::harness::codex::CodexMcpServer = mcp["engram"].clone().try_into().unwrap();
+    assert_eq!(engram.command, "engram");
+    assert_eq!(engram.args, vec!["serve"]);
+
+    // opencode directory must remain pristine / non-existent
+    assert!(!home.join(".config/opencode").exists());
+}
+
+#[test]
+fn init_prj_codex_writes_and_deinits_agents_md() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("my-project");
+    fs::create_dir_all(prj_dir.join(".codex")).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let md_path = prj_dir.join(".codex/AGENTS.md");
+    assert!(md_path.exists());
+    let content = fs::read_to_string(&md_path).unwrap();
+    assert!(content.contains("<!-- CE-AI MANAGED BLOCK BEGIN -->"));
+    assert!(content.contains("<!-- CE-AI MANAGED BLOCK END -->"));
+
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success();
+
+    assert!(!md_path.exists());
+}
+
+#[test]
+fn uninstall_codex_harness_cleans_native_dir_artifacts_and_preserves_user_configs() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    // Pre-populate user config
+    let initial_toml = r#"model = "gpt-4o"
+"#;
+    let codex_dir = home.join(".codex");
+    fs::create_dir_all(&codex_dir).unwrap();
+    fs::write(codex_dir.join("config.toml"), initial_toml).unwrap();
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "codex",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "codex"])
+        .assert()
+        .success();
+
+    let config_toml = home.join(".codex/config.toml");
+    assert!(config_toml.exists());
+    let content = fs::read_to_string(&config_toml).unwrap();
+    let root: toml::Table = content.parse().unwrap();
+    assert_eq!(root["model"].as_str().unwrap(), "gpt-4o");
+
+    if let Some(mcp) = root.get("mcp_servers").and_then(|v| v.as_table()) {
+        assert!(!mcp.contains_key("codegraph"));
+        assert!(!mcp.contains_key("engram"));
+    }
+
+    assert!(!home.join(".codex/skills").exists());
+    assert!(!home.join(".config/opencode").exists());
+
+    let state_file = config_dir.join("state.json");
+    let state_text = fs::read_to_string(&state_file).unwrap();
+    assert!(!state_text.contains("\"codex\""));
+}
+
+#[test]
 fn uninstall_failure_propagates_error_and_preserves_state() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
