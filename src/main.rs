@@ -15,8 +15,8 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 use crate::commands::{
-    backups, deinit_prj, doctor, init_prj, install, models, skills, status, sync, tools, uninstall,
-    upgrade, workflow, Context,
+    audit, backups, deinit_prj, doctor, init_prj, install, models, skills, status, sync, tools,
+    uninstall, upgrade, workflow, Context,
 };
 use crate::error::result_exit_code;
 
@@ -63,6 +63,8 @@ enum Commands {
     Tools(tools::Args),
     /// Workflow FSM & progress recovery system across 7 development stages.
     Workflow(workflow::Args),
+    /// Multi-harness token-efficiency and context-quality audit engine.
+    Audit(audit::Args),
     /// Adopt a project repository by injecting managed Compound Engineering workflow blocks into AGENTS.md.
     #[command(name = "init-prj")]
     InitPrj {
@@ -104,6 +106,7 @@ fn main() {
         Some(Commands::Backups(args)) => backups::run(&ctx, &args),
         Some(Commands::Tools(args)) => tools::run(&ctx, &args),
         Some(Commands::Workflow(args)) => workflow::run(&ctx, &args),
+        Some(Commands::Audit(args)) => audit::run(&ctx, &args),
         Some(Commands::InitPrj { path, tier, force }) => init_prj::run(&ctx, path, &tier, force),
         Some(Commands::DeinitPrj { path }) => deinit_prj::run(&ctx, path),
         None => tui::run_interactive(&ctx),

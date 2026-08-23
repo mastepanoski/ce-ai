@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-08-23
+
+### Added
+- **Multi-Harness Token Efficiency & Context Quality Audit Subcommand (Issue #117)**: Introduced `ce-ai audit`, a capability-based audit engine evaluating token efficiency (CLI output compression with `rtk`, MCP server sprawl thresholds, prompt duplication analysis) and context quality (persistent memory with `engram`, library docs provider with `context7`, code intelligence index with `.codegraph/`, and learnings library with `docs/solutions/`).
+- **Audit CLI Ergonomics**: Renders a categorized console output with an overall percentage score (e.g. `score: 78%`). Purely advisory by default (Exit 0); supports `--json` for machine-readable CI reports and `--fail-under <pct>` to enforce threshold gates.
+
+---
+
 ## [1.7.1] - 2026-08-23
 
 ### Fixed

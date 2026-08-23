@@ -1557,3 +1557,38 @@ fn skills_resolve_emits_markdown_prompt_and_json() {
             "\"resolution_status\": \"paths-injected\"",
         ));
 }
+
+#[test]
+fn audit_subcommand_runs_advisory_and_json_mode() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Advisory default console output
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .arg("audit")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "== [ce-ai Agent Environment Audit] ==",
+        ))
+        .stdout(predicate::str::contains("score:"));
+
+    // JSON mode
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .args(["audit", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"score_percentage\":"));
+
+    // Fail under threshold
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .args(["audit", "--fail-under", "101"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("is below required threshold"));
+}
