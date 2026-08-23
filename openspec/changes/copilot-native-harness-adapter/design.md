@@ -19,6 +19,7 @@ impl HarnessAdapter for CopilotAdapter {
             return home.to_path_buf();
         }
 
+        // Note: COPILOT_CONFIG_DIR is a ce-ai convention for test and profile isolation
         if let Ok(config_env) = std::env::var("COPILOT_CONFIG_DIR") {
             return PathBuf::from(config_env).join("mcp-config.json");
         }

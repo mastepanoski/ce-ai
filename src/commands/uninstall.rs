@@ -101,7 +101,14 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             {
                 let skills_dir = config_dir.join("skills");
                 if skills_dir.exists() {
-                    let _ = std::fs::remove_dir_all(&skills_dir);
+                    if let Err(e) = std::fs::remove_dir_all(&skills_dir) {
+                        if !ctx.quiet {
+                            eprintln!(
+                                "warning: failed to clean skills directory at {}: {e}",
+                                skills_dir.display()
+                            );
+                        }
+                    }
                 }
             }
         }

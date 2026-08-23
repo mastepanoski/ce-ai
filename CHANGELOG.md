@@ -5,6 +5,13 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.1] - 2026-08-23
+
+### Fixed
+- Fixed JSON `env` object replacement in `register_copilot_mcp_server` to cleanly remove the `env` key when `env` map is empty.
+- Emitted explicit stderr warnings on skills directory removal failures during `ce-ai uninstall` across native harnesses.
+- Documented `COPILOT_CONFIG_DIR` environment override convention in OpenSpec design contract.
+
 ## [1.13.0] - 2026-08-23
 
 ### Added
