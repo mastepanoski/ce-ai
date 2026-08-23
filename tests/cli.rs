@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
 use predicates::prelude::*;
+use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
 fn ceai(config_dir: &Path, home: &Path) -> Command {
@@ -1283,6 +1284,159 @@ fn init_prj_upgrade_rerun_preserves_created_file_flag() {
 
     assert!(!agents_file.exists());
     assert!(!prj_dir.join("CLAUDE.md").exists());
+}
+
+#[test]
+fn init_prj_replaces_lf_only_v1_block_preserving_content() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("v1-lf-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    let user_head = "# LF Project\n\nCustom notes.\n\n";
+    let user_tail = "\nTrailing section.\n";
+    let v1_block = "<!-- ce-ai:block begin v=1 tier=full sha256=deadbeef -->\n## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement\n\nStale v1 content.\n<!-- ce-ai:block end -->";
+    fs::write(
+        &agents_file,
+        format!("{}{}{}", user_head, v1_block, user_tail),
+    )
+    .unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let updated_text = fs::read_to_string(&agents_file).unwrap();
+    assert!(updated_text.starts_with(user_head));
+    assert!(updated_text.ends_with(user_tail));
+    assert!(!updated_text.contains("Stale v1 content."));
+    assert!(updated_text.contains("<!-- ce-ai:block begin v=2 tier=full"));
+    assert!(!updated_text.contains("\r\n"));
+    assert!(updated_text.contains("### Single Source of Truth Rule"));
+}
+
+#[test]
+fn init_prj_malformed_block_fails_closed() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("malformed-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    let initial =
+        "# My Project\n\n<!-- ce-ai:block begin v=1 tier=full sha256=x -->\nNo end marker.\n";
+    fs::write(&agents_file, initial).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .failure();
+
+    // Fail closed: file must be byte-for-byte untouched.
+    assert_eq!(fs::read_to_string(&agents_file).unwrap(), initial);
+}
+
+#[test]
+fn init_prj_block_header_sha_matches_body_and_state() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("sha-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let text = fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap();
+    let begin = text.find("<!-- ce-ai:block begin").unwrap();
+    let line_end = begin + text[begin..].find('\n').unwrap();
+    let header = &text[begin..line_end];
+    let header_sha = header
+        .split("sha256=")
+        .nth(1)
+        .unwrap()
+        .split(' ')
+        .next()
+        .unwrap();
+    let body_start = line_end + 1;
+    let body_end = text.find("<!-- ce-ai:block end -->").unwrap();
+    let body = text[body_start..body_end].trim_end_matches(['\n', '\r']);
+
+    let mut hasher = Sha256::new();
+    hasher.update(body.as_bytes());
+    let computed = format!("{:x}", hasher.finalize());
+
+    assert_eq!(header_sha, computed);
+
+    let state_val: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(config_dir.join("state.json")).unwrap()).unwrap();
+    assert_eq!(
+        state_val["projects"][0]["block_sha256"].as_str().unwrap(),
+        header_sha
+    );
+}
+
+#[test]
+fn doctor_reports_stale_block_version_with_upgrade_hint() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("stale-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    // Simulate a real stale v1 block: hand-written old-format block (old body,
+    // v=1 header, non-matching sha) replacing the adopted content.
+    let agents_file = prj_dir.join("AGENTS.md");
+    let v1_block = "<!-- ce-ai:block begin v=1 tier=full sha256=deadbeef -->\n## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement\n\nStale v1 content.\n<!-- ce-ai:block end -->";
+    fs::write(&agents_file, format!("# Notes\n\n{}\n", v1_block)).unwrap();
+
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains("stale block version v=1"))
+        .stdout(predicate::str::contains(
+            "re-run ce-ai init-prj --tier full to upgrade",
+        ));
+}
+
+#[test]
+fn doctor_reports_generic_drift_for_tampered_v2_body() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("tampered-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    // Tamper: keep the declared v2 version but corrupt the header sha so the
+    // current-template hash no longer appears anywhere in the file.
+    let agents_file = prj_dir.join("AGENTS.md");
+    let text = fs::read_to_string(&agents_file).unwrap();
+    let begin = text.find("<!-- ce-ai:block begin").unwrap();
+    let line_end = begin + text[begin..].find('\n').unwrap();
+    let mut tampered = text.clone();
+    tampered.replace_range(
+        begin..line_end,
+        "<!-- ce-ai:block begin v=2 tier=full sha256=fedcba -->",
+    );
+    drop(text);
+    fs::write(&agents_file, tampered).unwrap();
+
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains("block SHA drift detected"))
+        .stdout(predicate::str::contains("stale block version").not());
 }
 
 #[test]

@@ -17,6 +17,16 @@ pub enum AdoptionTier {
     Orchestrator,
 }
 
+impl AdoptionTier {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AdoptionTier::Full => "full",
+            AdoptionTier::Minimal => "minimal",
+            AdoptionTier::Orchestrator => "orchestrator",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectAdoptionEntry {
     pub path: PathBuf,
