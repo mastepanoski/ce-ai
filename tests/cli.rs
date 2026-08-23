@@ -1665,23 +1665,18 @@ fn uninstall_failure_propagates_error_and_preserves_state() {
     let initial_state = std::fs::read_to_string(&state_file).unwrap();
     assert!(initial_state.contains("cursor"));
 
-    // Inject unremovable file inside managed_dir to force IO error on remove_dir_all cross-platform
-    let managed_dir = home.join(".cursor").join("compound-engineering");
-    let lock_file = managed_dir.join("unremovable.txt");
-
-    // On Windows, keeping an open handle locks the file from deletion
+    // Lock target config file (.cursor/mcp.json) with open handle and read-only mode to force IO error on deletion cross-platform
+    let target_config = home.join(".cursor").join("mcp.json");
     let _open_file = std::fs::OpenOptions::new()
         .write(true)
-        .create(true)
-        .truncate(true)
-        .open(&lock_file)
+        .open(&target_config)
         .unwrap();
 
-    // On Unix, set managed_dir non-writable
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&managed_dir, std::fs::Permissions::from_mode(0o555));
+        let _ =
+            std::fs::set_permissions(home.join(".cursor"), std::fs::Permissions::from_mode(0o555));
     }
 
     let result = ceai(&config_dir, &home)
@@ -1695,7 +1690,8 @@ fn uninstall_failure_propagates_error_and_preserves_state() {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&managed_dir, std::fs::Permissions::from_mode(0o755));
+        let _ =
+            std::fs::set_permissions(home.join(".cursor"), std::fs::Permissions::from_mode(0o755));
     }
     drop(_open_file);
 
