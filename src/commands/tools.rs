@@ -3,6 +3,7 @@
 
 use crate::commands::Context;
 use crate::error::CeError;
+use crate::harness::HarnessAdapter;
 use crate::source::tools_registry::{
     evaluate_freshness, extract_tool_version, FreshnessStatus, ToolsRegistryCache,
 };
@@ -137,6 +138,30 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
             let cursor_mcp = home_dir.join(".cursor").join("mcp.json");
             crate::harness::cursor::register_cursor_mcp_server(
                 &cursor_mcp,
+                &tool_lower,
+                cmd,
+                &args_vec,
+                &empty_env,
+            )?;
+        }
+
+        let claude_installed = state
+            .installed_harnesses
+            .iter()
+            .any(|h| h["name"].as_str() == Some("claude"));
+        if claude_installed {
+            let (cmd, args_vec) = match tool_lower.as_str() {
+                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
+                "engram" => ("engram", vec!["serve"]),
+                "rtk" => ("rtk", vec!["mcp"]),
+                "codegraph" => ("codegraph", vec!["mcp"]),
+                _ => ("", vec![]),
+            };
+            let empty_env = std::collections::BTreeMap::new();
+            let claude_adapter = crate::harness::claude::ClaudeAdapter;
+            let claude_config = claude_adapter.default_config_path(&home_dir);
+            crate::harness::claude::register_claude_mcp_server(
+                &claude_config,
                 &tool_lower,
                 cmd,
                 &args_vec,

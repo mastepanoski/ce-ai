@@ -71,6 +71,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 for tool in &["codegraph", "engram", "context7", "rtk"] {
                     crate::harness::cursor::unregister_cursor_mcp_server(&target_config, tool)?;
                 }
+            } else if harness_kind == HarnessKind::Claude {
+                for tool in &["codegraph", "engram", "context7", "rtk"] {
+                    crate::harness::claude::unregister_claude_mcp_server(&target_config, tool)?;
+                }
             } else if target_config.exists() {
                 std::fs::remove_file(&target_config)?;
             }

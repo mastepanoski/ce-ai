@@ -5,6 +5,18 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-08-23
+
+### Added
+- **Native Claude Code Harness Adapter (Issue #174 / Umbrella #155)**:
+  - Native `~/.claude.json` / `~/.claude/settings.json` reader and writer using Claude's official `mcpServers` stdio schema (`type: "stdio"`, `command`, `args`, `env`), honoring `CLAUDE_CONFIG_DIR` when set.
+  - Zero OpenCode key leakage: `plugin` and `skills.paths` keys are never written to Claude Code configuration files.
+  - Native skills placement: Managed skills installed directly under `~/.claude/skills/<name>/SKILL.md`.
+  - Project rules support: `ce-ai init-prj` writes project rules to `CLAUDE.md` / `.claude/CLAUDE.md` with demarcated managed comment blocks and de-adoption (`deinit-prj`) cleanup.
+  - Full lifecycle support for Claude Code across `install`, `sync`, `tools install`, `init-prj`, `deinit-prj`, and `uninstall`.
+
+---
+
 ## [1.9.0] - 2026-08-23
 
 ### Added

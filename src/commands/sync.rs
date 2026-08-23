@@ -201,6 +201,22 @@ pub(crate) fn sync_with(
                     &["serve"],
                     &empty_env,
                 )?;
+            } else if h_kind == HarnessKind::Claude {
+                let empty_env = std::collections::BTreeMap::new();
+                crate::harness::claude::register_claude_mcp_server(
+                    &target_config,
+                    "codegraph",
+                    "codegraph",
+                    &["mcp"],
+                    &empty_env,
+                )?;
+                crate::harness::claude::register_claude_mcp_server(
+                    &target_config,
+                    "engram",
+                    "engram",
+                    &["serve"],
+                    &empty_env,
+                )?;
             } else {
                 let _ = crate::opencode::config::ensure_plugin_and_skills(
                     &target_config,
