@@ -1,8 +1,6 @@
 //! `ce-ai tools`: detection, installation, and management of companion sidecars
 //! (Engram, CodeGraph, Context7, RTK), version freshness, and skill suggestions.
 
-use std::path::Path;
-
 use crate::commands::Context;
 use crate::error::CeError;
 use crate::source::tools_registry::{
@@ -121,30 +119,31 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
     crate::opencode::config::register_mcp_server(&opencode_json, &tool_lower, server_def)?;
 
     let probe_version = extract_tool_version(&tool_lower);
-    let probe_ok = probe_version.is_some() || is_mcp_configured(&opencode_json, &tool_lower);
+    let binary_name = match tool_lower.as_str() {
+        "context7" => "npx",
+        _ => &tool_lower,
+    };
+    let binary_on_path = is_in_path(binary_name);
 
-    if !probe_ok {
-        return Err(CeError::Runtime(format!(
-            "installation check failed for companion tool '{tool_lower}': binary not found on PATH or MCP configuration invalid"
-        )));
-    }
+    let status_detail = if let Some(version) = &probe_version {
+        format!("v{version} (ok)")
+    } else if binary_on_path {
+        "registered (binary active on PATH)".into()
+    } else {
+        format!("registered (note: '{binary_name}' binary not found on PATH; install binary to enable execution)")
+    };
 
-    let version_str = probe_version.unwrap_or_else(|| "configured".into());
-    println!(
-        "tools: '{tool_lower}' MCP server registration and health probe completed successfully ({version_str})."
-    );
+    println!("tools: '{tool_lower}' MCP server registration completed ({status_detail}).");
 
     Ok(())
 }
 
-fn is_mcp_configured(opencode_json: &Path, tool_name: &str) -> bool {
-    if let Ok(text) = std::fs::read_to_string(opencode_json) {
-        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) {
-            return val
-                .get("mcpServers")
-                .and_then(|m| m.as_object())
-                .map(|m| m.contains_key(tool_name))
-                .unwrap_or(false);
+fn is_in_path(name: &str) -> bool {
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            if dir.join(name).is_file() {
+                return true;
+            }
         }
     }
     false
@@ -219,5 +218,22 @@ mod tests {
 
         let err = install_tool(&ctx, "invalid-tool").unwrap_err();
         assert!(matches!(err, CeError::Usage(_)));
+    }
+
+    #[test]
+    fn test_tools_install_dry_run_makes_no_changes() {
+        let tmp = TempDir::new().unwrap();
+        let opencode_dir = tmp.path().join("opencode");
+        let ctx = Context {
+            config_dir: tmp.path().to_path_buf(),
+            opencode_config_dir: opencode_dir.clone(),
+            dry_run: true,
+            verbose: false,
+            quiet: true,
+        };
+
+        let result = install_tool(&ctx, "engram");
+        assert!(result.is_ok());
+        assert!(!opencode_dir.join("opencode.json").exists());
     }
 }

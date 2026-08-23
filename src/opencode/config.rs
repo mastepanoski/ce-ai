@@ -108,6 +108,12 @@ pub fn register_mcp_server(
     server_def: serde_json::Value,
 ) -> Result<(), CeError> {
     let mut config = read_config(config_path)?;
+    if !config.is_object() {
+        return Err(CeError::Runtime(format!(
+            "{} must be a JSON object; refusing to overwrite it. Fix the file manually, then re-run.",
+            config_path.display()
+        )));
+    }
     match config.get_mut("mcpServers") {
         None => {
             config["mcpServers"] = serde_json::json!({
@@ -261,5 +267,24 @@ mod tests {
             "not-an-array",
             "user config preserved"
         );
+    }
+
+    #[test]
+    fn register_mcp_server_creates_block_and_preserves_malformed_failures() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("opencode.json");
+
+        // 1. Create on empty config
+        write_json(&path, serde_json::json!({}));
+        register_mcp_server(&path, "context7", serde_json::json!({"command": "npx"})).unwrap();
+        let val = read_json(&path);
+        assert_eq!(val["mcpServers"]["context7"]["command"], "npx");
+
+        // 2. Fail safely on non-object mcpServers
+        write_json(&path, serde_json::json!({ "mcpServers": "invalid-string" }));
+        let err =
+            register_mcp_server(&path, "rtk", serde_json::json!({"command": "rtk"})).unwrap_err();
+        assert!(err.to_string().contains("mcpServers"));
+        assert_eq!(read_json(&path)["mcpServers"], "invalid-string");
     }
 }
