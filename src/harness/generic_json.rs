@@ -1,4 +1,4 @@
-//! Generic JSON harness adapter implementation for Codex, Grok, Kimi, AGY, DeepSeek, FX.
+//! Generic JSON harness adapter implementation for Grok, Kimi, AGY, DeepSeek, FX.
 
 use std::path::{Path, PathBuf};
 
@@ -23,7 +23,6 @@ impl HarnessAdapter for GenericJsonAdapter {
 
     fn default_config_path(&self, home: &Path) -> PathBuf {
         match self.kind {
-            HarnessKind::Codex => home.join(".codex").join("config.json"),
             HarnessKind::Grok => home.join(".grok").join("config.json"),
             HarnessKind::Kimi => home.join(".kimi").join("config.json"),
             HarnessKind::Agy => home
@@ -44,12 +43,6 @@ mod tests {
     #[test]
     fn generic_json_adapter_paths() {
         let home = PathBuf::from("/tmp/home");
-
-        let codex = GenericJsonAdapter::new(HarnessKind::Codex);
-        assert_eq!(
-            codex.default_config_path(&home),
-            home.join(".codex/config.json")
-        );
 
         let agy = GenericJsonAdapter::new(HarnessKind::Agy);
         assert_eq!(

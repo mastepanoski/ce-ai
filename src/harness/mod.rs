@@ -163,9 +163,7 @@ impl HarnessKind {
             }
             HarnessKind::Codex => {
                 let dir = self.harness_dir(home_dir);
-                dir.join("config.toml").exists()
-                    || dir.join("skills").exists()
-                    || home_dir.join(".config").join("codex").exists()
+                dir.join("config.toml").exists() || dir.join("skills").exists()
             }
             HarnessKind::Grok => {
                 home_dir.join(".grok").join("grok.json").exists()
@@ -251,7 +249,7 @@ impl HarnessKind {
             HarnessKind::Copilot => std::env::var_os("COPILOT_CONFIG_DIR")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| home_dir.join(".copilot")),
-            HarnessKind::Codex => std::env::var_os("CODEX_CONFIG_DIR")
+            HarnessKind::Codex => std::env::var_os("CODEX_HOME")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| home_dir.join(".codex")),
             HarnessKind::Grok => home_dir.join(".config").join("grok"),

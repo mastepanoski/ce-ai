@@ -3,8 +3,8 @@
 ## Acceptance Criteria
 
 ### R1: Harness Home & Config Path Resolution
-- WHEN `harness_dir(HarnessKind::Codex)` is called THEN it MUST return `$CODEX_CONFIG_DIR` if set, otherwise `$HOME/.codex`.
-- WHEN `default_config_path` is called THEN it MUST return `$CODEX_CONFIG_DIR/config.toml` if set, otherwise `$HOME/.codex/config.toml`.
+- WHEN `harness_dir(HarnessKind::Codex)` is called THEN it MUST return `$CODEX_HOME` if set, otherwise `$HOME/.codex`.
+- WHEN `default_config_path` is called THEN it MUST return `$CODEX_HOME/config.toml` if set, otherwise `$HOME/.codex/config.toml`.
 - WHEN `is_installed_on_host` is called for `HarnessKind::Codex` THEN it MUST check if the harness directory or `config.toml` exists.
 - WHEN `is_ce_installed` is called for `HarnessKind::Codex` THEN it MUST check if `config.toml` contains `[mcp_servers]` sidecars or if `skills/` exists under the harness directory.
 
@@ -14,12 +14,9 @@
 - WHEN updating `~/.codex/config.toml` THEN `ce-ai` MUST preserve all unmanaged top-level TOML keys and user `[mcp_servers]` tables.
 
 ### R3: Project Rule Adoption
-- WHEN `ce-ai init-prj` runs in a Codex-enabled project THEN project rules MUST be updated in:
-  1. `./AGENTS.md` if present
-  2. `.codex/AGENTS.md` if `.codex/` directory exists
-  3. Default to `./AGENTS.md`
-- WHEN `ce-ai init-prj` runs THEN it MUST inject or update the demarcated `CE-AI MANAGED BLOCK`.
-- WHEN `ce-ai deinit-prj` is run THEN it MUST strip the demarcated `CE-AI MANAGED BLOCK` from the project rule file.
+- WHEN `ce-ai init-prj` runs in a Codex-enabled project with `.codex/` directory THEN `.codex/AGENTS.md` MUST be updated with the demarcated `CE-AI MANAGED BLOCK`.
+- WHEN `AGENTS.md` exists at project root as the primary `ce-ai` directive source THEN it MUST NOT be injected with a managed block to avoid self-referential redundancy.
+- WHEN `ce-ai deinit-prj` is run THEN it MUST strip the demarcated `CE-AI MANAGED BLOCK` from `.codex/AGENTS.md`.
 
 ### R4: Uninstallation & Cleanup
 - WHEN `uninstall --harness codex` is run THEN `ce-ai` sidecars (`codegraph`, `engram`) MUST be unregistered from `[mcp_servers]`.
