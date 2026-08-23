@@ -5,6 +5,13 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.2] - 2026-08-23
+
+### Fixed
+- Fixed flaky test environment race condition on `GROK_HOME` by introducing cross-module process-wide mutex guard `HARNESS_ENV_LOCK` across `grok.rs` and `mod.rs` unit tests.
+- Removed dead legacy `HarnessKind::Grok` generic JSON mapping (`.grok/config.json`) from `src/harness/generic_json.rs`.
+- Expanded unit tests in `src/harness/grok.rs` for edge cases and invalid TOML error handling, and in `src/harness/generic_json.rs` for all supported variants.
+
 ## [1.13.1] - 2026-08-23
 
 ### Fixed

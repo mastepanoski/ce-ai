@@ -1,4 +1,4 @@
-//! Generic JSON harness adapter implementation for Grok, Kimi, AGY, DeepSeek, FX.
+//! Generic JSON harness adapter implementation for Kimi, AGY, DeepSeek, FX.
 
 use std::path::{Path, PathBuf};
 
@@ -23,7 +23,6 @@ impl HarnessAdapter for GenericJsonAdapter {
 
     fn default_config_path(&self, home: &Path) -> PathBuf {
         match self.kind {
-            HarnessKind::Grok => home.join(".grok").join("config.json"),
             HarnessKind::Kimi => home.join(".kimi").join("config.json"),
             HarnessKind::Agy => home
                 .join(".gemini")
@@ -39,21 +38,43 @@ impl HarnessAdapter for GenericJsonAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     #[test]
-    fn generic_json_adapter_paths() {
-        let home = PathBuf::from("/tmp/home");
+    fn generic_json_adapter_paths_and_kinds() {
+        let tmp = TempDir::new().unwrap();
+        let home = tmp.path().to_path_buf();
+
+        let kimi = GenericJsonAdapter::new(HarnessKind::Kimi);
+        assert_eq!(kimi.kind(), HarnessKind::Kimi);
+        assert_eq!(
+            kimi.default_config_path(&home),
+            home.join(".kimi/config.json")
+        );
 
         let agy = GenericJsonAdapter::new(HarnessKind::Agy);
+        assert_eq!(agy.kind(), HarnessKind::Agy);
         assert_eq!(
             agy.default_config_path(&home),
             home.join(".gemini/antigravity-cli/config.json")
         );
 
         let deepseek = GenericJsonAdapter::new(HarnessKind::Deepseek);
+        assert_eq!(deepseek.kind(), HarnessKind::Deepseek);
         assert_eq!(
             deepseek.default_config_path(&home),
             home.join(".deepseek/config.json")
+        );
+
+        let fx = GenericJsonAdapter::new(HarnessKind::Fx);
+        assert_eq!(fx.kind(), HarnessKind::Fx);
+        assert_eq!(fx.default_config_path(&home), home.join(".fx/config.json"));
+
+        let custom = GenericJsonAdapter::new(HarnessKind::Custom);
+        assert_eq!(custom.kind(), HarnessKind::Custom);
+        assert_eq!(
+            custom.default_config_path(&home),
+            home.join(".custom/config.json")
         );
     }
 }

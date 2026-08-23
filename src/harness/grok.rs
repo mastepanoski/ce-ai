@@ -248,6 +248,8 @@ mod tests {
 
     #[test]
     fn grok_adapter_default_paths() {
+        let _guard = crate::harness::tests::HARNESS_ENV_LOCK.lock().unwrap();
+        std::env::remove_var("GROK_HOME");
         let adapter = GrokAdapter;
         assert_eq!(adapter.kind(), HarnessKind::Grok);
         let home = PathBuf::from("/tmp/home");
@@ -259,12 +261,40 @@ mod tests {
 
     #[test]
     fn grok_adapter_respects_grok_home_env() {
+        let _guard = crate::harness::tests::HARNESS_ENV_LOCK.lock().unwrap();
         let adapter = GrokAdapter;
         let home = PathBuf::from("/tmp/home");
         std::env::set_var("GROK_HOME", "/custom/grok/dir");
         let path = adapter.default_config_path(&home);
         std::env::remove_var("GROK_HOME");
         assert_eq!(path, PathBuf::from("/custom/grok/dir/config.toml"));
+    }
+
+    #[test]
+    fn grok_adapter_config_path_edge_cases() {
+        let _guard = crate::harness::tests::HARNESS_ENV_LOCK.lock().unwrap();
+        std::env::remove_var("GROK_HOME");
+        let adapter = GrokAdapter;
+
+        let config_direct = PathBuf::from("/tmp/home/config.toml");
+        assert_eq!(adapter.default_config_path(&config_direct), config_direct);
+
+        let grok_dir_direct = PathBuf::from("/tmp/home/.grok");
+        assert_eq!(
+            adapter.default_config_path(&grok_dir_direct),
+            PathBuf::from("/tmp/home/.grok/config.toml")
+        );
+    }
+
+    #[test]
+    fn register_grok_mcp_server_handles_invalid_toml() {
+        let tmp = TempDir::new().unwrap();
+        let config_path = tmp.path().join("config.toml");
+        std::fs::write(&config_path, "invalid_toml = [unclosed").unwrap();
+
+        let env = BTreeMap::new();
+        let res = register_grok_mcp_server(&config_path, "engram", "engram", &["serve"], &env);
+        assert!(res.is_err());
     }
 
     #[test]

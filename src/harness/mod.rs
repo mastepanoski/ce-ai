@@ -439,8 +439,15 @@ mod tests {
         assert!(ce_harnesses.contains(&HarnessKind::Claude));
     }
 
+    pub(crate) static HARNESS_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn harness_dir_resolves_native_paths_for_all_kinds() {
+        let _guard = HARNESS_ENV_LOCK.lock().unwrap();
+        std::env::remove_var("GROK_HOME");
+        std::env::remove_var("CODEX_HOME");
+        std::env::remove_var("COPILOT_CONFIG_DIR");
+        std::env::remove_var("CLAUDE_CONFIG_DIR");
         let home = Path::new("/tmp/home");
         assert_eq!(
             HarnessKind::Opencode.harness_dir(home),
