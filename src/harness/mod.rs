@@ -83,11 +83,8 @@ impl HarnessKind {
                 home_dir.join(".cursor").exists() || home_dir.join(".cursorrules").exists()
             }
             HarnessKind::Copilot => {
-                home_dir.join(".copilot").exists()
-                    || home_dir
-                        .join(".github")
-                        .join("copilot-instructions.md")
-                        .exists()
+                let dir = self.harness_dir(home_dir);
+                dir.exists() || dir.join("mcp-config.json").exists()
             }
             HarnessKind::Codex => {
                 let dir = self.harness_dir(home_dir);
@@ -161,11 +158,8 @@ impl HarnessKind {
                     || home_dir.join(".cursor").join("rules").exists()
             }
             HarnessKind::Copilot => {
-                home_dir
-                    .join(".github")
-                    .join("copilot-instructions.md")
-                    .exists()
-                    || home_dir.join(".copilot").exists()
+                let dir = self.harness_dir(home_dir);
+                dir.join("mcp-config.json").exists() || dir.join("skills").exists()
             }
             HarnessKind::Codex => {
                 let dir = self.harness_dir(home_dir);
@@ -254,7 +248,9 @@ impl HarnessKind {
                 .unwrap_or_else(|| home_dir.join(".claude")),
             HarnessKind::Pi => home_dir.join(".pi"),
             HarnessKind::Cursor => home_dir.join(".cursor"),
-            HarnessKind::Copilot => home_dir.join(".config").join("github-copilot"),
+            HarnessKind::Copilot => std::env::var_os("COPILOT_CONFIG_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home_dir.join(".copilot")),
             HarnessKind::Codex => std::env::var_os("CODEX_CONFIG_DIR")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| home_dir.join(".codex")),
@@ -276,7 +272,9 @@ impl HarnessKind {
             }
             HarnessKind::Pi => base_dir.join("config.json"),
             HarnessKind::Cursor => base_dir.join("mcp.json"),
-            HarnessKind::Copilot => base_dir.join("config.json"),
+            HarnessKind::Copilot => {
+                crate::harness::copilot::CopilotAdapter.default_config_path(base_dir)
+            }
             HarnessKind::Codex => crate::harness::codex::CodexAdapter.default_config_path(base_dir),
             HarnessKind::Grok => base_dir.join("grok.json"),
             HarnessKind::Kimi => base_dir.join("kimi.json"),
@@ -451,7 +449,7 @@ mod tests {
         assert_eq!(HarnessKind::Pi.harness_dir(home), home.join(".pi"));
         assert_eq!(
             HarnessKind::Copilot.harness_dir(home),
-            home.join(".config/github-copilot")
+            home.join(".copilot")
         );
         assert_eq!(
             HarnessKind::Agy.harness_dir(home),

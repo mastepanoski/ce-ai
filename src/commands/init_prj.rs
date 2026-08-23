@@ -309,6 +309,14 @@ pub fn run(
             crate::harness::codex::update_codex_agents_md(&codex_rule_path, inner_body)?;
         }
 
+        // Write Copilot project rule .github/copilot-instructions.md if .github or copilot-instructions.md exists
+        let github_dir = target_dir.join(".github");
+        let copilot_md_path = github_dir.join("copilot-instructions.md");
+        if github_dir.exists() || copilot_md_path.exists() {
+            fs::create_dir_all(&github_dir)?;
+            crate::harness::copilot::update_copilot_instructions_md(&copilot_md_path, inner_body)?;
+        }
+
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
             if !ctx.quiet {
                 eprintln!("warning: skill registry sync failed: {e}");

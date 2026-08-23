@@ -252,6 +252,33 @@ pub(crate) fn sync_with(
                             ))
                         })?;
                 }
+            } else if h_kind == HarnessKind::Copilot {
+                let empty_env = std::collections::BTreeMap::new();
+                crate::harness::copilot::register_copilot_mcp_server(
+                    &target_config,
+                    "codegraph",
+                    "codegraph",
+                    &["mcp"],
+                    &empty_env,
+                )?;
+                crate::harness::copilot::register_copilot_mcp_server(
+                    &target_config,
+                    "engram",
+                    "engram",
+                    &["serve"],
+                    &empty_env,
+                )?;
+                let copilot_skills_dir = config_dir.join("skills");
+                let managed_skills_src = managed_dir.join("skills");
+                if managed_skills_src.exists() {
+                    crate::source::archive::copy_dir_all(&managed_skills_src, &copilot_skills_dir)
+                        .map_err(|e| {
+                            CeError::Runtime(format!(
+                                "failed to copy managed skills to {}: {e}",
+                                copilot_skills_dir.display()
+                            ))
+                        })?;
+                }
             } else {
                 let _ = crate::opencode::config::ensure_plugin_and_skills(
                     &target_config,

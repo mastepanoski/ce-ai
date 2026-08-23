@@ -192,6 +192,30 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
                 &empty_env,
             )?;
         }
+
+        let copilot_installed = state
+            .installed_harnesses
+            .iter()
+            .any(|h| h["name"].as_str() == Some("copilot"));
+        if copilot_installed {
+            let (cmd, args_vec) = match tool_lower.as_str() {
+                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
+                "engram" => ("engram", vec!["serve"]),
+                "rtk" => ("rtk", vec!["mcp"]),
+                "codegraph" => ("codegraph", vec!["mcp"]),
+                _ => ("", vec![]),
+            };
+            let empty_env = std::collections::BTreeMap::new();
+            let copilot_adapter = crate::harness::copilot::CopilotAdapter;
+            let copilot_config = copilot_adapter.default_config_path(&home_dir);
+            crate::harness::copilot::register_copilot_mcp_server(
+                &copilot_config,
+                &tool_lower,
+                cmd,
+                &args_vec,
+                &empty_env,
+            )?;
+        }
     }
 
     let probe_version = extract_tool_version(&tool_lower);

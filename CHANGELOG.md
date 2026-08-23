@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-08-23
+
+### Added
+- Native GitHub Copilot CLI harness adapter (`src/harness/copilot.rs`) targeting `~/.copilot/mcp-config.json` (JSON format) with `mcpServers` schema (Issue #177).
+- Native skills placement under `~/.copilot/skills/` and project directives adoption under `.github/copilot-instructions.md`.
+- `COPILOT_CONFIG_DIR` environment variable support.
+- Full lifecycle support for Copilot across `install`, `tools install`, `init-prj`, `deinit-prj`, `sync`, `doctor`, `status`, and `uninstall`.
+
 ## [1.11.0] - 2026-08-23
 
 ### Added
