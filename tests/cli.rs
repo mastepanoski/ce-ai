@@ -2082,6 +2082,161 @@ fn uninstall_copilot_harness_cleans_native_dir_artifacts_and_preserves_user_conf
 }
 
 #[test]
+fn install_grok_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "grok",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let grok_config = home.join(".grok/config.toml");
+    assert!(grok_config.exists());
+    assert!(home.join(".grok/skills").exists());
+
+    let content = fs::read_to_string(&grok_config).unwrap();
+    let root: toml::Table = content.parse().unwrap();
+    let mcp = root["mcp_servers"].as_table().unwrap();
+    assert!(mcp.contains_key("codegraph"));
+    assert!(mcp.contains_key("engram"));
+    let codegraph = mcp["codegraph"].as_table().unwrap();
+    assert_eq!(codegraph["command"].as_str().unwrap(), "codegraph");
+    assert_eq!(
+        codegraph["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec!["mcp"]
+    );
+    assert!(!root.contains_key("plugin"), "Zero OpenCode key leaks");
+    assert!(!root.contains_key("skills"), "Zero OpenCode key leaks");
+
+    // opencode directory must remain pristine / non-existent
+    assert!(!home.join(".config/opencode").exists());
+}
+
+#[test]
+fn init_prj_grok_preserves_preexisting_rules_md_on_deinit() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("my-project");
+    let rules_dir = prj_dir.join(".grok").join("rules");
+    fs::create_dir_all(&rules_dir).unwrap();
+    let md_path = rules_dir.join("compound-engineering.md");
+    fs::write(&md_path, "# User Grok Rules\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(&md_path).unwrap();
+    assert!(content.starts_with("# User Grok Rules"));
+    assert!(content.contains("<!-- CE-AI MANAGED BLOCK BEGIN -->"));
+    assert!(content.contains("<!-- CE-AI MANAGED BLOCK END -->"));
+
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success();
+
+    assert!(md_path.exists());
+    let stripped = fs::read_to_string(&md_path).unwrap();
+    assert_eq!(stripped.trim(), "# User Grok Rules");
+}
+
+#[test]
+fn uninstall_grok_harness_clean_install_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "grok",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(home.join(".grok/config.toml").exists());
+    assert!(home.join(".grok/skills").exists());
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "grok"])
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(home.join(".grok/config.toml")).unwrap();
+    let root: toml::Table = content.parse().unwrap();
+    if let Some(mcp) = root.get("mcp_servers").and_then(|v| v.as_table()) {
+        assert!(mcp.is_empty());
+    }
+    assert!(!home.join(".grok/skills").exists());
+}
+
+#[test]
+fn uninstall_grok_harness_cleans_native_dir_artifacts_and_preserves_user_configs() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    // Pre-populate user config
+    let initial_toml = r#"
+model = "grok-beta"
+"#;
+    let grok_dir = home.join(".grok");
+    fs::create_dir_all(&grok_dir).unwrap();
+    fs::write(grok_dir.join("config.toml"), initial_toml).unwrap();
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "grok",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "grok"])
+        .assert()
+        .success();
+
+    let grok_config = home.join(".grok/config.toml");
+    assert!(grok_config.exists());
+    let content = fs::read_to_string(&grok_config).unwrap();
+    let root: toml::Table = content.parse().unwrap();
+    assert_eq!(root["model"].as_str().unwrap(), "grok-beta");
+    if let Some(mcp) = root.get("mcp_servers").and_then(|v| v.as_table()) {
+        assert!(!mcp.contains_key("codegraph"));
+        assert!(!mcp.contains_key("engram"));
+    }
+
+    assert!(!home.join(".grok/skills").exists());
+    assert!(!home.join(".config/opencode").exists());
+
+    let state_file = config_dir.join("state.json");
+    let state_text = fs::read_to_string(&state_file).unwrap();
+    assert!(!state_text.contains("\"grok\""));
+}
+
+#[test]
 fn uninstall_failure_propagates_error_and_preserves_state() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
