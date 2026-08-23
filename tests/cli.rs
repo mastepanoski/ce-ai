@@ -1404,6 +1404,14 @@ fn doctor_reports_stale_block_version_with_upgrade_hint() {
         .stdout(predicate::str::contains(
             "re-run ce-ai init-prj --tier full to upgrade",
         ));
+
+    ceai(&config_dir, &home)
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "status: STALE BLOCK v=1 — re-run ce-ai init-prj --tier full to upgrade",
+        ));
 }
 
 #[test]

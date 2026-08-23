@@ -18,6 +18,53 @@ pub const GITIGNORE_END_MARKER: &str = "# END CE-AI MANAGED BLOCK";
 /// `state.json` adoption entry so the two cannot drift apart.
 pub const BLOCK_VERSION: u32 = 2;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AdoptionBlockStatus {
+    Ok,
+    StaleVersion { version: u32 },
+    DriftDetected,
+    MalformedBlock,
+    BlockMissing,
+    FileMissing,
+    ReadError,
+}
+
+/// Single source of truth for classifying an on-disk adoption block status across doctor and status diagnostics.
+pub fn check_adoption_block_status(
+    agents_file: &std::path::Path,
+    tier: AdoptionTier,
+) -> AdoptionBlockStatus {
+    if !agents_file.exists() {
+        return AdoptionBlockStatus::FileMissing;
+    }
+    let Ok(text) = fs::read_to_string(agents_file) else {
+        return AdoptionBlockStatus::ReadError;
+    };
+    let Some(start_idx) = text.find(BLOCK_BEGIN_MARKER) else {
+        return AdoptionBlockStatus::BlockMissing;
+    };
+    if text[start_idx..].find(BLOCK_END_MARKER).is_none() {
+        return AdoptionBlockStatus::MalformedBlock;
+    }
+
+    let inner_body = render_block_content(tier);
+    let expected_sha = compute_sha256(inner_body);
+    if text.contains(&expected_sha) {
+        return AdoptionBlockStatus::Ok;
+    }
+
+    let declared_version = text.lines().find_map(|line| {
+        let rest = line.trim().strip_prefix(BLOCK_BEGIN_MARKER)?;
+        let v = rest.trim_start().strip_prefix("v=")?;
+        v.split([' ', '-']).next()?.parse::<u32>().ok()
+    });
+
+    match declared_version {
+        Some(v) if v < BLOCK_VERSION => AdoptionBlockStatus::StaleVersion { version: v },
+        _ => AdoptionBlockStatus::DriftDetected,
+    }
+}
+
 /// Renders the managed block content based on tier.
 pub fn render_block_content(tier: AdoptionTier) -> &'static str {
     match tier {
@@ -245,4 +292,46 @@ pub fn run(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_check_adoption_block_status_file_missing() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("AGENTS.md");
+        assert_eq!(
+            check_adoption_block_status(&path, AdoptionTier::Full),
+            AdoptionBlockStatus::FileMissing
+        );
+    }
+
+    #[test]
+    fn test_check_adoption_block_status_block_missing() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("AGENTS.md");
+        fs::write(&path, "# Hello World\n").unwrap();
+        assert_eq!(
+            check_adoption_block_status(&path, AdoptionTier::Full),
+            AdoptionBlockStatus::BlockMissing
+        );
+    }
+
+    #[test]
+    fn test_check_adoption_block_status_stale_version() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("AGENTS.md");
+        let content = format!(
+            "{} v=1\nOld Content\n{}\n",
+            BLOCK_BEGIN_MARKER, BLOCK_END_MARKER
+        );
+        fs::write(&path, content).unwrap();
+        assert_eq!(
+            check_adoption_block_status(&path, AdoptionTier::Full),
+            AdoptionBlockStatus::StaleVersion { version: 1 }
+        );
+    }
 }
