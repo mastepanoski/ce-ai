@@ -181,6 +181,37 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 config_mutations: vec![],
             }
             .write(&config_dir)?;
+        } else if *harness_kind == HarnessKind::Claude {
+            let empty_env = std::collections::BTreeMap::new();
+            crate::harness::claude::register_claude_mcp_server(
+                &target_config,
+                "codegraph",
+                "codegraph",
+                &["mcp"],
+                &empty_env,
+            )?;
+            crate::harness::claude::register_claude_mcp_server(
+                &target_config,
+                "engram",
+                "engram",
+                &["serve"],
+                &empty_env,
+            )?;
+            let claude_skills_dir = config_dir.join("skills");
+            let managed_skills_src = managed_dir.join("skills");
+            if managed_skills_src.exists() {
+                let _ =
+                    crate::source::archive::copy_dir_all(&managed_skills_src, &claude_skills_dir);
+            }
+            InstallManifest {
+                version: version.to_string(),
+                plugin_name: "compound-engineering".into(),
+                installed_at: chrono::Utc::now().to_rfc3339(),
+                source: source_json.clone(),
+                files,
+                config_mutations: vec![],
+            }
+            .write(&config_dir)?;
         } else {
             let mut mutation = ensure_plugin_and_skills(
                 &target_config,

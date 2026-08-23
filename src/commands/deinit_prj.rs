@@ -103,6 +103,25 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             crate::state::write_atomic(&agents_file, cleaned_content.as_bytes())?;
         }
 
+        // Clean up Claude rule files (CLAUDE.md / .claude/CLAUDE.md)
+        for claude_rule in &[
+            target_dir.join("CLAUDE.md"),
+            target_dir.join(".claude").join("CLAUDE.md"),
+        ] {
+            if claude_rule.exists() {
+                if let Ok(c_text) = fs::read_to_string(claude_rule) {
+                    if c_text.contains(crate::harness::claude::CE_MANAGED_BEGIN) {
+                        let stripped = crate::harness::claude::strip_managed_block(&c_text);
+                        if stripped.trim().is_empty() || stripped.trim() == "@AGENTS.md" {
+                            let _ = fs::remove_file(claude_rule);
+                        } else {
+                            let _ = crate::state::write_atomic(claude_rule, stripped.as_bytes());
+                        }
+                    }
+                }
+            }
+        }
+
         // Clean up sentinel-bounded .gitignore block (DEC-06)
         let gitignore_file = target_dir.join(".gitignore");
         if gitignore_file.exists() {

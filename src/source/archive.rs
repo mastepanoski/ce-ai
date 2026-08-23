@@ -6,6 +6,21 @@ use std::path::{Component, Path};
 
 use crate::error::CeError;
 
+/// Recursively copy a directory from `src` to `dst`.
+pub fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
 /// True when `path` is safe to extract: relative, no parent (`..`)
 /// components, and no Windows drive-letter prefix.
 fn is_safe_relative_path(path: &Path) -> bool {

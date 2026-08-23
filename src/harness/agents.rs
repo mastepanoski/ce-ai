@@ -27,9 +27,9 @@ pub const CE_AGENT_SLOTS: [&str; 6] = [
 /// Description advertised for the orchestrator agent.
 pub const ORCHESTRATOR_DESCRIPTION: &str = "CE AI Orchestrator - coordinates compound engineering";
 
-/// Harnesses whose config format supports structured agent entries.
+/// Harnesses whose config format supports structured agent entries (Opencode JSON schema).
 pub fn supports_agent_definitions(harness: &HarnessKind) -> bool {
-    !matches!(harness, HarnessKind::Cursor | HarnessKind::Copilot)
+    matches!(harness, HarnessKind::Opencode)
 }
 
 /// Applies a user-driven model assignment to `agent.<slot>.model` in any

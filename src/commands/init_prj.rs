@@ -286,6 +286,22 @@ pub fn run(
             crate::harness::cursor::update_cursor_rule_mdc(&rule_path, &frontmatter, inner_body)?;
         }
 
+        // Write Claude project rule .claude/CLAUDE.md or CLAUDE.md if .claude or pre-existing CLAUDE.md exists
+        let claude_dir = target_dir.join(".claude");
+        let claude_md_root = target_dir.join("CLAUDE.md");
+        let has_user_claude_md = claude_md_root.exists() && {
+            let text = fs::read_to_string(&claude_md_root).unwrap_or_default();
+            text.trim() != "@AGENTS.md"
+        };
+        if claude_dir.exists() || has_user_claude_md {
+            let claude_rule_path = if claude_md_root.exists() {
+                claude_md_root
+            } else {
+                claude_dir.join("CLAUDE.md")
+            };
+            crate::harness::claude::update_claude_md(&claude_rule_path, inner_body)?;
+        }
+
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
             if !ctx.quiet {
                 eprintln!("warning: skill registry sync failed: {e}");

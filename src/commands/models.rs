@@ -529,20 +529,15 @@ also/bad/
         let ctx = hermetic_ctx(&tmp);
         std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
 
-        set(&ctx, "claude", "ce-brainstorm", "user/custom-model").unwrap();
-        let home_dir = crate::harness::home_dir_from_ctx(&ctx);
-        let claude_dir = crate::harness::HarnessKind::Claude.harness_dir(&home_dir);
-        let claude_config = read_config(&claude_dir.join("claude.json")).unwrap();
+        set(&ctx, "opencode", "ce-brainstorm", "user/custom-model").unwrap();
+        let opencode_config = read_config(&ctx.opencode_config_dir.join("opencode.json")).unwrap();
         assert_eq!(
-            claude_config["agent"]["ce-brainstorm"]["model"],
+            opencode_config["agent"]["ce-brainstorm"]["model"],
             "user/custom-model"
         );
-        // opencode.json must stay untouched.
-        let opencode_config = read_config(&ctx.opencode_config_dir.join("opencode.json")).unwrap();
-        assert!(opencode_config.get("agent").is_none());
 
-        // Markdown-based harnesses reject assignment explicitly.
-        let err = set(&ctx, "cursor", "ce-brainstorm", "a/b").unwrap_err();
+        // Non-OpenCode harnesses reject agent assignment explicitly.
+        let err = set(&ctx, "claude", "ce-brainstorm", "a/b").unwrap_err();
         assert!(err.to_string().contains("no agent-map config"));
     }
 

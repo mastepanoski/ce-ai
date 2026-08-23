@@ -1726,6 +1726,93 @@ fn uninstall_cursor_harness_preserves_user_mcp_servers_in_mcp_json() {
 }
 
 #[test]
+fn install_claude_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "claude",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let claude_json = home.join(".claude.json");
+    assert!(claude_json.exists());
+    assert!(home.join(".claude/skills").exists());
+
+    let content = fs::read_to_string(&claude_json).unwrap();
+    let config: ce_ai::harness::claude::ClaudeMcpConfig = serde_json::from_str(&content).unwrap();
+    assert!(config.mcp_servers.contains_key("codegraph"));
+    assert!(config.mcp_servers.contains_key("engram"));
+    assert_eq!(
+        config.mcp_servers["codegraph"].r#type.as_deref(),
+        Some("stdio")
+    );
+    assert!(config.extra.is_empty(), "Zero OpenCode key leaks");
+
+    // opencode directory must remain pristine / non-existent
+    assert!(!home.join(".config/opencode").exists());
+}
+
+#[test]
+fn init_prj_claude_writes_claude_md() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("my-project");
+    fs::create_dir_all(prj_dir.join(".claude")).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let md_path = prj_dir.join("CLAUDE.md");
+    assert!(md_path.exists());
+    let content = fs::read_to_string(&md_path).unwrap();
+    assert!(content.contains("<!-- CE-AI MANAGED BLOCK BEGIN -->"));
+    assert!(content.contains("<!-- CE-AI MANAGED BLOCK END -->"));
+}
+
+#[test]
+fn uninstall_claude_harness_cleans_native_dir_artifacts() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "claude",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "claude"])
+        .assert()
+        .success();
+
+    let claude_json = home.join(".claude.json");
+    assert!(claude_json.exists());
+    let content = fs::read_to_string(&claude_json).unwrap();
+    let config: ce_ai::harness::claude::ClaudeMcpConfig = serde_json::from_str(&content).unwrap();
+    assert!(config.mcp_servers.is_empty());
+
+    let state_file = config_dir.join("state.json");
+    let state_text = fs::read_to_string(&state_file).unwrap();
+    assert!(!state_text.contains("\"claude\""));
+}
+
+#[test]
 fn uninstall_failure_propagates_error_and_preserves_state() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));

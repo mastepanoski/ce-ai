@@ -72,9 +72,10 @@ impl HarnessKind {
                     || home_dir.join(".opencode").exists()
             }
             HarnessKind::Claude => {
-                home_dir.join(".claude").exists()
+                let dir = self.harness_dir(home_dir);
+                dir.exists()
                     || home_dir.join(".claude.json").exists()
-                    || home_dir.join(".config").join("claude").exists()
+                    || dir.join("settings.json").exists()
             }
             HarnessKind::Pi => home_dir.join(".pi").exists() || home_dir.join(".pi-lens").exists(),
             HarnessKind::Cursor => {
@@ -144,13 +145,10 @@ impl HarnessKind {
                     || home_dir.join(".opencode").join("plugins").exists()
             }
             HarnessKind::Claude => {
+                let dir = self.harness_dir(home_dir);
                 home_dir.join(".claude.json").exists()
-                    || home_dir.join(".claude").join("plugins").exists()
-                    || home_dir
-                        .join(".config")
-                        .join("claude")
-                        .join("claude.json")
-                        .exists()
+                    || dir.join("skills").exists()
+                    || dir.join("settings.json").exists()
             }
             HarnessKind::Pi => {
                 home_dir.join(".pi").join("config.json").exists()
@@ -247,7 +245,9 @@ impl HarnessKind {
     pub fn harness_dir(&self, home_dir: &Path) -> PathBuf {
         match self {
             HarnessKind::Opencode => home_dir.join(".config").join("opencode"),
-            HarnessKind::Claude => home_dir.join(".config").join("claude"),
+            HarnessKind::Claude => std::env::var_os("CLAUDE_CONFIG_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home_dir.join(".claude")),
             HarnessKind::Pi => home_dir.join(".pi"),
             HarnessKind::Cursor => home_dir.join(".cursor"),
             HarnessKind::Copilot => home_dir.join(".config").join("github-copilot"),
@@ -265,7 +265,9 @@ impl HarnessKind {
     pub fn config_path(&self, base_dir: &Path) -> PathBuf {
         match self {
             HarnessKind::Opencode => base_dir.join("opencode.json"),
-            HarnessKind::Claude => base_dir.join("claude.json"),
+            HarnessKind::Claude => {
+                crate::harness::claude::ClaudeAdapter.default_config_path(base_dir)
+            }
             HarnessKind::Pi => base_dir.join("config.json"),
             HarnessKind::Cursor => base_dir.join("mcp.json"),
             HarnessKind::Copilot => base_dir.join("config.json"),
@@ -438,10 +440,7 @@ mod tests {
             HarnessKind::Opencode.harness_dir(home),
             home.join(".config/opencode")
         );
-        assert_eq!(
-            HarnessKind::Claude.harness_dir(home),
-            home.join(".config/claude")
-        );
+        assert_eq!(HarnessKind::Claude.harness_dir(home), home.join(".claude"));
         assert_eq!(HarnessKind::Cursor.harness_dir(home), home.join(".cursor"));
         assert_eq!(HarnessKind::Pi.harness_dir(home), home.join(".pi"));
         assert_eq!(
