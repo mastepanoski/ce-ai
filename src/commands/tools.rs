@@ -1,8 +1,11 @@
 //! `ce-ai tools`: detection, installation, and management of companion sidecars
-//! (Engram, CodeGraph, Context7, RTK).
+//! (Engram, CodeGraph, Context7, RTK), version freshness, and skill suggestions.
 
 use crate::commands::Context;
 use crate::error::CeError;
+use crate::source::tools_registry::{
+    evaluate_freshness, extract_tool_version, FreshnessStatus, ToolsRegistryCache,
+};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -12,7 +15,7 @@ pub struct Args {
 
 #[derive(clap::Subcommand)]
 pub enum Action {
-    /// Check installation and health status of companion tools & memory servers.
+    /// Check installation, version freshness, and health status of companion tools.
     Status,
     /// Install or provision a specific companion tool (engram, codegraph, context7, rtk).
     Install {
@@ -28,28 +31,51 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 }
 
-fn status(_ctx: &Context) -> Result<(), CeError> {
-    let tools = [
-        ("engram", "Engram Persistent Memory Server", "MCP Server"),
-        (
-            "codegraph",
-            "CodeGraph Codebase Indexer",
-            "MCP Server & CLI",
-        ),
-        ("context7", "Context7 Tech Specs Provider", "MCP Server"),
-        ("rtk", "RTK CLI Token Reduction Engine", "CLI Pre-Processor"),
-    ];
+pub fn status(ctx: &Context) -> Result<(), CeError> {
+    let registry = ToolsRegistryCache::load_or_default(ctx);
 
     println!("== [Companion Tools, Memory Sidecars & Token Reducers Status] ==");
-    for (name, label, category) in &tools {
-        let is_in_path = is_tool_in_path(name);
-        let status_str = if is_in_path {
-            "✅ Installed (In PATH)"
-        } else {
-            "⚠️ Not Found (Available to install via 'ce-ai tools install')"
+    for (name, info) in &registry.tools {
+        let installed = extract_tool_version(name);
+        let freshness = evaluate_freshness(installed.as_deref(), &info.latest_version);
+
+        let icon = match &freshness {
+            FreshnessStatus::Ok { .. } => "✅",
+            FreshnessStatus::Outdated { .. } => "⚠️",
+            FreshnessStatus::Missing => "❌",
+            FreshnessStatus::Offline { .. } => "🌐",
         };
-        println!("  • {name} [{category}] ({label}): {status_str}");
+
+        let hint = match &freshness {
+            FreshnessStatus::Ok { version } => format!("v{version} (ok)"),
+            FreshnessStatus::Outdated { current, expected } => {
+                format!(
+                    "v{current} (outdated -> v{expected} available; run '{}')",
+                    info.install_cmd
+                )
+            }
+            FreshnessStatus::Missing => format!("not found (suggested: '{}')", info.install_cmd),
+            FreshnessStatus::Offline { current } => format!("v{current} (offline)"),
+        };
+
+        println!(
+            "  {icon} {:<12} [{:<16}] ({}) : {}",
+            name, info.category, info.label, hint
+        );
     }
+
+    println!("\n== [Skill Registry Suggestions] ==");
+    for (name, skill) in &registry.skills {
+        println!(
+            "  ⚠️ {:<20} {} (suggested: '{}')",
+            name, skill.description, skill.resolve_cmd
+        );
+    }
+
+    println!("\n== [Orchestrator Readiness] ==");
+    let ce_version = env!("CARGO_PKG_VERSION");
+    println!("  ✓ ce-ai CLI            v{} (ok)", ce_version);
+
     Ok(())
 }
 
@@ -67,14 +93,21 @@ fn install_tool(_ctx: &Context, tool: &str) -> Result<(), CeError> {
     }
 }
 
-fn is_tool_in_path(name: &str) -> bool {
-    if let Ok(path_var) = std::env::var("PATH") {
-        for dir in std::env::split_paths(&path_var) {
-            let candidate = dir.join(name);
-            if candidate.is_file() {
-                return true;
-            }
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_tools_status_runs_without_panic() {
+        let tmp = TempDir::new().unwrap();
+        let ctx = Context {
+            config_dir: tmp.path().to_path_buf(),
+            opencode_config_dir: tmp.path().to_path_buf(),
+            dry_run: false,
+            verbose: false,
+            quiet: true,
+        };
+        assert!(status(&ctx).is_ok());
     }
-    false
 }

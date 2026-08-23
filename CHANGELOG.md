@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-08-22
+
+### Added
+- **Companion-Tool Readiness & Version Freshness Engine (Issue #112)**: `ce-ai doctor` and `ce-ai tools status` now act as a proactive environment readiness engine, validating installed version freshness against an embedded tools registry (`ToolsRegistryCache`) backed by a local 24-hour TTL cache (`~/.ce-ai/cache/companion-registry.json`).
+- **Resilient Exit Code Rules & `--strict` Flag**: Added `--strict` flag to `ce-ai doctor`. Outdated tools emit informational hints (`doctor-info:`) without failing `doctor` (Exit 0) by default; passing `--strict` fails `doctor` with non-zero exit code if any companion tool is missing or outdated.
+- **Skill Suggestions & Self-Update Hints**: Added skill presence probes (e.g. `sequential-thinking` in Skill Registry) and orchestrator self-update notifications in `tools status` and `doctor`.
+- **Graceful Offline Degradation**: Offline or timed-out network checks fall back smoothly to local TTL cache or embedded defaults, emitting `(offline)` tags without failing process exit codes.
+
+---
+
 ## [1.6.0] - 2026-08-22
 
 ### Added

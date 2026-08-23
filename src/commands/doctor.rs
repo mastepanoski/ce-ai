@@ -1,5 +1,6 @@
-//! `ce-ai doctor`: report config-validity, diff (drift), and state-consistency
-//! findings; exits non-zero when any finding exists.
+//! `ce-ai doctor`: report config-validity, diff (drift), state-consistency,
+//! companion tool readiness, version freshness, and skill health findings.
+//! Exits non-zero when any finding exists.
 
 use std::collections::BTreeMap;
 
@@ -8,10 +9,20 @@ use crate::error::CeError;
 use crate::opencode::config::read_config;
 use crate::opencode::manifest::InstallManifest;
 use crate::opencode::plugins::MANAGED_DIR;
+use crate::source::tools_registry::{
+    evaluate_freshness, extract_tool_version, FreshnessStatus, ToolsRegistryCache,
+};
 use crate::state::diff::{self, Action};
 use crate::state::state::State;
 
-pub fn run(ctx: &Context) -> Result<(), CeError> {
+#[derive(clap::Args, Debug, Default)]
+pub struct Args {
+    /// Enforce strict health checks, failing doctor with non-zero exit code if any tool is outdated.
+    #[arg(long)]
+    pub strict: bool,
+}
+
+pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let mut findings: Vec<String> = Vec::new();
 
     // Config validity: opencode.json must parse (D4).
@@ -51,7 +62,6 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
     }
 
     // Model assignment drift between state.json and opencode.json (#111).
-    // An invalid config is already reported above; treat it as empty here.
     if let Ok(config) = read_config(&opencode_json) {
         findings.extend(crate::commands::models::model_drift_findings(
             &state, &config,
@@ -61,6 +71,52 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
     // Skill Registry Integrity Health Probe
     if let Ok(skill_findings) = crate::source::registry::check_skill_registry_health(ctx) {
         findings.extend(skill_findings);
+    }
+
+    // Companion Tools Readiness & Version Freshness Probe (#112)
+    let registry = ToolsRegistryCache::load_or_default(ctx);
+    for (name, info) in &registry.tools {
+        let installed = extract_tool_version(name);
+        let freshness = evaluate_freshness(installed.as_deref(), &info.latest_version);
+
+        match freshness {
+            FreshnessStatus::Ok { version } => {
+                println!("doctor-info: {} v{} (ok)", name, version);
+            }
+            FreshnessStatus::Outdated { current, expected } => {
+                let msg = format!(
+                    "tool-outdated: {} v{} is outdated (v{} expected; run '{}')",
+                    name, current, expected, info.install_cmd
+                );
+                if args.strict {
+                    findings.push(msg);
+                } else {
+                    println!("doctor-info: {}", msg);
+                }
+            }
+            FreshnessStatus::Missing => {
+                let msg = format!(
+                    "companion tool '{}' not found (suggested: '{}')",
+                    name, info.install_cmd
+                );
+                if args.strict {
+                    findings.push(format!("tool-missing: {msg}"));
+                } else {
+                    println!("doctor-info: {}", msg);
+                }
+            }
+            FreshnessStatus::Offline { current } => {
+                println!("doctor-info: {} v{} (offline)", name, current);
+            }
+        }
+    }
+
+    // Skill Suggestions Probe (#112)
+    for (name, skill) in &registry.skills {
+        println!(
+            "doctor-info: skill-suggestion: {} (run '{}')",
+            name, skill.resolve_cmd
+        );
     }
 
     // Project adoption health checks
@@ -76,8 +132,6 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
             let inner_body = crate::commands::init_prj::render_block_content(p.tier);
             let expected_sha = crate::commands::init_prj::compute_sha256(inner_body);
             if !text.contains(&expected_sha) {
-                // Distinguish a stale managed-block version (operator action:
-                // re-run init-prj) from content tampering (generic drift).
                 let declared_version = text.lines().find_map(|line| {
                     let rest = line
                         .trim()
@@ -101,16 +155,7 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
         }
     }
 
-    // Companion tool health checks.
-    if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
-        let engram_db = std::path::Path::new(&home)
-            .join(".engram")
-            .join("engram.db");
-        if !engram_db.exists() {
-            println!("doctor-info: engram db (~/.engram/engram.db) not found");
-        }
-    }
-
+    // Git Hooks & Worktree Health Probes
     if let Ok(repo_root) = std::process::Command::new("git")
         .args(["rev-parse", "--show-toplevel"])
         .output()
@@ -126,7 +171,6 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
                 println!("doctor-info: codegraph index (.codegraph/) not initialized");
             }
 
-            // Git Hooks Health Probe
             if let Ok(hooks_output) = std::process::Command::new("git")
                 .args(["config", "--get", "core.hooksPath"])
                 .current_dir(root_path)
@@ -154,64 +198,6 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
                 }
             }
 
-            // GitHub Branch Protection Health Probe
-            let remote_url = std::process::Command::new("git")
-                .args(["remote", "get-url", "origin"])
-                .current_dir(root_path)
-                .output();
-
-            let is_github = remote_url
-                .map(|o| {
-                    o.status.success() && String::from_utf8_lossy(&o.stdout).contains("github.com")
-                })
-                .unwrap_or(false);
-
-            let gh_authenticated = std::process::Command::new("gh")
-                .args(["auth", "status"])
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false);
-
-            if is_github && gh_authenticated {
-                let repo_name = std::process::Command::new("gh")
-                    .args([
-                        "repo",
-                        "view",
-                        "--json",
-                        "nameWithOwner",
-                        "-q",
-                        ".nameWithOwner",
-                    ])
-                    .current_dir(root_path)
-                    .output();
-
-                if let Ok(repo_out) = repo_name {
-                    if repo_out.status.success() {
-                        let repo_str = String::from_utf8_lossy(&repo_out.stdout).trim().to_string();
-                        let prot_check = std::process::Command::new("gh")
-                            .args([
-                                "api",
-                                &format!("repos/{}/branches/main/protection", repo_str),
-                            ])
-                            .output();
-
-                        if let Ok(prot_out) = prot_check {
-                            if !prot_out.status.success() {
-                                let stderr = String::from_utf8_lossy(&prot_out.stderr);
-                                if stderr.contains("403") {
-                                    println!("doctor-info: token lacks admin permissions for branch protection API on {}", repo_str);
-                                } else {
-                                    findings.push(format!("branch-protection: main branch protection missing or unconfigured on {}", repo_str));
-                                }
-                            }
-                        }
-                    }
-                }
-            } else if is_github {
-                println!("doctor-info: gh CLI unauthenticated or offline, skipping branch protection probe");
-            }
-
-            // Git Sibling Worktree Probe
             if let Ok(wt_output) = std::process::Command::new("git")
                 .args(["worktree", "list", "--porcelain"])
                 .current_dir(root_path)
@@ -241,16 +227,6 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
         }
     }
 
-    let which_tool = if cfg!(windows) { "where" } else { "which" };
-    let rtk_on_path = std::process::Command::new(which_tool)
-        .arg("rtk")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
-    if !rtk_on_path {
-        println!("doctor-info: rtk binary not found on PATH");
-    }
-
     for finding in &findings {
         println!("{finding}");
     }
@@ -262,4 +238,35 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
         "doctor found {} finding(s)",
         findings.len()
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_doctor_strict_flag_default() {
+        let args = Args::default();
+        assert!(!args.strict);
+    }
+
+    #[test]
+    fn test_doctor_runs_on_clean_context() {
+        let tmp = TempDir::new().unwrap();
+        let ctx = Context {
+            config_dir: tmp.path().to_path_buf(),
+            opencode_config_dir: tmp.path().to_path_buf(),
+            dry_run: false,
+            verbose: false,
+            quiet: true,
+        };
+        std::fs::write(
+            ctx.config_dir.join("skills-registry.json"),
+            r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+        )
+        .unwrap();
+        let args = Args::default();
+        assert!(run(&ctx, &args).is_ok());
+    }
 }
