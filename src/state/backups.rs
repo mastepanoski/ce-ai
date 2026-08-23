@@ -186,7 +186,11 @@ pub fn restore_backup_by_id(root: &Path, id: &str, target: &Path) -> Result<Back
     let sub_entries: Vec<PathBuf> = std::fs::read_dir(&backup_dir)?
         .filter_map(Result::ok)
         .map(|e| e.path())
-        .filter(|p| p.is_file())
+        .filter(|p| {
+            std::fs::symlink_metadata(p)
+                .map(|m| m.file_type().is_file())
+                .unwrap_or(false)
+        })
         .collect();
 
     let backup_file_path = sub_entries.first().ok_or_else(|| {

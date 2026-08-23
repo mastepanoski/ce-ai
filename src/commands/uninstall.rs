@@ -78,6 +78,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         state
             .installed_harnesses
             .retain(|h| h["name"].as_str() != Some(target.as_str()));
+        state.save(&state_path)?;
     }
 
     if let Err(e) = crate::source::registry::SkillRegistry::remove(ctx) {
@@ -85,8 +86,6 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             eprintln!("warning: skill registry cleanup failed: {e}");
         }
     }
-
-    state.save(&state_path)?;
 
     if !ctx.quiet {
         if args.harness == "all" {
