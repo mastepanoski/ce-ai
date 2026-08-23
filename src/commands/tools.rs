@@ -168,6 +168,30 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
                 &empty_env,
             )?;
         }
+
+        let codex_installed = state
+            .installed_harnesses
+            .iter()
+            .any(|h| h["name"].as_str() == Some("codex"));
+        if codex_installed {
+            let (cmd, args_vec) = match tool_lower.as_str() {
+                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
+                "engram" => ("engram", vec!["serve"]),
+                "rtk" => ("rtk", vec!["mcp"]),
+                "codegraph" => ("codegraph", vec!["mcp"]),
+                _ => ("", vec![]),
+            };
+            let empty_env = std::collections::BTreeMap::new();
+            let codex_adapter = crate::harness::codex::CodexAdapter;
+            let codex_config = codex_adapter.default_config_path(&home_dir);
+            crate::harness::codex::register_codex_mcp_server(
+                &codex_config,
+                &tool_lower,
+                cmd,
+                &args_vec,
+                &empty_env,
+            )?;
+        }
     }
 
     let probe_version = extract_tool_version(&tool_lower);

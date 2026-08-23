@@ -2,6 +2,7 @@
 
 pub mod agents;
 pub mod claude;
+pub mod codex;
 pub mod copilot;
 pub mod cursor;
 pub mod custom;
@@ -89,7 +90,8 @@ impl HarnessKind {
                         .exists()
             }
             HarnessKind::Codex => {
-                home_dir.join(".codex").exists() || home_dir.join(".config").join("codex").exists()
+                let dir = self.harness_dir(home_dir);
+                dir.exists() || dir.join("config.toml").exists()
             }
             HarnessKind::Grok => {
                 home_dir.join(".grok").exists() || home_dir.join(".config").join("grok").exists()
@@ -166,7 +168,9 @@ impl HarnessKind {
                     || home_dir.join(".copilot").exists()
             }
             HarnessKind::Codex => {
-                home_dir.join(".codex").join("codex.json").exists()
+                let dir = self.harness_dir(home_dir);
+                dir.join("config.toml").exists()
+                    || dir.join("skills").exists()
                     || home_dir.join(".config").join("codex").exists()
             }
             HarnessKind::Grok => {
@@ -251,7 +255,9 @@ impl HarnessKind {
             HarnessKind::Pi => home_dir.join(".pi"),
             HarnessKind::Cursor => home_dir.join(".cursor"),
             HarnessKind::Copilot => home_dir.join(".config").join("github-copilot"),
-            HarnessKind::Codex => home_dir.join(".config").join("codex"),
+            HarnessKind::Codex => std::env::var_os("CODEX_CONFIG_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home_dir.join(".codex")),
             HarnessKind::Grok => home_dir.join(".config").join("grok"),
             HarnessKind::Kimi => home_dir.join(".config").join("kimi"),
             HarnessKind::Agy => home_dir.join(".gemini").join("antigravity-cli"),
@@ -271,7 +277,7 @@ impl HarnessKind {
             HarnessKind::Pi => base_dir.join("config.json"),
             HarnessKind::Cursor => base_dir.join("mcp.json"),
             HarnessKind::Copilot => base_dir.join("config.json"),
-            HarnessKind::Codex => base_dir.join("codex.json"),
+            HarnessKind::Codex => crate::harness::codex::CodexAdapter.default_config_path(base_dir),
             HarnessKind::Grok => base_dir.join("grok.json"),
             HarnessKind::Kimi => base_dir.join("kimi.json"),
             HarnessKind::Agy => base_dir.join("antigravity.json"),

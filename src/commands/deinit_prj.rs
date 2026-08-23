@@ -121,6 +121,24 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                 }
             }
         }
+        // Clean up Codex rule files (AGENTS.md / .codex/AGENTS.md)
+        for codex_rule in &[
+            target_dir.join("AGENTS.md"),
+            target_dir.join(".codex").join("AGENTS.md"),
+        ] {
+            if codex_rule.exists() {
+                if let Ok(c_text) = fs::read_to_string(codex_rule) {
+                    if c_text.contains(crate::harness::codex::CE_MANAGED_BEGIN) {
+                        let stripped = crate::harness::codex::strip_managed_block(&c_text);
+                        if stripped.trim().is_empty() {
+                            let _ = fs::remove_file(codex_rule);
+                        } else {
+                            let _ = crate::state::write_atomic(codex_rule, stripped.as_bytes());
+                        }
+                    }
+                }
+            }
+        }
 
         // Clean up sentinel-bounded .gitignore block (DEC-06)
         let gitignore_file = target_dir.join(".gitignore");

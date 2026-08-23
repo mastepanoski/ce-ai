@@ -92,6 +92,11 @@ pub fn backup_file(root: &Path, source: &Path) -> Result<PathBuf, CeError> {
         && !raw_name.contains("claude")
     {
         format!("claude-{raw_name}")
+    } else if (source.to_string_lossy().contains(".codex")
+        || source.file_name().and_then(|n| n.to_str()) == Some("config.toml"))
+        && !raw_name.contains("codex")
+    {
+        format!("codex-{raw_name}")
     } else {
         raw_name.to_string()
     };

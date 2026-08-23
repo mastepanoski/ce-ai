@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-08-23
+
+### Added
+- Native OpenAI Codex CLI harness adapter (`src/harness/codex.rs`) targeting `~/.codex/config.toml` (TOML format) with `[mcp_servers.<name>]` schema (Issue #175).
+- Native skills placement under `~/.codex/skills/` and project directives adoption under `.codex/AGENTS.md`.
+- `CODEX_CONFIG_DIR` environment variable support.
+- Full lifecycle support for Codex across `install`, `tools install`, `init-prj`, `deinit-prj`, `sync`, `doctor`, `status`, and `uninstall`.
+
 ## [1.10.0] - 2026-08-23
 
 ### Added
