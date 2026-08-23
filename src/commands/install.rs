@@ -96,14 +96,20 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         return err;
     }
 
-    let config_dir = &target_base_dir;
-    let managed_dir = config_dir.join(MANAGED_DIR);
-
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
 
+    let home_dir = crate::harness::home_dir_from_ctx(ctx);
+
     for harness_kind in &target_harnesses {
-        let target_config = harness_kind.config_path(config_dir);
+        let config_dir = if scope_arg == "workspace" {
+            target_base_dir.clone()
+        } else if *harness_kind == HarnessKind::Opencode {
+            ctx.opencode_config_dir.clone()
+        } else {
+            harness_kind.harness_dir(&home_dir)
+        };
+        let target_config = harness_kind.config_path(&config_dir);
         let needs_backup = target_config.exists();
 
         // Dry-run plans only; SU-4 guarantees zero writes.
@@ -133,7 +139,8 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         } else {
             None
         };
-        let mut files = vec![install_loader(&source_path, config_dir)?];
+        let managed_dir = config_dir.join(MANAGED_DIR);
+        let mut files = vec![install_loader(&source_path, &config_dir)?];
         for (rel, (source_rel, hash)) in &managed {
             if rel == LOADER_REL_PATH {
                 continue;
@@ -148,16 +155,25 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             });
         }
 
-        // Merge plugin entry + skills path into target harness config (OI-2, OI-4).
+        // Write target config settings (OI-2) and install-manifest.json (SU-2).
         let mut mutation = ensure_plugin_and_skills(
             &target_config,
-            &plugin_entry(config_dir).to_string_lossy(),
-            &skills_path(config_dir).to_string_lossy(),
+            &plugin_entry(&config_dir).to_string_lossy(),
+            &skills_path(&config_dir).to_string_lossy(),
         )?;
         mutation.backup = backup.map(|p| p.display().to_string());
 
-        // Ensure the structural `ce-ai` orchestrator agent exists — never
-        // model/variant; users customize those (#111).
+        InstallManifest {
+            version: version.to_string(),
+            plugin_name: "compound-engineering".into(),
+            installed_at: chrono::Utc::now().to_rfc3339(),
+            source: source_json.clone(),
+            files,
+            config_mutations: vec![mutation],
+        }
+        .write(&config_dir)?;
+
+        // Ensure the structural `ce-ai` orchestrator agent exists.
         let agent_ensured = !ctx.dry_run
             && crate::harness::agents::ensure_orchestrator_agent(&target_config, harness_kind)?;
         if agent_ensured && !ctx.quiet {
@@ -167,17 +183,6 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 harness_kind
             );
         }
-
-        // Record managed files and the config mutation (OI-5).
-        InstallManifest {
-            version: version.clone(),
-            plugin_name: "compound-engineering".into(),
-            installed_at: Utc::now().to_rfc3339(),
-            source: source_json.clone(),
-            files,
-            config_mutations: vec![mutation],
-        }
-        .write(config_dir)?;
 
         // Update state.json; replace any prior entry for this harness (idempotent).
         let harness_name = harness_kind.to_string();

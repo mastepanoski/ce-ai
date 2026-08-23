@@ -64,7 +64,13 @@ pub fn run(ctx: &Context, args: &BackupsArgs) -> Result<(), CeError> {
                 .as_deref()
                 .unwrap_or("opencode")
                 .parse::<HarnessKind>()?;
-            let target_path = target_harness.config_path(&ctx.opencode_config_dir);
+            let home_dir = crate::harness::home_dir_from_ctx(ctx);
+            let config_dir = if target_harness == HarnessKind::Opencode {
+                ctx.opencode_config_dir.clone()
+            } else {
+                target_harness.harness_dir(&home_dir)
+            };
+            let target_path = target_harness.config_path(&config_dir);
 
             if ctx.dry_run {
                 if !ctx.quiet {
