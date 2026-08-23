@@ -1645,7 +1645,6 @@ fn uninstall_cursor_harness_cleans_native_dir_artifacts() {
 }
 
 #[test]
-#[allow(clippy::permissions_set_readonly_false)]
 fn uninstall_failure_propagates_error_and_preserves_state() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
@@ -1666,14 +1665,19 @@ fn uninstall_failure_propagates_error_and_preserves_state() {
     let initial_state = std::fs::read_to_string(&state_file).unwrap();
     assert!(initial_state.contains("cursor"));
 
-    // Inject unremovable file inside managed_dir to force IO error on remove_dir_all
+    // Inject unremovable file inside managed_dir to force IO error on remove_dir_all cross-platform
     let managed_dir = home.join(".cursor").join("compound-engineering");
     let lock_file = managed_dir.join("unremovable.txt");
-    std::fs::write(&lock_file, "locked").unwrap();
-    let mut perms = std::fs::metadata(&lock_file).unwrap().permissions();
-    perms.set_readonly(true);
-    let _ = std::fs::set_permissions(&lock_file, perms.clone());
 
+    // On Windows, keeping an open handle locks the file from deletion
+    let _open_file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&lock_file)
+        .unwrap();
+
+    // On Unix, set managed_dir non-writable
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -1693,8 +1697,7 @@ fn uninstall_failure_propagates_error_and_preserves_state() {
         use std::os::unix::fs::PermissionsExt;
         let _ = std::fs::set_permissions(&managed_dir, std::fs::Permissions::from_mode(0o755));
     }
-    perms.set_readonly(false);
-    let _ = std::fs::set_permissions(&lock_file, perms);
+    drop(_open_file);
 
     // 3. Unconditionally assert state preservation
     let current_state = std::fs::read_to_string(&state_file).unwrap();
