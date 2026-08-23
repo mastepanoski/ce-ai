@@ -122,35 +122,31 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     // Project adoption health checks
     for p in &state.projects {
         let agents_file = p.path.join(&p.file);
-        if !agents_file.exists() {
-            findings.push(format!(
-                "project-adoption: missing instruction file '{}' at '{}'",
-                p.file,
-                p.path.display()
-            ));
-        } else if let Ok(text) = std::fs::read_to_string(&agents_file) {
-            let inner_body = crate::commands::init_prj::render_block_content(p.tier);
-            let expected_sha = crate::commands::init_prj::compute_sha256(inner_body);
-            if !text.contains(&expected_sha) {
-                let declared_version = text.lines().find_map(|line| {
-                    let rest = line
-                        .trim()
-                        .strip_prefix(crate::commands::init_prj::BLOCK_BEGIN_MARKER)?;
-                    let v = rest.trim_start().strip_prefix("v=")?;
-                    v.split([' ', '-']).next()?.parse::<u32>().ok()
-                });
-                match declared_version {
-                    Some(v) if v < crate::commands::init_prj::BLOCK_VERSION => findings.push(format!(
-                        "project-adoption: stale block version v={} at '{}' — re-run ce-ai init-prj --tier {} to upgrade",
-                        v,
-                        p.path.display(),
-                        p.tier.as_str()
-                    )),
-                    _ => findings.push(format!(
-                        "project-adoption: block SHA drift detected at '{}'",
-                        p.path.display()
-                    )),
-                }
+        match crate::commands::init_prj::check_adoption_block_status(&agents_file, p.tier) {
+            crate::commands::init_prj::AdoptionBlockStatus::Ok => {}
+            crate::commands::init_prj::AdoptionBlockStatus::FileMissing => {
+                findings.push(format!(
+                    "project-adoption: missing instruction file '{}' at '{}'",
+                    p.file,
+                    p.path.display()
+                ));
+            }
+            crate::commands::init_prj::AdoptionBlockStatus::StaleVersion { version } => {
+                findings.push(format!(
+                    "project-adoption: stale block version v={} at '{}' — re-run ce-ai init-prj --tier {} to upgrade",
+                    version,
+                    p.path.display(),
+                    p.tier.as_str()
+                ));
+            }
+            crate::commands::init_prj::AdoptionBlockStatus::DriftDetected
+            | crate::commands::init_prj::AdoptionBlockStatus::MalformedBlock
+            | crate::commands::init_prj::AdoptionBlockStatus::BlockMissing
+            | crate::commands::init_prj::AdoptionBlockStatus::ReadError => {
+                findings.push(format!(
+                    "project-adoption: block SHA drift detected at '{}'",
+                    p.path.display()
+                ));
             }
         }
     }

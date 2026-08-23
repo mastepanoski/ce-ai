@@ -88,32 +88,33 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
         println!("projects: {} adopted", state.projects.len());
         for p in &state.projects {
             let agents_file = p.path.join(&p.file);
-            let status_str = if !agents_file.exists() {
-                "MISSING"
-            } else if let Ok(text) = std::fs::read_to_string(&agents_file) {
-                if let Some(start_idx) = text.find(crate::commands::init_prj::BLOCK_BEGIN_MARKER) {
-                    if let Some(end_rel_idx) =
-                        text[start_idx..].find(crate::commands::init_prj::BLOCK_END_MARKER)
-                    {
-                        let end_idx = start_idx
-                            + end_rel_idx
-                            + crate::commands::init_prj::BLOCK_END_MARKER.len();
-                        let block_text = &text[start_idx..end_idx];
-                        let inner_body = crate::commands::init_prj::render_block_content(p.tier);
-                        let expected_sha = crate::commands::init_prj::compute_sha256(inner_body);
-                        if block_text.contains(&expected_sha) {
-                            "OK"
-                        } else {
-                            "DRIFT DETECTED"
-                        }
-                    } else {
-                        "MALFORMED BLOCK"
-                    }
-                } else {
-                    "BLOCK MISSING"
+            let status_str = match crate::commands::init_prj::check_adoption_block_status(
+                &agents_file,
+                p.tier,
+            ) {
+                crate::commands::init_prj::AdoptionBlockStatus::Ok => "OK".to_string(),
+                crate::commands::init_prj::AdoptionBlockStatus::StaleVersion { version } => {
+                    format!(
+                        "STALE BLOCK v={} — re-run ce-ai init-prj --tier {} to upgrade",
+                        version,
+                        p.tier.as_str()
+                    )
                 }
-            } else {
-                "READ ERROR"
+                crate::commands::init_prj::AdoptionBlockStatus::DriftDetected => {
+                    "DRIFT DETECTED".to_string()
+                }
+                crate::commands::init_prj::AdoptionBlockStatus::MalformedBlock => {
+                    "MALFORMED BLOCK".to_string()
+                }
+                crate::commands::init_prj::AdoptionBlockStatus::BlockMissing => {
+                    "BLOCK MISSING".to_string()
+                }
+                crate::commands::init_prj::AdoptionBlockStatus::FileMissing => {
+                    "MISSING".to_string()
+                }
+                crate::commands::init_prj::AdoptionBlockStatus::ReadError => {
+                    "READ ERROR".to_string()
+                }
             };
             println!(
                 "  - {} (tier: {:?}, file: {}, status: {})",
