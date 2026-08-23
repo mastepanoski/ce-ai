@@ -155,6 +155,24 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             }
         }
 
+        // Clean up Grok rule file (.grok/rules/compound-engineering.md)
+        let grok_rule = target_dir
+            .join(".grok")
+            .join("rules")
+            .join("compound-engineering.md");
+        if grok_rule.exists() {
+            if let Ok(c_text) = fs::read_to_string(&grok_rule) {
+                if c_text.contains(crate::harness::grok::CE_MANAGED_BEGIN) {
+                    let stripped = crate::harness::grok::strip_managed_block(&c_text);
+                    if stripped.trim().is_empty() {
+                        let _ = fs::remove_file(&grok_rule);
+                    } else {
+                        let _ = crate::state::write_atomic(&grok_rule, stripped.as_bytes());
+                    }
+                }
+            }
+        }
+
         // Clean up sentinel-bounded .gitignore block (DEC-06)
         let gitignore_file = target_dir.join(".gitignore");
         if gitignore_file.exists() {

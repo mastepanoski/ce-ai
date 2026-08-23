@@ -253,6 +253,42 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 config_mutations: vec![],
             }
             .write(&config_dir)?;
+        } else if *harness_kind == HarnessKind::Grok {
+            let empty_env = std::collections::BTreeMap::new();
+            crate::harness::grok::register_grok_mcp_server(
+                &target_config,
+                "codegraph",
+                "codegraph",
+                &["mcp"],
+                &empty_env,
+            )?;
+            crate::harness::grok::register_grok_mcp_server(
+                &target_config,
+                "engram",
+                "engram",
+                &["serve"],
+                &empty_env,
+            )?;
+            let grok_skills_dir = config_dir.join("skills");
+            let managed_skills_src = managed_dir.join("skills");
+            if managed_skills_src.exists() {
+                crate::source::archive::copy_dir_all(&managed_skills_src, &grok_skills_dir)
+                    .map_err(|e| {
+                        CeError::Runtime(format!(
+                            "failed to copy managed skills to {}: {e}",
+                            grok_skills_dir.display()
+                        ))
+                    })?;
+            }
+            InstallManifest {
+                version: version.to_string(),
+                plugin_name: "compound-engineering".into(),
+                installed_at: chrono::Utc::now().to_rfc3339(),
+                source: source_json.clone(),
+                files,
+                config_mutations: vec![],
+            }
+            .write(&config_dir)?;
         } else if *harness_kind == HarnessKind::Codex {
             let empty_env = std::collections::BTreeMap::new();
             crate::harness::codex::register_codex_mcp_server(

@@ -75,6 +75,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 for tool in &["codegraph", "engram", "context7", "rtk"] {
                     crate::harness::claude::unregister_claude_mcp_server(&target_config, tool)?;
                 }
+            } else if harness_kind == HarnessKind::Grok {
+                for tool in &["codegraph", "engram", "context7", "rtk"] {
+                    crate::harness::grok::unregister_grok_mcp_server(&target_config, tool)?;
+                }
             } else if harness_kind == HarnessKind::Copilot {
                 for tool in &["codegraph", "engram", "context7", "rtk"] {
                     crate::harness::copilot::unregister_copilot_mcp_server(&target_config, tool)?;
@@ -93,6 +97,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             if harness_kind == HarnessKind::Claude
                 || harness_kind == HarnessKind::Codex
                 || harness_kind == HarnessKind::Copilot
+                || harness_kind == HarnessKind::Grok
             {
                 let skills_dir = config_dir.join("skills");
                 if skills_dir.exists() {

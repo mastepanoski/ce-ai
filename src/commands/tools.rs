@@ -216,6 +216,30 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
                 &empty_env,
             )?;
         }
+
+        let grok_installed = state
+            .installed_harnesses
+            .iter()
+            .any(|h| h["name"].as_str() == Some("grok"));
+        if grok_installed {
+            let (cmd, args_vec) = match tool_lower.as_str() {
+                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
+                "engram" => ("engram", vec!["serve"]),
+                "rtk" => ("rtk", vec!["mcp"]),
+                "codegraph" => ("codegraph", vec!["mcp"]),
+                _ => ("", vec![]),
+            };
+            let empty_env = std::collections::BTreeMap::new();
+            let grok_adapter = crate::harness::grok::GrokAdapter;
+            let grok_config = grok_adapter.default_config_path(&home_dir);
+            crate::harness::grok::register_grok_mcp_server(
+                &grok_config,
+                &tool_lower,
+                cmd,
+                &args_vec,
+                &empty_env,
+            )?;
+        }
     }
 
     let probe_version = extract_tool_version(&tool_lower);

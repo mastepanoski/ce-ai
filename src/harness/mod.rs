@@ -7,6 +7,7 @@ pub mod copilot;
 pub mod cursor;
 pub mod custom;
 pub mod generic_json;
+pub mod grok;
 pub mod opencode;
 pub mod pi;
 
@@ -91,7 +92,8 @@ impl HarnessKind {
                 dir.exists() || dir.join("config.toml").exists()
             }
             HarnessKind::Grok => {
-                home_dir.join(".grok").exists() || home_dir.join(".config").join("grok").exists()
+                let dir = self.harness_dir(home_dir);
+                dir.exists() || dir.join("config.toml").exists()
             }
             HarnessKind::Kimi => {
                 home_dir.join(".kimi").exists()
@@ -166,8 +168,8 @@ impl HarnessKind {
                 dir.join("config.toml").exists() || dir.join("skills").exists()
             }
             HarnessKind::Grok => {
-                home_dir.join(".grok").join("grok.json").exists()
-                    || home_dir.join(".config").join("grok").exists()
+                let dir = self.harness_dir(home_dir);
+                dir.join("config.toml").exists() || dir.join("skills").exists()
             }
             HarnessKind::Kimi => {
                 home_dir.join(".kimi").join("kimi.json").exists()
@@ -252,7 +254,9 @@ impl HarnessKind {
             HarnessKind::Codex => std::env::var_os("CODEX_HOME")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| home_dir.join(".codex")),
-            HarnessKind::Grok => home_dir.join(".config").join("grok"),
+            HarnessKind::Grok => std::env::var_os("GROK_HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home_dir.join(".grok")),
             HarnessKind::Kimi => home_dir.join(".config").join("kimi"),
             HarnessKind::Agy => home_dir.join(".gemini").join("antigravity-cli"),
             HarnessKind::Deepseek => home_dir.join(".config").join("deepseek"),
@@ -274,7 +278,7 @@ impl HarnessKind {
                 crate::harness::copilot::CopilotAdapter.default_config_path(base_dir)
             }
             HarnessKind::Codex => crate::harness::codex::CodexAdapter.default_config_path(base_dir),
-            HarnessKind::Grok => base_dir.join("grok.json"),
+            HarnessKind::Grok => crate::harness::grok::GrokAdapter.default_config_path(base_dir),
             HarnessKind::Kimi => base_dir.join("kimi.json"),
             HarnessKind::Agy => base_dir.join("antigravity.json"),
             HarnessKind::Deepseek => base_dir.join("deepseek.json"),
@@ -449,6 +453,7 @@ mod tests {
             HarnessKind::Copilot.harness_dir(home),
             home.join(".copilot")
         );
+        assert_eq!(HarnessKind::Grok.harness_dir(home), home.join(".grok"));
         assert_eq!(
             HarnessKind::Agy.harness_dir(home),
             home.join(".gemini/antigravity-cli")

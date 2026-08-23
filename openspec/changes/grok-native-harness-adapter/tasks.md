@@ -1,0 +1,21 @@
+# Task Breakdown: Grok Native Harness Adapter
+
+- [x] Create brainstorm doc `docs/brainstorms/2026-08-23-grok-native-harness-adapter-requirements.md`
+- [x] Create plan doc `docs/plans/2026-08-23-grok-native-harness-adapter-plan.md`
+- [x] Create OpenSpec contract (`proposal.md`, `exploration.md`, `design.md`, `spec.md`, `tasks.md`)
+- [x] Run `ce-doc-review` panel on OpenSpec contract and address findings
+- [x] TDD Implementation:
+  - [x] Implement `GrokAdapter` in `src/harness/grok.rs`
+  - [x] Implement `register_grok_mcp_server`, `unregister_grok_mcp_server`, `update_grok_rule_md` with unit tests in `src/harness/grok.rs`
+  - [x] Update `is_installed_on_host`, `is_ce_installed`, `harness_dir`, `config_path` for `HarnessKind::Grok` in `src/harness/mod.rs`
+  - [x] Wire Grok native install in `src/commands/install.rs` and `src/commands/tools.rs`
+  - [x] Wire Grok project rule in `src/commands/init_prj.rs`, `src/commands/deinit_prj.rs`, and drift sync in `src/commands/sync.rs`
+  - [x] Wire Grok native uninstall in `src/commands/uninstall.rs`
+  - [x] Tag Grok backups with `grok-` prefix in `src/state/backups.rs`
+  - [x] Remove `HarnessKind::Grok` from `src/harness/generic_json.rs`
+  - [x] Update health check and status reporting in `src/commands/doctor.rs` and `src/commands/status.rs`
+  - [x] Add CLI integration tests verifying TOML `[mcp_servers]` schema, zero OpenCode keys, `.grok/rules/compound-engineering.md` rule creation, and clean uninstall in `tests/cli.rs`
+- [x] Run quality gates (`cargo fmt`, `cargo clippy`, `cargo test`)
+- [x] Run `ce-code-review` panel
+- [x] Document solution via `ce-compound`
+- [x] Ship PR, wait for 100% green CI matrix, merge, tag `v1.13.0`, release, close Issue #176

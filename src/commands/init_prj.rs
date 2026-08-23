@@ -317,6 +317,15 @@ pub fn run(
             crate::harness::copilot::update_copilot_instructions_md(&copilot_md_path, inner_body)?;
         }
 
+        // Write Grok project rule .grok/rules/compound-engineering.md if .grok exists
+        let grok_dir = target_dir.join(".grok");
+        if grok_dir.exists() {
+            let grok_rules_dir = grok_dir.join("rules");
+            fs::create_dir_all(&grok_rules_dir)?;
+            let grok_rule_path = grok_rules_dir.join("compound-engineering.md");
+            crate::harness::grok::update_grok_rule_md(&grok_rule_path, inner_body)?;
+        }
+
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
             if !ctx.quiet {
                 eprintln!("warning: skill registry sync failed: {e}");
