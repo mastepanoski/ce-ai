@@ -156,22 +156,49 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
 
         // Write target config settings (OI-2) and install-manifest.json (SU-2).
-        let mut mutation = ensure_plugin_and_skills(
-            &target_config,
-            &plugin_entry(&config_dir).to_string_lossy(),
-            &skills_path(&config_dir).to_string_lossy(),
-        )?;
-        mutation.backup = backup.map(|p| p.display().to_string());
+        if *harness_kind == HarnessKind::Cursor {
+            let empty_env = std::collections::BTreeMap::new();
+            crate::harness::cursor::register_cursor_mcp_server(
+                &target_config,
+                "codegraph",
+                "codegraph",
+                &["mcp"],
+                &empty_env,
+            )?;
+            crate::harness::cursor::register_cursor_mcp_server(
+                &target_config,
+                "engram",
+                "engram",
+                &["serve"],
+                &empty_env,
+            )?;
+            InstallManifest {
+                version: version.to_string(),
+                plugin_name: "compound-engineering".into(),
+                installed_at: chrono::Utc::now().to_rfc3339(),
+                source: source_json.clone(),
+                files,
+                config_mutations: vec![],
+            }
+            .write(&config_dir)?;
+        } else {
+            let mut mutation = ensure_plugin_and_skills(
+                &target_config,
+                &plugin_entry(&config_dir).to_string_lossy(),
+                &skills_path(&config_dir).to_string_lossy(),
+            )?;
+            mutation.backup = backup.map(|p| p.display().to_string());
 
-        InstallManifest {
-            version: version.to_string(),
-            plugin_name: "compound-engineering".into(),
-            installed_at: chrono::Utc::now().to_rfc3339(),
-            source: source_json.clone(),
-            files,
-            config_mutations: vec![mutation],
+            InstallManifest {
+                version: version.to_string(),
+                plugin_name: "compound-engineering".into(),
+                installed_at: chrono::Utc::now().to_rfc3339(),
+                source: source_json.clone(),
+                files,
+                config_mutations: vec![mutation],
+            }
+            .write(&config_dir)?;
         }
-        .write(&config_dir)?;
 
         // Ensure the structural `ce-ai` orchestrator agent exists.
         let agent_ensured = !ctx.dry_run

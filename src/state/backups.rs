@@ -20,17 +20,22 @@ fn backup_ts() -> String {
     Utc::now().format("%Y%m%dT%H%M%S%.6fZ").to_string()
 }
 
-/// Resolves harness name from backup file name.
+/// Resolves harness name from backup file path or filename.
 pub fn harness_from_filename(name: &str) -> String {
-    let lower = name.to_lowercase();
-    if lower.contains("opencode") {
+    harness_from_path(Path::new(name))
+}
+
+/// Resolves harness name from backup file path.
+pub fn harness_from_path(path: &Path) -> String {
+    let lower = path.to_string_lossy().to_lowercase();
+    if lower.contains(".cursor") || lower.contains("cursor") {
+        "cursor".to_string()
+    } else if lower.contains("opencode") {
         "opencode".to_string()
     } else if lower.contains("claude") {
         "claude".to_string()
     } else if lower.contains("pi") {
         "pi".to_string()
-    } else if lower.contains("cursor") {
-        "cursor".to_string()
     } else if lower.contains("copilot") {
         "copilot".to_string()
     } else if lower.contains("codex") {
@@ -75,9 +80,16 @@ fn format_ts_display(id: &str) -> String {
 
 /// Copies `source` into a fresh timestamped backup dir under `root`.
 pub fn backup_file(root: &Path, source: &Path) -> Result<PathBuf, CeError> {
-    let file_name = source
+    let raw_name = source
         .file_name()
-        .ok_or_else(|| CeError::Runtime("backup source has no file name".to_string()))?;
+        .ok_or_else(|| CeError::Runtime("backup source has no file name".to_string()))?
+        .to_string_lossy();
+    let file_name = if source.to_string_lossy().contains(".cursor") && !raw_name.contains("cursor")
+    {
+        format!("cursor-{raw_name}")
+    } else {
+        raw_name.to_string()
+    };
     let dest = root.join(backup_ts()).join(file_name);
     write_atomic(&dest, &std::fs::read(source)?)?;
     Ok(dest)

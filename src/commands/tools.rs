@@ -118,6 +118,33 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
     let opencode_json = ctx.opencode_config_dir.join("opencode.json");
     crate::opencode::config::register_mcp_server(&opencode_json, &tool_lower, server_def)?;
 
+    let home_dir = crate::harness::home_dir_from_ctx(ctx);
+    let state_path = ctx.config_dir.join("state.json");
+    if let Ok(state) = crate::state::state::State::load(&state_path) {
+        let cursor_installed = state
+            .installed_harnesses
+            .iter()
+            .any(|h| h["name"].as_str() == Some("cursor"));
+        if cursor_installed {
+            let (cmd, args_vec) = match tool_lower.as_str() {
+                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
+                "engram" => ("engram", vec!["serve"]),
+                "rtk" => ("rtk", vec!["mcp"]),
+                "codegraph" => ("codegraph", vec!["mcp"]),
+                _ => ("", vec![]),
+            };
+            let empty_env = std::collections::BTreeMap::new();
+            let cursor_mcp = home_dir.join(".cursor").join("mcp.json");
+            crate::harness::cursor::register_cursor_mcp_server(
+                &cursor_mcp,
+                &tool_lower,
+                cmd,
+                &args_vec,
+                &empty_env,
+            )?;
+        }
+    }
+
     let probe_version = extract_tool_version(&tool_lower);
     let binary_name = match tool_lower.as_str() {
         "context7" => "npx",
