@@ -5,6 +5,13 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-08-23
+
+### Fixed
+- **Adoption Block Staleness Alignment (Issue #149)**: `ce-ai status` now surfaces actionable upgrade hints (`STALE BLOCK v=<ver> — re-run ce-ai init-prj --tier <tier> to upgrade`) matching `ce-ai doctor` when a managed block in `AGENTS.md` is on an older version (`v < BLOCK_VERSION`). Extracted a single source of truth helper `check_adoption_block_status` in `src/commands/init_prj.rs`.
+
+---
+
 ## [1.7.0] - 2026-08-22
 
 ### Added
