@@ -99,11 +99,7 @@ pub fn register_copilot_mcp_server(
 
     server_entry.command = command.to_string();
     server_entry.args = args.iter().map(|s| s.to_string()).collect();
-    if !env.is_empty() {
-        for (k, v) in env {
-            server_entry.env.insert(k.clone(), v.clone());
-        }
-    }
+    server_entry.env = env.clone();
 
     let json_bytes = serde_json::to_vec_pretty(&config).map_err(|e| {
         CeError::Runtime(format!(
@@ -349,5 +345,39 @@ mod tests {
         let config: CopilotMcpConfig = serde_json::from_str(&content).unwrap();
         assert_eq!(config.mcp_servers.len(), 1);
         assert!(config.mcp_servers.contains_key("engram"));
+    }
+
+    #[test]
+    fn replaces_env_map_cleanly_on_re_registration() {
+        let tmp = TempDir::new().unwrap();
+        let config_path = tmp.path().join("mcp-config.json");
+
+        let mut env1 = BTreeMap::new();
+        env1.insert("OLD_KEY".to_string(), "old_val".to_string());
+        register_copilot_mcp_server(&config_path, "engram", "engram", &["serve"], &env1).unwrap();
+
+        let mut env2 = BTreeMap::new();
+        env2.insert("NEW_KEY".to_string(), "new_val".to_string());
+        register_copilot_mcp_server(&config_path, "engram", "engram", &["serve"], &env2).unwrap();
+
+        let content = std::fs::read_to_string(&config_path).unwrap();
+        let config: CopilotMcpConfig = serde_json::from_str(&content).unwrap();
+        let engram = config.mcp_servers.get("engram").unwrap();
+        assert!(!engram.env.contains_key("OLD_KEY"));
+        assert_eq!(engram.env.get("NEW_KEY").unwrap(), "new_val");
+
+        // Re-register with empty env map -> removes env key from JSON
+        let empty_env = BTreeMap::new();
+        register_copilot_mcp_server(&config_path, "engram", "engram", &["serve"], &empty_env)
+            .unwrap();
+        let content_empty = std::fs::read_to_string(&config_path).unwrap();
+        assert!(!content_empty.contains("\"env\""));
+
+        // Confirm struct-level deserialization: env map is empty and command/args are preserved
+        let config_empty: CopilotMcpConfig = serde_json::from_str(&content_empty).unwrap();
+        let engram_server = config_empty.mcp_servers.get("engram").unwrap();
+        assert!(engram_server.env.is_empty());
+        assert_eq!(engram_server.command, "engram");
+        assert_eq!(engram_server.args, vec!["serve"]);
     }
 }
