@@ -43,8 +43,8 @@ pub struct CursorMcpConfig {
 /// Native Cursor MCP server entry (`type: stdio` or SSE).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CursorMcpServer {
-    #[serde(default = "default_stdio_type")]
-    pub r#type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub command: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -55,10 +55,6 @@ pub struct CursorMcpServer {
     pub url: Option<String>,
     #[serde(flatten)]
     pub extra: serde_json::Map<String, serde_json::Value>,
-}
-
-fn default_stdio_type() -> String {
-    "stdio".to_string()
 }
 
 /// Frontmatter header for `.cursor/rules/*.mdc` project rules.
@@ -107,7 +103,7 @@ pub fn register_cursor_mcp_server(
         .mcp_servers
         .remove(name)
         .unwrap_or_else(|| CursorMcpServer {
-            r#type: "stdio".to_string(),
+            r#type: Some("stdio".to_string()),
             command: String::new(),
             args: Vec::new(),
             env: BTreeMap::new(),
@@ -115,8 +111,11 @@ pub fn register_cursor_mcp_server(
             extra: serde_json::Map::new(),
         });
 
-    if server.r#type.is_empty() {
-        server.r#type = "stdio".to_string();
+    if server.r#type.is_none() {
+        server.r#type = Some("stdio".to_string());
+    }
+    if server.r#type.as_deref() == Some("stdio") {
+        server.url = None;
     }
     server.command = command.to_string();
     server.args = args.iter().map(|s| s.to_string()).collect();
@@ -315,7 +314,10 @@ mod tests {
 
         let config: CursorMcpConfig = serde_json::from_str(&content).unwrap();
         assert_eq!(config.mcp_servers.len(), 1);
-        assert_eq!(config.mcp_servers["codegraph"].r#type, "stdio");
+        assert_eq!(
+            config.mcp_servers["codegraph"].r#type.as_deref(),
+            Some("stdio")
+        );
 
         unregister_cursor_mcp_server(&config_path, "codegraph").unwrap();
         assert!(!config_path.exists());
@@ -422,7 +424,7 @@ mod tests {
 
         let content = std::fs::read_to_string(&config_path).unwrap();
         let config: CursorMcpConfig = serde_json::from_str(&content).unwrap();
-        assert_eq!(config.mcp_servers["engram"].r#type, "sse");
+        assert_eq!(config.mcp_servers["engram"].r#type.as_deref(), Some("sse"));
         assert_eq!(config.mcp_servers["engram"].command, "engram");
     }
 

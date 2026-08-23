@@ -40,8 +40,8 @@ pub struct ClaudeMcpConfig {
 /// Native Claude Code MCP server entry (stdio or SSE/http transport).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ClaudeMcpServer {
-    #[serde(default = "default_stdio_type")]
-    pub r#type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub command: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -54,21 +54,20 @@ pub struct ClaudeMcpServer {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
-fn default_stdio_type() -> String {
-    "stdio".to_string()
-}
-```
+### Path Resolution & Defensive Compatibility
+`ClaudeAdapter::default_config_path` checks `~/.claude.json` by default (or `.claude.json` inside `$CLAUDE_CONFIG_DIR`). The inspection of `~/.claude/settings.json` is defensive compatibility for users who manually placed `"mcpServers"` in `settings.json`.
 
 ## Functions & Lifecycle Wiring
 
 1. `register_claude_mcp_server(config_path: &Path, name: &str, command: &str, args: &[&str], env: &BTreeMap<String, String>) -> Result<(), CeError>`:
    - Reads `config_path` if present; parses `ClaudeMcpConfig`.
    - Inserts or updates `mcp_servers[name]`.
+   - Preserves non-stdio transport types (`r#type`), clearing stale `url` fields when registering stdio commands.
    - Writes back atomically using `write_atomic`.
 
 2. `unregister_claude_mcp_server(config_path: &Path, name: &str) -> Result<(), CeError>`:
    - Removes `name` from `mcp_servers`.
-   - Deletes file ONLY if `mcp_servers` and `extra` are empty; otherwise writes updated JSON atomically.
+   - Writes updated JSON atomically while leaving the file intact to preserve user OAuth sessions, project trust, and preferences.
 
 3. `update_claude_md(rule_path: &Path, managed_text: &str) -> Result<(), CeError>`:
    - Priority path resolution:

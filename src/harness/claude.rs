@@ -35,7 +35,7 @@ impl HarnessAdapter for ClaudeAdapter {
             if settings.exists() {
                 return settings;
             }
-            let json_path = env_path.join("claude.json");
+            let json_path = env_path.join(".claude.json");
             if json_path.exists() {
                 return json_path;
             }
@@ -122,6 +122,9 @@ pub fn register_claude_mcp_server(
 
     if server.r#type.is_none() {
         server.r#type = Some("stdio".to_string());
+    }
+    if server.r#type.as_deref() == Some("stdio") {
+        server.url = None;
     }
     server.command = command.to_string();
     server.args = args.iter().map(|s| s.to_string()).collect();
