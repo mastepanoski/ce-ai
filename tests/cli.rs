@@ -1619,8 +1619,14 @@ fn install_cursor_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
     let config: ce_ai::harness::cursor::CursorMcpConfig = serde_json::from_str(&content).unwrap();
     assert!(config.mcp_servers.contains_key("codegraph"));
     assert!(config.mcp_servers.contains_key("engram"));
-    assert_eq!(config.mcp_servers["codegraph"].r#type, "stdio");
-    assert_eq!(config.mcp_servers["engram"].r#type, "stdio");
+    assert_eq!(
+        config.mcp_servers["codegraph"].r#type.as_deref(),
+        Some("stdio")
+    );
+    assert_eq!(
+        config.mcp_servers["engram"].r#type.as_deref(),
+        Some("stdio")
+    );
     assert!(config.extra.is_empty(), "Zero OpenCode key leaks");
 
     // opencode directory must remain pristine / non-existent

@@ -25,7 +25,7 @@
 
 ### R4: Uninstallation & Cleanup
 - WHEN `uninstall --harness claude` is run THEN `ce-ai` sidecars (`codegraph`, `engram`) MUST be unregistered from `mcpServers`.
-- WHEN `mcpServers` becomes empty and no extra user keys remain THEN the config file MUST be deleted. If user servers or extra settings remain, the config file MUST NOT be deleted.
+- WHEN `mcpServers` becomes empty THEN the `mcpServers` block MAY be cleared, but the configuration file (`~/.claude.json` / `settings.json`) MUST NOT be deleted even when empty to preserve user application state (OAuth sessions, project trust, and preferences).
 
 ### R5: Skills Directory & Asset Placement
 - WHEN `install` or `sync` runs for Claude harness THEN managed skills MUST be copied to `~/.claude/skills/<name>/SKILL.md`.

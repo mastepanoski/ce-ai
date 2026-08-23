@@ -200,8 +200,13 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             let claude_skills_dir = config_dir.join("skills");
             let managed_skills_src = managed_dir.join("skills");
             if managed_skills_src.exists() {
-                let _ =
-                    crate::source::archive::copy_dir_all(&managed_skills_src, &claude_skills_dir);
+                crate::source::archive::copy_dir_all(&managed_skills_src, &claude_skills_dir)
+                    .map_err(|e| {
+                        CeError::Runtime(format!(
+                            "failed to copy managed skills to {}: {e}",
+                            claude_skills_dir.display()
+                        ))
+                    })?;
             }
             InstallManifest {
                 version: version.to_string(),
