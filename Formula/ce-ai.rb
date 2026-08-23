@@ -1,7 +1,7 @@
 class CeAi < Formula
   desc "CLI for managing the compound-engineering plugin across AI harnesses"
   homepage "https://github.com/mastepanoski/ce-ai"
-  version "1.11.0"
+  version "1.12.0"
   license "MIT"
 
   if OS.mac? && Hardware::CPU.intel?

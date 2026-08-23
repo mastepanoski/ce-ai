@@ -140,6 +140,21 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             }
         }
 
+        // Clean up Copilot rule file (.github/copilot-instructions.md)
+        let copilot_rule = target_dir.join(".github").join("copilot-instructions.md");
+        if copilot_rule.exists() {
+            if let Ok(c_text) = fs::read_to_string(&copilot_rule) {
+                if c_text.contains(crate::harness::copilot::CE_MANAGED_BEGIN) {
+                    let stripped = crate::harness::copilot::strip_managed_block(&c_text);
+                    if stripped.trim().is_empty() {
+                        let _ = fs::remove_file(&copilot_rule);
+                    } else {
+                        let _ = crate::state::write_atomic(&copilot_rule, stripped.as_bytes());
+                    }
+                }
+            }
+        }
+
         // Clean up sentinel-bounded .gitignore block (DEC-06)
         let gitignore_file = target_dir.join(".gitignore");
         if gitignore_file.exists() {
