@@ -56,7 +56,7 @@ enum Commands {
     /// Remove the CE plugin and restore the pre-install config.
     Uninstall(uninstall::Args),
     /// Report config validity, drift, and state consistency.
-    Doctor,
+    Doctor(doctor::Args),
     /// Backup listing and point-in-time config recovery.
     Backups(backups::BackupsArgs),
     /// Companion developer sidecars and memory tools manager (Engram, CodeGraph, Context7, RTK).
@@ -100,7 +100,7 @@ fn main() {
         Some(Commands::Skills(args)) => skills::run(&ctx, &args),
         Some(Commands::Status) => status::run(&ctx),
         Some(Commands::Uninstall(args)) => uninstall::run(&ctx, &args),
-        Some(Commands::Doctor) => doctor::run(&ctx),
+        Some(Commands::Doctor(args)) => doctor::run(&ctx, &args),
         Some(Commands::Backups(args)) => backups::run(&ctx, &args),
         Some(Commands::Tools(args)) => tools::run(&ctx, &args),
         Some(Commands::Workflow(args)) => workflow::run(&ctx, &args),

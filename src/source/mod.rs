@@ -7,3 +7,4 @@ pub mod archive;
 pub mod cache;
 pub mod registry;
 pub mod release;
+pub mod tools_registry;
