@@ -51,6 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.2] - 2026-08-22
+
+### Fixed
+- **Installer Download Resilience**: `install.ps1` / `install.sh` retry release downloads (3 attempts, linear backoff) and fall back to the 5 most recent releases when `latest` lacks the platform asset — eliminates HTTP 404 installer/CI failures during concurrent release publication windows. Formula version realigned to match Cargo (was drifting at 1.5.1).
+
+---
+
 ## [Unreleased]
 
 ### Fixed
