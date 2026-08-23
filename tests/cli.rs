@@ -1611,11 +1611,43 @@ fn install_cursor_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
         .success();
 
     let cursor_dir = home.join(".cursor");
-    assert!(cursor_dir.join("mcp.json").exists());
+    let mcp_json = cursor_dir.join("mcp.json");
+    assert!(mcp_json.exists());
     assert!(cursor_dir.join("compound-engineering").exists());
+
+    let content = fs::read_to_string(&mcp_json).unwrap();
+    let config: ce_ai::harness::cursor::CursorMcpConfig = serde_json::from_str(&content).unwrap();
+    assert!(config.mcp_servers.contains_key("codegraph"));
+    assert!(config.mcp_servers.contains_key("engram"));
+    assert_eq!(config.mcp_servers["codegraph"].r#type, "stdio");
+    assert_eq!(config.mcp_servers["engram"].r#type, "stdio");
+    assert!(config.extra.is_empty(), "Zero OpenCode key leaks");
 
     // opencode directory must remain pristine / non-existent
     assert!(!home.join(".config/opencode").exists());
+}
+
+#[test]
+fn init_prj_cursor_writes_rule_mdc() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("my-project");
+    fs::create_dir_all(prj_dir.join(".cursor")).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let mdc_path = prj_dir.join(".cursor/rules/compound-engineering.mdc");
+    assert!(mdc_path.exists());
+    let content = fs::read_to_string(&mdc_path).unwrap();
+    assert!(content.starts_with("---\n"));
+    assert!(content.contains("description: Compound Engineering Agent Directives"));
+    assert!(content.contains("globs: *"));
+    assert!(content.contains("alwaysApply: true"));
+    assert!(content.contains("<!-- CE-AI MANAGED BLOCK BEGIN -->"));
+    assert!(content.contains("<!-- CE-AI MANAGED BLOCK END -->"));
 }
 
 #[test]
@@ -1642,6 +1674,55 @@ fn uninstall_cursor_harness_cleans_native_dir_artifacts() {
 
     let cursor_dir = home.join(".cursor");
     assert!(!cursor_dir.join("compound-engineering").exists());
+    assert!(!cursor_dir.join("mcp.json").exists());
+
+    let state_file = config_dir.join("state.json");
+    let state_text = fs::read_to_string(&state_file).unwrap();
+    assert!(!state_text.contains("\"cursor\""));
+}
+
+#[test]
+fn uninstall_cursor_harness_preserves_user_mcp_servers_in_mcp_json() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    // Pre-create user mcp.json with a custom server
+    let cursor_dir = home.join(".cursor");
+    fs::create_dir_all(&cursor_dir).unwrap();
+    let initial_json = r#"{
+  "mcpServers": {
+    "user-tool": {
+      "type": "stdio",
+      "command": "my-tool"
+    }
+  }
+}"#;
+    fs::write(cursor_dir.join("mcp.json"), initial_json).unwrap();
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "cursor",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "cursor"])
+        .assert()
+        .success();
+
+    let mcp_json = cursor_dir.join("mcp.json");
+    assert!(mcp_json.exists());
+    let content = fs::read_to_string(&mcp_json).unwrap();
+    let config: ce_ai::harness::cursor::CursorMcpConfig = serde_json::from_str(&content).unwrap();
+    assert!(config.mcp_servers.contains_key("user-tool"));
+    assert!(!config.mcp_servers.contains_key("codegraph"));
+    assert!(!config.mcp_servers.contains_key("engram"));
 }
 
 #[test]

@@ -276,6 +276,16 @@ pub fn run(
             crate::state::write_atomic(&gitignore_file, updated_gi.as_bytes())?;
         }
 
+        // Write Cursor project rule .cursor/rules/compound-engineering.mdc if .cursor exists
+        let cursor_dir = target_dir.join(".cursor");
+        if cursor_dir.exists() {
+            let cursor_rules_dir = cursor_dir.join("rules");
+            fs::create_dir_all(&cursor_rules_dir)?;
+            let rule_path = cursor_rules_dir.join("compound-engineering.mdc");
+            let frontmatter = crate::harness::cursor::CursorRuleFrontmatter::default();
+            crate::harness::cursor::update_cursor_rule_mdc(&rule_path, &frontmatter, inner_body)?;
+        }
+
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
             if !ctx.quiet {
                 eprintln!("warning: skill registry sync failed: {e}");

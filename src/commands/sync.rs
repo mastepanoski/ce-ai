@@ -185,11 +185,29 @@ pub(crate) fn sync_with(
                 h_kind.harness_dir(&home_dir)
             };
             let target_config = h_kind.config_path(&config_dir);
-            let _ = crate::opencode::config::ensure_plugin_and_skills(
-                &target_config,
-                &crate::opencode::plugins::plugin_entry(&config_dir).to_string_lossy(),
-                &crate::opencode::plugins::skills_path(&config_dir).to_string_lossy(),
-            );
+            if h_kind == HarnessKind::Cursor {
+                let empty_env = std::collections::BTreeMap::new();
+                crate::harness::cursor::register_cursor_mcp_server(
+                    &target_config,
+                    "codegraph",
+                    "codegraph",
+                    &["mcp"],
+                    &empty_env,
+                )?;
+                crate::harness::cursor::register_cursor_mcp_server(
+                    &target_config,
+                    "engram",
+                    "engram",
+                    &["serve"],
+                    &empty_env,
+                )?;
+            } else {
+                let _ = crate::opencode::config::ensure_plugin_and_skills(
+                    &target_config,
+                    &crate::opencode::plugins::plugin_entry(&config_dir).to_string_lossy(),
+                    &crate::opencode::plugins::skills_path(&config_dir).to_string_lossy(),
+                );
+            }
         }
         state.installed_harnesses.push(serde_json::json!({
             "name": name,

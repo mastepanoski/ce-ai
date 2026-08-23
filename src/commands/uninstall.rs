@@ -67,6 +67,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 crate::state::backups::newest_backup_for_harness(&backups, target)?
             {
                 crate::state::backups::restore_backup_by_id(&backups, &backup.id, &target_config)?;
+            } else if harness_kind == HarnessKind::Cursor {
+                for tool in &["codegraph", "engram", "context7", "rtk"] {
+                    crate::harness::cursor::unregister_cursor_mcp_server(&target_config, tool)?;
+                }
             } else if target_config.exists() {
                 std::fs::remove_file(&target_config)?;
             }

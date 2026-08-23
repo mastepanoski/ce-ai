@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-08-23
+
+### Added
+- **Native Cursor Harness Adapter (Issue #173 / Umbrella #155)**:
+  - Native `~/.cursor/mcp.json` reader and writer using Cursor's official `mcpServers` stdio schema (`type: "stdio"`, `command`, `args`, `env`), preserving all unmanaged user MCP entries and per-server custom attributes.
+  - Zero OpenCode key leakage: `plugin` and `skills.paths` keys are never written to `~/.cursor/mcp.json`.
+  - Project rules support: `ce-ai init-prj` writes project rules to `.cursor/rules/compound-engineering.mdc` with valid frontmatter (`description`, `globs`, `alwaysApply`) and demarcated managed comment blocks.
+  - Full lifecycle support for Cursor across `install`, `sync`, `tools install`, `init-prj`, and `uninstall` with byte-for-byte user content preservation.
+
+---
+
 ## [1.8.4] - 2026-08-23
 
 ### Fixed
