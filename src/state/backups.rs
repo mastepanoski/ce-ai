@@ -155,6 +155,15 @@ pub fn list_backups(
     Ok(entries)
 }
 
+/// Returns the newest backup entry under `root` for a specific harness target, if any.
+pub fn newest_backup_for_harness(
+    root: &Path,
+    harness: &str,
+) -> Result<Option<BackupEntry>, CeError> {
+    let entries = list_backups(root, Some(harness))?;
+    Ok(entries.into_iter().next())
+}
+
 /// Restores a specific backup snapshot by ID onto `target`.
 pub fn restore_backup_by_id(root: &Path, id: &str, target: &Path) -> Result<BackupEntry, CeError> {
     // Path Traversal Security Hardening

@@ -1643,3 +1643,75 @@ fn uninstall_cursor_harness_cleans_native_dir_artifacts() {
     let cursor_dir = home.join(".cursor");
     assert!(!cursor_dir.join("compound-engineering").exists());
 }
+
+#[test]
+#[allow(clippy::permissions_set_readonly_false)]
+fn uninstall_failure_propagates_error_and_preserves_state() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "cursor",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let state_file = config_dir.join("state.json");
+    let initial_state = std::fs::read_to_string(&state_file).unwrap();
+    assert!(initial_state.contains("cursor"));
+
+    // Inject unremovable file inside managed_dir to force IO error on remove_dir_all
+    let managed_dir = home.join(".cursor").join("compound-engineering");
+    let lock_file = managed_dir.join("unremovable.txt");
+    std::fs::write(&lock_file, "locked").unwrap();
+    let mut perms = std::fs::metadata(&lock_file).unwrap().permissions();
+    perms.set_readonly(true);
+    let _ = std::fs::set_permissions(&lock_file, perms.clone());
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&managed_dir, std::fs::Permissions::from_mode(0o555));
+    }
+
+    let result = ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "cursor"])
+        .assert();
+
+    // 1. Assert non-zero exit status (must fail)
+    result.failure();
+
+    // 2. Restore permissions for TempDir cleanup
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&managed_dir, std::fs::Permissions::from_mode(0o755));
+    }
+    perms.set_readonly(false);
+    let _ = std::fs::set_permissions(&lock_file, perms);
+
+    // 3. Unconditionally assert state preservation
+    let current_state = std::fs::read_to_string(&state_file).unwrap();
+    assert!(
+        current_state.contains("cursor"),
+        "state.json should preserve cursor harness entry when uninstall fails"
+    );
+}
+
+#[test]
+fn uninstall_invalid_harness_name_returns_usage_error() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "invalid-harness-xyz"])
+        .assert()
+        .failure()
+        .code(2);
+}

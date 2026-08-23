@@ -4,7 +4,6 @@ use crate::commands::Context;
 use crate::error::CeError;
 use crate::harness::HarnessKind;
 use crate::opencode::plugins::MANAGED_DIR;
-use crate::state::backups::{newest_backup_dir, restore_latest};
 use crate::state::state::State;
 
 #[derive(clap::Args, Debug, Clone)]
@@ -64,19 +63,16 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             };
             let target_config = harness_kind.config_path(&config_dir);
             let backups = ctx.config_dir.join("backups");
-            match newest_backup_dir(&backups)? {
-                Some(_) => {
-                    let _ = restore_latest(&backups, &target_config);
-                }
-                None => {
-                    if target_config.exists() {
-                        let _ = std::fs::remove_file(&target_config);
-                    }
-                }
+            if let Some(backup) =
+                crate::state::backups::newest_backup_for_harness(&backups, target)?
+            {
+                crate::state::backups::restore_backup_by_id(&backups, &backup.id, &target_config)?;
+            } else if target_config.exists() {
+                std::fs::remove_file(&target_config)?;
             }
             let managed_dir = config_dir.join(MANAGED_DIR);
             if managed_dir.exists() {
-                let _ = std::fs::remove_dir_all(&managed_dir);
+                std::fs::remove_dir_all(&managed_dir)?;
             }
         }
         state
@@ -84,9 +80,13 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             .retain(|h| h["name"].as_str() != Some(target.as_str()));
     }
 
-    state.save(&state_path)?;
+    if let Err(e) = crate::source::registry::SkillRegistry::remove(ctx) {
+        if !ctx.quiet {
+            eprintln!("warning: skill registry cleanup failed: {e}");
+        }
+    }
 
-    let _ = crate::source::registry::SkillRegistry::remove(ctx);
+    state.save(&state_path)?;
 
     if !ctx.quiet {
         if args.harness == "all" {
