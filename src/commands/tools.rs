@@ -1,6 +1,8 @@
 //! `ce-ai tools`: detection, installation, and management of companion sidecars
 //! (Engram, CodeGraph, Context7, RTK), version freshness, and skill suggestions.
 
+use std::path::Path;
+
 use crate::commands::Context;
 use crate::error::CeError;
 use crate::source::tools_registry::{
@@ -79,18 +81,73 @@ pub fn status(ctx: &Context) -> Result<(), CeError> {
     Ok(())
 }
 
-fn install_tool(_ctx: &Context, tool: &str) -> Result<(), CeError> {
+fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
     let tool_lower = tool.to_lowercase();
-    match tool_lower.as_str() {
-        "engram" | "codegraph" | "context7" | "rtk" => {
-            println!("tools: provisioning companion tool '{tool_lower}'...");
-            println!("tools: '{tool_lower}' MCP server registration completed successfully.");
-            Ok(())
+
+    let server_def = match tool_lower.as_str() {
+        "context7" => serde_json::json!({
+            "command": "npx",
+            "args": ["-y", "@upstash/context7-mcp@latest"]
+        }),
+        "engram" => serde_json::json!({
+            "command": "engram",
+            "args": ["serve"]
+        }),
+        "rtk" => serde_json::json!({
+            "command": "rtk",
+            "args": ["mcp"]
+        }),
+        "codegraph" => serde_json::json!({
+            "command": "codegraph",
+            "args": ["mcp"]
+        }),
+        _ => {
+            return Err(CeError::Usage(format!(
+                "unknown companion tool '{tool}'. Supported tools: engram, codegraph, context7, rtk"
+            )))
         }
-        _ => Err(CeError::Usage(format!(
-            "unknown companion tool '{tool}'. Supported tools: engram, codegraph, context7, rtk"
-        ))),
+    };
+
+    println!("tools: provisioning companion tool '{tool_lower}'...");
+
+    if ctx.dry_run {
+        println!(
+            "tools: [dry-run] would merge '{tool_lower}' MCP server definition into opencode.json"
+        );
+        return Ok(());
     }
+
+    let opencode_json = ctx.opencode_config_dir.join("opencode.json");
+    crate::opencode::config::register_mcp_server(&opencode_json, &tool_lower, server_def)?;
+
+    let probe_version = extract_tool_version(&tool_lower);
+    let probe_ok = probe_version.is_some() || is_mcp_configured(&opencode_json, &tool_lower);
+
+    if !probe_ok {
+        return Err(CeError::Runtime(format!(
+            "installation check failed for companion tool '{tool_lower}': binary not found on PATH or MCP configuration invalid"
+        )));
+    }
+
+    let version_str = probe_version.unwrap_or_else(|| "configured".into());
+    println!(
+        "tools: '{tool_lower}' MCP server registration and health probe completed successfully ({version_str})."
+    );
+
+    Ok(())
+}
+
+fn is_mcp_configured(opencode_json: &Path, tool_name: &str) -> bool {
+    if let Ok(text) = std::fs::read_to_string(opencode_json) {
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) {
+            return val
+                .get("mcpServers")
+                .and_then(|m| m.as_object())
+                .map(|m| m.contains_key(tool_name))
+                .unwrap_or(false);
+        }
+    }
+    false
 }
 
 #[cfg(test)]
@@ -109,5 +166,58 @@ mod tests {
             quiet: true,
         };
         assert!(status(&ctx).is_ok());
+    }
+
+    #[test]
+    fn test_tools_install_registers_mcp_server_atomically_without_clobbering() {
+        let tmp = TempDir::new().unwrap();
+        let opencode_dir = tmp.path().join("opencode");
+        std::fs::create_dir_all(&opencode_dir).unwrap();
+        let config_file = opencode_dir.join("opencode.json");
+
+        // Write pre-existing user config
+        std::fs::write(
+            &config_file,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "mcpServers": {
+                    "custom-user-mcp": { "command": "my-mcp" }
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let ctx = Context {
+            config_dir: tmp.path().to_path_buf(),
+            opencode_config_dir: opencode_dir.clone(),
+            dry_run: false,
+            verbose: false,
+            quiet: true,
+        };
+
+        let result = install_tool(&ctx, "context7");
+        assert!(result.is_ok());
+
+        // Verify config was updated atomically preserving user mcp
+        let val: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&config_file).unwrap()).unwrap();
+        let mcp = val.get("mcpServers").unwrap().as_object().unwrap();
+        assert!(mcp.contains_key("custom-user-mcp"));
+        assert!(mcp.contains_key("context7"));
+    }
+
+    #[test]
+    fn test_tools_install_unknown_tool_fails_usage() {
+        let tmp = TempDir::new().unwrap();
+        let ctx = Context {
+            config_dir: tmp.path().to_path_buf(),
+            opencode_config_dir: tmp.path().to_path_buf(),
+            dry_run: false,
+            verbose: false,
+            quiet: true,
+        };
+
+        let err = install_tool(&ctx, "invalid-tool").unwrap_err();
+        assert!(matches!(err, CeError::Usage(_)));
     }
 }

@@ -100,6 +100,34 @@ pub fn ensure_plugin_and_skills(
     })
 }
 
+/// Merges an MCP server definition into `opencode.json` under `mcpServers.<tool_name>`.
+/// Preserves pre-existing user MCP servers and custom config. Writes atomically.
+pub fn register_mcp_server(
+    config_path: &Path,
+    tool_name: &str,
+    server_def: serde_json::Value,
+) -> Result<(), CeError> {
+    let mut config = read_config(config_path)?;
+    match config.get_mut("mcpServers") {
+        None => {
+            config["mcpServers"] = serde_json::json!({
+                tool_name: server_def
+            });
+        }
+        Some(serde_json::Value::Object(mcp)) => {
+            mcp.insert(tool_name.to_string(), server_def);
+        }
+        Some(_) => {
+            return Err(CeError::Runtime(
+                "`mcpServers` in opencode.json must be an object; refusing to overwrite it. Fix the file manually, then re-run."
+                    .into(),
+            ));
+        }
+    }
+    write_atomic(config_path, &serde_json::to_vec_pretty(&config)?)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
