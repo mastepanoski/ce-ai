@@ -76,10 +76,27 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
             let inner_body = crate::commands::init_prj::render_block_content(p.tier);
             let expected_sha = crate::commands::init_prj::compute_sha256(inner_body);
             if !text.contains(&expected_sha) {
-                findings.push(format!(
-                    "project-adoption: block SHA drift detected at '{}'",
-                    p.path.display()
-                ));
+                // Distinguish a stale managed-block version (operator action:
+                // re-run init-prj) from content tampering (generic drift).
+                let declared_version = text.lines().find_map(|line| {
+                    let rest = line
+                        .trim()
+                        .strip_prefix(crate::commands::init_prj::BLOCK_BEGIN_MARKER)?;
+                    let v = rest.trim_start().strip_prefix("v=")?;
+                    v.split([' ', '-']).next()?.parse::<u32>().ok()
+                });
+                match declared_version {
+                    Some(v) if v < crate::commands::init_prj::BLOCK_VERSION => findings.push(format!(
+                        "project-adoption: stale block version v={} at '{}' — re-run ce-ai init-prj --tier {} to upgrade",
+                        v,
+                        p.path.display(),
+                        p.tier.as_str()
+                    )),
+                    _ => findings.push(format!(
+                        "project-adoption: block SHA drift detected at '{}'",
+                        p.path.display()
+                    )),
+                }
             }
         }
     }

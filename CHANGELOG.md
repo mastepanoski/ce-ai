@@ -51,6 +51,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.3] - 2026-08-22
+
+### Added
+- **Doctor Stale-Block Upgrade Hint**: `ce-ai doctor` now distinguishes stale managed-block versions from content tampering — blocks declaring an older `v=` report a targeted finding (`re-run ce-ai init-prj --tier <tier> to upgrade`) instead of generic SHA drift.
+- **Adoption v2 Test Hardening**: new integration coverage for LF-only v1→v2 replacement, malformed-block fail-closed behavior, and header-sha256 ↔ body ↔ state.json triangle consistency.
+
+---
+
 ## [1.6.2] - 2026-08-22
 
 ### Fixed
