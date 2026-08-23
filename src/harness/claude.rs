@@ -120,7 +120,9 @@ pub fn register_claude_mcp_server(
             extra: serde_json::Map::new(),
         });
 
-    server.r#type = Some("stdio".to_string());
+    if server.r#type.is_none() {
+        server.r#type = Some("stdio".to_string());
+    }
     server.command = command.to_string();
     server.args = args.iter().map(|s| s.to_string()).collect();
     server.env = env.clone();
@@ -191,41 +193,71 @@ pub fn update_managed_block(content: &str, managed_text: &str) -> String {
         CE_MANAGED_END
     );
 
-    if let (Some(start), Some(end)) = (content.find(CE_MANAGED_BEGIN), content.find(CE_MANAGED_END))
-    {
-        let before = content[..start].trim_end();
-        let after = content[end + CE_MANAGED_END.len()..].trim_start();
-        if before.is_empty() && after.is_empty() {
-            block
-        } else if before.is_empty() {
-            format!("{}\n\n{}", block, after)
-        } else if after.is_empty() {
-            format!("{}\n\n{}", before, block)
-        } else {
-            format!("{}\n\n{}\n\n{}", before, block, after)
+    let start_opt = content.find(CE_MANAGED_BEGIN);
+    let end_opt = content.find(CE_MANAGED_END);
+
+    match (start_opt, end_opt) {
+        (Some(start), Some(end)) if start <= end => {
+            let before = content[..start].trim_end();
+            let after = content[end + CE_MANAGED_END.len()..].trim_start();
+            if before.is_empty() && after.is_empty() {
+                block
+            } else if before.is_empty() {
+                format!("{}\n\n{}", block, after)
+            } else if after.is_empty() {
+                format!("{}\n\n{}", before, block)
+            } else {
+                format!("{}\n\n{}\n\n{}", before, block, after)
+            }
         }
-    } else if content.trim().is_empty() {
-        block
-    } else {
-        format!("{}\n\n{}", content.trim_end(), block)
+        (Some(start), _) => {
+            let before = content[..start].trim_end();
+            if before.is_empty() {
+                block
+            } else {
+                format!("{}\n\n{}", before, block)
+            }
+        }
+        (_, Some(end)) => {
+            let after = content[end + CE_MANAGED_END.len()..].trim_start();
+            if after.is_empty() {
+                block
+            } else {
+                format!("{}\n\n{}", block, after)
+            }
+        }
+        (None, None) => {
+            if content.trim().is_empty() {
+                block
+            } else {
+                format!("{}\n\n{}", content.trim_end(), block)
+            }
+        }
     }
 }
 
 /// Strip demarcated managed comment block on project de-adoption or uninstallation.
 pub fn strip_managed_block(content: &str) -> String {
-    if let (Some(start), Some(end)) = (content.find(CE_MANAGED_BEGIN), content.find(CE_MANAGED_END))
-    {
-        let before = content[..start].trim_end();
-        let after = content[end + CE_MANAGED_END.len()..].trim_start();
-        if before.is_empty() {
-            after.to_string()
-        } else if after.is_empty() {
-            before.to_string()
-        } else {
-            format!("{}\n\n{}", before, after)
+    let start_opt = content.find(CE_MANAGED_BEGIN);
+    let end_opt = content.find(CE_MANAGED_END);
+
+    match (start_opt, end_opt) {
+        (Some(start), Some(end)) if start <= end => {
+            let before = content[..start].trim_end();
+            let after = content[end + CE_MANAGED_END.len()..].trim_start();
+            if before.is_empty() {
+                after.to_string()
+            } else if after.is_empty() {
+                before.to_string()
+            } else {
+                format!("{}\n\n{}", before, after)
+            }
         }
-    } else {
-        content.to_string()
+        (Some(start), _) => content[..start].trim_end().to_string(),
+        (_, Some(end)) => content[end + CE_MANAGED_END.len()..]
+            .trim_start()
+            .to_string(),
+        (None, None) => content.to_string(),
     }
 }
 

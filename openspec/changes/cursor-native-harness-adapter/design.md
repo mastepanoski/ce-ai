@@ -21,10 +21,10 @@ pub struct CursorMcpServer {
     pub args: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<String, String>,
-}
-
-fn default_stdio_type() -> String {
-    "stdio".to_string()
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -44,6 +44,12 @@ impl Default for CursorRuleFrontmatter {
     }
 }
 ```
+
+### Collision Resolution Policy for MCP Servers
+When `register_cursor_mcp_server` or `register_claude_mcp_server` updates an MCP server entry:
+- If a server with the target `name` already exists in `mcpServers`, its existing `extra` fields (such as `disabled`, `url`) are preserved.
+- If the existing entry has `r#type` set to a non-stdio value (e.g., `"sse"`), `r#type` is preserved; otherwise, `r#type` defaults to `Some("stdio".to_string())`.
+- `command`, `args`, and `env` are updated with `ce-ai`'s sidecar target values.
 
 ## 2. Functions & API Contract
 

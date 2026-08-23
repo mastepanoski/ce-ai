@@ -115,7 +115,9 @@ pub fn register_cursor_mcp_server(
             extra: serde_json::Map::new(),
         });
 
-    server.r#type = "stdio".to_string();
+    if server.r#type.is_empty() {
+        server.r#type = "stdio".to_string();
+    }
     server.command = command.to_string();
     server.args = args.iter().map(|s| s.to_string()).collect();
     server.env = env.clone();
@@ -186,9 +188,12 @@ pub fn update_cursor_rule_mdc(
         frontmatter.description, frontmatter.globs, frontmatter.always_apply
     );
 
+    let has_frontmatter = existing_content.trim_start().starts_with("---\n")
+        || existing_content.trim_start().starts_with("---\r\n");
+
     let updated_body = update_managed_block(&existing_content, managed_text);
 
-    let final_content = if updated_body.starts_with("---") {
+    let final_content = if has_frontmatter {
         updated_body
     } else {
         format!("{}\n\n{}", frontmatter_str, updated_body.trim_start())
@@ -206,42 +211,72 @@ pub fn update_managed_block(content: &str, managed_text: &str) -> String {
         CE_MANAGED_END
     );
 
-    if let (Some(start), Some(end)) = (content.find(CE_MANAGED_BEGIN), content.find(CE_MANAGED_END))
-    {
-        let before = content[..start].trim_end();
-        let after = content[end + CE_MANAGED_END.len()..].trim_start();
-        if before.is_empty() && after.is_empty() {
-            block
-        } else if before.is_empty() {
-            format!("{}\n\n{}", block, after)
-        } else if after.is_empty() {
-            format!("{}\n\n{}", before, block)
-        } else {
-            format!("{}\n\n{}\n\n{}", before, block, after)
+    let start_opt = content.find(CE_MANAGED_BEGIN);
+    let end_opt = content.find(CE_MANAGED_END);
+
+    match (start_opt, end_opt) {
+        (Some(start), Some(end)) if start <= end => {
+            let before = content[..start].trim_end();
+            let after = content[end + CE_MANAGED_END.len()..].trim_start();
+            if before.is_empty() && after.is_empty() {
+                block
+            } else if before.is_empty() {
+                format!("{}\n\n{}", block, after)
+            } else if after.is_empty() {
+                format!("{}\n\n{}", before, block)
+            } else {
+                format!("{}\n\n{}\n\n{}", before, block, after)
+            }
         }
-    } else if content.trim().is_empty() {
-        block
-    } else {
-        format!("{}\n\n{}", content.trim_end(), block)
+        (Some(start), _) => {
+            let before = content[..start].trim_end();
+            if before.is_empty() {
+                block
+            } else {
+                format!("{}\n\n{}", before, block)
+            }
+        }
+        (_, Some(end)) => {
+            let after = content[end + CE_MANAGED_END.len()..].trim_start();
+            if after.is_empty() {
+                block
+            } else {
+                format!("{}\n\n{}", block, after)
+            }
+        }
+        (None, None) => {
+            if content.trim().is_empty() {
+                block
+            } else {
+                format!("{}\n\n{}", content.trim_end(), block)
+            }
+        }
     }
 }
 
 /// Strip demarcated managed comment block on uninstallation.
 #[allow(dead_code)]
 pub fn strip_managed_block(content: &str) -> String {
-    if let (Some(start), Some(end)) = (content.find(CE_MANAGED_BEGIN), content.find(CE_MANAGED_END))
-    {
-        let before = content[..start].trim_end();
-        let after = content[end + CE_MANAGED_END.len()..].trim_start();
-        if before.is_empty() {
-            after.to_string()
-        } else if after.is_empty() {
-            before.to_string()
-        } else {
-            format!("{}\n\n{}", before, after)
+    let start_opt = content.find(CE_MANAGED_BEGIN);
+    let end_opt = content.find(CE_MANAGED_END);
+
+    match (start_opt, end_opt) {
+        (Some(start), Some(end)) if start <= end => {
+            let before = content[..start].trim_end();
+            let after = content[end + CE_MANAGED_END.len()..].trim_start();
+            if before.is_empty() {
+                after.to_string()
+            } else if after.is_empty() {
+                before.to_string()
+            } else {
+                format!("{}\n\n{}", before, after)
+            }
         }
-    } else {
-        content.to_string()
+        (Some(start), _) => content[..start].trim_end().to_string(),
+        (_, Some(end)) => content[end + CE_MANAGED_END.len()..]
+            .trim_start()
+            .to_string(),
+        (None, None) => content.to_string(),
     }
 }
 
@@ -353,6 +388,42 @@ mod tests {
         assert!(content.contains(CE_MANAGED_BEGIN));
         assert!(content.contains("Directives content"));
         assert!(content.contains(CE_MANAGED_END));
+    }
+
+    #[test]
+    fn handles_unbalanced_managed_markers_gracefully() {
+        let unbalanced_start = format!("User content\n\n{}\nPartial block", CE_MANAGED_BEGIN);
+        let updated = update_managed_block(&unbalanced_start, "Fresh block");
+        assert!(updated.contains("User content"));
+        assert!(updated.contains(CE_MANAGED_BEGIN));
+        assert!(updated.contains("Fresh block"));
+        assert!(updated.contains(CE_MANAGED_END));
+
+        let stripped = strip_managed_block(&unbalanced_start);
+        assert_eq!(stripped.trim(), "User content");
+    }
+
+    #[test]
+    fn preserves_non_stdio_transport_type_on_re_registration() {
+        let tmp = TempDir::new().unwrap();
+        let config_path = tmp.path().join("mcp.json");
+        let initial_json = r#"{
+  "mcpServers": {
+    "engram": {
+      "type": "sse",
+      "command": "old",
+      "url": "https://example.com/sse"
+    }
+  }
+}"#;
+        std::fs::write(&config_path, initial_json).unwrap();
+        let env = BTreeMap::new();
+        register_cursor_mcp_server(&config_path, "engram", "engram", &["serve"], &env).unwrap();
+
+        let content = std::fs::read_to_string(&config_path).unwrap();
+        let config: CursorMcpConfig = serde_json::from_str(&content).unwrap();
+        assert_eq!(config.mcp_servers["engram"].r#type, "sse");
+        assert_eq!(config.mcp_servers["engram"].command, "engram");
     }
 
     #[test]
