@@ -364,6 +364,7 @@ mod tests {
         let ctx = Context {
             config_dir: tmp.path().to_path_buf(),
             opencode_config_dir: tmp.path().to_path_buf(),
+            workspace_root: None,
             dry_run: false,
             verbose: false,
             quiet: true,
@@ -393,6 +394,7 @@ mod tests {
         let ctx = Context {
             config_dir: tmp.path().to_path_buf(),
             opencode_config_dir: opencode_dir.clone(),
+            workspace_root: None,
             dry_run: false,
             verbose: false,
             quiet: true,
@@ -415,6 +417,7 @@ mod tests {
         let ctx = Context {
             config_dir: tmp.path().to_path_buf(),
             opencode_config_dir: tmp.path().to_path_buf(),
+            workspace_root: None,
             dry_run: false,
             verbose: false,
             quiet: true,
@@ -431,6 +434,7 @@ mod tests {
         let ctx = Context {
             config_dir: tmp.path().to_path_buf(),
             opencode_config_dir: opencode_dir.clone(),
+            workspace_root: None,
             dry_run: true,
             verbose: false,
             quiet: true,

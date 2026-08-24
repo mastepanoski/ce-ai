@@ -633,6 +633,7 @@ triggers:
         let ctx = Context {
             config_dir: temp.path().join(".ce-ai"),
             opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: None,
             dry_run: false,
             verbose: false,
             quiet: true,

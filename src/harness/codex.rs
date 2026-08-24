@@ -5,8 +5,6 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
-
 use crate::error::CeError;
 use crate::harness::{HarnessAdapter, HarnessKind};
 use crate::state::write_atomic;
@@ -39,18 +37,6 @@ impl HarnessAdapter for CodexAdapter {
 
         home_dir.join(".codex").join("config.toml")
     }
-}
-
-/// Native Codex MCP server entry (`[mcp_servers.<name>]` in TOML).
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CodexMcpServer {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub command: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub args: Vec<String>,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub env: BTreeMap<String, String>,
 }
 
 /// Merge and register an MCP server into Codex's TOML config using native `[mcp_servers.<name>]` schema.
@@ -300,10 +286,9 @@ mod tests {
         assert!(!root.contains_key("skills"));
 
         let mcp = root["mcp_servers"].as_table().unwrap();
-        let server: CodexMcpServer = mcp["codegraph"].clone().try_into().unwrap();
-        assert_eq!(server.command, "codegraph");
-        assert_eq!(server.args, vec!["mcp"]);
-        assert_eq!(server.env.get("LOG_LEVEL").unwrap(), "info");
+        let codegraph = mcp["codegraph"].as_table().unwrap();
+        assert_eq!(codegraph["command"].as_str(), Some("codegraph"));
+        assert_eq!(codegraph["env"]["LOG_LEVEL"].as_str(), Some("info"));
 
         unregister_codex_mcp_server(&config_path, "codegraph").unwrap();
         let content_after = std::fs::read_to_string(&config_path).unwrap();

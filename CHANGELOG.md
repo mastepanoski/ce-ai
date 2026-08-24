@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.3] - 2026-08-24
+
+### Fixed
+- Cursor no longer receives a skills-tree copy during install or sync (`~/.cursor/skills` pollution introduced by the v1.19.2 table): the shared registration spec now marks cursor as MCP-only, matching its documented `mcp.json` + rules surface.
+
+### Changed
+- Internal: the registration strategy table moved to `src/harness/registration.rs` and is now shared by both `install` and `sync` (single source of truth; ~230 duplicated lines removed from install). OpenCode remains the sole consumer of the plugin/skills JSON merge; the dead legacy `.opencode/skills` fallback path in install arms is gone.
+- Dead-code honesty pass: every `#[allow(dead_code)]` removed (including the three module-wide suppressions in `opencode`, `source`, and `state`). Truly unused items were deleted — `AuditStatus::Fail` + `fail_count` (no detector emits failures), `CodexMcpServer`, `CursorAdapter`, `OpencodeAdapter`, cursor's `strip_managed_block`, `apply_model_assignment`, `list_snapshots`, three speculative `State` methods, TUI `LOGO`, and the trait's never-read `canonical_instruction_file`/`derived_stub_files` defaults with their per-vendor overrides.
+- Wired the previously dormant `.ce-ai.json` workspace-override loading: `Context` now carries `workspace_root`, and model-assignment readers (`models`, `status`, `sync`, `doctor`) resolve state through `load_with_workspace_overrides` as documented in CONCEPTS.md.
+
 ## [1.20.2] - 2026-08-24
 
 ### Changed

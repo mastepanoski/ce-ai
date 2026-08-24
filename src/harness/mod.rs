@@ -10,8 +10,8 @@ pub mod custom;
 pub mod fx;
 pub mod grok;
 pub mod kimi;
-pub mod opencode;
 pub mod pi;
+pub mod registration;
 
 pub use grok::{
     strip_managed_block as strip_managed_rule_block, update_grok_rule_md as update_managed_rule_md,
@@ -27,7 +27,6 @@ use serde::{Deserialize, Serialize};
 use crate::error::CeError;
 
 /// Supported AI coding harness identifiers.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum HarnessKind {
@@ -45,7 +44,6 @@ pub enum HarnessKind {
     Custom,
 }
 
-#[allow(dead_code)]
 impl HarnessKind {
     /// List all natively supported harness identifiers as string slices.
     pub fn all_str() -> &'static [&'static str] {
@@ -358,20 +356,9 @@ impl fmt::Display for HarnessKind {
 }
 
 /// Abstract interface implemented by harness adapters.
-#[allow(dead_code)]
 pub trait HarnessAdapter {
     fn kind(&self) -> HarnessKind;
     fn default_config_path(&self, home: &Path) -> PathBuf;
-
-    /// Primary instruction file name managed by this harness (default: AGENTS.md).
-    fn canonical_instruction_file(&self) -> PathBuf {
-        PathBuf::from("AGENTS.md")
-    }
-
-    /// Derived reference stub files (e.g. CLAUDE.md) associated with this harness.
-    fn derived_stub_files(&self) -> Vec<PathBuf> {
-        vec![]
-    }
 }
 
 #[cfg(test)]

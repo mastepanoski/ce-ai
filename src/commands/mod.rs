@@ -24,6 +24,9 @@ use crate::error::CeError;
 pub struct Context {
     pub config_dir: PathBuf,
     pub opencode_config_dir: PathBuf,
+    /// Repository root when the CLI runs inside a git work tree; enables
+    /// `.ce-ai.json` workspace overrides of model assignments (MM-1).
+    pub workspace_root: Option<std::path::PathBuf>,
     pub dry_run: bool,
     pub verbose: bool,
     pub quiet: bool,
@@ -61,9 +64,17 @@ impl Context {
                 PathBuf::from(home).join(".config/opencode")
             }
         };
+        let workspace_root = std::process::Command::new("git")
+            .args(["rev-parse", "--show-toplevel"])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| std::path::PathBuf::from(String::from_utf8_lossy(&o.stdout).trim()));
+
         Ok(Self {
             config_dir,
             opencode_config_dir,
+            workspace_root,
             dry_run,
             verbose,
             quiet,

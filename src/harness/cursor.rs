@@ -3,29 +3,15 @@
 //! and `.cursor/rules/*.mdc` instruction files.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::CeError;
-use crate::harness::{HarnessAdapter, HarnessKind};
 use crate::state::write_atomic;
 
 pub const CE_MANAGED_BEGIN: &str = "<!-- CE-AI MANAGED BLOCK BEGIN -->";
 pub const CE_MANAGED_END: &str = "<!-- CE-AI MANAGED BLOCK END -->";
-
-#[derive(Debug, Default)]
-pub struct CursorAdapter;
-
-impl HarnessAdapter for CursorAdapter {
-    fn kind(&self) -> HarnessKind {
-        HarnessKind::Cursor
-    }
-
-    fn default_config_path(&self, home: &Path) -> PathBuf {
-        home.join(".cursor").join("mcp.json")
-    }
-}
 
 /// Root schema for Cursor's `~/.cursor/mcp.json`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -253,47 +239,10 @@ pub fn update_managed_block(content: &str, managed_text: &str) -> String {
     }
 }
 
-/// Strip demarcated managed comment block on uninstallation.
-#[allow(dead_code)]
-pub fn strip_managed_block(content: &str) -> String {
-    let start_opt = content.find(CE_MANAGED_BEGIN);
-    let end_opt = content.find(CE_MANAGED_END);
-
-    match (start_opt, end_opt) {
-        (Some(start), Some(end)) if start <= end => {
-            let before = content[..start].trim_end();
-            let after = content[end + CE_MANAGED_END.len()..].trim_start();
-            if before.is_empty() {
-                after.to_string()
-            } else if after.is_empty() {
-                before.to_string()
-            } else {
-                format!("{}\n\n{}", before, after)
-            }
-        }
-        (Some(start), _) => content[..start].trim_end().to_string(),
-        (_, Some(end)) => content[end + CE_MANAGED_END.len()..]
-            .trim_start()
-            .to_string(),
-        (None, None) => content.to_string(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
-
-    #[test]
-    fn cursor_adapter_default_paths() {
-        let adapter = CursorAdapter;
-        assert_eq!(adapter.kind(), HarnessKind::Cursor);
-        let home = PathBuf::from("/tmp/home");
-        assert_eq!(
-            adapter.default_config_path(&home),
-            PathBuf::from("/tmp/home/.cursor/mcp.json")
-        );
-    }
 
     #[test]
     fn registers_and_unregisters_native_cursor_mcp_server() {
@@ -400,9 +349,6 @@ mod tests {
         assert!(updated.contains(CE_MANAGED_BEGIN));
         assert!(updated.contains("Fresh block"));
         assert!(updated.contains(CE_MANAGED_END));
-
-        let stripped = strip_managed_block(&unbalanced_start);
-        assert_eq!(stripped.trim(), "User content");
     }
 
     #[test]

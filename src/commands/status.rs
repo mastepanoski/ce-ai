@@ -13,7 +13,10 @@ use crate::harness::HarnessKind;
 use std::collections::HashSet;
 
 pub fn run(ctx: &Context) -> Result<(), CeError> {
-    let state = State::load(&ctx.config_dir.join("state.json"))?;
+    let state = State::load_with_workspace_overrides(
+        &ctx.config_dir.join("state.json"),
+        ctx.workspace_root.as_deref(),
+    )?;
     let mut installed_list = Vec::new();
     let mut seen = HashSet::new();
 

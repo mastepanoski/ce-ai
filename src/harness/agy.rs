@@ -82,16 +82,6 @@ impl HarnessAdapter for AgyAdapter {
             .join("config")
             .join("mcp_config.json")
     }
-
-    fn canonical_instruction_file(&self) -> PathBuf {
-        PathBuf::from("GEMINI.md")
-    }
-
-    fn derived_stub_files(&self) -> Vec<PathBuf> {
-        vec![PathBuf::from(".agents")
-            .join("rules")
-            .join("compound-engineering.md")]
-    }
 }
 
 /// Merge and register an MCP server into Google Antigravity's `mcp_config.json` config using native `mcpServers` JSON object schema.
@@ -196,14 +186,6 @@ mod tests {
         assert_eq!(
             adapter.default_config_path(home),
             home.join(".gemini/config/mcp_config.json")
-        );
-        assert_eq!(
-            adapter.canonical_instruction_file(),
-            PathBuf::from("GEMINI.md")
-        );
-        assert_eq!(
-            adapter.derived_stub_files(),
-            vec![PathBuf::from(".agents/rules/compound-engineering.md")]
         );
     }
 

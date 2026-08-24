@@ -69,30 +69,12 @@ pub fn save_snapshot(
     Ok(filename)
 }
 
-/// Lists snapshot filenames for a profile, oldest first.
-pub fn list_snapshots(root: &Path, name: &str) -> Result<Vec<String>, CeError> {
-    let prefix = format!("{name}-");
-    let mut names = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(root.join("versions")) {
-        for entry in entries {
-            let file_name = entry?.file_name().to_string_lossy().into_owned();
-            if file_name.starts_with(&prefix) && file_name.ends_with(".json") {
-                names.push(file_name);
-            }
-        }
-    }
-    names.sort();
-    Ok(names)
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
     use tempfile::tempdir;
 
-    use crate::state::profiles::{
-        list_snapshots, load_profile, save_profile, save_snapshot, Profile,
-    };
+    use crate::state::profiles::{load_profile, save_profile, save_snapshot, Profile};
 
     fn models() -> BTreeMap<String, String> {
         BTreeMap::from([(
@@ -127,9 +109,10 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(5));
         let second = save_snapshot(dir.path(), "fast", &before, &before).unwrap();
         assert_ne!(first, second);
-        let snapshots = list_snapshots(dir.path(), "fast").unwrap();
-        assert_eq!(snapshots.len(), 2);
-        assert!(snapshots[0].starts_with("fast-") && snapshots[0].ends_with(".json"));
+        let version_count = std::fs::read_dir(dir.path().join("versions"))
+            .unwrap()
+            .count();
+        assert_eq!(version_count, 2);
         let kept: serde_json::Value = serde_json::from_str(
             &std::fs::read_to_string(dir.path().join("versions").join(first)).unwrap(),
         )

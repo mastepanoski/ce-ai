@@ -187,7 +187,8 @@ pub(crate) fn set(ctx: &Context, harness: &str, slot: &str, model: &str) -> Resu
     let config_path = kind.config_path(&config_dir);
 
     let state_path = ctx.config_dir.join("state.json");
-    let mut state = State::load(&state_path)?;
+    let mut state =
+        State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())?;
     let before = assignments_map(&state);
 
     // Merge into the target harness config first so a config failure leaves
@@ -318,7 +319,10 @@ pub fn purge_stale_assignments(state: &mut State, config: &serde_json::Value) ->
 }
 
 fn list(ctx: &Context) -> Result<(), CeError> {
-    let state = State::load(&ctx.config_dir.join("state.json"))?;
+    let state = State::load_with_workspace_overrides(
+        &ctx.config_dir.join("state.json"),
+        ctx.workspace_root.as_deref(),
+    )?;
     if state.model_assignments.is_empty() {
         println!("models: none");
         return Ok(());
@@ -330,7 +334,10 @@ fn list(ctx: &Context) -> Result<(), CeError> {
 }
 
 fn save(ctx: &Context, name: &str) -> Result<(), CeError> {
-    let state = State::load(&ctx.config_dir.join("state.json"))?;
+    let state = State::load_with_workspace_overrides(
+        &ctx.config_dir.join("state.json"),
+        ctx.workspace_root.as_deref(),
+    )?;
     let models = assignments_map(&state);
     let root = ctx.config_dir.join("profiles");
     save_profile(
@@ -351,7 +358,8 @@ fn save(ctx: &Context, name: &str) -> Result<(), CeError> {
 fn load(ctx: &Context, name: &str) -> Result<(), CeError> {
     let profile = load_profile(&ctx.config_dir.join("profiles"), name)?;
     let state_path = ctx.config_dir.join("state.json");
-    let mut state = State::load(&state_path)?;
+    let mut state =
+        State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())?;
     state.model_assignments.clear();
     let opencode_json = ctx.opencode_config_dir.join("opencode.json");
     for (slot, model) in &profile.models {
@@ -380,6 +388,7 @@ pub mod tests {
         Context {
             config_dir: tmp.path().join("ce-ai"),
             opencode_config_dir: tmp.path().join("home/.config/opencode"),
+            workspace_root: None,
             dry_run: false,
             verbose: false,
             quiet: true,
