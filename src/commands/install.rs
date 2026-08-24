@@ -397,6 +397,28 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 config_mutations: vec![],
             }
             .write(&config_dir)?;
+        } else if *harness_kind == HarnessKind::Pi {
+            let pi_skills_dir = config_dir.join("skills");
+            let managed_skills_src = managed_dir.join("skills");
+            if managed_skills_src.exists() {
+                crate::source::archive::copy_dir_all(&managed_skills_src, &pi_skills_dir).map_err(
+                    |e| {
+                        CeError::Runtime(format!(
+                            "failed to copy managed skills to {}: {e}",
+                            pi_skills_dir.display()
+                        ))
+                    },
+                )?;
+            }
+            InstallManifest {
+                version: version.to_string(),
+                plugin_name: "compound-engineering".into(),
+                installed_at: chrono::Utc::now().to_rfc3339(),
+                source: source_json.clone(),
+                files,
+                config_mutations: vec![],
+            }
+            .write(&config_dir)?;
         } else {
             let mut mutation = ensure_plugin_and_skills(
                 &target_config,

@@ -349,6 +349,13 @@ pub fn run(
             }
         }
 
+        // Write Pi project rule .pi/AGENTS.md if .pi exists
+        let pi_dir = target_dir.join(".pi");
+        if pi_dir.exists() {
+            let pi_agents = pi_dir.join("AGENTS.md");
+            crate::harness::update_managed_rule_md(&pi_agents, inner_body)?;
+        }
+
         // Write Antigravity project rules if .agents or GEMINI.md exists
         let agents_dir = target_dir.join(".agents");
         if agents_dir.exists() {

@@ -258,8 +258,12 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    use crate::harness::tests::HARNESS_ENV_LOCK;
+
     #[test]
     fn codex_adapter_default_paths() {
+        let _guard = HARNESS_ENV_LOCK.lock().unwrap();
+        std::env::remove_var("CODEX_HOME");
         let adapter = CodexAdapter;
         assert_eq!(adapter.kind(), HarnessKind::Codex);
         let home = PathBuf::from("/tmp/home");
@@ -271,6 +275,7 @@ mod tests {
 
     #[test]
     fn codex_adapter_respects_codex_home_env() {
+        let _guard = HARNESS_ENV_LOCK.lock().unwrap();
         let adapter = CodexAdapter;
         let home = PathBuf::from("/tmp/home");
         std::env::set_var("CODEX_HOME", "/custom/codex/dir");

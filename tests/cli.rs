@@ -2662,3 +2662,106 @@ fn uninstall_agy_harness_cleans_native_dir_artifacts_and_preserves_user_configs(
     let state_text = fs::read_to_string(config_dir.join("state.json")).unwrap();
     assert!(!state_text.contains("\"agy\""));
 }
+
+#[test]
+fn install_pi_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "pi",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let pi_dir = home.join(".pi/agent");
+    assert!(pi_dir.join("skills").exists());
+    assert!(pi_dir.join("skills/ce-brainstorm/SKILL.md").exists());
+
+    // Pi does NOT write any mcp.json, config.json, mcp-config.json or plugins.json
+    assert!(!pi_dir.join("config.json").exists());
+    assert!(!pi_dir.join("mcp.json").exists());
+    assert!(!pi_dir.join("mcp-config.json").exists());
+    assert!(!pi_dir.join("plugins.json").exists());
+
+    // opencode directory must remain pristine / non-existent
+    assert!(!home.join(".config/opencode").exists());
+}
+
+#[test]
+fn uninstall_pi_harness_cleans_native_dir_artifacts_and_preserves_user_configs() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    // Pre-populate custom user skill in ~/.pi/agent/
+    let user_custom_dir = home.join(".pi/agent/user_custom_skill");
+    fs::create_dir_all(&user_custom_dir).unwrap();
+    let user_skill_file = user_custom_dir.join("SKILL.md");
+    fs::write(&user_skill_file, "# My Custom Skill\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "pi",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "pi"])
+        .assert()
+        .success();
+
+    assert!(!home.join(".pi/agent/skills").exists());
+    assert!(user_skill_file.exists());
+    assert_eq!(
+        fs::read_to_string(&user_skill_file).unwrap(),
+        "# My Custom Skill\n"
+    );
+    assert!(!home.join(".config/opencode").exists());
+
+    let state_text = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    assert!(!state_text.contains("\"pi\""));
+}
+
+#[test]
+fn install_pi_harness_respects_pi_coding_agent_dir_env() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let custom_pi_dir = tmp.path().join("custom_pi_agent");
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .env("PI_CODING_AGENT_DIR", custom_pi_dir.to_str().unwrap())
+        .args([
+            "install",
+            "--harness",
+            "pi",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(custom_pi_dir.join("skills").exists());
+    assert!(custom_pi_dir.join("skills/ce-brainstorm/SKILL.md").exists());
+    assert!(!home.join(".pi").exists());
+
+    ceai(&config_dir, &home)
+        .env("PI_CODING_AGENT_DIR", custom_pi_dir.to_str().unwrap())
+        .args(["uninstall", "--harness", "pi"])
+        .assert()
+        .success();
+
+    assert!(!custom_pi_dir.join("skills").exists());
+}

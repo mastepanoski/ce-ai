@@ -99,7 +99,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 for tool in &["codegraph", "engram", "context7", "rtk"] {
                     crate::harness::codex::unregister_codex_mcp_server(&target_config, tool)?;
                 }
-            } else if target_config.exists() {
+            } else if target_config.is_file() {
                 std::fs::remove_file(&target_config)?;
             }
             let managed_dir = config_dir.join(MANAGED_DIR);
@@ -112,6 +112,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 || harness_kind == HarnessKind::Grok
                 || harness_kind == HarnessKind::Kimi
                 || harness_kind == HarnessKind::Agy
+                || harness_kind == HarnessKind::Pi
             {
                 let skills_dir = if harness_kind == HarnessKind::Agy {
                     config_dir.join("config").join("skills")

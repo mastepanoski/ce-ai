@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-08-23
+
+### Added
+- Native harness adapter implementation for Mario Zechner's `pi` coding agent (`PiAdapter`, Issue #182).
+- Native asset management under `~/.pi/agent/skills/` (and environment override `$PI_CODING_AGENT_DIR`), eliminating fictional MCP JSON or OpenCode plugin config file generation.
+- Project rule adoption targeting `.pi/AGENTS.md` when `.pi/` directory pre-exists.
+- Informative skip handling for `pi` targets in `ce-ai tools install` (reporting `pi`'s native no-MCP philosophy by design).
+
 ## [1.15.2] - 2026-08-23
 
 ### Fixed
