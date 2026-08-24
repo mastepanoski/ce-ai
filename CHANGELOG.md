@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.1] - 2026-08-24
+
+### Added
+- Community health files per the [opensource.guide](https://opensource.guide/) standards checklist: `.github/PULL_REQUEST_TEMPLATE.md` (DoD verification gates, Conventional Commits, OpenSpec requirement, SemVer + CHANGELOG bumps, AI-assisted contribution disclosure), referenced from `CONTRIBUTING.md`.
+- `.github/ISSUE_TEMPLATE/config.yml`: blank issues disabled; contact links route security reports to Private Vulnerability Reporting and general questions to Discussions.
+
+### Changed
+- Security disclosure is now private-only: the public `security_report.yml` issue form was removed because it exposed proof-of-concept exploit details before a patch exists. `SECURITY.md` documents Private Vulnerability Reporting as the primary channel with an email fallback (`me@maurostepanoski.ar`).
+- Version metadata repaired after v1.21.0 shipped without its `Cargo.toml` bump: the package now reports 1.21.1 and the Homebrew formula carries a single `version` stanza again.
+
 ## [1.21.0] - 2026-08-24
 
 ### Added
