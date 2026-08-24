@@ -22,9 +22,7 @@ impl HarnessAdapter for FxAdapter {
         if home.file_name().and_then(|n| n.to_str()) == Some("mcp.json") {
             return home.to_path_buf();
         }
-        if home.file_name().and_then(|n| n.to_str()) == Some(".fx")
-            || home.join("mcp.json").exists()
-        {
+        if home.file_name().and_then(|n| n.to_str()) == Some(".fx") {
             return home.join("mcp.json");
         }
         self.kind().harness_dir(home).join("mcp.json")
@@ -131,7 +129,11 @@ pub fn unregister_fx_mcp_server(config_path: &Path, name: &str) -> Result<(), Ce
 
     if config.mcp.remove(name).is_some() {
         if config.mcp.is_empty() && config.extra.is_empty() {
-            let _ = std::fs::remove_file(config_path);
+            if let Err(e) = std::fs::remove_file(config_path) {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    return Err(e.into());
+                }
+            }
         } else {
             let json_bytes = serde_json::to_vec_pretty(&config)
                 .map_err(|e| CeError::Runtime(format!("failed to serialize fx MCP config: {e}")))?;
@@ -264,5 +266,71 @@ mod tests {
         let config_after: FxMcpConfig = serde_json::from_str(&content_after).unwrap();
         assert!(config_after.mcp.contains_key("user_remote"));
         assert!(!config_after.mcp.contains_key("codegraph"));
+    }
+
+    #[test]
+    fn fx_adapter_default_paths_ignores_preexisting_mcp_json_in_home_dir() {
+        let _guard = HARNESS_ENV_LOCK.lock().unwrap();
+        std::env::remove_var("FX_HOME");
+
+        let tmp = TempDir::new().unwrap();
+        // Create an unrelated mcp.json in the home directory root
+        let home_mcp_json = tmp.path().join("mcp.json");
+        std::fs::write(&home_mcp_json, "{}").unwrap();
+
+        let adapter = FxAdapter;
+        // Even though home/mcp.json exists, default_config_path must deterministically return home/.fx/mcp.json
+        assert_eq!(
+            adapter.default_config_path(tmp.path()),
+            tmp.path().join(".fx").join("mcp.json")
+        );
+    }
+
+    #[test]
+    fn cleans_stale_type_from_extra_map_on_re_registration() {
+        let tmp = TempDir::new().unwrap();
+        let config_path = tmp.path().join("mcp.json");
+        let initial_json = r#"{
+            "mcp": {
+                "codegraph": {
+                    "type": "custom_legacy",
+                    "custom_field": "keep_me"
+                }
+            }
+        }"#;
+        std::fs::write(&config_path, initial_json).unwrap();
+
+        let env = BTreeMap::new();
+        register_fx_mcp_server(&config_path, "codegraph", "codegraph", &["mcp"], &env).unwrap();
+
+        let content = std::fs::read_to_string(&config_path).unwrap();
+        let config: FxMcpConfig = serde_json::from_str(&content).unwrap();
+        let server = &config.mcp["codegraph"];
+        assert_eq!(server.r#type.as_deref(), Some("local"));
+        assert!(!server.extra.contains_key("type"));
+        assert_eq!(server.extra.get("custom_field").unwrap(), "keep_me");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn unregister_fx_mcp_server_propagates_io_errors() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp = TempDir::new().unwrap();
+        let dir_path = tmp.path().join("readonly_dir");
+        std::fs::create_dir(&dir_path).unwrap();
+        let config_path = dir_path.join("mcp.json");
+        std::fs::write(&config_path, r#"{"mcp":{"codegraph":{"type":"local"}}}"#).unwrap();
+
+        let mut perms = std::fs::metadata(&dir_path).unwrap().permissions();
+        perms.set_mode(0o555);
+        std::fs::set_permissions(&dir_path, perms).unwrap();
+
+        let res = unregister_fx_mcp_server(&config_path, "codegraph");
+        assert!(matches!(res, Err(CeError::Io(_))));
+
+        let mut perms = std::fs::metadata(&dir_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&dir_path, perms).unwrap();
     }
 }
