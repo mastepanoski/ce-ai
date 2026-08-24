@@ -22,6 +22,32 @@ pub struct Args {
     pub strict: bool,
 }
 
+/// Extracts the `OWNER/REPO` slug from a GitHub `origin` remote URL
+/// (ssh or https forms, optional `.git` suffix). Returns `None` for
+/// non-GitHub remotes.
+fn github_slug_from_url(url: &str) -> Option<String> {
+    let no_git = url.trim().strip_suffix(".git").unwrap_or(url.trim());
+    if let Some(rest) = no_git.strip_prefix("git@github.com:") {
+        return Some(rest.to_string());
+    }
+    no_git
+        .split_once("github.com/")
+        .map(|(_, rest)| rest.trim_end_matches('/').to_string())
+}
+
+/// Resolves the GitHub slug for `origin` inside `repo_root`.
+fn github_slug_from_remote(repo_root: &std::path::Path) -> Option<String> {
+    let out = std::process::Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(repo_root)
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    github_slug_from_url(&String::from_utf8_lossy(&out.stdout))
+}
+
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let mut findings: Vec<String> = Vec::new();
 
@@ -223,6 +249,46 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                     }
                 }
             }
+
+            // Branch Protection Health Probe (context-resilience R1):
+            // verifies the GitHub platform boundary requires status checks
+            // on `main`. Non-GitHub remotes and an unavailable `gh` degrade
+            // to notices — only a *verifiably* unprotected main is a finding.
+            if let Some(slug) = github_slug_from_remote(root_path) {
+                match std::process::Command::new("gh")
+                    .args(["api", &format!("repos/{slug}/branches/main/protection")])
+                    .output()
+                {
+                    Ok(out) if out.status.success() => {
+                        let body = String::from_utf8_lossy(&out.stdout);
+                        if !body.contains("required_status_checks") {
+                            findings.push(
+                                "branch-protection: main missing required status checks".into(),
+                            );
+                        } else if !body.contains("required_pull_request_reviews") {
+                            println!(
+                                "doctor-info: branch-protection: PR reviews not required on main (single-developer flow)"
+                            );
+                        }
+                    }
+                    Ok(out) => {
+                        let stderr = String::from_utf8_lossy(&out.stderr);
+                        if stderr.contains("404") || stderr.contains("Not Found") {
+                            findings
+                                .push("branch-protection: missing or unconfigured for main".into());
+                        } else if !ctx.quiet {
+                            println!(
+                                "doctor-info: cannot verify branch protection ({})",
+                                stderr.trim()
+                            );
+                        }
+                    }
+                    Err(err) if !ctx.quiet => {
+                        println!("doctor-info: cannot verify branch protection (gh: {err})");
+                    }
+                    Err(_) => {}
+                }
+            }
         }
     }
 
@@ -268,5 +334,26 @@ mod tests {
         .unwrap();
         let args = Args::default();
         assert!(run(&ctx, &args).is_ok());
+    }
+}
+
+#[cfg(test)]
+mod branch_protection_tests {
+    use super::github_slug_from_url;
+
+    #[test]
+    fn github_slug_parses_ssh_https_and_rejects_other_hosts() {
+        assert_eq!(
+            github_slug_from_url("git@github.com:mastepanoski/ce-ai.git").as_deref(),
+            Some("mastepanoski/ce-ai")
+        );
+        assert_eq!(
+            github_slug_from_url("https://github.com/mastepanoski/ce-ai/").as_deref(),
+            Some("mastepanoski/ce-ai")
+        );
+        assert_eq!(
+            github_slug_from_url("https://gitlab.com/group/proj.git"),
+            None
+        );
     }
 }

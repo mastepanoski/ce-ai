@@ -15,9 +15,13 @@ releases to their frozen contracts.
 
 | Folder | Open boxes | Next action |
 | :--- | :--- | :--- |
-| `../context_exhaustion_resilience/` | 15 | No observable ship evidence found in v1.20.0 sweep — needs feature-level verification before archive or revival |
+| *(none — ledger clean as of v1.21.0)* | | |
 
-Historical note (v1.20.1 sweep): 51 folders were archived in bulk under
-criteria (1) and (2). The sweep's evidence sources: CHANGELOG cross-references
-and live code symbols (`BLOCK_VERSION`, doctor probes #112, `SkillRegistry`,
-installer CI gates, worktree probes, exit-code contract).
+Historical notes:
+- v1.20.1 sweep: 51 folders archived under criteria (1) and (2); evidence
+  sources were CHANGELOG cross-references and live code symbols
+  (`BLOCK_VERSION`, doctor probes #112, `SkillRegistry`, installer CI gates,
+  worktree probes, exit-code contract).
+- v1.21.0: `context_exhaustion_resilience` completed its last open
+  requirement (doctor branch-protection probe) and was archived fully
+  checked.
