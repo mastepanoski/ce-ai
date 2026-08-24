@@ -2288,3 +2288,171 @@ fn uninstall_invalid_harness_name_returns_usage_error() {
         .failure()
         .code(2);
 }
+
+#[test]
+fn init_prj_kimi_writes_and_deinits_agents_md() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("my-project");
+    let rules_dir = prj_dir.join(".kimi-code").join("rules");
+    fs::create_dir_all(&rules_dir).unwrap();
+    let md_path = rules_dir.join("compound-engineering.md");
+    fs::write(&md_path, "# User Kimi Rules\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(&md_path).unwrap();
+    assert!(content.starts_with("# User Kimi Rules"));
+    assert!(content.contains("<!-- CE-AI MANAGED BLOCK BEGIN -->"));
+    assert!(content.contains("<!-- CE-AI MANAGED BLOCK END -->"));
+
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success();
+
+    assert!(md_path.exists());
+    let stripped = fs::read_to_string(&md_path).unwrap();
+    assert_eq!(stripped.trim(), "# User Kimi Rules");
+}
+
+#[test]
+fn install_kimi_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "kimi",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let kimi_config = home.join(".kimi-code/mcp.json");
+    assert!(kimi_config.exists());
+    assert!(home.join(".kimi-code/skills").exists());
+
+    let content = fs::read_to_string(&kimi_config).unwrap();
+    let config: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let mcp = config["mcpServers"].as_object().unwrap();
+    assert!(mcp.contains_key("codegraph"));
+    assert!(mcp.contains_key("engram"));
+    let codegraph = mcp["codegraph"].as_object().unwrap();
+    assert_eq!(codegraph["command"].as_str().unwrap(), "codegraph");
+    assert_eq!(
+        codegraph["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec!["mcp"]
+    );
+
+    assert!(config.get("plugin").is_none(), "Zero OpenCode key leaks");
+    assert!(
+        config.get("skills.paths").is_none(),
+        "Zero OpenCode key leaks"
+    );
+    assert!(!content.contains("plugin"), "Zero OpenCode key leaks");
+
+    // opencode directory must remain pristine / non-existent
+    assert!(!home.join(".config/opencode").exists());
+}
+
+#[test]
+fn uninstall_kimi_harness_clean_install_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "kimi",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(home.join(".kimi-code/mcp.json").exists());
+    assert!(home.join(".kimi-code/skills").exists());
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "kimi"])
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(home.join(".kimi-code/mcp.json")).unwrap();
+    let config: serde_json::Value = serde_json::from_str(&content).unwrap();
+    if let Some(mcp) = config.get("mcpServers").and_then(|v| v.as_object()) {
+        assert!(mcp.is_empty());
+    }
+    assert!(!home.join(".kimi-code/skills").exists());
+    assert!(!home.join(".config/opencode").exists());
+
+    let state_text = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    assert!(!state_text.contains("\"kimi\""));
+}
+
+#[test]
+fn uninstall_kimi_harness_cleans_native_dir_artifacts_and_preserves_user_configs() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    // Pre-populate user config
+    let initial_json = r#"{
+      "user_setting": "enabled",
+      "mcpServers": {
+        "user_custom": {
+          "command": "my-custom-cmd",
+          "args": ["run"]
+        }
+      }
+    }"#;
+    let kimi_dir = home.join(".kimi-code");
+    fs::create_dir_all(&kimi_dir).unwrap();
+    fs::write(kimi_dir.join("mcp.json"), initial_json).unwrap();
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "kimi",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "kimi"])
+        .assert()
+        .success();
+
+    let kimi_config = home.join(".kimi-code/mcp.json");
+    assert!(kimi_config.exists());
+    let content = fs::read_to_string(&kimi_config).unwrap();
+    let config: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(config["user_setting"].as_str().unwrap(), "enabled");
+    let mcp = config["mcpServers"].as_object().unwrap();
+    assert!(mcp.contains_key("user_custom"));
+    assert!(!mcp.contains_key("codegraph"));
+    assert!(!mcp.contains_key("engram"));
+    assert!(!home.join(".kimi-code/skills").exists());
+    assert!(!home.join(".config/opencode").exists());
+
+    let state_text = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    assert!(!state_text.contains("\"kimi\""));
+}

@@ -8,6 +8,7 @@ pub mod cursor;
 pub mod custom;
 pub mod generic_json;
 pub mod grok;
+pub mod kimi;
 pub mod opencode;
 pub mod pi;
 
@@ -96,9 +97,8 @@ impl HarnessKind {
                 dir.exists() || dir.join("config.toml").exists()
             }
             HarnessKind::Kimi => {
-                home_dir.join(".kimi").exists()
-                    || home_dir.join(".kimi-code").exists()
-                    || home_dir.join(".config").join("kimi").exists()
+                let dir = self.harness_dir(home_dir);
+                dir.exists() || dir.join("mcp.json").exists()
             }
             HarnessKind::Agy => {
                 home_dir.join(".gemini").join("antigravity-cli").exists()
@@ -172,9 +172,8 @@ impl HarnessKind {
                 dir.join("config.toml").exists() || dir.join("skills").exists()
             }
             HarnessKind::Kimi => {
-                home_dir.join(".kimi").join("kimi.json").exists()
-                    || home_dir.join(".kimi-code").exists()
-                    || home_dir.join(".config").join("kimi").exists()
+                let dir = self.harness_dir(home_dir);
+                dir.join("mcp.json").exists() || dir.join("skills").exists()
             }
             HarnessKind::Agy => {
                 home_dir
@@ -257,7 +256,9 @@ impl HarnessKind {
             HarnessKind::Grok => std::env::var_os("GROK_HOME")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| home_dir.join(".grok")),
-            HarnessKind::Kimi => home_dir.join(".config").join("kimi"),
+            HarnessKind::Kimi => std::env::var_os("KIMI_CODE_HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home_dir.join(".kimi-code")),
             HarnessKind::Agy => home_dir.join(".gemini").join("antigravity-cli"),
             HarnessKind::Deepseek => home_dir.join(".config").join("deepseek"),
             HarnessKind::Fx => home_dir.join(".config").join("fx"),
@@ -279,7 +280,7 @@ impl HarnessKind {
             }
             HarnessKind::Codex => crate::harness::codex::CodexAdapter.default_config_path(base_dir),
             HarnessKind::Grok => crate::harness::grok::GrokAdapter.default_config_path(base_dir),
-            HarnessKind::Kimi => base_dir.join("kimi.json"),
+            HarnessKind::Kimi => crate::harness::kimi::KimiAdapter.default_config_path(base_dir),
             HarnessKind::Agy => base_dir.join("antigravity.json"),
             HarnessKind::Deepseek => base_dir.join("deepseek.json"),
             HarnessKind::Fx => base_dir.join("fx.json"),
@@ -448,6 +449,7 @@ mod tests {
         std::env::remove_var("CODEX_HOME");
         std::env::remove_var("COPILOT_CONFIG_DIR");
         std::env::remove_var("CLAUDE_CONFIG_DIR");
+        std::env::remove_var("KIMI_CODE_HOME");
         let home = Path::new("/tmp/home");
         assert_eq!(
             HarnessKind::Opencode.harness_dir(home),
@@ -461,6 +463,7 @@ mod tests {
             home.join(".copilot")
         );
         assert_eq!(HarnessKind::Grok.harness_dir(home), home.join(".grok"));
+        assert_eq!(HarnessKind::Kimi.harness_dir(home), home.join(".kimi-code"));
         assert_eq!(
             HarnessKind::Agy.harness_dir(home),
             home.join(".gemini/antigravity-cli")

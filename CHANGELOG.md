@@ -5,6 +5,13 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-08-23
+
+### Added
+- Native harness adapter for Kimi Code CLI (`kimi`, Issue #178) writing to `~/.kimi-code/mcp.json` (`mcpServers` JSON object) and `$KIMI_CODE_HOME/skills/`.
+- Project rule adoption for Kimi under `.kimi-code/rules/compound-engineering.md` and `AGENTS.md`.
+- Environment variable override `$KIMI_CODE_HOME` support.
+
 ## [1.13.2] - 2026-08-23
 
 ### Fixed
