@@ -127,7 +127,6 @@ impl App {
                 "grok".into(),
                 "kimi".into(),
                 "agy".into(),
-                "deepseek".into(),
                 "fx".into(),
                 "custom".into(),
             ],
@@ -476,11 +475,11 @@ fn ui(f: &mut ratatui::Frame, app: &App, ctx: &Context) {
             Style::default().fg(Color::LightCyan),
         )),
         Line::from(Span::styled(
-            format!("   ██        █████     Harnesses: 12 Supported | {} Detected | {} Active", app.detected_harnesses.len(), app.harnesses.len()),
+            format!("   ██        █████     Harnesses: 11 Supported | {} Detected | {} Active", app.detected_harnesses.len(), app.harnesses.len()),
             Style::default().fg(Color::LightCyan).add_modifier(Modifier::BOLD),
         )),
         Line::from(Span::styled(
-            "    ███                Supported: opencode, claude, pi, cursor, copilot, codex, grok, kimi, agy, deepseek, fx, custom",
+            "    ███                Supported: opencode, claude, pi, cursor, copilot, codex, grok, kimi, agy, fx, custom",
             Style::default().fg(Color::Gray),
         )),
         Line::from(Span::styled(

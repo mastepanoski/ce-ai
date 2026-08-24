@@ -206,6 +206,21 @@ fn install_deepseek_harness_exits_usage_code() {
 }
 
 #[test]
+fn uninstall_deepseek_harness_exits_usage_code() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "deepseek"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "deepseek harness is unsupported during developer preview",
+        ));
+}
+
+#[test]
 fn status_prints_installed_harness_version_and_drift() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));

@@ -128,7 +128,15 @@ pub fn resolve_latest_release(
             return Ok(None);
         }
     };
-    latest_ce_release(&body)
+    match latest_ce_release(&body) {
+        Ok(res) => Ok(res),
+        Err(err) => {
+            eprintln!(
+                "notice: Failed to parse GitHub API release payload ({err}). Falling back to main branch source tarball."
+            );
+            Ok(None)
+        }
+    }
 }
 
 #[cfg(test)]
