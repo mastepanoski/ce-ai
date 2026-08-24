@@ -23,6 +23,9 @@ brew install mastepanoski/ce-ai/ce-ai
 cargo install --path .
 ```
 
+Every release publishes `SHA256SUMS.txt` alongside its binaries — verify any
+download before running it (ISO/IEC 27002 integrity control).
+
 **2. Preview the plugin installation** (modifies nothing):
 
 ```bash
