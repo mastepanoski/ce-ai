@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.4] - 2026-08-24
+
+### Fixed
+- Verification gates now verify (Issue #165): `make e2e` is fail-closed — Docker absence, an unreachable daemon, or a Windows host is a hard `FAILED-TO-RUN` failure with remediation guidance instead of a silent `SKIPPED` pass; and a new `make security` target installs cargo-audit if missing (one-time, `--locked`) then fails on any advisory, mirroring the CI Supply Chain job locally.
+
+### Changed
+- The CI Supply Chain Security Audit job tees its full output into the GitHub step summary (`set -o pipefail` preserved) so a green run always means the audit actually executed.
+
 ## [1.21.3] - 2026-08-24
 
 ### Added

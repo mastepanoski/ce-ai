@@ -63,7 +63,15 @@ jobs:
         run: cargo install cargo-audit --locked
 
       - name: Run Security Audit
-        run: cargo audit
+        run: |
+          set -o pipefail
+          cargo audit | tee audit-output.txt
+          {
+            echo "## Supply Chain Security Audit"
+            echo '```'
+            cat audit-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   docker-e2e-gate:
     name: Containerized E2E Gate (NIST AI RMF & ISO 42001)
