@@ -23,11 +23,6 @@ impl HarnessAdapter for GenericJsonAdapter {
 
     fn default_config_path(&self, home: &Path) -> PathBuf {
         match self.kind {
-            HarnessKind::Kimi => home.join(".kimi").join("config.json"),
-            HarnessKind::Agy => home
-                .join(".gemini")
-                .join("antigravity-cli")
-                .join("config.json"),
             HarnessKind::Deepseek => home.join(".deepseek").join("config.json"),
             HarnessKind::Fx => home.join(".fx").join("config.json"),
             _ => home.join(format!(".{}", self.kind)).join("config.json"),
@@ -44,20 +39,6 @@ mod tests {
     fn generic_json_adapter_paths_and_kinds() {
         let tmp = TempDir::new().unwrap();
         let home = tmp.path().to_path_buf();
-
-        let kimi = GenericJsonAdapter::new(HarnessKind::Kimi);
-        assert_eq!(kimi.kind(), HarnessKind::Kimi);
-        assert_eq!(
-            kimi.default_config_path(&home),
-            home.join(".kimi/config.json")
-        );
-
-        let agy = GenericJsonAdapter::new(HarnessKind::Agy);
-        assert_eq!(agy.kind(), HarnessKind::Agy);
-        assert_eq!(
-            agy.default_config_path(&home),
-            home.join(".gemini/antigravity-cli/config.json")
-        );
 
         let deepseek = GenericJsonAdapter::new(HarnessKind::Deepseek);
         assert_eq!(deepseek.kind(), HarnessKind::Deepseek);

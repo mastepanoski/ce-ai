@@ -2456,3 +2456,199 @@ fn uninstall_kimi_harness_cleans_native_dir_artifacts_and_preserves_user_configs
     let state_text = fs::read_to_string(config_dir.join("state.json")).unwrap();
     assert!(!state_text.contains("\"kimi\""));
 }
+
+#[test]
+fn init_prj_agy_writes_and_deinits_rules() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("my-project");
+    let rules_dir = prj_dir.join(".agents").join("rules");
+    fs::create_dir_all(&rules_dir).unwrap();
+    let md_path = rules_dir.join("compound-engineering.md");
+    fs::write(&md_path, "# User AGY Rules\n").unwrap();
+    let gemini_path = prj_dir.join("GEMINI.md");
+    fs::write(&gemini_path, "# User GEMINI Rules\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(&md_path).unwrap();
+    assert!(content.starts_with("# User AGY Rules"));
+    assert!(content.contains("<!-- CE-AI MANAGED BLOCK BEGIN -->"));
+    assert!(content.contains("<!-- CE-AI MANAGED BLOCK END -->"));
+
+    let gemini_content = fs::read_to_string(&gemini_path).unwrap();
+    assert!(gemini_content.starts_with("# User GEMINI Rules"));
+    assert!(gemini_content.contains("<!-- CE-AI MANAGED BLOCK BEGIN -->"));
+
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success();
+
+    assert!(md_path.exists());
+    let stripped = fs::read_to_string(&md_path).unwrap();
+    assert_eq!(stripped.trim(), "# User AGY Rules");
+
+    assert!(gemini_path.exists());
+    let g_stripped = fs::read_to_string(&gemini_path).unwrap();
+    assert_eq!(g_stripped.trim(), "# User GEMINI Rules");
+}
+
+#[test]
+fn install_agy_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "agy",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let agy_config = home.join(".gemini/config/mcp_config.json");
+    assert!(agy_config.exists());
+    assert!(home.join(".gemini/config/skills").exists());
+
+    let content = fs::read_to_string(&agy_config).unwrap();
+    let config: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let mcp = config["mcpServers"].as_object().unwrap();
+    assert!(mcp.contains_key("codegraph"));
+    assert!(mcp.contains_key("engram"));
+    let codegraph = mcp["codegraph"].as_object().unwrap();
+    assert_eq!(codegraph["command"].as_str().unwrap(), "codegraph");
+
+    assert!(config.get("plugin").is_none(), "Zero OpenCode key leaks");
+    assert!(
+        config.pointer("/skills/paths").is_none(),
+        "Zero OpenCode key leaks"
+    );
+    assert!(!content.contains("plugin"), "Zero OpenCode key leaks");
+
+    // opencode directory must remain pristine / non-existent
+    assert!(!home.join(".config/opencode").exists());
+}
+
+#[test]
+fn uninstall_agy_harness_clean_install_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "agy",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(home.join(".gemini/config/mcp_config.json").exists());
+    assert!(home.join(".gemini/config/skills").exists());
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "agy"])
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(home.join(".gemini/config/mcp_config.json")).unwrap();
+    let config: serde_json::Value = serde_json::from_str(&content).unwrap();
+    if let Some(mcp) = config.get("mcpServers").and_then(|v| v.as_object()) {
+        assert!(mcp.is_empty());
+    }
+    assert!(!home.join(".gemini/config/skills").exists());
+    assert!(!home.join(".config/opencode").exists());
+
+    let state_text = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    assert!(!state_text.contains("\"agy\""));
+}
+
+#[test]
+fn uninstall_agy_harness_cleans_native_dir_artifacts_and_preserves_user_configs() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    // Pre-populate user config with remote server using serverUrl
+    let initial_json = r#"{
+      "user_setting": "enabled",
+      "mcpServers": {
+        "user_remote": {
+          "serverUrl": "https://mcp.example.com/sse",
+          "headers": { "Auth": "Bearer token" }
+        }
+      }
+    }"#;
+    let gemini_config_dir = home.join(".gemini/config");
+    fs::create_dir_all(&gemini_config_dir).unwrap();
+    fs::write(gemini_config_dir.join("mcp_config.json"), initial_json).unwrap();
+
+    // Pre-populate legacy antigravity.json
+    let legacy_dir = home.join(".gemini/antigravity-cli");
+    fs::create_dir_all(&legacy_dir).unwrap();
+    fs::write(legacy_dir.join("antigravity.json"), "{}").unwrap();
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "agy",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // Verify post-install state: serverUrl preserved alongside codegraph and engram
+    let post_install_content =
+        fs::read_to_string(gemini_config_dir.join("mcp_config.json")).unwrap();
+    let post_install_config: serde_json::Value =
+        serde_json::from_str(&post_install_content).unwrap();
+    let post_mcp = post_install_config["mcpServers"].as_object().unwrap();
+    assert!(post_mcp.contains_key("user_remote"));
+    assert_eq!(
+        post_mcp["user_remote"]["serverUrl"].as_str().unwrap(),
+        "https://mcp.example.com/sse"
+    );
+    assert!(post_mcp.contains_key("codegraph"));
+    assert!(post_mcp.contains_key("engram"));
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "agy"])
+        .assert()
+        .success();
+
+    let agy_config = home.join(".gemini/config/mcp_config.json");
+    assert!(agy_config.exists());
+    let content = fs::read_to_string(&agy_config).unwrap();
+    let config: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(config["user_setting"].as_str().unwrap(), "enabled");
+    let mcp = config["mcpServers"].as_object().unwrap();
+    assert!(mcp.contains_key("user_remote"));
+    let remote = &mcp["user_remote"];
+    assert_eq!(
+        remote["serverUrl"].as_str().unwrap(),
+        "https://mcp.example.com/sse"
+    );
+    assert!(!mcp.contains_key("codegraph"));
+    assert!(!mcp.contains_key("engram"));
+
+    // Legacy antigravity.json must be cleaned up
+    assert!(!legacy_dir.join("antigravity.json").exists());
+    assert!(!home.join(".gemini/config/skills").exists());
+    assert!(!home.join(".config/opencode").exists());
+
+    let state_text = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    assert!(!state_text.contains("\"agy\""));
+}
