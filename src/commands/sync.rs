@@ -9,6 +9,9 @@ use chrono::Utc;
 
 use crate::commands::Context;
 use crate::error::CeError;
+use crate::harness::custom::{
+    plugin_rel as custom_plugin_rel, skill_rel as custom_skill_rel, CustomHarnessConfig,
+};
 use crate::harness::HarnessKind;
 use crate::opencode::manifest::{InstallManifest, ManifestFile};
 use crate::opencode::plugins::MANAGED_DIR;
@@ -176,6 +179,18 @@ pub(crate) fn sync_with(
 
     let home_dir = crate::harness::home_dir_from_ctx(ctx);
 
+    // Custom-mode directory snapshots must survive the state rebuild below.
+    let prior_custom: BTreeMap<String, serde_json::Value> = state
+        .installed_harnesses
+        .iter()
+        .filter(|h| h.get("custom").is_some_and(|c| c.is_object()))
+        .filter_map(|h| {
+            h["name"]
+                .as_str()
+                .map(|n| (n.to_string(), h["custom"].clone()))
+        })
+        .collect();
+
     state.installed_harnesses.clear();
     for name in &active_harnesses {
         if let Ok(h_kind) = name.parse::<HarnessKind>() {
@@ -185,7 +200,47 @@ pub(crate) fn sync_with(
                 h_kind.harness_dir(&home_dir)
             };
             let target_config = h_kind.config_path(&config_dir);
-            if h_kind == HarnessKind::Cursor {
+            if h_kind == HarnessKind::Custom {
+                let Some(cfg) = prior_custom
+                    .get(name)
+                    .and_then(CustomHarnessConfig::from_state_json)
+                else {
+                    return Err(CeError::Runtime(
+                        "custom harness entry lacks its directory snapshot; \
+                         re-run 'ce-ai install --harness custom'"
+                            .into(),
+                    ));
+                };
+                std::fs::create_dir_all(&cfg.plugins_dir)?;
+                std::fs::create_dir_all(&cfg.skills_dir)?;
+                let mut files: Vec<ManifestFile> = Vec::new();
+                for (rel, src_rel) in &source_rel {
+                    let dest = if let Some(rest) = custom_plugin_rel(rel) {
+                        cfg.plugins_dir.join(rest)
+                    } else if let Some(rest) = custom_skill_rel(rel) {
+                        cfg.skills_dir.join(rest)
+                    } else {
+                        continue;
+                    };
+                    if let Some(parent) = dest.parent() {
+                        std::fs::create_dir_all(parent)?;
+                    }
+                    write_atomic(&dest, &std::fs::read(source_root.join(src_rel))?)?;
+                    files.push(ManifestFile {
+                        path: rel.clone(),
+                        sha256: desired[rel].clone(),
+                    });
+                }
+                InstallManifest {
+                    version: version.to_string(),
+                    plugin_name: "compound-engineering".into(),
+                    installed_at: Utc::now().to_rfc3339(),
+                    source: source_json.clone(),
+                    files,
+                    config_mutations: manifest.config_mutations.clone(),
+                }
+                .write(&cfg.plugins_dir)?;
+            } else if h_kind == HarnessKind::Cursor {
                 let empty_env = std::collections::BTreeMap::new();
                 crate::harness::cursor::register_cursor_mcp_server(
                     &target_config,
@@ -314,12 +369,16 @@ pub(crate) fn sync_with(
                 );
             }
         }
-        state.installed_harnesses.push(serde_json::json!({
+        let mut entry = serde_json::json!({
             "name": name,
             "version": version.to_string(),
             "source": source_json.clone(),
             "last_synced_at": Utc::now().to_rfc3339(),
-        }));
+        });
+        if let Some(custom) = prior_custom.get(name) {
+            entry["custom"] = custom.clone();
+        }
+        state.installed_harnesses.push(entry);
     }
     // Repair model-assignment desync: import effective opencode.json
     // assignments into state.json (config→state; #111). Config is the live
@@ -360,6 +419,16 @@ pub(crate) fn sync_with(
             .filter(|(path, _)| path.starts_with("skills/"))
             .map(|(path, hash)| (path.trim_start_matches("skills/").to_string(), hash.clone()))
             .collect();
+        let plugins_expected: BTreeMap<String, String> = desired
+            .iter()
+            .filter(|(path, _)| path.starts_with("plugins/"))
+            .map(|(path, hash)| {
+                (
+                    path.trim_start_matches("plugins/").to_string(),
+                    hash.clone(),
+                )
+            })
+            .collect();
         for name in &active_harnesses {
             if name == "opencode" {
                 continue;
@@ -367,7 +436,40 @@ pub(crate) fn sync_with(
             let Ok(kind) = name.parse::<HarnessKind>() else {
                 continue;
             };
-            if matches!(
+            if kind == HarnessKind::Custom {
+                match prior_custom
+                    .get(name)
+                    .and_then(CustomHarnessConfig::from_state_json)
+                {
+                    Some(cfg) => {
+                        if desired.is_empty() {
+                            surfaces.push(SurfaceCheck {
+                                harness: name.clone(),
+                                status: CheckStatus::NotVerified {
+                                    reason: "no managed tree present",
+                                },
+                            });
+                            continue;
+                        }
+                        // Both custom trees are hash-checked like native
+                        // skills surfaces; drift on either fails sync.
+                        let mut drift = verify_tree_against(&cfg.plugins_dir, &plugins_expected);
+                        let skill_drift = verify_tree_against(&cfg.skills_dir, &skills_expected);
+                        drift.missing.extend(skill_drift.missing);
+                        drift.mismatched.extend(skill_drift.mismatched);
+                        surfaces.push(SurfaceCheck {
+                            harness: name.clone(),
+                            status: CheckStatus::from_drift(desired.len(), drift),
+                        });
+                    }
+                    None => surfaces.push(SurfaceCheck {
+                        harness: name.clone(),
+                        status: CheckStatus::NotVerified {
+                            reason: "no directory snapshot",
+                        },
+                    }),
+                }
+            } else if matches!(
                 kind,
                 HarnessKind::Claude | HarnessKind::Codex | HarnessKind::Copilot | HarnessKind::Grok
             ) {

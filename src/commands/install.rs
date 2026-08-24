@@ -7,7 +7,7 @@ use chrono::Utc;
 
 use crate::commands::Context;
 use crate::error::CeError;
-use crate::opencode::config::ensure_plugin_and_skills;
+use crate::opencode::config::{ensure_plugin_and_skills, ConfigMutation};
 use crate::opencode::manifest::{InstallManifest, ManifestFile};
 use crate::opencode::plugins::{
     install_loader, plugin_entry, skills_path, LOADER_REL_PATH, MANAGED_DIR,
@@ -35,6 +35,16 @@ pub struct Args {
     /// Installation scope: global (default) or workspace (repository root).
     #[arg(long, default_value = "global")]
     pub scope: String,
+    /// Custom mode (--harness custom): target directory for CE plugin assets.
+    #[arg(long)]
+    pub plugins_dir: Option<PathBuf>,
+    /// Custom mode (--harness custom): target directory for CE skill folders.
+    #[arg(long)]
+    pub skills_dir: Option<PathBuf>,
+    /// Custom mode (--harness custom): markdown rules file receiving the
+    /// managed CE block.
+    #[arg(long)]
+    pub rules_file: Option<PathBuf>,
 }
 
 use crate::harness::HarnessKind;
@@ -108,6 +118,20 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let home_dir = crate::harness::home_dir_from_ctx(ctx);
 
     for harness_kind in &target_harnesses {
+        // R4: resolve custom-mode targets up front so dry-run planning and
+        // apply share one validated configuration (Usage fast-fail included).
+        let custom_cfg = if *harness_kind == HarnessKind::Custom {
+            let flags = crate::harness::custom::CustomConfigFlags {
+                plugins_dir: args.plugins_dir.clone(),
+                skills_dir: args.skills_dir.clone(),
+                rules_file: args.rules_file.clone(),
+            };
+            Some(crate::harness::custom::CustomHarnessConfig::resolve(
+                &home_dir, &flags,
+            )?)
+        } else {
+            None
+        };
         let config_dir = if scope_arg == "workspace" {
             target_base_dir.clone()
         } else if *harness_kind == HarnessKind::Opencode {
@@ -116,10 +140,23 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             harness_kind.harness_dir(&home_dir)
         };
         let target_config = harness_kind.config_path(&config_dir);
-        let needs_backup = target_config.exists();
+        let needs_backup = custom_cfg.is_none() && target_config.exists();
 
         // Dry-run plans only; SU-4 guarantees zero writes.
         if ctx.dry_run {
+            if let Some(cfg) = &custom_cfg {
+                println!("plan: create {}", cfg.plugins_dir.display());
+                println!("plan: create {}", cfg.skills_dir.display());
+                for rel in managed.keys() {
+                    println!("plan: copy {rel}");
+                }
+                if let Some(rules) = &cfg.rules_file {
+                    println!("plan: ensure managed CE block in {}", rules.display());
+                }
+                println!("plan: write install-manifest.json");
+                println!("plan: update state.json");
+                continue;
+            }
             println!(
                 "plan: {}",
                 if needs_backup {
@@ -146,19 +183,44 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             None
         };
         let managed_dir = config_dir.join(MANAGED_DIR);
-        let mut files = vec![install_loader(&source_path, &config_dir)?];
-        for (rel, (source_rel, hash)) in &managed {
-            if rel == LOADER_REL_PATH {
-                continue;
+        let mut files: Vec<ManifestFile> = Vec::new();
+        if let Some(cfg) = &custom_cfg {
+            // R4 layout: plugins/<rest> → <plugins_dir>/<rest>,
+            // skills/<rest> → <skills_dir>/<rest>. No fabricated config file.
+            std::fs::create_dir_all(&cfg.plugins_dir)?;
+            std::fs::create_dir_all(&cfg.skills_dir)?;
+            for (rel, (source_rel, hash)) in &managed {
+                let dest = if let Some(rest) = crate::harness::custom::plugin_rel(rel) {
+                    cfg.plugins_dir.join(rest)
+                } else if let Some(rest) = crate::harness::custom::skill_rel(rel) {
+                    cfg.skills_dir.join(rest)
+                } else {
+                    continue;
+                };
+                if let Some(parent) = dest.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                write_atomic(&dest, &std::fs::read(source_path.join(source_rel))?)?;
+                files.push(ManifestFile {
+                    path: rel.clone(),
+                    sha256: hash.clone(),
+                });
             }
-            write_atomic(
-                &managed_dir.join(rel),
-                &std::fs::read(source_path.join(source_rel))?,
-            )?;
-            files.push(ManifestFile {
-                path: rel.clone(),
-                sha256: hash.clone(),
-            });
+        } else {
+            files.push(install_loader(&source_path, &config_dir)?);
+            for (rel, (source_rel, hash)) in &managed {
+                if rel == LOADER_REL_PATH {
+                    continue;
+                }
+                write_atomic(
+                    &managed_dir.join(rel),
+                    &std::fs::read(source_path.join(source_rel))?,
+                )?;
+                files.push(ManifestFile {
+                    path: rel.clone(),
+                    sha256: hash.clone(),
+                });
+            }
         }
 
         // Write target config settings (OI-2) and install-manifest.json (SU-2).
@@ -486,6 +548,41 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 config_mutations: vec![],
             }
             .write(&config_dir)?;
+        } else if *harness_kind == HarnessKind::Custom {
+            let cfg = custom_cfg.as_ref().expect("custom config resolved above");
+            // Route through the adapter so custom-mode behavior stays in one place.
+            let adapter = crate::harness::custom::CustomAdapter::new(Some(cfg.clone()));
+
+            let mut mutations: Vec<ConfigMutation> = Vec::new();
+            if let Some(rules) = adapter.config().and_then(|c| c.rules_file.clone()) {
+                let backup_id = if rules.exists() {
+                    Some(
+                        backup_file(&ctx.config_dir.join("backups"), &rules)?
+                            .display()
+                            .to_string(),
+                    )
+                } else {
+                    None
+                };
+                if crate::harness::custom::ensure_rules_block(&rules)? && !ctx.quiet {
+                    println!("install: managed CE block ensured in {}", rules.display());
+                }
+                mutations.push(ConfigMutation {
+                    file: rules.display().to_string(),
+                    backup: backup_id,
+                    keys: vec!["ce-ai:block".into()],
+                });
+            }
+
+            InstallManifest {
+                version: version.to_string(),
+                plugin_name: "compound-engineering".into(),
+                installed_at: chrono::Utc::now().to_rfc3339(),
+                source: source_json.clone(),
+                files,
+                config_mutations: mutations,
+            }
+            .write(&cfg.plugins_dir)?;
         } else {
             let mut mutation = ensure_plugin_and_skills(
                 &target_config,
@@ -521,13 +618,17 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         state
             .installed_harnesses
             .retain(|h| h["name"].as_str() != Some(harness_name.as_str()));
-        state.installed_harnesses.push(serde_json::json!({
+        let mut entry = serde_json::json!({
             "name": harness_name,
             "version": version,
             "source": source_json,
             "installed_at": Utc::now().to_rfc3339(),
             "last_synced_at": Utc::now().to_rfc3339(),
-        }));
+        });
+        if let Some(cfg) = &custom_cfg {
+            entry["custom"] = cfg.to_state_json();
+        }
+        state.installed_harnesses.push(entry);
 
         if !ctx.quiet && !ctx.dry_run {
             let source_disp = if args.source.is_some() {
