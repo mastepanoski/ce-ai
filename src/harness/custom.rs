@@ -138,9 +138,11 @@ fn expand_tilde(p: PathBuf, home: &Path) -> PathBuf {
 }
 
 /// Anchors a relative path against the process CWD so persisted snapshots
-/// stay stable across invocations.
+/// stay stable across invocations. Rooted paths (e.g. `\x` or `/x`, which
+/// lack a drive letter on Windows) are preserved verbatim instead of being
+/// joined onto the CWD.
 fn absolutize(p: PathBuf) -> PathBuf {
-    if p.is_absolute() {
+    if p.is_absolute() || p.has_root() {
         p
     } else {
         std::env::current_dir()
@@ -357,6 +359,24 @@ mod tests {
             CustomHarnessConfig::resolve(tmp.path(), &CustomConfigFlags::default()).unwrap_err();
         assert!(matches!(err, CeError::Usage(_)));
         assert_eq!(err.exit_code(), 2);
+    }
+
+    #[test]
+    fn resolve_preserves_rooted_paths_without_cwd_joining() {
+        let tmp = TempDir::new().unwrap();
+        let cfg = CustomHarnessConfig::resolve(
+            tmp.path(),
+            &CustomConfigFlags {
+                plugins_dir: Some(PathBuf::from("/rooted/plugins")),
+                skills_dir: Some(PathBuf::from("/rooted/skills")),
+                rules_file: None,
+            },
+        )
+        .unwrap();
+        // A rooted path without a drive letter (Windows) must never be
+        // joined onto the CWD.
+        assert_eq!(cfg.plugins_dir, PathBuf::from("/rooted/plugins"));
+        assert_eq!(cfg.skills_dir, PathBuf::from("/rooted/skills"));
     }
 
     #[test]
