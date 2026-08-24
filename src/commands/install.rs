@@ -13,12 +13,12 @@ use crate::opencode::plugins::{
     install_loader, plugin_entry, skills_path, LOADER_REL_PATH, MANAGED_DIR,
 };
 use crate::source::archive::extract_to_source;
-use crate::source::cache::{read_local_tree, Cache};
+use crate::source::cache::{read_local_tree, record_tarball_provenance, Cache};
 use crate::source::release::{
     github_token_from_env, main_tarball_url, resolve_latest_release, tag_tarball_url,
 };
 use crate::state::backups::backup_file;
-use crate::state::state::State;
+use crate::state::state::{ReleaseProvenance, State};
 use crate::state::write_atomic;
 
 /// Source-tree dirs ce-ai manages; the `.opencode/` prefix is stripped on copy.
@@ -600,9 +600,19 @@ fn resolve_source(
         .map_err(|err| CeError::Runtime(format!("release download failed: {err}")))?
         .bytes()
         .map_err(|err| CeError::Runtime(err.to_string()))?;
-    let tarball = Cache::new(ctx.config_dir.join("cache"))
-        .cache_tarball(&bytes, &ctx.config_dir.join("state.json"))?;
+    let (tarball, hex) = Cache::new(ctx.config_dir.join("cache")).cache_tarball(&bytes)?;
     let (root, tmp) = extract_to_source(&ctx.config_dir, ctx.dry_run, &tarball, &version)?;
+    if !ctx.dry_run {
+        record_tarball_provenance(
+            &ctx.config_dir.join("state.json"),
+            ReleaseProvenance {
+                tag: version.clone(),
+                url,
+                archive_sha256: hex,
+                extraction_path: root.clone(),
+            },
+        )?;
+    }
     let source_json = serde_json::json!({ "kind": "github-release", "tag": version, "tree": root });
     Ok((root, version, source_json, tmp))
 }

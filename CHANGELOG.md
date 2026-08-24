@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.1] - 2026-08-24
+
+### Changed
+- `ce-ai upgrade` no longer accepts the never-implemented `--harness`/`-t` and `--force`/`-f` flags; clap now rejects them as unknown arguments with a usage error (exit code 2) instead of silently ignoring them (Issue #161).
+- `ce-ai sync` (and upgrade-triggered sync) now reports only checks that actually ran per harness: the OpenCode managed surface is re-hashed after apply, harness skill copies are hash-checked when performed, and registration-only adapters are explicitly labelled as not verified; the fabricated `100% Verified` matrix is gone.
+
+### Fixed
+- `upgrade --to <tag>` is bound to recorded release provenance `{tag, url, archive_sha256, extraction_path}` persisted atomically in `state.json`: a tag mismatch fails with a precise usage error and a tampered/corrupted cached archive fails closed with a verification error naming expected vs actual SHA256 — a cached release can never be relabelled as a different requested version (Issue #161).
+- Added `CeError::Verification` mapped to exit code 6, completing the standardized exit-code contract (`0/1/2/3/4/5/6`); post-sync verification drift now propagates to the process exit status.
+
 ## [1.18.0] - 2026-08-24
 
 ### Changed

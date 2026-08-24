@@ -46,6 +46,22 @@ pub struct ModelAssignment {
     pub effort: Option<String>,
 }
 
+/// Supply-chain provenance of the cached release tarball (Issue #161):
+/// binds the archive digest to the release tag it actually came from so a
+/// cached artifact can never be relabelled as a different requested version.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReleaseProvenance {
+    /// GitHub release tag (e.g. `v1.2.3`) or `main` for the SF-2 fallback.
+    pub tag: String,
+    /// Archive download URL that produced the cached artifact.
+    pub url: String,
+    /// Lowercase hex SHA256 of the cached tarball bytes.
+    pub archive_sha256: String,
+    /// Extracted source tree root used for the sync
+    /// (`<config>/cache/trees/<tag>`; a temp dir under `--dry-run`).
+    pub extraction_path: PathBuf,
+}
+
 /// Canonical state file at `~/.ce-ai/state.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
@@ -55,6 +71,8 @@ pub struct State {
     pub installed_harnesses: Vec<serde_json::Value>,
     #[serde(default)]
     pub managed_asset_digest: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub release_provenance: Option<ReleaseProvenance>,
     #[serde(default)]
     pub model_assignments: BTreeMap<String, ModelAssignment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -160,13 +178,14 @@ mod tests {
     use std::collections::BTreeMap;
     use tempfile::tempdir;
 
-    use crate::state::state::{ModelAssignment, State};
+    use crate::state::state::{ModelAssignment, ReleaseProvenance, State};
 
     fn state_with(slot: &str) -> State {
         State {
             version: 1,
             installed_harnesses: vec![],
             managed_asset_digest: BTreeMap::new(),
+            release_provenance: None,
             model_assignments: BTreeMap::from([(
                 slot.to_string(),
                 ModelAssignment {
@@ -268,5 +287,58 @@ mod tests {
         assert_eq!(loaded.projects[0].path, PathBuf::from("/tmp/repo"));
         assert_eq!(loaded.projects[0].tier, AdoptionTier::Full);
         assert!(loaded.projects[0].created_file);
+    }
+
+    #[test]
+    fn release_provenance_round_trips_through_state_json() {
+        use std::path::PathBuf;
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("state.json");
+        let mut state = State::new();
+        state
+            .managed_asset_digest
+            .insert("tarball".into(), "sha256:deadbeef".into());
+        state.release_provenance = Some(ReleaseProvenance {
+            tag: "v1.18.0".into(),
+            url: "https://github.com/everyinc/compound-engineering-plugin/archive/refs/tags/v1.18.0.tar.gz".into(),
+            archive_sha256: "deadbeef".into(),
+            extraction_path: PathBuf::from("/tmp/ce-ai/cache/trees/v1.18.0"),
+        });
+        state.save(&path).unwrap();
+
+        let loaded = State::load(&path).unwrap();
+        let prov = loaded.release_provenance.expect("provenance persisted");
+        assert_eq!(prov.tag, "v1.18.0");
+        assert_eq!(prov.archive_sha256, "deadbeef");
+        assert_eq!(
+            loaded
+                .managed_asset_digest
+                .get("tarball")
+                .map(String::as_str),
+            Some("sha256:deadbeef")
+        );
+    }
+
+    #[test]
+    fn legacy_state_without_provenance_loads() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("state.json");
+        let legacy = serde_json::json!({
+            "version": 1,
+            "installed_harnesses": [],
+            "managed_asset_digest": { "tarball": "sha256:abc" }
+        });
+        std::fs::write(&path, serde_json::to_vec(&legacy).unwrap()).unwrap();
+
+        let loaded = State::load(&path).unwrap();
+        assert!(loaded.release_provenance.is_none());
+        assert_eq!(
+            loaded
+                .managed_asset_digest
+                .get("tarball")
+                .map(String::as_str),
+            Some("sha256:abc")
+        );
     }
 }

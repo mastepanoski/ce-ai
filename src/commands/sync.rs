@@ -13,7 +13,7 @@ use crate::harness::HarnessKind;
 use crate::opencode::manifest::{InstallManifest, ManifestFile};
 use crate::opencode::plugins::MANAGED_DIR;
 use crate::source::cache::read_local_tree;
-use crate::state::diff::{self, Action};
+use crate::state::diff::{self, sha256_hex, Action};
 use crate::state::state::State;
 use crate::state::write_atomic;
 
@@ -342,26 +342,202 @@ pub(crate) fn sync_with(
         let _ = crate::source::registry::SkillRegistry::sync_registry(ctx);
     }
 
-    if !ctx.quiet && !ctx.dry_run {
-        let count = desired.len();
-        println!("== [Sync Verification Matrix] ==");
-        println!("version: {version}");
-        println!(
-            "source: {}",
-            source_json
+    // Issue #161: report only what was actually verified. The OpenCode
+    // managed surface is re-hashed after apply; harness skill copies are
+    // hash-checked when performed; registration-only adapters are labelled
+    // as not verified. Any verified-surface drift fails with exit code 6.
+    if !ctx.dry_run {
+        let mut surfaces: Vec<SurfaceCheck> = Vec::new();
+
+        let drift = verify_tree_against(&managed_dir, &desired);
+        surfaces.push(SurfaceCheck {
+            harness: "opencode".into(),
+            status: CheckStatus::from_drift(desired.len(), drift),
+        });
+
+        let skills_expected: BTreeMap<String, String> = desired
+            .iter()
+            .filter(|(path, _)| path.starts_with("skills/"))
+            .map(|(path, hash)| (path.trim_start_matches("skills/").to_string(), hash.clone()))
+            .collect();
+        for name in &active_harnesses {
+            if name == "opencode" {
+                continue;
+            }
+            let Ok(kind) = name.parse::<HarnessKind>() else {
+                continue;
+            };
+            if matches!(
+                kind,
+                HarnessKind::Claude | HarnessKind::Codex | HarnessKind::Copilot | HarnessKind::Grok
+            ) {
+                let skills_dir = kind.harness_dir(&home_dir).join("skills");
+                if skills_expected.is_empty() {
+                    surfaces.push(SurfaceCheck {
+                        harness: name.clone(),
+                        status: CheckStatus::NotVerified {
+                            reason: "no managed skills tree present",
+                        },
+                    });
+                    continue;
+                }
+                let drift = verify_tree_against(&skills_dir, &skills_expected);
+                surfaces.push(SurfaceCheck {
+                    harness: name.clone(),
+                    status: CheckStatus::from_drift(skills_expected.len(), drift),
+                });
+            } else {
+                surfaces.push(SurfaceCheck {
+                    harness: name.clone(),
+                    status: CheckStatus::NotVerified {
+                        reason: "config registration only — asset hashes not checked",
+                    },
+                });
+            }
+        }
+
+        if !ctx.quiet {
+            let source_kind = source_json
                 .get("kind")
                 .and_then(|k| k.as_str())
-                .unwrap_or("unknown")
-        );
-        for name in &active_harnesses {
+                .unwrap_or("unknown");
+            println!("== [Sync Verification Matrix] ==");
+            println!("version: {version}");
+            println!("source: {source_kind}");
+            for surface in &surfaces {
+                match &surface.status {
+                    CheckStatus::Verified { matched, total } => println!(
+                        "  ✓ {harness}: verified — {matched}/{total} files match SHA256",
+                        harness = surface.harness,
+                    ),
+                    CheckStatus::Failed {
+                        mismatched,
+                        missing,
+                    } => {
+                        println!(
+                            "  ✗ {harness}: FAILED — {count} file(s) drifted",
+                            harness = surface.harness,
+                            count = mismatched.len() + missing.len()
+                        );
+                        for path in mismatched.iter().chain(missing.iter()) {
+                            println!("      {path}");
+                        }
+                    }
+                    CheckStatus::NotVerified { reason } => println!(
+                        "  ○ {harness}: synced — verification not performed ({reason})",
+                        harness = surface.harness,
+                    ),
+                }
+            }
+            let verified = surfaces
+                .iter()
+                .filter(|s| matches!(s.status, CheckStatus::Verified { .. }))
+                .count();
+            let failed = surfaces
+                .iter()
+                .filter(|s| matches!(s.status, CheckStatus::Failed { .. }))
+                .count();
+            let unverified = surfaces
+                .iter()
+                .filter(|s| matches!(s.status, CheckStatus::NotVerified { .. }))
+                .count();
             println!(
-                "  ✓ harness '{name}': synced & verified ({count} files, SHA256 integrity match)"
+                "reconciliation status: {verified} verified, {unverified} unverified, {failed} failed"
             );
         }
-        println!("reconciliation status: 100% Verified (0 drift)");
+
+        let failed_surfaces: Vec<String> = surfaces
+            .iter()
+            .filter_map(|s| match &s.status {
+                CheckStatus::Failed {
+                    mismatched,
+                    missing,
+                } => Some(format!(
+                    "{} ({} drifted)",
+                    s.harness,
+                    mismatched.len() + missing.len()
+                )),
+                _ => None,
+            })
+            .collect();
+        if !failed_surfaces.is_empty() {
+            return Err(CeError::Verification(format!(
+                "sync verification failed for {}",
+                failed_surfaces.join(", ")
+            )));
+        }
     }
 
     Ok(())
+}
+
+/// Drift found by [`verify_tree_against`]: files absent from disk or whose
+/// on-disk hash no longer matches the expected digest.
+#[derive(Debug, Default, PartialEq)]
+pub(crate) struct TreeDrift {
+    pub missing: Vec<String>,
+    pub mismatched: Vec<String>,
+}
+
+impl TreeDrift {
+    pub(crate) fn total(&self) -> usize {
+        self.missing.len() + self.mismatched.len()
+    }
+}
+
+/// Re-hashes every expected file under `root` and reports which ones are
+/// missing or hash-mismatched. Pure filesystem reads — never mutates.
+pub(crate) fn verify_tree_against(root: &Path, expected: &BTreeMap<String, String>) -> TreeDrift {
+    let mut drift = TreeDrift::default();
+    for (rel, hash) in expected {
+        let path = root.join(rel);
+        match std::fs::read(&path) {
+            Ok(bytes) => {
+                if &sha256_hex(&bytes) != hash {
+                    drift.mismatched.push(rel.clone());
+                }
+            }
+            Err(_) => drift.missing.push(rel.clone()),
+        }
+    }
+    drift
+}
+
+/// Outcome of one harness surface's post-sync verification (Issue #161):
+/// statuses are produced only by checks that actually ran.
+#[derive(Debug)]
+pub(crate) struct SurfaceCheck {
+    pub harness: String,
+    pub status: CheckStatus,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum CheckStatus {
+    /// Every expected file present and hash-matching.
+    Verified { matched: usize, total: usize },
+    /// Real drift detected on a verified surface.
+    Failed {
+        mismatched: Vec<String>,
+        missing: Vec<String>,
+    },
+    /// No hash check ran for this surface; the reason says why.
+    NotVerified { reason: &'static str },
+}
+
+impl CheckStatus {
+    fn from_drift(total: usize, drift: TreeDrift) -> Self {
+        if drift.total() == 0 {
+            Self::Verified {
+                matched: total,
+                total,
+            }
+        } else {
+            Self::Failed {
+                mismatched: drift.mismatched,
+                missing: drift.missing,
+            }
+        }
+    }
 }
 
 fn plan_verb(action: &Action) -> (&'static str, &str) {
@@ -369,5 +545,87 @@ fn plan_verb(action: &Action) -> (&'static str, &str) {
         Action::Copy { path } => ("copy", path),
         Action::Restore { path } => ("restore", path),
         Action::Remove { path } => ("remove", path),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use tempfile::tempdir;
+
+    use super::{verify_tree_against, CheckStatus, TreeDrift};
+    use crate::state::diff::sha256_hex;
+
+    fn expected_map(files: &[(&str, &[u8])]) -> BTreeMap<String, String> {
+        files
+            .iter()
+            .map(|(name, bytes)| ((*name).to_string(), sha256_hex(bytes)))
+            .collect()
+    }
+
+    #[test]
+    fn clean_tree_reports_no_drift() {
+        let dir = tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), b"alpha").unwrap();
+        let expected = expected_map(&[("a.txt", b"alpha")]);
+
+        let drift = verify_tree_against(dir.path(), &expected);
+        assert_eq!(drift, TreeDrift::default());
+        assert_eq!(
+            CheckStatus::from_drift(1, drift),
+            CheckStatus::Verified {
+                matched: 1,
+                total: 1
+            }
+        );
+    }
+
+    #[test]
+    fn hash_mismatch_is_detected_per_file() {
+        let dir = tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), b"tampered").unwrap();
+        std::fs::write(dir.path().join("b.txt"), b"beta").unwrap();
+        let expected = expected_map(&[("a.txt", b"alpha"), ("b.txt", b"beta")]);
+
+        let drift = verify_tree_against(dir.path(), &expected);
+        assert_eq!(drift.mismatched, vec!["a.txt".to_string()]);
+        assert!(drift.missing.is_empty());
+    }
+
+    #[test]
+    fn missing_files_are_reported_separately() {
+        let dir = tempdir().unwrap();
+        std::fs::write(dir.path().join("b.txt"), b"beta").unwrap();
+        let expected = expected_map(&[("a.txt", b"alpha"), ("b.txt", b"beta")]);
+
+        let drift = verify_tree_against(dir.path(), &expected);
+        assert!(drift.mismatched.is_empty());
+        assert_eq!(drift.missing, vec!["a.txt".to_string()]);
+
+        let status = CheckStatus::from_drift(2, drift);
+        match status {
+            CheckStatus::Failed {
+                mismatched,
+                missing,
+            } => {
+                assert!(mismatched.is_empty());
+                assert_eq!(missing.len(), 1);
+            }
+            other => panic!("expected Failed, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn nested_paths_are_hashed_relative_to_root() {
+        let dir = tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("skills/ce-work")).unwrap();
+        std::fs::write(dir.path().join("skills/ce-work/SKILL.md"), b"# skill").unwrap();
+        let expected = expected_map(&[("ce-work/SKILL.md", b"# skill")]);
+
+        // The harness skills root maps `skills/<rest>` onto `<root>/<rest>`.
+        let skills_root = dir.path().join("skills");
+        let drift = verify_tree_against(&skills_root, &expected);
+        assert_eq!(drift, TreeDrift::default());
     }
 }
