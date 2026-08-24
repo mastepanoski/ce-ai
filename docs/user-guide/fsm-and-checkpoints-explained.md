@@ -93,7 +93,7 @@ flowchart TD
 | **Stage 2** | **OpenSpec Definition** | `openspec/changes/*/` | Formal Contract & Spec Sheet | Authoring the contract progressively (`proposal.md`, `exploration.md`, `design.md`, `spec.md`). |
 | **Stage 3** | **Execution Plan** | `ce-plan`<br>`ce-doc-review` | Construction Milestone Breakdown | Generating the executable checklist (`openspec/changes/<feature>/tasks.md`) from `spec.md`/`design.md`, structuring implementation units, file lists, test scenarios, and reviewing doc rigor (`ce-doc-review`). |
 | **Stage 4** | **TDD & Work** | `ce-work`<br>`ce-debug`<br>`ce-simplify-code` | Laying Bricks & Wiring | Writing tests first (Red), implementing code (Green), running diagnostic debug sub-loops (`ce-debug`), and refactoring (`ce-simplify-code`). |
-| **Stage 5** | **Verification** | `ce-code-review`<br>`ce-test-browser`<br>`cargo test` | Safety Inspector Audit | Running linters (`clippy`), unit tests, browser tests (`ce-test-browser`), and Docker containerized E2E gates. |
+| **Stage 5** | **Verification** | `ce-code-review`<br>`ce-test-browser`<br>project test suite | Safety Inspector Audit | Running the project's linters and test suite, browser tests (`ce-test-browser`), plus any containerized/E2E gates your stack defines. |
 | **Stage 6** | **Knowledge Capture** | `ce-compound`<br>`ce-compound-refresh` | Updating Operations Manual | Documenting hard-earned discoveries in `docs/solutions/` (`ce-compound`) and auditing stale docs (`ce-compound-refresh`). |
 | **Stage 7** | **Git Shipping** | `ce-commit-push-pr`<br>`ce-commit`<br>`ce-resolve-pr-feedback` | Delivering Keys to Client | Creating feature branches, writing value-communicating commit messages, and resolving PR feedback (`ce-resolve-pr-feedback`). |
 
@@ -138,7 +138,7 @@ flowchart TD
     ENTRY --> DIAGNOSE[Stage 4: Diagnosis & Root Cause Identification]
     DIAGNOSE --> REPRODUCE[Write Failing Test Case / Minimal Reproducer]
     REPRODUCE --> FIX[Apply Root Cause Fix & Verify Green]
-    FIX --> VERIFY[Stage 5: Empirical Verification: cargo test / make e2e]
+    FIX --> VERIFY[Stage 5: Empirical Verification: project quality gates]
     VERIFY --> COMPOUND[Stage 6: ce-compound: Store Learning in docs/solutions/]
     COMPOUND --> SHIP[Stage 7: ce-commit-push-pr: Ship Fix via PR]
 ```

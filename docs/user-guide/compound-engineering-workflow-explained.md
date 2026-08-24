@@ -92,7 +92,7 @@ flowchart TD
 | **Specification** | OpenSpec Definition | Creates `design.md` (Structs/APIs) & `spec.md` (`WHEN..THEN`) |
 | **Planning** | `ce-plan` | Reads `spec.md`/`design.md` and generates `tasks.md` |
 | **Development** | `ce-work` | Updates `tasks.md` (`- [x]`) and updates `spec.md` if design changes |
-| **Verification** | Tests / `cargo test` / E2E gates | Proves every `spec.md` WHEN/THEN scenario — non-negotiable before shipping |
+| **Verification** | Project test suite, linters & E2E gates | Proves every `spec.md` WHEN/THEN scenario — non-negotiable before shipping |
 | **Capitalization** | `ce-compound` | Consolidates learnings into permanent `docs/solutions/` |
 
 ---

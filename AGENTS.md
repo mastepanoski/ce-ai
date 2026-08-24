@@ -113,7 +113,7 @@ Regardless of whether Compound Engineering, Spec-Driven Development, or pair pro
 
 ```
 [Stage 1: Ideation (ce-brainstorm)] ➔ [Stage 2: OpenSpec Definition (MANDATORY)] ➔ [Stage 3: Execution Plan (ce-plan)]
-   ➔ [Stage 4: TDD & Implementation (ce-work)] ➔ [Stage 5: Verification (cargo test / make e2e)]
+   ➔ [Stage 4: TDD & Implementation (ce-work)] ➔ [Stage 5: Verification (project quality gates)]
    ➔ [Stage 6: Knowledge Capture (ce-compound)] ➔ [Stage 7: Git Shipping (ce-commit-push-pr)]
 ```
 
