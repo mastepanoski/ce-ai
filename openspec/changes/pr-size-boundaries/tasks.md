@@ -1,0 +1,3 @@
+- [x] T1.1 CONTRIBUTING.md policy section (boundary/counting/corrections/work-units/orthogonality/constants/enforcement)
+- [x] T1.2 PR-template Changed-Lines Forecast section
+- [x] T2.1 AGENTS.md budget bullet + docs-styling sibling pointer

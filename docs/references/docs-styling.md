@@ -73,3 +73,7 @@ Documentation-map rows must state the intended audience so both personas can sel
 - [ ] No content duplicated between README and `docs/`.
 - [ ] Audience labels present on doc-map/tutorial entries.
 - [ ] All commands verified runnable.
+
+## Related Policy Documents
+
+- [CONTRIBUTING](../../CONTRIBUTING.md): PR size boundaries (400-line review boundary), counting contract, bounded correction policy, and OpenSpec work-unit budgets.
