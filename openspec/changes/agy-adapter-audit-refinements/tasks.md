@@ -1,8 +1,11 @@
-# Task Breakdown: Antigravity (AGY) Adapter Audit Refinements
+# Task Breakdown: Google Antigravity (AGY) Adapter Audit Refinements
 
-- [x] Update `openspec/changes/agy-native-harness-adapter/design.md` with `$ANTIGRAVITY_CONFIG_DIR`, `$GEMINI_HOME`, rule adoption, and `serverUrl` collision policy documentation
-- [x] Bump SemVer to `v1.15.2` in `Cargo.toml` and `Formula/ce-ai.rb`, and update `CHANGELOG.md`
+- [x] Document environment variable extensions (`ANTIGRAVITY_CONFIG_DIR`, `GEMINI_HOME`) in OpenSpec `design.md` and `spec.md`
+- [x] Document project rules architecture (`GEMINI.md`, `.agents/rules/compound-engineering.md`) in OpenSpec `design.md` and `spec.md`
+- [x] Document and verify `serverUrl` collision policy in OpenSpec `design.md`, `spec.md`, and `src/harness/agy.rs` unit tests
+- [x] Document `HarnessAdapter` zero-argument trait signatures in OpenSpec `design.md` and `spec.md`
+- [x] Run `ce-doc-review` panel
 - [x] Run quality gates (`cargo fmt`, `cargo clippy`, `cargo test`)
 - [x] Run `ce-code-review` panel
-- [x] Document solution via `ce-compound`
-- [x] Create branch `fix/agy-adapter-audit-refinements`, commit, push, PR, merge, release patch `v1.15.2`
+- [x] Document solution in `docs/solutions/architecture/agy-adapter-audit-refinements.md`
+- [x] Create branch `feat/agy-adapter-audit-refinements`, commit, push, PR, merge, release patch `v1.17.1`

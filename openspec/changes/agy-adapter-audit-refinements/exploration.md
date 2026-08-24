@@ -1,11 +1,21 @@
-# Exploration: Antigravity (AGY) Adapter Audit Refinements
+# Exploration: Google Antigravity (AGY) Adapter Audit Refinements
 
-## Technical Investigation
-1. **Environment Variables**:
-   - Google Antigravity defaults to `~/.gemini`.
-   - `ce-ai` supports `$ANTIGRAVITY_CONFIG_DIR` and `$GEMINI_HOME` for custom directory relocation (useful in testing, containerized environments, and custom user setups).
-   - Documenting these as `ce-ai` extension conventions prevents ambiguity regarding upstream Google documentation versus `ce-ai` extensions.
-2. **Project Rules**:
-   - `ce-ai init-prj` writes project rules to `.agents/rules/compound-engineering.md` (when `.agents/` pre-exists) and `GEMINI.md` (project root). `GEMINI.md` guarantees root instruction loading across Antigravity tools.
-3. **Name Collision Policy**:
-   - When registering a local stdio tool (e.g. `codegraph`, `engram`) with `register_agy_mcp_server`, if an existing server entry under the same name previously had `serverUrl` set (remote SSE/HTTP), `register_agy_mcp_server` updates `command`, `args`, `env` and resets `server_url` to `None`. This guarantees valid stdio server JSON structure without dual `command` and `serverUrl` fields.
+## Audit Analysis
+
+### 1. Relocation Environment Variables (`ANTIGRAVITY_CONFIG_DIR`, `GEMINI_HOME`)
+- **Status**: Official Google Antigravity documentation relies on default path `~/.gemini/`.
+- **ce-ai Extension**: `ce-ai` supports `$ANTIGRAVITY_CONFIG_DIR` and `$GEMINI_HOME` environment overrides for custom test setups and isolated harness environments.
+- **Action**: Document as explicit `ce-ai` extensions in `design.md` and `spec.md`.
+
+### 2. Project Rules Architecture
+- **Canonical Instruction**: `GEMINI.md` at repository root.
+- **Derived Stub**: `.agents/rules/compound-engineering.md` when `.agents/` pre-exists.
+- **Action**: Document dual instruction resolution strategy in `design.md`.
+
+### 3. Server Registration Name Collision Policy
+- **Behavior**: When registering managed tools (`codegraph`, `engram`), if `mcp_config.json` already contains an entry with `serverUrl`, setting `server_url = None` converts the entry to a stdio command server (`command`, `args`, `env`).
+- **Action**: Verify with unit test assertion in `src/harness/agy.rs`.
+
+### 4. HarnessAdapter Trait Evolution
+- **Behavior**: `canonical_instruction_file()` and `derived_stub_files()` provide clean polymorphism for instruction file targets.
+- **Action**: Maintain trait integrity.

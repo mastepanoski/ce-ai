@@ -1,15 +1,21 @@
-# Design: Antigravity (AGY) Adapter Audit Refinements
+# Design: Google Antigravity (AGY) Adapter Audit Refinements
 
-## 1. Environment Variable Extensions
-- `$ANTIGRAVITY_CONFIG_DIR`: Primary environment variable override for Google Antigravity configuration directory (defaults to `$HOME/.gemini`).
-- `$GEMINI_HOME`: Secondary environment variable override for Google Antigravity configuration directory.
-- Both environment variables are `ce-ai` extension conventions for custom directory relocation.
+## Environment Variable Extensions
+`ce-ai` provides two environment variable extensions for custom directory relocation when targeting Google Antigravity:
+1. `ANTIGRAVITY_CONFIG_DIR`: Highest precedence override for `harness_dir`.
+2. `GEMINI_HOME`: Secondary precedence override for `harness_dir`.
+3. Default: `<home_dir>/.gemini`.
 
-## 2. Project Rules Architecture
-- `canonical_instruction_file()` returns `PathBuf::from("GEMINI.md")`.
-- `derived_stub_files()` returns `vec![PathBuf::from(".agents/rules/compound-engineering.md")]`.
-- `init-prj` adopts `GEMINI.md` and `.agents/rules/compound-engineering.md` if `.agents/` directory pre-exists.
+Note: `ANTIGRAVITY_CONFIG_DIR` and `GEMINI_HOME` are custom `ce-ai` extensions introduced to support hermetic test runners and custom user deployments.
 
-## 3. Server Registration Collision Policy
-- When `register_agy_mcp_server` registers a server name that already exists as a remote server entry (`serverUrl: Some(...)`), the entry is updated to a local stdio command server (`command`, `args`, `env`), and `server_url` is explicitly reset to `None`.
-- Unmanaged remote server entries with different names are preserved intact with `serverUrl` and `headers`.
+## Project Rules Architecture
+- **Canonical Instruction File**: `<project_dir>/GEMINI.md`
+- **Derived Stub File**: `<project_dir>/.agents/rules/compound-engineering.md` (adopted when `.agents/` directory pre-exists).
+
+## Server URL Collision Policy
+When registering a managed MCP server (`codegraph` or `engram`) via `register_agy_mcp_server`, if an existing entry under that key contains a `serverUrl` field, `server_url` is explicitly set to `None` to convert the entry cleanly to a stdio command definition (`command`, `args`, `env`). Non-colliding remote MCP servers (servers with distinct names) are explicitly preserved unchanged.
+
+## HarnessAdapter Trait Evolution
+The `HarnessAdapter` trait evolved cleanly across adapters to expose zero-argument relative path methods:
+- `fn canonical_instruction_file(&self) -> PathBuf`: Returns `PathBuf::from("GEMINI.md")`.
+- `fn derived_stub_files(&self) -> Vec<PathBuf>`: Returns `vec![PathBuf::from(".agents").join("rules").join("compound-engineering.md")]`.

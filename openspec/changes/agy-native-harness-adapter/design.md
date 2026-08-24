@@ -30,12 +30,12 @@ impl HarnessAdapter for AgyAdapter {
         self.harness_dir(home_dir).join("config").join("mcp_config.json")
     }
 
-    fn canonical_instruction_file(&self, project_dir: &Path) -> PathBuf {
-        project_dir.join("GEMINI.md")
+    fn canonical_instruction_file(&self) -> PathBuf {
+        PathBuf::from("GEMINI.md")
     }
 
-    fn derived_stub_files(&self, project_dir: &Path) -> Vec<PathBuf> {
-        vec![project_dir.join(".agents").join("rules").join("compound-engineering.md")]
+    fn derived_stub_files(&self) -> Vec<PathBuf> {
+        vec![PathBuf::from(".agents").join("rules").join("compound-engineering.md")]
     }
 
     fn register_mcp_server(

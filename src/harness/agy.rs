@@ -27,7 +27,11 @@ pub struct AgyMcpServer {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<String, String>,
 
-    #[serde(rename = "serverUrl", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "serverUrl",
+        alias = "url",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub server_url: Option<String>,
 
     #[serde(flatten)]
@@ -64,13 +68,7 @@ impl HarnessAdapter for AgyAdapter {
             return base_dir.to_path_buf();
         }
 
-        if base_dir.file_name().and_then(|n| n.to_str()) == Some("config")
-            && base_dir
-                .parent()
-                .and_then(|p| p.file_name())
-                .and_then(|n| n.to_str())
-                == Some(".gemini")
-        {
+        if base_dir.file_name().and_then(|n| n.to_str()) == Some("config") {
             return base_dir.join("mcp_config.json");
         }
 
@@ -90,7 +88,9 @@ impl HarnessAdapter for AgyAdapter {
     }
 
     fn derived_stub_files(&self) -> Vec<PathBuf> {
-        vec![PathBuf::from(".agents/rules/compound-engineering.md")]
+        vec![PathBuf::from(".agents")
+            .join("rules")
+            .join("compound-engineering.md")]
     }
 }
 
@@ -133,6 +133,9 @@ pub fn register_agy_mcp_server(
     server_entry.args = args.iter().map(|s| s.to_string()).collect();
     server_entry.env = env.clone();
     server_entry.server_url = None;
+    for key in ["url", "serverUrl", "headers", "transport"] {
+        server_entry.extra.remove(key);
+    }
 
     let updated_json = serde_json::to_string_pretty(&config).map_err(|e| {
         CeError::Runtime(format!(
@@ -218,12 +221,22 @@ mod tests {
             PathBuf::from("/custom/agy/dir/config/mcp_config.json")
         );
 
-        std::env::remove_var("ANTIGRAVITY_CONFIG_DIR");
-
         std::env::set_var("GEMINI_HOME", "/custom/gemini/dir");
         assert_eq!(
             adapter.harness_dir(home),
+            PathBuf::from("/custom/agy/dir"),
+            "ANTIGRAVITY_CONFIG_DIR takes precedence over GEMINI_HOME"
+        );
+
+        std::env::remove_var("ANTIGRAVITY_CONFIG_DIR");
+
+        assert_eq!(
+            adapter.harness_dir(home),
             PathBuf::from("/custom/gemini/dir")
+        );
+        assert_eq!(
+            adapter.default_config_path(home),
+            PathBuf::from("/custom/gemini/dir/config/mcp_config.json")
         );
         std::env::remove_var("GEMINI_HOME");
     }
@@ -285,6 +298,50 @@ mod tests {
     }
 
     #[test]
+    fn register_agy_mcp_server_resets_server_url_on_name_collision() {
+        let tmp = TempDir::new().unwrap();
+        let config_path = tmp.path().join("mcp_config.json");
+
+        // Seed with codegraph entry containing serverUrl and url alias
+        let initial_json = r#"{
+          "mcpServers": {
+            "codegraph": {
+              "url": "https://mcp.example.com/codegraph",
+              "headers": { "Auth": "Bearer token" }
+            },
+            "other_remote": {
+              "serverUrl": "https://mcp.example.com/other"
+            }
+          }
+        }"#;
+        std::fs::write(&config_path, initial_json).unwrap();
+
+        let env = BTreeMap::new();
+        register_agy_mcp_server(&config_path, "codegraph", "codegraph", &["mcp"], &env).unwrap();
+
+        let content = std::fs::read_to_string(&config_path).unwrap();
+        let json_val: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        assert!(json_val
+            .pointer("/mcpServers/codegraph/serverUrl")
+            .is_none());
+        assert!(json_val.pointer("/mcpServers/codegraph/url").is_none());
+        assert!(json_val.pointer("/mcpServers/codegraph/headers").is_none());
+
+        let config: AgyMcpConfig = serde_json::from_str(&content).unwrap();
+
+        let codegraph = &config.mcp_servers["codegraph"];
+        assert_eq!(codegraph.server_url, None);
+        assert_eq!(codegraph.command.as_deref(), Some("codegraph"));
+
+        let other = &config.mcp_servers["other_remote"];
+        assert_eq!(
+            other.server_url.as_deref(),
+            Some("https://mcp.example.com/other")
+        );
+    }
+
+    #[test]
     fn register_agy_mcp_server_excludes_opencode_keys() {
         let tmp = TempDir::new().unwrap();
         let config_path = tmp.path().join("mcp_config.json");
@@ -296,7 +353,8 @@ mod tests {
         let json_val: serde_json::Value = serde_json::from_str(&content).unwrap();
 
         assert!(json_val.get("plugin").is_none());
-        assert!(json_val.pointer("/skills/paths").is_none());
+        assert!(json_val.get("skills").is_none());
         assert!(!content.contains("plugin"));
+        assert!(!content.contains("skills"));
     }
 }
