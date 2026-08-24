@@ -1,6 +1,6 @@
 [package]
 name = "ce-ai"
-version = "1.17.2"
+version = "1.18.0"
 edition = "2021"
 description = "CLI for managing the compound-engineering plugin across AI harnesses"
 license = "MIT"

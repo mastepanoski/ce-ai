@@ -99,20 +99,44 @@ pub fn resolve_latest_release(
     if let Some(header) = auth_header(token) {
         request = request.header(reqwest::header::AUTHORIZATION, header);
     }
-    let response = request
+    let response = match request
         .header(reqwest::header::USER_AGENT, "ce-ai/0.1.0")
         .send()
-        .map_err(|err| CeError::Runtime(format!("github releases request failed: {err}")))?;
+    {
+        Ok(res) => res,
+        Err(err) => {
+            eprintln!(
+                "notice: GitHub API release query network error ({err}). Falling back to main branch source tarball. Tip: set CE_AI_GITHUB_TOKEN to authenticate requests."
+            );
+            return Ok(None);
+        }
+    };
+
     if !response.status().is_success() {
-        return Err(CeError::Runtime(format!(
-            "github releases returned {}",
+        eprintln!(
+            "notice: GitHub API returned HTTP {} when querying releases. Falling back to main branch source tarball. Tip: set CE_AI_GITHUB_TOKEN to authenticate requests.",
             response.status()
-        )));
+        );
+        return Ok(None);
     }
-    let body = response
-        .bytes()
-        .map_err(|err| CeError::Runtime(err.to_string()))?;
-    latest_ce_release(&body)
+    let body = match response.bytes() {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            eprintln!(
+                "notice: Failed to read GitHub API response bytes ({err}). Falling back to main branch source tarball."
+            );
+            return Ok(None);
+        }
+    };
+    match latest_ce_release(&body) {
+        Ok(res) => Ok(res),
+        Err(err) => {
+            eprintln!(
+                "notice: Failed to parse GitHub API release payload ({err}). Falling back to main branch source tarball."
+            );
+            Ok(None)
+        }
+    }
 }
 
 #[cfg(test)]

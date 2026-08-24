@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-08-24
+
+### Changed
+- Reconciled `README.md` and `openspec/changes/multi_harness_support/spec.md` to state 10 native supported AI agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `fx`) and detail native directory locations (Issues #155, #183).
+- De-scoped `deepseek` cleanly: CLI invocations specifying `deepseek` return `CeError::Usage` (exit code 2) explaining that `dsh` uses `~/.dsh` YAML patch layers during developer preview, and excluded `deepseek` from host harness auto-detection (Issue #180).
+- Renamed audit output header, `--fail-under` docstring, and threshold error message in `src/commands/audit.rs` to `configuration coverage` (Issue #164).
+
+### Fixed
+- Hardened `resolve_latest_release` in `src/source/release.rs` to catch network send errors and HTTP 403 / 429 rate limit responses from the GitHub API, logging an informative notice to stderr and falling back to the `main` branch source tarball (`main_tarball_url()`, SF-2) without hard-failing (Issue #202).
+
 ## [1.17.2] - 2026-08-24
 
 ### Fixed

@@ -189,6 +189,38 @@ fn install_unknown_harness_exits_usage_code() {
 }
 
 #[test]
+fn install_deepseek_harness_exits_usage_code() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "deepseek", "--source"])
+        .arg(&source)
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "deepseek harness is unsupported during developer preview",
+        ));
+}
+
+#[test]
+fn uninstall_deepseek_harness_exits_usage_code() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "deepseek"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "deepseek harness is unsupported during developer preview",
+        ));
+}
+
+#[test]
 fn status_prints_installed_harness_version_and_drift() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
@@ -1574,7 +1606,7 @@ fn audit_subcommand_runs_advisory_and_json_mode() {
         .stdout(predicate::str::contains(
             "== [ce-ai Agent Environment Audit] ==",
         ))
-        .stdout(predicate::str::contains("score:"));
+        .stdout(predicate::str::contains("configuration coverage:"));
 
     // JSON mode
     ceai(&config_dir, &home)

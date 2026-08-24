@@ -7,21 +7,21 @@
 ## Requirements
 
 ### Requirement 1: Multi-Harness Flag Parsing & Resolution
-- **WHEN** the user invokes `ce-ai install --harness <name>`, **THEN** the CLI MUST validate `<name>` against `HarnessKind`. If invalid, return exit code `2` (Usage Error) with a list of supported harnesses.
-- **WHEN** the user invokes `ce-ai install --all`, **THEN** the CLI MUST probe for installed harness configuration directories on the host system and execute installation for each detected harness.
+- **WHEN** the user invokes `ce-ai install --harness <name>`, **THEN** the CLI MUST validate `<name>` against `HarnessKind`. If invalid or de-scoped (such as `deepseek`), return exit code `2` (Usage Error) with actionable error guidance.
+- **WHEN** the user invokes `ce-ai install --all`, **THEN** the CLI MUST probe for installed host harness configuration directories across the 10 supported native harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `fx`) and execute installation for each detected harness.
 
-### Requirement 2: JSON Configuration Merging
-- **WHEN** installing or updating a JSON-based harness (`opencode`, `claude`, `pi`, `codex`, `grok`, `kimi`, `agy`, `deepseek`, `fx`), **THEN** `ce-ai` MUST parse the target JSON file, update managed fields (`plugins`, `skills`), preserve unmanaged keys, and write back using `write_atomic`.
+### Requirement 2: Native Per-Harness Adapters & Configuration Merging
+- **WHEN** installing or updating a native harness, **THEN** `ce-ai` MUST delegate to the corresponding `HarnessAdapter` (`OpenCode`, `Claude`, `Pi`, `Cursor`, `Copilot`, `Codex`, `Grok`, `Kimi`, `Agy`, `Fx`), writing to its native host directory in its native configuration format (JSON for OpenCode/Claude/Kimi/Agy/Fx/Copilot/Cursor, TOML for Codex/Grok, Skills directory for Pi, MDC/Markdown for Cursor/Copilot project rules), preserving unmanaged user keys and writing back via `write_atomic`.
 
-### Requirement 3: Markdown Instruction Block Ingestion
-- **WHEN** installing or updating a Markdown-based harness (`cursor`, `copilot`), **THEN** `ce-ai` MUST append or update a managed block demarcated by `<!-- CE-AI MANAGED BLOCK BEGIN -->` and `<!-- CE-AI MANAGED BLOCK END -->`, leaving user instructions untouched.
+### Requirement 3: Project Rules Adoption & Management
+- **WHEN** adopting a project via `ce-ai init-prj`, **THEN** `ce-ai` MUST write non-destructive managed blocks to `AGENTS.md` (root) and derived stub rule files (`CLAUDE.md`, `.cursor/rules/compound-engineering.mdc`, `.github/copilot-instructions.md`, `.codex/AGENTS.md`, `.grok/AGENTS.md`, `.kimi-code/AGENTS.md`, `.agents/rules/compound-engineering.md`, `.pi/AGENTS.md`, `.fx/AGENTS.md`).
 
 ### Requirement 4: Custom Harness Fallback Mode
-- **WHEN** the user runs `ce-ai install --harness custom`, **THEN** the CLI MUST check for `--plugins-dir` and `--skills-dir` flags. If missing in interactive mode, prompt the user via `inquire`.
+- **WHEN** the user runs `ce-ai install --harness custom`, **THEN** the CLI MUST support custom plugin directory configuration.
 
 ### Requirement 5: Model Role Syncing Across Harnesses
-- **WHEN** `ce-ai models set <slot> = <model>` is run, **THEN** `ce-ai` MUST update central `state.json` and sync the model assignment into all installed harness configuration files.
+- **WHEN** `ce-ai models set <slot> = <model>` is run, **THEN** `ce-ai` MUST update central `state.json` and sync model assignments across configured harnesses.
 
 ### Requirement 6: Manifest Tracking & Backup Restoration
-- **WHEN** any harness is installed or modified, **THEN** SHA256 file hashes MUST be saved in `manifest.json` under `~/.ce-ai/manifest.json`.
-- **WHEN** `ce-ai uninstall --harness <name>` is executed, **THEN** `ce-ai` MUST restore the timestamped pre-install backup and remove managed files.
+- **WHEN** any harness is installed or modified, **THEN** SHA256 file hashes MUST be saved in `install-manifest.json`.
+- **WHEN** `ce-ai uninstall --harness <name>` is executed, **THEN** `ce-ai` MUST restore the timestamped pre-install backup and remove managed files cleanly.

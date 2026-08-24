@@ -1,4 +1,4 @@
-//! Generic JSON harness adapter implementation for DeepSeek and Custom.
+//! Generic JSON harness adapter implementation for Custom.
 
 use std::path::{Path, PathBuf};
 
@@ -22,10 +22,7 @@ impl HarnessAdapter for GenericJsonAdapter {
     }
 
     fn default_config_path(&self, home: &Path) -> PathBuf {
-        match self.kind {
-            HarnessKind::Deepseek => home.join(".deepseek").join("config.json"),
-            _ => home.join(format!(".{}", self.kind)).join("config.json"),
-        }
+        home.join(format!(".{}", self.kind)).join("config.json")
     }
 }
 
@@ -38,13 +35,6 @@ mod tests {
     fn generic_json_adapter_paths_and_kinds() {
         let tmp = TempDir::new().unwrap();
         let home = tmp.path().to_path_buf();
-
-        let deepseek = GenericJsonAdapter::new(HarnessKind::Deepseek);
-        assert_eq!(deepseek.kind(), HarnessKind::Deepseek);
-        assert_eq!(
-            deepseek.default_config_path(&home),
-            home.join(".deepseek/config.json")
-        );
 
         let custom = GenericJsonAdapter::new(HarnessKind::Custom);
         assert_eq!(custom.kind(), HarnessKind::Custom);
