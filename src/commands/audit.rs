@@ -16,7 +16,7 @@ pub struct Args {
     /// Render machine-readable JSON output.
     #[arg(long)]
     pub json: bool,
-    /// Exit with non-zero code if score falls below specified percentage (0-100).
+    /// Exit with non-zero code if configuration coverage falls below specified percentage (0-100).
     #[arg(long)]
     pub fail_under: Option<u32>,
 }
@@ -467,7 +467,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
 
         println!(
-            "\nscore: {}% ({} pass / {} warn / {} fail)",
+            "\nconfiguration coverage: {}% ({} pass / {} warn / {} fail)",
             score_pct, pass_cnt, warn_cnt, fail_cnt
         );
     }
@@ -475,7 +475,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     if let Some(threshold) = args.fail_under {
         if score_pct < threshold {
             return Err(CeError::Runtime(format!(
-                "audit score {}% is below required threshold of {}%",
+                "configuration coverage {}% is below required threshold of {}%",
                 score_pct, threshold
             )));
         }

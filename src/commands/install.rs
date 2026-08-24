@@ -75,6 +75,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         vec![harness_arg.parse::<HarnessKind>()?]
     };
 
+    if target_harnesses.contains(&HarnessKind::Deepseek) {
+        return Err(CeError::Usage(
+            "deepseek harness is unsupported during developer preview (DeepSeek Harness 'dsh' uses YAML patch layers under ~/.dsh). Please use a supported native harness (opencode, claude, codex, copilot, cursor, grok, kimi, agy, pi, fx).".to_string()
+        ));
+    }
+
     let (source_path, version, source_json, tmp_dir) = resolve_source(ctx, &args.source)?;
 
     let managed: BTreeMap<String, (String, String)> = read_local_tree(&source_path)?

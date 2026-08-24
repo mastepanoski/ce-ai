@@ -51,8 +51,8 @@ impl HarnessKind {
     /// List all natively supported harness identifiers as string slices.
     pub fn all_str() -> &'static [&'static str] {
         &[
-            "opencode", "claude", "pi", "cursor", "copilot", "codex", "grok", "kimi", "agy",
-            "deepseek", "fx", "custom",
+            "opencode", "claude", "pi", "cursor", "copilot", "codex", "grok", "kimi", "agy", "fx",
+            "custom",
         ]
     }
 
@@ -68,7 +68,6 @@ impl HarnessKind {
             HarnessKind::Grok,
             HarnessKind::Kimi,
             HarnessKind::Agy,
-            HarnessKind::Deepseek,
             HarnessKind::Fx,
             HarnessKind::Custom,
         ]
@@ -114,10 +113,7 @@ impl HarnessKind {
                 let dir = self.harness_dir(home_dir);
                 dir.exists() || home_dir.join(".config").join("antigravity").exists()
             }
-            HarnessKind::Deepseek => {
-                home_dir.join(".deepseek").exists()
-                    || home_dir.join(".config").join("deepseek").exists()
-            }
+            HarnessKind::Deepseek => false,
             HarnessKind::Fx => {
                 let dir = self.harness_dir(home_dir);
                 dir.exists() || home_dir.join(".fx").exists()
@@ -138,7 +134,6 @@ impl HarnessKind {
             HarnessKind::Grok,
             HarnessKind::Kimi,
             HarnessKind::Agy,
-            HarnessKind::Deepseek,
             HarnessKind::Fx,
         ];
         all.into_iter()
@@ -201,10 +196,7 @@ impl HarnessKind {
                         .exists()
                     || home_dir.join(".config").join("antigravity").exists()
             }
-            HarnessKind::Deepseek => {
-                home_dir.join(".deepseek").join("deepseek.json").exists()
-                    || home_dir.join(".config").join("deepseek").exists()
-            }
+            HarnessKind::Deepseek => false,
             HarnessKind::Fx => {
                 let dir = self.harness_dir(home_dir);
                 dir.join("mcp.json").exists() || dir.join("skills").exists()
@@ -225,7 +217,6 @@ impl HarnessKind {
             HarnessKind::Grok,
             HarnessKind::Kimi,
             HarnessKind::Agy,
-            HarnessKind::Deepseek,
             HarnessKind::Fx,
         ];
         all.into_iter()

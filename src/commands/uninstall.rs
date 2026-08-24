@@ -56,6 +56,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     for target in &targets {
         if let Ok(harness_kind) = target.parse::<HarnessKind>() {
+            if harness_kind == HarnessKind::Deepseek {
+                return Err(CeError::Usage(
+                    "deepseek harness is unsupported during developer preview (DeepSeek Harness 'dsh' uses YAML patch layers under ~/.dsh). Please use a supported native harness (opencode, claude, codex, copilot, cursor, grok, kimi, agy, pi, fx).".to_string()
+                ));
+            }
             let config_dir = if harness_kind == HarnessKind::Opencode {
                 ctx.opencode_config_dir.clone()
             } else {
