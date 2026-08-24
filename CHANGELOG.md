@@ -5,6 +5,12 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.4] - 2026-08-24
+
+### Fixed
+- Completed the exit-code contract (invariant #7 / Issue #163): new `CeError::State` (exit **3**) raised from corrupt/unreadable/unpersistable `state.json`, `CeError::Network` (exit **5**) from propagating GitHub tarball transport failures, and filesystem I/O remapped to its own exit **4** instead of folding into runtime(1). Verification(6) existed since v1.18.1.
+- Performance bounds are executable again (Issue #84): new `make bench` target runs `benches/benchmarks.rs` (`<50ms` state-resolution and manifest-roundtrip assertions) under `cargo test --benches --release`; the stale hardcoded `0.9.0` version literal is now derived from `CARGO_PKG_VERSION`.
+
 ## [1.20.3] - 2026-08-24
 
 ### Fixed

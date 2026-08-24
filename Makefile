@@ -1,4 +1,4 @@
-.PHONY: e2e test build clean hooks lint
+.PHONY: e2e test bench build clean hooks lint
 
 test:
 	cargo test
@@ -8,6 +8,9 @@ build:
 
 e2e:
 	cargo test --test e2e -- --ignored --nocapture
+
+bench:
+	cargo test --benches --release
 
 lint:
 	cargo fmt --check

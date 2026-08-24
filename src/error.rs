@@ -1,7 +1,7 @@
 //! Error type and process exit-code mapping for the ce-ai CLI.
 //!
-//! Exit-code contract (design.md §File Changes): `0` = ok, `1` = runtime
-//! error, `2` = usage error, `6` = verification failure.
+//! Exit-code contract (AGENTS.md invariant #7): `0` = ok, `1` = runtime,
+//! `2` = usage, `3` = state, `4` = I/O, `5` = network, `6` = verification.
 
 use std::fmt;
 
@@ -10,10 +10,15 @@ use std::fmt;
 pub enum CeError {
     /// Invalid CLI usage; mapped to process exit code 2.
     Usage(String),
-    /// Runtime failure (state I/O, network, source fetch); mapped to exit 1.
+    /// Runtime failure; mapped to exit 1.
     Runtime(String),
-    /// Filesystem I/O failure; mapped to exit 1.
+    /// state.json lifecycle failure (corrupt, unreadable, unpersistable);
+    /// mapped to exit 3.
+    State(String),
+    /// Filesystem I/O failure; mapped to exit 4.
     Io(std::io::Error),
+    /// Remote-fetch failure (GitHub API/tarball transport); mapped to exit 5.
+    Network(String),
     /// JSON (de)serialization failure; mapped to exit 1.
     Json(serde_json::Error),
     /// Post-operation integrity check failed; mapped to exit 6.
@@ -25,6 +30,8 @@ impl fmt::Display for CeError {
         match self {
             CeError::Usage(msg) => write!(f, "usage error: {msg}"),
             CeError::Runtime(msg) => write!(f, "runtime error: {msg}"),
+            CeError::State(msg) => write!(f, "state error: {msg}"),
+            CeError::Network(msg) => write!(f, "network error: {msg}"),
             CeError::Io(err) => write!(f, "I/O error: {err}"),
             CeError::Json(err) => write!(f, "JSON error: {err}"),
             CeError::Verification(msg) => write!(f, "verification error: {msg}"),
@@ -55,19 +62,21 @@ impl From<serde_json::Error> for CeError {
 }
 
 impl CeError {
-    /// Maps this error to a process exit code: 1 = runtime, 2 = usage,
-    /// 6 = verification.
+    /// Maps this error to a process exit code per invariant #7: 1 = runtime,
+    /// 2 = usage, 3 = state, 4 = I/O, 5 = network, 6 = verification.
     pub fn exit_code(&self) -> i32 {
         match self {
             CeError::Usage(_) => 2,
             CeError::Verification(_) => 6,
-            CeError::Runtime(_) | CeError::Io(_) | CeError::Json(_) => 1,
+            CeError::State(_) => 3,
+            CeError::Io(_) => 4,
+            CeError::Network(_) => 5,
+            CeError::Runtime(_) | CeError::Json(_) => 1,
         }
     }
 }
 
-/// Maps a command result to a process exit code: 0 = ok, 1 = runtime,
-/// 2 = usage, 6 = verification.
+/// Maps a command result to a process exit code per invariant #7.
 pub fn result_exit_code(result: &Result<(), CeError>) -> i32 {
     match result {
         Ok(()) => 0,
@@ -88,7 +97,9 @@ mod tests {
     fn runtime_errors_map_to_exit_one() {
         assert_eq!(CeError::Runtime("boom".into()).exit_code(), 1);
         let io = std::io::Error::other("disk full");
-        assert_eq!(CeError::Io(io).exit_code(), 1);
+        assert_eq!(CeError::Io(io).exit_code(), 4);
+        assert_eq!(CeError::State("state.json corrupt".into()).exit_code(), 3);
+        assert_eq!(CeError::Network("timeout".into()).exit_code(), 5);
         let json = serde_json::from_str::<serde_json::Value>("{").unwrap_err();
         assert_eq!(CeError::Json(json).exit_code(), 1);
     }

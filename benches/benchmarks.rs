@@ -57,7 +57,7 @@ fn benchmark_sha256_manifest_roundtrip_under_50ms() {
 
     let start = Instant::now();
     let manifest = InstallManifest {
-        version: "0.9.0".into(),
+        version: env!("CARGO_PKG_VERSION").into(),
         plugin_name: "compound-engineering".into(),
         installed_at: "2026-08-21T00:00:00Z".into(),
         source: serde_json::json!({"type": "git"}),
@@ -80,7 +80,7 @@ fn benchmark_sha256_manifest_roundtrip_under_50ms() {
     let loaded = InstallManifest::load(&config_dir).expect("Manifest load should succeed");
     let elapsed = start.elapsed();
 
-    assert_eq!(loaded.version, "0.9.0");
+    assert_eq!(loaded.version, env!("CARGO_PKG_VERSION"));
     assert!(
         elapsed.as_millis() < 50,
         "Manifest creation and SHA256 indexing must complete under 50ms (took {:?})",

@@ -91,7 +91,7 @@ fn atomic_write_guarantees_file_integrity_and_zero_residual_tempfiles() {
 }
 
 #[test]
-fn corrupted_json_state_returns_clear_runtime_error() {
+fn corrupted_json_state_returns_state_error() {
     let tmp = TempDir::new().unwrap();
     let state_file = tmp.path().join("state.json");
     std::fs::write(&state_file, r#"{"invalid": json syntax"#).unwrap();
@@ -102,7 +102,7 @@ fn corrupted_json_state_returns_clear_runtime_error() {
         "Corrupted state.json must return error instead of panicking"
     );
     match result.unwrap_err() {
-        CeError::Json(_) => (),
-        err => panic!("Expected CeError::Json, got {:?}", err),
+        CeError::State(_) => (),
+        err => panic!("Expected CeError::State, got {:?}", err),
     }
 }

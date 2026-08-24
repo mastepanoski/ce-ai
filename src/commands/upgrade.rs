@@ -64,7 +64,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         .get(&url)
         .header(reqwest::header::USER_AGENT, "ce-ai/0.1.0")
         .send()
-        .map_err(|err| CeError::Runtime(format!("release download failed: {err}")))?
+        .map_err(|err| CeError::Network(format!("release download failed: {err}")))?
         .bytes()
         .map_err(|err| CeError::Runtime(err.to_string()))?;
     let (tarball, hex, _dry_run_tmp) = if ctx.dry_run {
