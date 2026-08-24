@@ -272,14 +272,7 @@ pub(crate) fn sync_with(
                     &["serve"],
                     &empty_env,
                 )?;
-                let claude_skills_dir = config_dir.join("skills");
-                let managed_skills_src = managed_dir.join("skills");
-                if managed_skills_src.exists() {
-                    let _ = crate::source::archive::copy_dir_all(
-                        &managed_skills_src,
-                        &claude_skills_dir,
-                    );
-                }
+                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
             } else if h_kind == HarnessKind::Codex {
                 let empty_env = std::collections::BTreeMap::new();
                 crate::harness::codex::register_codex_mcp_server(
@@ -296,17 +289,7 @@ pub(crate) fn sync_with(
                     &["serve"],
                     &empty_env,
                 )?;
-                let codex_skills_dir = config_dir.join("skills");
-                let managed_skills_src = managed_dir.join("skills");
-                if managed_skills_src.exists() {
-                    crate::source::archive::copy_dir_all(&managed_skills_src, &codex_skills_dir)
-                        .map_err(|e| {
-                            CeError::Runtime(format!(
-                                "failed to copy managed skills to {}: {e}",
-                                codex_skills_dir.display()
-                            ))
-                        })?;
-                }
+                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
             } else if h_kind == HarnessKind::Copilot {
                 let empty_env = std::collections::BTreeMap::new();
                 crate::harness::copilot::register_copilot_mcp_server(
@@ -323,17 +306,7 @@ pub(crate) fn sync_with(
                     &["serve"],
                     &empty_env,
                 )?;
-                let copilot_skills_dir = config_dir.join("skills");
-                let managed_skills_src = managed_dir.join("skills");
-                if managed_skills_src.exists() {
-                    crate::source::archive::copy_dir_all(&managed_skills_src, &copilot_skills_dir)
-                        .map_err(|e| {
-                            CeError::Runtime(format!(
-                                "failed to copy managed skills to {}: {e}",
-                                copilot_skills_dir.display()
-                            ))
-                        })?;
-                }
+                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
             } else if h_kind == HarnessKind::Grok {
                 let empty_env = std::collections::BTreeMap::new();
                 crate::harness::grok::register_grok_mcp_server(
@@ -350,23 +323,76 @@ pub(crate) fn sync_with(
                     &["serve"],
                     &empty_env,
                 )?;
-                let grok_skills_dir = config_dir.join("skills");
-                let managed_skills_src = managed_dir.join("skills");
-                if managed_skills_src.exists() {
-                    crate::source::archive::copy_dir_all(&managed_skills_src, &grok_skills_dir)
-                        .map_err(|e| {
-                            CeError::Runtime(format!(
-                                "failed to copy managed skills to {}: {e}",
-                                grok_skills_dir.display()
-                            ))
-                        })?;
-                }
-            } else {
-                let _ = crate::opencode::config::ensure_plugin_and_skills(
+                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
+            } else if h_kind == HarnessKind::Kimi {
+                let empty_env = std::collections::BTreeMap::new();
+                crate::harness::kimi::register_kimi_mcp_server(
+                    &target_config,
+                    "codegraph",
+                    "codegraph",
+                    &["mcp"],
+                    &empty_env,
+                )?;
+                crate::harness::kimi::register_kimi_mcp_server(
+                    &target_config,
+                    "engram",
+                    "engram",
+                    &["serve"],
+                    &empty_env,
+                )?;
+                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
+            } else if h_kind == HarnessKind::Agy {
+                let empty_env = std::collections::BTreeMap::new();
+                crate::harness::agy::register_agy_mcp_server(
+                    &target_config,
+                    "codegraph",
+                    "codegraph",
+                    &["mcp"],
+                    &empty_env,
+                )?;
+                crate::harness::agy::register_agy_mcp_server(
+                    &target_config,
+                    "engram",
+                    "engram",
+                    &["serve"],
+                    &empty_env,
+                )?;
+                copy_managed_skills(&managed_dir, &config_dir.join("config").join("skills"))?;
+            } else if h_kind == HarnessKind::Fx {
+                let empty_env = std::collections::BTreeMap::new();
+                crate::harness::fx::register_fx_mcp_server(
+                    &target_config,
+                    "codegraph",
+                    "codegraph",
+                    &["mcp"],
+                    &empty_env,
+                )?;
+                crate::harness::fx::register_fx_mcp_server(
+                    &target_config,
+                    "engram",
+                    "engram",
+                    &["serve"],
+                    &empty_env,
+                )?;
+                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
+            } else if h_kind == HarnessKind::Pi {
+                // Pi is No-MCP by design (objective 8): skills tree only.
+                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
+            } else if h_kind == HarnessKind::Opencode {
+                // OpenCode's own registration: plugin entry + skills paths.
+                crate::opencode::config::ensure_plugin_and_skills(
                     &target_config,
                     &crate::opencode::plugins::plugin_entry(&config_dir).to_string_lossy(),
                     &crate::opencode::plugins::skills_path(&config_dir).to_string_lossy(),
-                );
+                )?;
+            } else {
+                // Every supported kind has an explicit arm above; reaching
+                // this point means state.json references an unsupported
+                // harness and OpenCode-format mutations must never be a
+                // fallback (invariant #5).
+                return Err(CeError::Runtime(format!(
+                    "cannot re-sync unsupported harness '{name}' recorded in state.json"
+                )));
             }
         }
         let mut entry = serde_json::json!({
@@ -471,9 +497,16 @@ pub(crate) fn sync_with(
                 }
             } else if matches!(
                 kind,
-                HarnessKind::Claude | HarnessKind::Codex | HarnessKind::Copilot | HarnessKind::Grok
+                HarnessKind::Claude
+                    | HarnessKind::Codex
+                    | HarnessKind::Copilot
+                    | HarnessKind::Grok
+                    | HarnessKind::Kimi
+                    | HarnessKind::Agy
+                    | HarnessKind::Pi
+                    | HarnessKind::Fx
             ) {
-                let skills_dir = kind.harness_dir(&home_dir).join("skills");
+                let skills_dir = sync_skills_root(kind, &home_dir);
                 if skills_expected.is_empty() {
                     surfaces.push(SurfaceCheck {
                         harness: name.clone(),
@@ -639,6 +672,33 @@ impl CheckStatus {
                 missing: drift.missing,
             }
         }
+    }
+}
+
+/// Copies the managed skills tree into a harness root, propagating IO
+/// failures (invariant #5). No-op when the source tree is absent.
+fn copy_managed_skills(managed_dir: &Path, dest: &Path) -> Result<(), CeError> {
+    let src = managed_dir.join("skills");
+    if !src.exists() {
+        return Ok(());
+    }
+    crate::source::archive::copy_dir_all(&src, dest).map_err(|e| {
+        CeError::Runtime(format!(
+            "failed to copy managed skills to {}: {e}",
+            dest.display()
+        ))
+    })
+}
+
+/// Per-kind managed-skills root used for post-sync hash verification.
+/// Agy nests its skills under `config/skills`; every other directory-copying
+/// harness uses `<harness_dir>/skills`.
+fn sync_skills_root(kind: HarnessKind, home_dir: &Path) -> PathBuf {
+    let dir = kind.harness_dir(home_dir);
+    if kind == HarnessKind::Agy {
+        dir.join("config").join("skills")
+    } else {
+        dir.join("skills")
     }
 }
 

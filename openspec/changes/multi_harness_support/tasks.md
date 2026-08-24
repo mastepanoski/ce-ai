@@ -23,8 +23,10 @@
   - *Verification*: `cargo test harness::cursor::tests::managed_block_injection_and_stripping`
 - [x] **Task 2.5**: Implement Generic JSON adapter for Codex, Grok, Kimi, AGY, DeepSeek in `src/harness/generic_json.rs`.
   - *Verification*: `cargo test harness::generic::tests::roundtrip`
+  - *Reality note (v1.19.1)*: `generic_json.rs` only ever implemented the Custom kind and was removed in v1.19.0 (single path contract). Codex/Grok/Kimi/AGY ship native adapters from the audit series (#199–#203); DeepSeek was de-scoped (Issue #180). Live verification: `cargo test harness::custom::tests::custom_adapter_default_paths_use_single_contract`.
 - [x] **Task 2.6**: Implement Custom harness fallback mode (`--harness custom`) in `src/harness/custom.rs`.
   - *Verification*: `cargo test harness::custom::tests::custom_flags_registration`
+  - *Reality note (v1.19.0)*: R4 landed for real in PR #205; the cited test never existed. Live verification: `cargo test --test cli install_custom`.
 
 ### Phase 3: Model Role Translation & Multi-Harness Sync
 - [x] **Task 3.1**: Implement multi-harness model translation engine in `src/commands/models.rs`.
