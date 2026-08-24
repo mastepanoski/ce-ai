@@ -323,16 +323,30 @@ pub fn run(
             let grok_rules_dir = grok_dir.join("rules");
             fs::create_dir_all(&grok_rules_dir)?;
             let grok_rule_path = grok_rules_dir.join("compound-engineering.md");
-            crate::harness::grok::update_grok_rule_md(&grok_rule_path, inner_body)?;
+            crate::harness::update_managed_rule_md(&grok_rule_path, inner_body)?;
         }
 
-        // Write Kimi project rule .kimi-code/rules/compound-engineering.md if .kimi-code exists
+        // Write Kimi project rule .kimi-code/AGENTS.md if .kimi-code exists
         let kimi_dir = target_dir.join(".kimi-code");
         if kimi_dir.exists() {
-            let kimi_rules_dir = kimi_dir.join("rules");
-            fs::create_dir_all(&kimi_rules_dir)?;
-            let kimi_rule_path = kimi_rules_dir.join("compound-engineering.md");
-            crate::harness::grok::update_grok_rule_md(&kimi_rule_path, inner_body)?;
+            let kimi_agents = kimi_dir.join("AGENTS.md");
+            crate::harness::update_managed_rule_md(&kimi_agents, inner_body)?;
+
+            // Clean up legacy .kimi-code/rules/compound-engineering.md if present
+            let legacy_rule = kimi_dir.join("rules").join("compound-engineering.md");
+            if legacy_rule.exists() {
+                if let Ok(text) = fs::read_to_string(&legacy_rule) {
+                    if text.contains(crate::harness::CE_MANAGED_BEGIN) {
+                        let stripped = crate::harness::strip_managed_rule_block(&text);
+                        if stripped.trim().is_empty() {
+                            let _ = fs::remove_file(&legacy_rule);
+                            let _ = fs::remove_dir(kimi_dir.join("rules"));
+                        } else {
+                            let _ = crate::state::write_atomic(&legacy_rule, stripped.as_bytes());
+                        }
+                    }
+                }
+            }
         }
 
         // Write Antigravity project rules if .agents or GEMINI.md exists
@@ -341,11 +355,11 @@ pub fn run(
             let agents_rules_dir = agents_dir.join("rules");
             fs::create_dir_all(&agents_rules_dir)?;
             let agy_rule_path = agents_rules_dir.join("compound-engineering.md");
-            crate::harness::grok::update_grok_rule_md(&agy_rule_path, inner_body)?;
+            crate::harness::update_managed_rule_md(&agy_rule_path, inner_body)?;
         }
         let gemini_md = target_dir.join("GEMINI.md");
         if gemini_md.exists() || (agents_dir.exists() && !gemini_md.exists()) {
-            crate::harness::grok::update_grok_rule_md(&gemini_md, inner_body)?;
+            crate::harness::update_managed_rule_md(&gemini_md, inner_body)?;
         }
 
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {

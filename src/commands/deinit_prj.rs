@@ -162,8 +162,8 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             .join("compound-engineering.md");
         if grok_rule.exists() {
             if let Ok(c_text) = fs::read_to_string(&grok_rule) {
-                if c_text.contains(crate::harness::grok::CE_MANAGED_BEGIN) {
-                    let stripped = crate::harness::grok::strip_managed_block(&c_text);
+                if c_text.contains(crate::harness::CE_MANAGED_BEGIN) {
+                    let stripped = crate::harness::strip_managed_rule_block(&c_text);
                     if stripped.trim().is_empty() {
                         let _ = fs::remove_file(&grok_rule);
                     } else {
@@ -173,19 +173,24 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             }
         }
 
-        // Clean up Kimi rule file (.kimi-code/rules/compound-engineering.md)
-        let kimi_rule = target_dir
-            .join(".kimi-code")
-            .join("rules")
-            .join("compound-engineering.md");
-        if kimi_rule.exists() {
-            if let Ok(c_text) = fs::read_to_string(&kimi_rule) {
-                if c_text.contains(crate::harness::grok::CE_MANAGED_BEGIN) {
-                    let stripped = crate::harness::grok::strip_managed_block(&c_text);
-                    if stripped.trim().is_empty() {
-                        let _ = fs::remove_file(&kimi_rule);
-                    } else {
-                        let _ = crate::state::write_atomic(&kimi_rule, stripped.as_bytes());
+        // Clean up Kimi rule file (.kimi-code/AGENTS.md and legacy .kimi-code/rules/compound-engineering.md)
+        for kimi_path in &[
+            target_dir.join(".kimi-code").join("AGENTS.md"),
+            target_dir
+                .join(".kimi-code")
+                .join("rules")
+                .join("compound-engineering.md"),
+        ] {
+            if kimi_path.exists() {
+                if let Ok(c_text) = fs::read_to_string(kimi_path) {
+                    if c_text.contains(crate::harness::CE_MANAGED_BEGIN) {
+                        let stripped = crate::harness::strip_managed_rule_block(&c_text);
+                        if stripped.trim().is_empty() {
+                            let _ = fs::remove_file(kimi_path);
+                            let _ = fs::remove_dir(target_dir.join(".kimi-code").join("rules"));
+                        } else {
+                            let _ = crate::state::write_atomic(kimi_path, stripped.as_bytes());
+                        }
                     }
                 }
             }
@@ -198,8 +203,8 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             .join("compound-engineering.md");
         if agy_rule.exists() {
             if let Ok(c_text) = fs::read_to_string(&agy_rule) {
-                if c_text.contains(crate::harness::grok::CE_MANAGED_BEGIN) {
-                    let stripped = crate::harness::grok::strip_managed_block(&c_text);
+                if c_text.contains(crate::harness::CE_MANAGED_BEGIN) {
+                    let stripped = crate::harness::strip_managed_rule_block(&c_text);
                     if stripped.trim().is_empty() {
                         let _ = fs::remove_file(&agy_rule);
                     } else {
@@ -211,8 +216,8 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
         let gemini_rule = target_dir.join("GEMINI.md");
         if gemini_rule.exists() {
             if let Ok(c_text) = fs::read_to_string(&gemini_rule) {
-                if c_text.contains(crate::harness::grok::CE_MANAGED_BEGIN) {
-                    let stripped = crate::harness::grok::strip_managed_block(&c_text);
+                if c_text.contains(crate::harness::CE_MANAGED_BEGIN) {
+                    let stripped = crate::harness::strip_managed_rule_block(&c_text);
                     if stripped.trim().is_empty() {
                         let _ = fs::remove_file(&gemini_rule);
                     } else {

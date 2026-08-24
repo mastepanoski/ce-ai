@@ -2294,10 +2294,17 @@ fn init_prj_kimi_writes_and_deinits_agents_md() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
     let prj_dir = tmp.path().join("my-project");
-    let rules_dir = prj_dir.join(".kimi-code").join("rules");
-    fs::create_dir_all(&rules_dir).unwrap();
-    let md_path = rules_dir.join("compound-engineering.md");
+    let kimi_dir = prj_dir.join(".kimi-code");
+    let legacy_rules_dir = kimi_dir.join("rules");
+    fs::create_dir_all(&legacy_rules_dir).unwrap();
+    let md_path = kimi_dir.join("AGENTS.md");
     fs::write(&md_path, "# User Kimi Rules\n").unwrap();
+    let legacy_rule_path = legacy_rules_dir.join("compound-engineering.md");
+    fs::write(
+        &legacy_rule_path,
+        "<!-- CE-AI MANAGED BLOCK BEGIN -->\nlegacy block\n<!-- CE-AI MANAGED BLOCK END -->",
+    )
+    .unwrap();
 
     ceai(&config_dir, &home)
         .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
@@ -2317,6 +2324,9 @@ fn init_prj_kimi_writes_and_deinits_agents_md() {
     assert!(md_path.exists());
     let stripped = fs::read_to_string(&md_path).unwrap();
     assert_eq!(stripped.trim(), "# User Kimi Rules");
+
+    // Legacy rule file must be cleaned up and deleted when empty
+    assert!(!legacy_rule_path.exists());
 }
 
 #[test]

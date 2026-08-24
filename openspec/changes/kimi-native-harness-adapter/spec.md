@@ -12,7 +12,7 @@
 - `ce-ai` MUST preserve unmanaged user servers and top-level JSON fields.
 
 ### R3: Project Rule Adoption
-- WHEN running `init-prj` for Kimi THEN `ce-ai` MUST adopt project `AGENTS.md` with `CE-AI MANAGED BLOCK`.
+- WHEN running `init-prj` for Kimi THEN `ce-ai` MUST adopt `.kimi-code/AGENTS.md` (or project `AGENTS.md`) with `CE-AI MANAGED BLOCK`.
 
 ### R4: Skills Installation & Clean Lifecycle
 - WHEN installing skills for Kimi THEN `ce-ai` MUST place skill folders into `$KIMI_CODE_HOME/skills/` (or `~/.kimi-code/skills/`).

@@ -13,6 +13,11 @@ pub mod kimi;
 pub mod opencode;
 pub mod pi;
 
+pub use grok::{
+    strip_managed_block as strip_managed_rule_block, update_grok_rule_md as update_managed_rule_md,
+    CE_MANAGED_BEGIN,
+};
+
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
