@@ -1,29 +1,29 @@
 class CeAi < Formula
   desc "Compound Engineering AI plugin installer and manager"
   homepage "https://github.com/mastepanoski/ce-ai"
-  version "1.21.3"
+  version "1.21.4"
   license "MIT"
 
   # Managed by scripts/release-integrity.sh — regenerate with:
-  #   TAG_NAME=v1.21.3 GH_REPO=mastepanoski/ce-ai ./scripts/release-integrity.sh
+  #   TAG_NAME=v1.21.4 GH_REPO=mastepanoski/ce-ai ./scripts/release-integrity.sh
   # Do not edit URLs or checksums by hand.
   on_macos do
     if Hardware::CPU.intel?
-      url "https://github.com/mastepanoski/ce-ai/releases/download/v1.21.3/ce-ai-x86_64-apple-darwin.tar.gz"
-      sha256 "51b86d3b9e681e402bf70cc5717a1f38ceb08e23d92b2d51a2bcac7febcf8cfd"
+      url "https://github.com/mastepanoski/ce-ai/releases/download/v1.21.4/ce-ai-x86_64-apple-darwin.tar.gz"
+      sha256 "54c68bab195ecde9bb59ddf937c81846dc989c1e2208c0d9c558bc5d7a45d5f1"
     else
-      url "https://github.com/mastepanoski/ce-ai/releases/download/v1.21.3/ce-ai-aarch64-apple-darwin.tar.gz"
-      sha256 "cacad1b98e93cf341542abc6bce51b40888fec0ef889a63d969e0c612e508572"
+      url "https://github.com/mastepanoski/ce-ai/releases/download/v1.21.4/ce-ai-aarch64-apple-darwin.tar.gz"
+      sha256 "2fa09ec42fb9aa34c0ed9586c5bc94f71972f221893c811fb2349eabef02941c"
     end
   end
 
   on_linux do
     if Hardware::CPU.intel?
-      url "https://github.com/mastepanoski/ce-ai/releases/download/v1.21.3/ce-ai-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "9bcb9291accb4595d653969b7e03d85d0fa45806ac42ffa324c2849472504c40"
+      url "https://github.com/mastepanoski/ce-ai/releases/download/v1.21.4/ce-ai-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "218d338bc7360eb94c5a81e958764d4c0720dc7a41e2c194b378dfe40a7f5368"
     else
-      url "https://github.com/mastepanoski/ce-ai/releases/download/v1.21.3/ce-ai-aarch64-unknown-linux-gnu.tar.gz"
-      sha256 "5e48ea3b33108e4d79af535c6c3eeb2d89bb982cc0a52f54156c38224b8efcea"
+      url "https://github.com/mastepanoski/ce-ai/releases/download/v1.21.4/ce-ai-aarch64-unknown-linux-gnu.tar.gz"
+      sha256 "d12e0f2db36ba506ad5b8b93fa32ebf5dd373baf298c095ed600f9c9141511cf"
     end
   end
 
