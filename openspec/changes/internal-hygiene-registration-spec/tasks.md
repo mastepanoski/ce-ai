@@ -1,0 +1,5 @@
+- [x] T1.1 Extract shared registration module; refactor install+sync onto it
+- [x] T1.2 Cursor MCP-only fix + unit-test pin
+- [x] T2.1 Dead-code purge (all allows removed)
+- [x] T2.2 Wire .ce-ai.json overrides via Context.workspace_root
+- [x] T3.1 Gates green (fmt/clippy -D warnings/test/e2e)
