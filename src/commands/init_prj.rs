@@ -335,6 +335,19 @@ pub fn run(
             crate::harness::grok::update_grok_rule_md(&kimi_rule_path, inner_body)?;
         }
 
+        // Write Antigravity project rules if .agents or GEMINI.md exists
+        let agents_dir = target_dir.join(".agents");
+        if agents_dir.exists() {
+            let agents_rules_dir = agents_dir.join("rules");
+            fs::create_dir_all(&agents_rules_dir)?;
+            let agy_rule_path = agents_rules_dir.join("compound-engineering.md");
+            crate::harness::grok::update_grok_rule_md(&agy_rule_path, inner_body)?;
+        }
+        let gemini_md = target_dir.join("GEMINI.md");
+        if gemini_md.exists() || (agents_dir.exists() && !gemini_md.exists()) {
+            crate::harness::grok::update_grok_rule_md(&gemini_md, inner_body)?;
+        }
+
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
             if !ctx.quiet {
                 eprintln!("warning: skill registry sync failed: {e}");

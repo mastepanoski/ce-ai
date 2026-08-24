@@ -264,6 +264,30 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
                 &empty_env,
             )?;
         }
+
+        let agy_installed = state
+            .installed_harnesses
+            .iter()
+            .any(|h| h["name"].as_str() == Some("agy"));
+        if agy_installed {
+            let (cmd, args_vec) = match tool_lower.as_str() {
+                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
+                "engram" => ("engram", vec!["serve"]),
+                "rtk" => ("rtk", vec!["mcp"]),
+                "codegraph" => ("codegraph", vec!["mcp"]),
+                _ => ("", vec![]),
+            };
+            let empty_env = std::collections::BTreeMap::new();
+            let agy_adapter = crate::harness::agy::AgyAdapter;
+            let agy_config = agy_adapter.default_config_path(&home_dir);
+            crate::harness::agy::register_agy_mcp_server(
+                &agy_config,
+                &tool_lower,
+                cmd,
+                &args_vec,
+                &empty_env,
+            )?;
+        }
     }
 
     let probe_version = extract_tool_version(&tool_lower);

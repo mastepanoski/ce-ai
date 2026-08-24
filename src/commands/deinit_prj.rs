@@ -191,6 +191,37 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             }
         }
 
+        // Clean up Antigravity rule files (.agents/rules/compound-engineering.md, GEMINI.md)
+        let agy_rule = target_dir
+            .join(".agents")
+            .join("rules")
+            .join("compound-engineering.md");
+        if agy_rule.exists() {
+            if let Ok(c_text) = fs::read_to_string(&agy_rule) {
+                if c_text.contains(crate::harness::grok::CE_MANAGED_BEGIN) {
+                    let stripped = crate::harness::grok::strip_managed_block(&c_text);
+                    if stripped.trim().is_empty() {
+                        let _ = fs::remove_file(&agy_rule);
+                    } else {
+                        let _ = crate::state::write_atomic(&agy_rule, stripped.as_bytes());
+                    }
+                }
+            }
+        }
+        let gemini_rule = target_dir.join("GEMINI.md");
+        if gemini_rule.exists() {
+            if let Ok(c_text) = fs::read_to_string(&gemini_rule) {
+                if c_text.contains(crate::harness::grok::CE_MANAGED_BEGIN) {
+                    let stripped = crate::harness::grok::strip_managed_block(&c_text);
+                    if stripped.trim().is_empty() {
+                        let _ = fs::remove_file(&gemini_rule);
+                    } else {
+                        let _ = crate::state::write_atomic(&gemini_rule, stripped.as_bytes());
+                    }
+                }
+            }
+        }
+
         // Clean up sentinel-bounded .gitignore block (DEC-06)
         let gitignore_file = target_dir.join(".gitignore");
         if gitignore_file.exists() {

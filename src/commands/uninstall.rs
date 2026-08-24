@@ -75,6 +75,14 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 for tool in &["codegraph", "engram", "context7", "rtk"] {
                     crate::harness::kimi::unregister_kimi_mcp_server(&target_config, tool)?;
                 }
+            } else if harness_kind == HarnessKind::Agy {
+                for tool in &["codegraph", "engram", "context7", "rtk"] {
+                    crate::harness::agy::unregister_agy_mcp_server(&target_config, tool)?;
+                }
+                let legacy_json = config_dir.join("antigravity-cli").join("antigravity.json");
+                if legacy_json.exists() {
+                    let _ = std::fs::remove_file(&legacy_json);
+                }
             } else if harness_kind == HarnessKind::Claude {
                 for tool in &["codegraph", "engram", "context7", "rtk"] {
                     crate::harness::claude::unregister_claude_mcp_server(&target_config, tool)?;
@@ -103,8 +111,13 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 || harness_kind == HarnessKind::Copilot
                 || harness_kind == HarnessKind::Grok
                 || harness_kind == HarnessKind::Kimi
+                || harness_kind == HarnessKind::Agy
             {
-                let skills_dir = config_dir.join("skills");
+                let skills_dir = if harness_kind == HarnessKind::Agy {
+                    config_dir.join("config").join("skills")
+                } else {
+                    config_dir.join("skills")
+                };
                 if skills_dir.exists() {
                     if let Err(e) = std::fs::remove_dir_all(&skills_dir) {
                         if !ctx.quiet {
