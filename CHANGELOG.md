@@ -5,6 +5,12 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0] - 2026-08-24
+
+### Added
+- Transactional multi-file operations (Issue #166): install and sync route every tracked filesystem mutation through a durable operation journal (`<config-dir>/install-journal.json`) that records prior content **before** each write; a crashed or failing run is detected by `ce-ai doctor` (`install-journal:` finding) and deterministically rolled back in reverse by the next install/sync before proceeding fresh. Fault injection via `CE_AI_FAIL_AFTER_WRITES=<N>` makes the N+1 tracked write fail; integration tests cover early and mid-sequence cuts proving user content survives without loss.
+- Ordering guarantee enforced and documented: `state.json` remains the final persisted mutation of every command, with the journal cleared only after it succeeds.
+
 ## [1.21.6] - 2026-08-24
 
 ### Changed

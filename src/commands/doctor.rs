@@ -292,6 +292,13 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
     }
 
+    // Incomplete-operation journal (#166): diagnosis before auto-recovery.
+    if let Some(cmd_name) = crate::state::journal::recorded_command(&ctx.config_dir) {
+        findings.push(format!(
+            "install-journal: incomplete '{cmd_name}' operation detected — the next install/sync rolls it back automatically"
+        ));
+    }
+
     for finding in &findings {
         println!("{finding}");
     }
