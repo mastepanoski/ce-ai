@@ -5,6 +5,15 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.2] - 2026-08-24
+
+### Fixed
+- Removed filesystem-dependent `home.join("mcp.json").exists()` check in `FxAdapter::default_config_path` in `src/harness/fx.rs`, ensuring deterministic path resolution based strictly on basenames.
+- Propagated IO errors on `std::fs::remove_file` in `unregister_fx_mcp_server` while ignoring `ErrorKind::NotFound`.
+- Documented `$FX_HOME` environment variable override as a `ce-ai` extension convention in OpenSpec `design.md`.
+- Documented extra map `type` collision cleanup in OpenSpec `design.md`.
+- Expanded unit tests in `src/harness/fx.rs` covering deterministic path resolution when `$HOME/mcp.json` pre-exists, extra map `type` purging on re-registration, and IO error propagation.
+
 ## [1.17.1] - 2026-08-24
 
 ### Fixed
