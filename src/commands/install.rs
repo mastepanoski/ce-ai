@@ -47,6 +47,7 @@ pub struct Args {
     pub rules_file: Option<PathBuf>,
 }
 
+use crate::harness::registration::copy_managed_skills;
 use crate::harness::HarnessKind;
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
@@ -224,331 +225,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
 
         // Write target config settings (OI-2) and install-manifest.json (SU-2).
-        if *harness_kind == HarnessKind::Cursor {
-            let empty_env = std::collections::BTreeMap::new();
-            crate::harness::cursor::register_cursor_mcp_server(
-                &target_config,
-                "codegraph",
-                "codegraph",
-                &["mcp"],
-                &empty_env,
-            )?;
-            crate::harness::cursor::register_cursor_mcp_server(
-                &target_config,
-                "engram",
-                "engram",
-                &["serve"],
-                &empty_env,
-            )?;
-            InstallManifest {
-                version: version.to_string(),
-                plugin_name: "compound-engineering".into(),
-                installed_at: chrono::Utc::now().to_rfc3339(),
-                source: source_json.clone(),
-                files,
-                config_mutations: vec![],
-            }
-            .write(&config_dir)?;
-        } else if *harness_kind == HarnessKind::Claude {
-            let empty_env = std::collections::BTreeMap::new();
-            crate::harness::claude::register_claude_mcp_server(
-                &target_config,
-                "codegraph",
-                "codegraph",
-                &["mcp"],
-                &empty_env,
-            )?;
-            crate::harness::claude::register_claude_mcp_server(
-                &target_config,
-                "engram",
-                "engram",
-                &["serve"],
-                &empty_env,
-            )?;
-            let claude_skills_dir = config_dir.join("skills");
-            let managed_skills_src = managed_dir.join("skills");
-            if managed_skills_src.exists() {
-                crate::source::archive::copy_dir_all(&managed_skills_src, &claude_skills_dir)
-                    .map_err(|e| {
-                        CeError::Runtime(format!(
-                            "failed to copy managed skills to {}: {e}",
-                            claude_skills_dir.display()
-                        ))
-                    })?;
-            }
-            InstallManifest {
-                version: version.to_string(),
-                plugin_name: "compound-engineering".into(),
-                installed_at: chrono::Utc::now().to_rfc3339(),
-                source: source_json.clone(),
-                files,
-                config_mutations: vec![],
-            }
-            .write(&config_dir)?;
-        } else if *harness_kind == HarnessKind::Copilot {
-            let empty_env = std::collections::BTreeMap::new();
-            crate::harness::copilot::register_copilot_mcp_server(
-                &target_config,
-                "codegraph",
-                "codegraph",
-                &["mcp"],
-                &empty_env,
-            )?;
-            crate::harness::copilot::register_copilot_mcp_server(
-                &target_config,
-                "engram",
-                "engram",
-                &["serve"],
-                &empty_env,
-            )?;
-            let copilot_skills_dir = config_dir.join("skills");
-            let managed_skills_src = if managed_dir.join("skills").exists() {
-                managed_dir.join("skills")
-            } else {
-                managed_dir.join(".opencode").join("skills")
-            };
-            if managed_skills_src.exists() {
-                crate::source::archive::copy_dir_all(&managed_skills_src, &copilot_skills_dir)
-                    .map_err(|e| {
-                        CeError::Runtime(format!(
-                            "failed to copy managed skills to {}: {e}",
-                            copilot_skills_dir.display()
-                        ))
-                    })?;
-            }
-            InstallManifest {
-                version: version.to_string(),
-                plugin_name: "compound-engineering".into(),
-                installed_at: chrono::Utc::now().to_rfc3339(),
-                source: source_json.clone(),
-                files,
-                config_mutations: vec![],
-            }
-            .write(&config_dir)?;
-        } else if *harness_kind == HarnessKind::Kimi {
-            let empty_env = std::collections::BTreeMap::new();
-            crate::harness::kimi::register_kimi_mcp_server(
-                &target_config,
-                "codegraph",
-                "codegraph",
-                &["mcp"],
-                &empty_env,
-            )?;
-            crate::harness::kimi::register_kimi_mcp_server(
-                &target_config,
-                "engram",
-                "engram",
-                &["serve"],
-                &empty_env,
-            )?;
-            let kimi_skills_dir = config_dir.join("skills");
-            let managed_skills_src = if managed_dir.join("skills").exists() {
-                managed_dir.join("skills")
-            } else {
-                managed_dir.join(".opencode").join("skills")
-            };
-            if managed_skills_src.exists() {
-                crate::source::archive::copy_dir_all(&managed_skills_src, &kimi_skills_dir)
-                    .map_err(|e| {
-                        CeError::Runtime(format!(
-                            "failed to copy managed skills to {}: {e}",
-                            kimi_skills_dir.display()
-                        ))
-                    })?;
-            }
-            InstallManifest {
-                version: version.to_string(),
-                plugin_name: "compound-engineering".into(),
-                installed_at: chrono::Utc::now().to_rfc3339(),
-                source: source_json.clone(),
-                files,
-                config_mutations: vec![],
-            }
-            .write(&config_dir)?;
-        } else if *harness_kind == HarnessKind::Grok {
-            let empty_env = std::collections::BTreeMap::new();
-            crate::harness::grok::register_grok_mcp_server(
-                &target_config,
-                "codegraph",
-                "codegraph",
-                &["mcp"],
-                &empty_env,
-            )?;
-            crate::harness::grok::register_grok_mcp_server(
-                &target_config,
-                "engram",
-                "engram",
-                &["serve"],
-                &empty_env,
-            )?;
-            let grok_skills_dir = config_dir.join("skills");
-            let managed_skills_src = if managed_dir.join("skills").exists() {
-                managed_dir.join("skills")
-            } else {
-                managed_dir.join(".opencode").join("skills")
-            };
-            if managed_skills_src.exists() {
-                crate::source::archive::copy_dir_all(&managed_skills_src, &grok_skills_dir)
-                    .map_err(|e| {
-                        CeError::Runtime(format!(
-                            "failed to copy managed skills to {}: {e}",
-                            grok_skills_dir.display()
-                        ))
-                    })?;
-            }
-            InstallManifest {
-                version: version.to_string(),
-                plugin_name: "compound-engineering".into(),
-                installed_at: chrono::Utc::now().to_rfc3339(),
-                source: source_json.clone(),
-                files,
-                config_mutations: vec![],
-            }
-            .write(&config_dir)?;
-        } else if *harness_kind == HarnessKind::Agy {
-            let empty_env = std::collections::BTreeMap::new();
-            crate::harness::agy::register_agy_mcp_server(
-                &target_config,
-                "codegraph",
-                "codegraph",
-                &["mcp"],
-                &empty_env,
-            )?;
-            crate::harness::agy::register_agy_mcp_server(
-                &target_config,
-                "engram",
-                "engram",
-                &["serve"],
-                &empty_env,
-            )?;
-            let agy_skills_dir = config_dir.join("config").join("skills");
-            let managed_skills_src = if managed_dir.join("skills").exists() {
-                managed_dir.join("skills")
-            } else {
-                managed_dir.join(".opencode").join("skills")
-            };
-            if managed_skills_src.exists() {
-                crate::source::archive::copy_dir_all(&managed_skills_src, &agy_skills_dir)
-                    .map_err(|e| {
-                        CeError::Runtime(format!(
-                            "failed to copy managed skills to {}: {e}",
-                            agy_skills_dir.display()
-                        ))
-                    })?;
-            }
-            InstallManifest {
-                version: version.to_string(),
-                plugin_name: "compound-engineering".into(),
-                installed_at: chrono::Utc::now().to_rfc3339(),
-                source: source_json.clone(),
-                files,
-                config_mutations: vec![],
-            }
-            .write(&config_dir)?;
-        } else if *harness_kind == HarnessKind::Codex {
-            let empty_env = std::collections::BTreeMap::new();
-            crate::harness::codex::register_codex_mcp_server(
-                &target_config,
-                "codegraph",
-                "codegraph",
-                &["mcp"],
-                &empty_env,
-            )?;
-            crate::harness::codex::register_codex_mcp_server(
-                &target_config,
-                "engram",
-                "engram",
-                &["serve"],
-                &empty_env,
-            )?;
-            let codex_skills_dir = config_dir.join("skills");
-            let managed_skills_src = if managed_dir.join("skills").exists() {
-                managed_dir.join("skills")
-            } else {
-                managed_dir.join(".opencode").join("skills")
-            };
-            if managed_skills_src.exists() {
-                crate::source::archive::copy_dir_all(&managed_skills_src, &codex_skills_dir)
-                    .map_err(|e| {
-                        CeError::Runtime(format!(
-                            "failed to copy managed skills to {}: {e}",
-                            codex_skills_dir.display()
-                        ))
-                    })?;
-            }
-            InstallManifest {
-                version: version.to_string(),
-                plugin_name: "compound-engineering".into(),
-                installed_at: chrono::Utc::now().to_rfc3339(),
-                source: source_json.clone(),
-                files,
-                config_mutations: vec![],
-            }
-            .write(&config_dir)?;
-        } else if *harness_kind == HarnessKind::Fx {
-            let empty_env = std::collections::BTreeMap::new();
-            crate::harness::fx::register_fx_mcp_server(
-                &target_config,
-                "codegraph",
-                "codegraph",
-                &["mcp"],
-                &empty_env,
-            )?;
-            crate::harness::fx::register_fx_mcp_server(
-                &target_config,
-                "engram",
-                "engram",
-                &["serve"],
-                &empty_env,
-            )?;
-            let fx_skills_dir = config_dir.join("skills");
-            let managed_skills_src = managed_dir.join("skills");
-            if managed_skills_src.exists() {
-                crate::source::archive::copy_dir_all(&managed_skills_src, &fx_skills_dir).map_err(
-                    |e| {
-                        CeError::Runtime(format!(
-                            "failed to copy managed skills to {}: {e}",
-                            fx_skills_dir.display()
-                        ))
-                    },
-                )?;
-            }
-            InstallManifest {
-                version: version.to_string(),
-                plugin_name: "compound-engineering".into(),
-                installed_at: chrono::Utc::now().to_rfc3339(),
-                source: source_json.clone(),
-                files,
-                config_mutations: vec![],
-            }
-            .write(&config_dir)?;
-        } else if *harness_kind == HarnessKind::Pi {
-            let pi_skills_dir = config_dir.join("skills");
-            let managed_skills_src = if managed_dir.join("skills").exists() {
-                managed_dir.join("skills")
-            } else {
-                managed_dir.join(".opencode").join("skills")
-            };
-            if managed_skills_src.exists() {
-                crate::source::archive::copy_dir_all(&managed_skills_src, &pi_skills_dir).map_err(
-                    |e| {
-                        CeError::Runtime(format!(
-                            "failed to copy managed skills to {}: {e}",
-                            pi_skills_dir.display()
-                        ))
-                    },
-                )?;
-            }
-            InstallManifest {
-                version: version.to_string(),
-                plugin_name: "compound-engineering".into(),
-                installed_at: chrono::Utc::now().to_rfc3339(),
-                source: source_json.clone(),
-                files,
-                config_mutations: vec![],
-            }
-            .write(&config_dir)?;
-        } else if *harness_kind == HarnessKind::Custom {
+        if *harness_kind == HarnessKind::Custom {
             let cfg = custom_cfg.as_ref().expect("custom config resolved above");
             // Route through the adapter so custom-mode behavior stays in one place.
             let adapter = crate::harness::custom::CustomAdapter::new(Some(cfg.clone()));
@@ -583,7 +260,25 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 config_mutations: mutations,
             }
             .write(&cfg.plugins_dir)?;
+        } else if let Some(spec) = crate::harness::registration::registration_spec(*harness_kind) {
+            // Strategy table: one exhaustive entry per table-driven kind
+            // (see harness::registration).
+            spec.register_companions(&target_config)?;
+            if let Some(subpath) = spec.skills_subpath {
+                copy_managed_skills(&managed_dir, &config_dir.join(subpath))?;
+            }
+            InstallManifest {
+                version: version.to_string(),
+                plugin_name: "compound-engineering".into(),
+                installed_at: chrono::Utc::now().to_rfc3339(),
+                source: source_json.clone(),
+                files,
+                config_mutations: vec![],
+            }
+            .write(&config_dir)?;
         } else {
+            // The only kind reaching this arm is OpenCode itself: its native
+            // registration is the plugin-entry + skills-paths JSON merge.
             let mut mutation = ensure_plugin_and_skills(
                 &target_config,
                 &plugin_entry(&config_dir).to_string_lossy(),

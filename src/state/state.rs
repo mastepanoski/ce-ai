@@ -231,32 +231,7 @@ impl State {
         });
         Ok(())
     }
-    /// Default model assignments for Compound Engineering workflow slots.
-    pub fn default_model_assignments() -> BTreeMap<String, ModelAssignment> {
-        let defaults = [
-            ("ce-ai", "anthropic", "claude-3-7-sonnet"),
-            ("ce-brainstorm", "anthropic", "claude-3-7-sonnet"),
-            ("ce-plan", "anthropic", "claude-3-7-sonnet"),
-            ("ce-work", "anthropic", "claude-3-7-sonnet"),
-            ("ce-code-review", "anthropic", "claude-3-7-sonnet"),
-            ("ce-doc-review", "anthropic", "claude-3-7-sonnet"),
-        ];
-        defaults
-            .into_iter()
-            .map(|(slot, provider, model)| {
-                (
-                    slot.to_string(),
-                    ModelAssignment {
-                        provider_id: provider.to_string(),
-                        model_id: model.to_string(),
-                        effort: None,
-                    },
-                )
-            })
-            .collect()
-    }
 
-    /// Records a model assignment for a slot (MM-1).
     pub fn set_model_assignment(&mut self, slot: &str, provider_id: &str, model_id: &str) {
         let assignment = ModelAssignment {
             provider_id: provider_id.into(),

@@ -25,14 +25,6 @@ impl HarnessAdapter for PiAdapter {
         }
         self.kind().harness_dir(home).join("skills")
     }
-
-    fn canonical_instruction_file(&self) -> PathBuf {
-        PathBuf::from("AGENTS.md")
-    }
-
-    fn derived_stub_files(&self) -> Vec<PathBuf> {
-        vec![PathBuf::from(".pi").join("AGENTS.md")]
-    }
 }
 
 #[cfg(test)]
@@ -55,14 +47,6 @@ mod tests {
         assert_eq!(
             adapter.default_config_path(&home),
             PathBuf::from("/tmp/home/.pi/agent/skills")
-        );
-        assert_eq!(
-            adapter.canonical_instruction_file(),
-            PathBuf::from("AGENTS.md")
-        );
-        assert_eq!(
-            adapter.derived_stub_files(),
-            vec![PathBuf::from(".pi/AGENTS.md")]
         );
     }
 

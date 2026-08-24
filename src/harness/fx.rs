@@ -27,14 +27,6 @@ impl HarnessAdapter for FxAdapter {
         }
         self.kind().harness_dir(home).join("mcp.json")
     }
-
-    fn canonical_instruction_file(&self) -> PathBuf {
-        PathBuf::from("AGENTS.md")
-    }
-
-    fn derived_stub_files(&self) -> Vec<PathBuf> {
-        vec![PathBuf::from(".fx").join("AGENTS.md")]
-    }
 }
 
 /// Root structure of `~/.fx/mcp.json`.
@@ -174,14 +166,6 @@ mod tests {
         assert_eq!(
             adapter.default_config_path(&PathBuf::from("/tmp/home/.fx/mcp.json")),
             PathBuf::from("/tmp/home/.fx/mcp.json")
-        );
-        assert_eq!(
-            adapter.canonical_instruction_file(),
-            PathBuf::from("AGENTS.md")
-        );
-        assert_eq!(
-            adapter.derived_stub_files(),
-            vec![PathBuf::from(".fx/AGENTS.md")]
         );
     }
 

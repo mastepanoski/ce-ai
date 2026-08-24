@@ -12,6 +12,7 @@ use crate::error::CeError;
 use crate::harness::custom::{
     plugin_rel as custom_plugin_rel, skill_rel as custom_skill_rel, CustomHarnessConfig,
 };
+use crate::harness::registration::{copy_managed_skills, registration_spec};
 use crate::harness::HarnessKind;
 use crate::opencode::manifest::{InstallManifest, ManifestFile};
 use crate::opencode::plugins::MANAGED_DIR;
@@ -153,7 +154,8 @@ pub(crate) fn sync_with(
 
     // Refresh and sync across all active host-detected and registered harness entries in state.json (SU-2, SU-5).
     let state_path = ctx.config_dir.join("state.json");
-    let mut state = State::load(&state_path)?;
+    let mut state =
+        State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())?;
 
     let mut active_harnesses: Vec<String> = state
         .installed_harnesses
@@ -239,18 +241,8 @@ pub(crate) fn sync_with(
                 .write(&cfg.plugins_dir)?;
             } else if let Some(spec) = registration_spec(h_kind) {
                 // Strategy table: one exhaustive entry per table-driven kind
-                // (see registration_spec below).
-                let empty_env = std::collections::BTreeMap::new();
-                if let Some(register) = spec.register_mcp {
-                    register(
-                        &target_config,
-                        "codegraph",
-                        "codegraph",
-                        &["mcp"],
-                        &empty_env,
-                    )?;
-                    register(&target_config, "engram", "engram", &["serve"], &empty_env)?;
-                }
+                // (see harness::registration).
+                spec.register_companions(&target_config)?;
                 if let Some(subpath) = spec.skills_subpath {
                     copy_managed_skills(&managed_dir, &config_dir.join(subpath))?;
                 }
@@ -555,74 +547,6 @@ impl CheckStatus {
     }
 }
 
-/// Vendor MCP registrar signature shared by every native adapter.
-type McpRegistrar = fn(
-    &Path,
-    &str,
-    &str,
-    &[&str],
-    &std::collections::BTreeMap<String, String>,
-) -> Result<(), CeError>;
-
-/// Strategy-table entry describing how `sync` re-registers one harness.
-#[derive(Clone, Copy)]
-struct RegistrationSpec {
-    /// Vendor registrar; `None` for No-MCP harnesses such as pi.
-    register_mcp: Option<McpRegistrar>,
-    /// Managed-skills destination relative to the harness dir; `None`
-    /// disables the skills recopy.
-    skills_subpath: Option<&'static str>,
-}
-
-/// Exhaustive re-registration table (Strategy via data): adding a
-/// `HarnessKind` variant breaks compilation here instead of silently
-/// falling into a fictional write path at runtime.
-fn registration_spec(kind: HarnessKind) -> Option<RegistrationSpec> {
-    let native = |reg: McpRegistrar, subpath: &'static str| RegistrationSpec {
-        register_mcp: Some(reg),
-        skills_subpath: Some(subpath),
-    };
-    Some(match kind {
-        HarnessKind::Cursor => native(crate::harness::cursor::register_cursor_mcp_server, "skills"),
-        HarnessKind::Claude => native(crate::harness::claude::register_claude_mcp_server, "skills"),
-        HarnessKind::Codex => native(crate::harness::codex::register_codex_mcp_server, "skills"),
-        HarnessKind::Copilot => native(
-            crate::harness::copilot::register_copilot_mcp_server,
-            "skills",
-        ),
-        HarnessKind::Grok => native(crate::harness::grok::register_grok_mcp_server, "skills"),
-        HarnessKind::Kimi => native(crate::harness::kimi::register_kimi_mcp_server, "skills"),
-        HarnessKind::Agy => native(
-            crate::harness::agy::register_agy_mcp_server,
-            "config/skills",
-        ),
-        HarnessKind::Fx => native(crate::harness::fx::register_fx_mcp_server, "skills"),
-        // Pi is No-MCP by design (objective 8): skills tree only.
-        HarnessKind::Pi => RegistrationSpec {
-            register_mcp: None,
-            skills_subpath: Some("skills"),
-        },
-        // Dedicated call-site arms: Custom is state-snapshot-driven,
-        // Opencode writes the plugin/skills JSON, Deepseek is de-scoped.
-        HarnessKind::Custom | HarnessKind::Opencode | HarnessKind::Deepseek => return None,
-    })
-}
-
-/// Copies the managed skills tree into a harness root, propagating IO
-/// failures (invariant #5). No-op when the source tree is absent.
-fn copy_managed_skills(managed_dir: &Path, dest: &Path) -> Result<(), CeError> {
-    let src = managed_dir.join("skills");
-    if !src.exists() {
-        return Ok(());
-    }
-    crate::source::archive::copy_dir_all(&src, dest).map_err(|e| {
-        CeError::Runtime(format!(
-            "failed to copy managed skills to {}: {e}",
-            dest.display()
-        ))
-    })
-}
-
 /// Per-kind managed-skills root used for post-sync hash verification.
 /// Agy nests its skills under `config/skills`; every other directory-copying
 /// harness uses `<harness_dir>/skills`.
@@ -759,27 +683,51 @@ mod tests {
 
     use tempfile::tempdir;
 
-    use super::{registration_spec, verify_tree_against, CheckStatus, RegistrationSpec, TreeDrift};
+    use super::{sync_skills_root, verify_tree_against, CheckStatus, TreeDrift};
+    use crate::harness::registration::registration_spec;
     use crate::harness::HarnessKind;
     use crate::state::diff::sha256_hex;
 
     #[test]
     fn registration_specs_cover_the_table_driven_kinds() {
         use HarnessKind::*;
-        for kind in [Cursor, Claude, Codex, Copilot, Grok, Kimi, Agy, Fx, Pi] {
-            let spec: RegistrationSpec = registration_spec(kind).expect("table-driven kind");
-            match kind {
-                Pi => assert!(spec.register_mcp.is_none()),
-                _ => assert!(spec.register_mcp.is_some()),
-            }
+        for kind in [Claude, Codex, Copilot, Grok, Kimi, Agy, Fx] {
+            let spec = registration_spec(kind).expect("table-driven kind");
+            assert!(spec.register_mcp.is_some());
             assert!(spec.skills_subpath.is_some());
             if kind == Agy {
                 assert_eq!(spec.skills_subpath, Some("config/skills"));
             }
         }
+
+        // Pi: skills tree only — No-MCP by design (objective 8).
+        let pi = registration_spec(Pi).expect("pi spec");
+        assert!(pi.register_mcp.is_none());
+        assert_eq!(pi.skills_subpath, Some("skills"));
+
+        // Cursor consumes MCP servers only; copying a skills tree into its
+        // directory would pollute user storage (regression pin).
+        let cursor = registration_spec(Cursor).expect("cursor spec");
+        assert!(cursor.register_mcp.is_some());
+        assert_eq!(cursor.skills_subpath, None);
+
         for kind in [Opencode, Custom, Deepseek] {
             assert!(registration_spec(kind).is_none(), "dedicated arm kind");
         }
+    }
+
+    #[test]
+    fn sync_skills_root_nests_agy_under_config() {
+        let home = tempdir().unwrap();
+        let dir = home.path();
+        assert_eq!(
+            sync_skills_root(HarnessKind::Agy, dir),
+            dir.join(".gemini").join("config").join("skills")
+        );
+        assert_eq!(
+            sync_skills_root(HarnessKind::Pi, dir),
+            dir.join(".pi").join("agent").join("skills")
+        );
     }
 
     fn expected_map(files: &[(&str, &[u8])]) -> BTreeMap<String, String> {

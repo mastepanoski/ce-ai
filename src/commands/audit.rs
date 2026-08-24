@@ -21,13 +21,11 @@ pub struct Args {
     pub fail_under: Option<u32>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum AuditStatus {
     Pass,
     Warn,
-    Fail,
     Info,
 }
 
@@ -36,7 +34,6 @@ impl std::fmt::Display for AuditStatus {
         match self {
             AuditStatus::Pass => write!(f, "PASS"),
             AuditStatus::Warn => write!(f, "WARN"),
-            AuditStatus::Fail => write!(f, "FAIL"),
             AuditStatus::Info => write!(f, "INFO"),
         }
     }
@@ -58,14 +55,12 @@ pub struct AuditReport {
     pub score_percentage: u32,
     pub pass_count: usize,
     pub warn_count: usize,
-    pub fail_count: usize,
 }
 
 impl AuditReport {
-    pub fn compute_score(checks: &[AuditCheck]) -> (u32, usize, usize, usize) {
+    pub fn compute_score(checks: &[AuditCheck]) -> (u32, usize, usize) {
         let mut pass_count = 0;
         let mut warn_count = 0;
-        let mut fail_count = 0;
         let mut total_applicable = 0;
 
         for check in checks {
@@ -78,28 +73,22 @@ impl AuditReport {
                     warn_count += 1;
                     total_applicable += 1;
                 }
-                AuditStatus::Fail => {
-                    fail_count += 1;
-                    total_applicable += 1;
-                }
                 AuditStatus::Info => {}
             }
         }
 
         if total_applicable == 0 {
-            return (100, pass_count, warn_count, fail_count);
+            return (100, pass_count, warn_count);
         }
 
         let score_pts = (pass_count as f64 * 1.0) + (warn_count as f64 * 0.5);
         let pct = ((score_pts / total_applicable as f64) * 100.0).round() as u32;
-        (pct, pass_count, warn_count, fail_count)
+        (pct, pass_count, warn_count)
     }
 }
 
-#[allow(dead_code)]
 pub struct AuditCtx {
     pub home_dir: PathBuf,
-    pub config_dir: PathBuf,
     pub opencode_config_dir: PathBuf,
     pub repo_root: Option<PathBuf>,
 }
@@ -121,7 +110,6 @@ impl AuditCtx {
 
         Self {
             home_dir,
-            config_dir: ctx.config_dir.clone(),
             opencode_config_dir: ctx.opencode_config_dir.clone(),
             repo_root,
         }
@@ -431,7 +419,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         checks.extend(detector.detect(&audit_ctx, &installed_harnesses));
     }
 
-    let (score_pct, pass_cnt, warn_cnt, fail_cnt) = AuditReport::compute_score(&checks);
+    let (score_pct, pass_cnt, warn_cnt) = AuditReport::compute_score(&checks);
 
     let report = AuditReport {
         harnesses_detected: harness_names.clone(),
@@ -439,7 +427,6 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         score_percentage: score_pct,
         pass_count: pass_cnt,
         warn_count: warn_cnt,
-        fail_count: fail_cnt,
     };
 
     if args.json {
@@ -453,7 +440,6 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             let status_str = match check.status {
                 AuditStatus::Pass => "PASS",
                 AuditStatus::Warn => "WARN",
-                AuditStatus::Fail => "FAIL",
                 AuditStatus::Info => "INFO",
             };
             let sat_str = match &check.satisfied_by {
@@ -467,8 +453,8 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
 
         println!(
-            "\nconfiguration coverage: {}% ({} pass / {} warn / {} fail)",
-            score_pct, pass_cnt, warn_cnt, fail_cnt
+            "\nconfiguration coverage: {}% ({} pass / {} warn)",
+            score_pct, pass_cnt, warn_cnt
         );
     }
 
@@ -507,11 +493,10 @@ mod tests {
                 detail: "warn".into(),
             },
         ];
-        let (score, pass, warn, fail) = AuditReport::compute_score(&checks);
+        let (score, pass, warn) = AuditReport::compute_score(&checks);
         assert_eq!(score, 75);
         assert_eq!(pass, 1);
         assert_eq!(warn, 1);
-        assert_eq!(fail, 0);
     }
 
     #[test]
@@ -520,6 +505,7 @@ mod tests {
         let ctx = Context {
             config_dir: tmp.path().to_path_buf(),
             opencode_config_dir: tmp.path().to_path_buf(),
+            workspace_root: None,
             dry_run: false,
             verbose: false,
             quiet: true,

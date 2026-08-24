@@ -1,8 +1,6 @@
 //! Persistent state: state.json, profiles, snapshots, backups, and the sync diff engine.
 //! Wired into CLI commands in later PRs; until then items are exercised by unit tests.
 
-#![allow(dead_code)]
-
 pub mod backups;
 pub mod diff;
 pub mod profiles;

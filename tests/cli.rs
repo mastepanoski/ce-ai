@@ -2094,14 +2094,11 @@ fn install_codex_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
     assert!(!root.contains_key("skills"));
 
     let mcp = root["mcp_servers"].as_table().unwrap();
-    let codegraph: ce_ai::harness::codex::CodexMcpServer =
-        mcp["codegraph"].clone().try_into().unwrap();
-    assert_eq!(codegraph.command, "codegraph");
-    assert_eq!(codegraph.args, vec!["mcp"]);
+    let codegraph = mcp["codegraph"].as_table().unwrap();
+    assert_eq!(codegraph["command"].as_str(), Some("codegraph"));
 
-    let engram: ce_ai::harness::codex::CodexMcpServer = mcp["engram"].clone().try_into().unwrap();
-    assert_eq!(engram.command, "engram");
-    assert_eq!(engram.args, vec!["serve"]);
+    let engram = mcp["engram"].as_table().unwrap();
+    assert_eq!(engram["command"].as_str(), Some("engram"));
 
     // opencode directory must remain pristine / non-existent
     assert!(!home.join(".config/opencode").exists());

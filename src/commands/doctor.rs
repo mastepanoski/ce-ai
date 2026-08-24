@@ -51,7 +51,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 
     // State consistency: the opencode state entry and the manifest must agree.
-    let state = State::load(&ctx.config_dir.join("state.json"))?;
+    let state = State::load_with_workspace_overrides(
+        &ctx.config_dir.join("state.json"),
+        ctx.workspace_root.as_deref(),
+    )?;
     let has_entry = state
         .installed_harnesses
         .iter()
@@ -253,6 +256,7 @@ mod tests {
         let ctx = Context {
             config_dir: tmp.path().to_path_buf(),
             opencode_config_dir: tmp.path().to_path_buf(),
+            workspace_root: None,
             dry_run: false,
             verbose: false,
             quiet: true,

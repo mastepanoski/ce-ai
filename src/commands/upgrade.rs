@@ -186,6 +186,7 @@ mod tests {
         Context {
             config_dir: dir.to_path_buf(),
             opencode_config_dir: dir.join(".config/opencode"),
+            workspace_root: None,
             dry_run: false,
             verbose: false,
             quiet: true,

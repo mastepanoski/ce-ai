@@ -72,17 +72,6 @@ fn merge_skills_path(config: &mut serde_json::Value, skills_path: &str) -> Resul
     Ok(())
 }
 
-/// Applies a model assignment to `agent.<slot>.model` (MM-2). Thin alias
-/// over the harness-neutral `agents::apply_agent_model`.
-pub fn apply_model_assignment(
-    config_path: &Path,
-    slot: &str,
-    model_value: &str,
-) -> Result<(), CeError> {
-    crate::harness::agents::apply_agent_model(config_path, slot, model_value)
-}
-
-/// Read → merge (dedup) → atomic write; hard-fails on invalid JSON (D4).
 /// Returns the mutation record for the install manifest (OI-5).
 pub fn ensure_plugin_and_skills(
     config_path: &Path,

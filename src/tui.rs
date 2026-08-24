@@ -22,19 +22,6 @@ use crate::error::CeError;
 use crate::harness::HarnessKind;
 use crate::state::state::State;
 
-#[allow(dead_code)]
-pub const LOGO: &str = r#"
-       █████████████
-    ███
-   ██        █████
-   ██        █████
-    ███
-      █████████████
-
-       C O M P O U N D
-        ─ ENGINEERING ─
-"#;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuTab {
     Status,
