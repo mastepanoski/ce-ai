@@ -10,6 +10,16 @@
 
 - Closes #
 
+## 📏 Changed-Lines Forecast
+
+<!-- Required (see CONTRIBUTING.md §1–§2). Compute with:
+     git diff --numstat origin/main...HEAD -->
+
+- Forecast: ~___ added / ___ deleted across ___ files
+- Within the 400-line review boundary? yes / no
+  - If no: chained split or approved `size:exception` linked here:
+- Pure-documentation change? (exempt from correction-budget accounting) yes/no
+
 ## 🏷️ Type of Change
 
 <!-- Check exactly one primary type (Conventional Commits). -->

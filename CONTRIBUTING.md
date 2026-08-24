@@ -61,6 +61,58 @@ This builds an isolated Linux container (`Dockerfile.e2e`) and validates `ce-ai 
 4. **100% Test Coverage**: New features or bug fixes must include unit or CLI integration tests.
 5. **No Breaking Changes**: Preserve existing CLI contracts and JSON schema formats unless explicitly documented and reviewed.
 6. **Security Audit**: Code must pass `cargo audit` without open vulnerability alerts.
+7. **Changed-Lines Forecast**: Every PR description includes a changed-lines forecast; the 400-line review boundary and bounded correction policy below apply.
+
+---
+
+---
+
+## 📏 PR Size Boundaries & Bounded Corrections
+
+These boundaries apply equally to human and AI-agent contributors. Documentation tone follows the [Documentation Style Guide](docs/references/docs-styling.md).
+
+### Review Boundary
+
+**400 changed lines** per pull request (added + deleted per the counting contract).
+
+- Below the boundary: zero extra ceremony.
+- Above it: chain into independently shippable slices (each with its own tests and rollback boundary) or attach an explicitly approved **size exception** documented in the PR.
+- Every PR description includes a **Changed-Lines Forecast** (`git diff --numstat origin/main...HEAD`) so reviewers see the budget before reading code.
+
+### Counting Contract
+
+- Sum added + deleted lines across non-binary files (`numstat` binary rows report `-` and are skipped).
+- Excluded from the budget: lockfiles (`Cargo.lock`) and any path declared as generated/vendored in `.gitattributes`. Whitespace-only churn does not count.
+
+### Bounded Correction Policy
+
+Fixes responding to CI/review findings on an open PR cap at:
+
+```text
+min(200, ceil(original_pr_changed_lines / 2))
+```
+
+changed lines per review cycle.
+
+- At most **one bounded correction per cycle**; defects exceeding the budget become scoped follow-up issues/PRs reviewed independently — re-planning is the escape hatch, never another patch round.
+- Maintainer-approved exceptions are documented in the PR.
+- Pure-documentation changes are exempt.
+
+### Work-Unit Budgets (OpenSpec)
+
+`tasks.md` work units target ~200 changed lines each; a rescope may only narrow a budget — widening requires a new spec revision.
+
+### Size Is Not Risk
+
+Volume triggers splitting and review-burden handling only. Risk classification stays evidence-based — authentication, payments, data-loss surfaces, shell/process execution — regardless of line count.
+
+### Source Constants
+
+Adopted from Gentle AI v2.4.0 (`Gentleman-Programming/gentle-ai`): `LargeChangeLines=400`, `MaxCorrectionChangedLines=200`, `CorrectionBudget` (floor-two variant), `MaxCompactCorrectionAttempts=1` (`internal/reviewtransaction/{risk,compact}.go`); `DefaultRuntimeChangedLines=200`, `DefaultRuntimeAttemptLimit=2` (`internal/sddstatus/runtime_ledger.go`). This document is authoritative for this repository regardless of upstream drift.
+
+### Enforcement Status
+
+Documentation-first. A fast-follow CI job will compute numstat totals per PR and gate above-boundary changes behind a `size:exception` label; until then the PR-template forecast is mandatory.
 
 ---
 

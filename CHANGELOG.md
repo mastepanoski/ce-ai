@@ -5,6 +5,12 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.1] - 2026-08-24
+
+### Added
+- Contributor policy for PR size boundaries and bounded corrections (Issue #108): 400-line review boundary with a counting contract (`--numstat`, lockfile/generated/binary exclusions), correction budget of `min(200, ceil(original/2))` per cycle with a single bounded correction, ~200-line work-unit budgets in OpenSpec `tasks.md` (rescopes narrow only), and the size-is-not-risk principle — adopted from Gentle AI v2.4.0 constants, documented in the new CONTRIBUTING.md policy section.
+- PR template now requires a Changed-Lines Forecast; AGENTS.md Stage-2 checklist references work-unit budgets; docs-styling links the sibling policy.
+
 ## [1.22.0] - 2026-08-24
 
 ### Added
