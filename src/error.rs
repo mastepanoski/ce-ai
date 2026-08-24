@@ -1,7 +1,7 @@
 //! Error type and process exit-code mapping for the ce-ai CLI.
 //!
 //! Exit-code contract (design.md §File Changes): `0` = ok, `1` = runtime
-//! error, `2` = usage error.
+//! error, `2` = usage error, `6` = verification failure.
 
 use std::fmt;
 
@@ -16,6 +16,8 @@ pub enum CeError {
     Io(std::io::Error),
     /// JSON (de)serialization failure; mapped to exit 1.
     Json(serde_json::Error),
+    /// Post-operation integrity check failed; mapped to exit 6.
+    Verification(String),
 }
 
 impl fmt::Display for CeError {
@@ -25,6 +27,7 @@ impl fmt::Display for CeError {
             CeError::Runtime(msg) => write!(f, "runtime error: {msg}"),
             CeError::Io(err) => write!(f, "I/O error: {err}"),
             CeError::Json(err) => write!(f, "JSON error: {err}"),
+            CeError::Verification(msg) => write!(f, "verification error: {msg}"),
         }
     }
 }
@@ -52,17 +55,19 @@ impl From<serde_json::Error> for CeError {
 }
 
 impl CeError {
-    /// Maps this error to a process exit code: 1 = runtime, 2 = usage.
+    /// Maps this error to a process exit code: 1 = runtime, 2 = usage,
+    /// 6 = verification.
     pub fn exit_code(&self) -> i32 {
         match self {
             CeError::Usage(_) => 2,
+            CeError::Verification(_) => 6,
             CeError::Runtime(_) | CeError::Io(_) | CeError::Json(_) => 1,
         }
     }
 }
 
 /// Maps a command result to a process exit code: 0 = ok, 1 = runtime,
-/// 2 = usage.
+/// 2 = usage, 6 = verification.
 pub fn result_exit_code(result: &Result<(), CeError>) -> i32 {
     match result {
         Ok(()) => 0,
@@ -91,6 +96,17 @@ mod tests {
     #[test]
     fn usage_error_maps_to_exit_two() {
         assert_eq!(CeError::Usage("missing subcommand".into()).exit_code(), 2);
+    }
+
+    #[test]
+    fn verification_error_maps_to_exit_six() {
+        assert_eq!(
+            CeError::Verification("archive hash mismatch".into()).exit_code(),
+            6
+        );
+        assert!(CeError::Verification("archive hash mismatch".into())
+            .to_string()
+            .contains("verification error: archive hash mismatch"));
     }
 
     #[test]

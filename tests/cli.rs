@@ -600,15 +600,27 @@ fn upgrade_to_tag_resolves_from_cache_and_runs_sync() {
     let source = ce_source(tmp.path());
     install(&config_dir, &home, &source);
 
-    // Seed the cache with a v9 tarball and record its digest in state.json.
+    // Seed the cache with a v9 tarball and record digest + release provenance
+    // in state.json (#161 contract: --to binds to matching provenance).
     let tarball = ce_tarball_v9(tmp.path());
     let bytes = fs::read(&tarball).unwrap();
     let hex = sha256_hex(&bytes);
+    let tag = "compound-engineering-v9.9.9";
     let cache_dir = config_dir.join("cache");
     fs::create_dir_all(&cache_dir).unwrap();
     fs::write(cache_dir.join(format!("ce-{hex}.tar.gz")), &bytes).unwrap();
     let mut state = read_json(&config_dir.join("state.json"));
     state["managed_asset_digest"]["tarball"] = serde_json::json!(format!("sha256:{hex}"));
+    state["release_provenance"] = serde_json::json!({
+        "tag": tag,
+        "url": format!("https://example.test/ce-{hex}.tar.gz"),
+        "archive_sha256": hex,
+        "extraction_path": config_dir
+            .join("cache/trees")
+            .join(tag)
+            .to_string_lossy()
+            .to_string(),
+    });
     fs::write(
         config_dir.join("state.json"),
         serde_json::to_vec_pretty(&state).unwrap(),
@@ -671,6 +683,107 @@ fn upgrade_to_tag_resolves_from_cache_and_runs_sync() {
         state["installed_harnesses"][0]["version"],
         "compound-engineering-v9.9.9"
     );
+}
+
+#[test]
+fn upgrade_to_mismatched_tag_fails_without_relabeling() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Cache holds v9 provenance; request a different tag.
+    let tarball = ce_tarball_v9(tmp.path());
+    let bytes = fs::read(&tarball).unwrap();
+    let hex = sha256_hex(&bytes);
+    let tag = "compound-engineering-v9.9.9";
+    let cache_dir = config_dir.join("cache");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(cache_dir.join(format!("ce-{hex}.tar.gz")), &bytes).unwrap();
+    let mut state = read_json(&config_dir.join("state.json"));
+    state["managed_asset_digest"]["tarball"] = serde_json::json!(format!("sha256:{hex}"));
+    state["release_provenance"] = serde_json::json!({
+        "tag": tag,
+        "url": format!("https://example.test/ce-{hex}.tar.gz"),
+        "archive_sha256": hex,
+        "extraction_path": config_dir
+            .join("cache/trees")
+            .join(tag)
+            .to_string_lossy()
+            .to_string(),
+    });
+    fs::write(
+        config_dir.join("state.json"),
+        serde_json::to_vec_pretty(&state).unwrap(),
+    )
+    .unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["upgrade", "--to", "compound-engineering-v1.0.0"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("usage error"))
+        .stderr(predicate::str::contains("compound-engineering-v1.0.0"))
+        .stderr(predicate::str::contains("never relabels"));
+
+    // Provenance still binds the artifact to v9 — no relabeling happened.
+    let after = read_json(&config_dir.join("state.json"));
+    assert_eq!(after["release_provenance"]["tag"], tag);
+    assert_eq!(
+        read_json(&manifest_path(&home))["version"],
+        "local",
+        "manifest untouched by the aborted upgrade"
+    );
+}
+
+#[test]
+fn upgrade_tampered_cache_fails_closed_with_exit_six() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    let tarball = ce_tarball_v9(tmp.path());
+    let bytes = fs::read(&tarball).unwrap();
+    let hex = sha256_hex(&bytes);
+    let tag = "compound-engineering-v9.9.9";
+    let cache_dir = config_dir.join("cache");
+    fs::create_dir_all(&cache_dir).unwrap();
+    let cached_path = cache_dir.join(format!("ce-{hex}.tar.gz"));
+    fs::write(&cached_path, &bytes).unwrap();
+    let mut state = read_json(&config_dir.join("state.json"));
+    state["managed_asset_digest"]["tarball"] = serde_json::json!(format!("sha256:{hex}"));
+    state["release_provenance"] = serde_json::json!({
+        "tag": tag,
+        "url": format!("https://example.test/ce-{hex}.tar.gz"),
+        "archive_sha256": hex,
+        "extraction_path": config_dir
+            .join("cache/trees")
+            .join(tag)
+            .to_string_lossy()
+            .to_string(),
+    });
+    fs::write(
+        config_dir.join("state.json"),
+        serde_json::to_vec_pretty(&state).unwrap(),
+    )
+    .unwrap();
+
+    // Tamper with the cached archive in place.
+    fs::write(&cached_path, b"tampered-payload").unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["upgrade", "--to", tag])
+        .assert()
+        .failure()
+        .code(6)
+        .stderr(predicate::str::contains("verification error"))
+        .stderr(predicate::str::contains("integrity check failed"));
+
+    // State untouched by the aborted upgrade.
+    let after = read_json(&config_dir.join("state.json"));
+    assert_eq!(after["release_provenance"]["tag"], tag);
 }
 
 // ---- doctor ----
