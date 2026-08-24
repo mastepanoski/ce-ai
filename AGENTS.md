@@ -15,7 +15,7 @@ All AI agents MUST enforce these hard invariants deterministically at every sess
 6. **OpenSpec Required**: NO code changes without formal spec in `openspec/changes/<feature_name>/`.
 7. **Strict Exit Codes**: Map all errors to `CeError` enum exit codes (`0` Success, `1` Runtime, `2` Usage, `3` State, `4` IO, `5` Network, `6` Verification).
 8. **Preserve Active Worktrees**: NEVER run `git worktree remove` or delete sibling worktrees in `<repo>-worktrees/` without explicit USER permission or verifying creation within the current turn.
-9. **Mandatory Versioning & CHANGELOG**: Every merged feature/fix MUST bump SemVer in `Cargo.toml` and `Formula/ce-ai.rb`, update `CHANGELOG.md`, tag release (`vX.Y.Z`), and create a GitHub Release.
+9. **Mandatory Versioning & CHANGELOG**: Every merged feature/fix MUST bump SemVer in `Cargo.toml`, update `CHANGELOG.md`, tag release (`vX.Y.Z`), and create a GitHub Release. Homebrew distribution is owned exclusively by the `mastepanoski/homebrew-ce-ai` tap (self-updating); no formula is maintained in this repository.
 10. **Post-Merge Cleanup**: Immediately after merging a PR, switch to `main`, run `git pull`, delete merged local branches (`git branch -d`), prune remotes (`git fetch --prune`), and remove turn-created temporary worktrees.
 
 ---

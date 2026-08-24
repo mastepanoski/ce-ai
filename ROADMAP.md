@@ -59,7 +59,7 @@ This document outlines the version milestones, feature criteria, and release pip
 ### ✅ `v0.8.0` (Released) — Universal Installer & Multi-Arch Release Matrix ([#2](https://github.com/mastepanoski/ce-ai/issues/2), [#3](https://github.com/mastepanoski/ce-ai/issues/3), [#28](https://github.com/mastepanoski/ce-ai/issues/28))
 - [x] **Multi-Platform Release Pipeline (`.github/workflows/release.yml`)**: Automated 6-target build matrix compiling Linux/macOS/Windows release binaries for `x86_64` and `ARM64`.
 - [x] **Universal One-Line Installer Script**: Cross-platform POSIX (`scripts/install.sh`) and PowerShell (`scripts/install.ps1`) scripts for zero-dependency installation.
-- [x] **Package Manager Homebrew Formula**: Formula template `Formula/ce-ai.rb`.
+- [x] **Package Manager Homebrew Formula**: Distributed via the self-updating [`mastepanoski/homebrew-ce-ai`](https://github.com/mastepanoski/homebrew-ce-ai) tap (formula no longer maintained in this repository).
 
 ---
 
