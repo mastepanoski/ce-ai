@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.5] - 2026-08-24
+
+### Fixed
+- TUI "Upgrade Release" no longer fails with `unexpected argument '--harness'`: the panel still spawned the flags removed in v1.18.1 (Issue #161). It now invokes plain `ce-ai upgrade`, which reconciles every active harness by design, and drops the obsolete "Target Harness Scope" line.
+
+### Changed
+- Anti-drift net: all nine TUI-spawned command vectors were extracted into pure builders and are unit-validated against their live clap subcommand surfaces (`augment_args` + globals modeling). Any future CLI contract change now breaks TUI tests instead of failing at runtime for users.
+
 ## [1.21.4] - 2026-08-24
 
 ### Fixed
