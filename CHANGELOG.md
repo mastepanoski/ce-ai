@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.1] - 2026-08-24
+
+### Fixed
+- `ce-ai sync` no longer routes Kimi, Antigravity (`agy`), fx, and Pi through the generic OpenCode-format branch: each now re-registers exactly like `install`. Previously a sync could inject OpenCode-only `plugin`/`skills.paths` keys into their native config files (`~/.kimi-code/mcp.json`, `~/.gemini/config/mcp_config.json`, `~/.fx/mcp.json`) — corrupting native MCP definitions.
+- Managed-skills copies during sync propagate IO errors instead of being swallowed; the Claude arm's silent `let _ =` copy is gone (invariant #5).
+- An unsupported harness name found in `state.json` now fails sync with a named `Runtime` error instead of silently receiving fabricated OpenCode-format mutations.
+- The post-sync verification matrix hash-checks the skills surfaces of all eight directory-copying harnesses (`claude`, `codex`, `copilot`, `grok`, `kimi`, `agy`, `pi`, `fx`; agy under `config/skills`) instead of labelling four of them "not verified".
+
+### Changed
+- Bookkeeping: reality-note annotations on `openspec/changes/multi_harness_support/tasks.md` Tasks 2.5/2.6 correcting stale pointers and `generic_json.rs` history (docs-only).
+
 ## [1.19.0] - 2026-08-24
 
 ### Added

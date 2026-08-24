@@ -3381,3 +3381,109 @@ fn sync_restores_drifted_custom_assets_and_reports_verified_surface() {
         plugins.display().to_string()
     );
 }
+
+// ---------------------------------------------------------------------------
+// sync-native-registration-fix: Pi/Kimi/Agy/Fx re-registration correctness
+// ---------------------------------------------------------------------------
+
+/// Shared scenario: opencode anchor install + target-harness install, then a
+/// managed skill goes missing under the vendor root; sync must restore it,
+/// hash-verify the surface, and leave the native config file byte-identical.
+fn assert_sync_restores_and_preserves_native_config(
+    kind: &str,
+    env_key: &str,
+    dir: &Path,
+    cfg_rel: Option<&str>,
+    skills_prefix: &str,
+) {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    // Sync is anchored on the opencode manifest (SU-2).
+    install(&config_dir, &home, &source);
+
+    ceai(&config_dir, &home)
+        .env(env_key, dir.to_str().unwrap())
+        .args(["install", "--harness", kind, "--source"])
+        .arg(&source)
+        .assert()
+        .success();
+
+    let native_cfg = cfg_rel.map(|rel| dir.join(rel));
+    let before = native_cfg.as_ref().map(|p| fs::read(p).unwrap());
+
+    let drifted = dir.join(skills_prefix).join("ce-brainstorm/SKILL.md");
+    fs::remove_file(&drifted).unwrap();
+
+    ceai(&config_dir, &home)
+        .env(env_key, dir.to_str().unwrap())
+        .arg("sync")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(format!("✓ {kind}")));
+
+    assert_eq!(
+        fs::read_to_string(&drifted).unwrap(),
+        "# ce-brainstorm\n",
+        "managed skill restored for {kind}"
+    );
+    if let (Some(p), Some(b)) = (&native_cfg, &before) {
+        assert_eq!(
+            fs::read(p).unwrap(),
+            *b,
+            "native config of {kind} must stay byte-identical across sync"
+        );
+    }
+}
+
+#[test]
+fn sync_pi_recopies_skills_without_touching_any_config() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path().join("home").join("pi-agent");
+    assert_sync_restores_and_preserves_native_config(
+        "pi",
+        "PI_CODING_AGENT_DIR",
+        &dir,
+        None,
+        "skills",
+    );
+}
+
+#[test]
+fn sync_kimi_keeps_native_mcp_json_intact() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path().join("home").join("kimi-home");
+    assert_sync_restores_and_preserves_native_config(
+        "kimi",
+        "KIMI_CODE_HOME",
+        &dir,
+        Some("mcp.json"),
+        "skills",
+    );
+}
+
+#[test]
+fn sync_agy_keeps_native_mcp_config_intact() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path().join("home").join("agy-dir");
+    assert_sync_restores_and_preserves_native_config(
+        "agy",
+        "ANTIGRAVITY_CONFIG_DIR",
+        &dir,
+        Some("config/mcp_config.json"),
+        "config/skills",
+    );
+}
+
+#[test]
+fn sync_fx_keeps_native_mcp_json_intact() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path().join("home").join("fx-dir");
+    assert_sync_restores_and_preserves_native_config(
+        "fx",
+        "FX_HOME",
+        &dir,
+        Some("mcp.json"),
+        "skills",
+    );
+}
