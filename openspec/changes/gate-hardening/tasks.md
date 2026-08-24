@@ -1,0 +1,4 @@
+- [x] T1.1 Fail-closed e2e probe (Windows/Docker-missing hard failures)
+- [x] T2.1 make security target (+PHONY)
+- [x] T2.2 CI step-summary surfacing with pipefail semantics
+- [x] T3.1 Gates green incl. real containerized run
