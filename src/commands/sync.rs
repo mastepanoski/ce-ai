@@ -112,6 +112,24 @@ pub(crate) fn sync_with(
         return Ok(());
     }
 
+    // Transactional journal (#166): tracked mutations record prior content;
+    // state.json remains the final persisted write.
+    let mut journal = if ctx.dry_run {
+        None
+    } else {
+        Some(crate::state::journal::Journal::begin(
+            &ctx.config_dir,
+            "sync",
+        )?)
+    };
+    macro_rules! arm {
+        ($p:expr) => {
+            if let Some(j) = journal.as_mut() {
+                j.arm($p)?;
+            }
+        };
+    }
+
     for action in &plan.actions {
         match action {
             Action::Copy { path } | Action::Restore { path } => {
@@ -120,11 +138,13 @@ pub(crate) fn sync_with(
                 } else {
                     "restore"
                 };
+                arm!(&managed_dir.join(path));
                 let src = source_root.join(&source_rel[path]);
                 write_atomic(&managed_dir.join(path), &std::fs::read(&src)?)?;
                 println!("sync: {verb} {path}");
             }
             Action::Remove { path } => {
+                arm!(&managed_dir.join(path));
                 std::fs::remove_file(managed_dir.join(path))?;
                 println!("sync: remove {path}");
             }
@@ -142,6 +162,10 @@ pub(crate) fn sync_with(
             sha256: sha256.clone(),
         })
         .collect();
+    arm!(&ctx
+        .opencode_config_dir
+        .join(MANAGED_DIR)
+        .join("install-manifest.json"));
     InstallManifest {
         version: version.to_string(),
         plugin_name: manifest.plugin_name.clone(),
@@ -224,6 +248,7 @@ pub(crate) fn sync_with(
                     if let Some(parent) = dest.parent() {
                         std::fs::create_dir_all(parent)?;
                     }
+                    arm!(&dest);
                     write_atomic(&dest, &std::fs::read(source_root.join(src_rel))?)?;
                     files.push(ManifestFile {
                         path: rel.clone(),
@@ -290,6 +315,9 @@ pub(crate) fn sync_with(
         }
     }
     state.save(&state_path)?;
+    if let Some(j) = journal.take() {
+        j.complete()?;
+    }
 
     if !ctx.dry_run {
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {

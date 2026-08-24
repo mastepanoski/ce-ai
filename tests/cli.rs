@@ -3607,3 +3607,84 @@ fn doctor_stays_quiet_when_main_is_protected() {
         ))
         .stdout(predicate::str::contains("branch-protection: missing or unconfigured").not());
 }
+
+// ---------------------------------------------------------------------------
+// transactional-ops: operation journal + deterministic recovery (#166)
+// ---------------------------------------------------------------------------
+
+mod journal_fault_injection {
+    use super::*;
+
+    fn user_opencode_config(home: &Path) {
+        let dir = home.join(".config/opencode");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("opencode.json"),
+            r#"{"plugin":["user-plugin"],"skills":{"paths":["/home/user/skills"]}}"#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn injected_fault_mid_install_leaves_journal_and_next_run_recovers() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source(tmp.path());
+        user_opencode_config(&home);
+
+        ceai(&config_dir, &home)
+            .env("CE_AI_FAIL_AFTER_WRITES", "2")
+            .args(["install", "--harness", "opencode", "--source"])
+            .arg(&source)
+            .assert()
+            .failure();
+
+        // Journal survives the crash and doctor diagnoses it (#166 criterion).
+        assert!(config_dir.join("install-journal.json").exists());
+        ceai(&config_dir, &home)
+            .arg("doctor")
+            .assert()
+            .failure()
+            .stdout(predicate::str::contains("install-journal:"));
+
+        // Deterministic recovery: next install rolls back the partial state,
+        // proceeds fresh, preserves user content, and clears the journal.
+        install(&config_dir, &home, &source);
+        let cfg = read_json(&home.join(".config/opencode/opencode.json"));
+        let plugins = cfg["plugin"].as_array().unwrap();
+        assert!(plugins.iter().any(|v| v == "user-plugin"), "user data kept");
+        assert!(plugins.len() >= 2, "CE entry re-added");
+        assert!(!config_dir.join("install-journal.json").exists());
+
+        // And doctor is clean again regarding the journal.
+        ceai(&config_dir, &home)
+            .arg("doctor")
+            .assert()
+            .stdout(predicate::str::contains("install-journal:").not());
+    }
+
+    #[test]
+    fn early_fault_writes_nothing_and_still_journals_intent() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source(tmp.path());
+        user_opencode_config(&home);
+
+        ceai(&config_dir, &home)
+            .env("CE_AI_FAIL_AFTER_WRITES", "0")
+            .args(["install", "--harness", "opencode", "--source"])
+            .arg(&source)
+            .assert()
+            .failure();
+
+        // Nothing was applied: user config byte-identical, no managed tree.
+        assert_eq!(
+            fs::read_to_string(home.join(".config/opencode/opencode.json")).unwrap(),
+            r#"{"plugin":["user-plugin"],"skills":{"paths":["/home/user/skills"]}}"#
+        );
+        assert!(!home
+            .join(".config/opencode/compound-engineering/plugins/compound-engineering.js")
+            .exists());
+        assert!(config_dir.join("install-journal.json").exists());
+    }
+}

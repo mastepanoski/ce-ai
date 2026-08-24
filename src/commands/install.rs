@@ -116,6 +116,24 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
 
+    // Transactional journal (#166): every tracked mutation records prior
+    // content before being performed; state.json stays the final write.
+    let mut journal = if ctx.dry_run {
+        None
+    } else {
+        Some(crate::state::journal::Journal::begin(
+            &ctx.config_dir,
+            "install",
+        )?)
+    };
+    macro_rules! arm {
+        ($p:expr) => {
+            if let Some(j) = journal.as_mut() {
+                j.arm($p)?;
+            }
+        };
+    }
+
     let home_dir = crate::harness::home_dir_from_ctx(ctx);
 
     for harness_kind in &target_harnesses {
@@ -201,6 +219,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 if let Some(parent) = dest.parent() {
                     std::fs::create_dir_all(parent)?;
                 }
+                arm!(&dest);
                 write_atomic(&dest, &std::fs::read(source_path.join(source_rel))?)?;
                 files.push(ManifestFile {
                     path: rel.clone(),
@@ -208,11 +227,13 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 });
             }
         } else {
+            arm!(&plugin_entry(&config_dir));
             files.push(install_loader(&source_path, &config_dir)?);
             for (rel, (source_rel, hash)) in &managed {
                 if rel == LOADER_REL_PATH {
                     continue;
                 }
+                arm!(&managed_dir.join(rel));
                 write_atomic(
                     &managed_dir.join(rel),
                     &std::fs::read(source_path.join(source_rel))?,
@@ -241,6 +262,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 } else {
                     None
                 };
+                arm!(&rules);
                 if crate::harness::custom::ensure_rules_block(&rules)? && !ctx.quiet {
                     println!("install: managed CE block ensured in {}", rules.display());
                 }
@@ -251,6 +273,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 });
             }
 
+            arm!(&cfg
+                .plugins_dir
+                .join(MANAGED_DIR)
+                .join("install-manifest.json"));
             InstallManifest {
                 version: version.to_string(),
                 plugin_name: "compound-engineering".into(),
@@ -267,6 +293,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             if let Some(subpath) = spec.skills_subpath {
                 copy_managed_skills(&managed_dir, &config_dir.join(subpath))?;
             }
+            arm!(&config_dir.join(MANAGED_DIR).join("install-manifest.json"));
             InstallManifest {
                 version: version.to_string(),
                 plugin_name: "compound-engineering".into(),
@@ -279,6 +306,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         } else {
             // The only kind reaching this arm is OpenCode itself: its native
             // registration is the plugin-entry + skills-paths JSON merge.
+            arm!(&target_config);
             let mut mutation = ensure_plugin_and_skills(
                 &target_config,
                 &plugin_entry(&config_dir).to_string_lossy(),
@@ -298,6 +326,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
 
         // Ensure the structural `ce-ai` orchestrator agent exists.
+        arm!(&target_config);
         let agent_ensured = !ctx.dry_run
             && crate::harness::agents::ensure_orchestrator_agent(&target_config, harness_kind)?;
         if agent_ensured && !ctx.quiet {
@@ -337,6 +366,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     if !ctx.dry_run {
         state.save(&state_path)?;
+        if let Some(j) = journal.take() {
+            j.complete()?;
+        }
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
             if !ctx.quiet {
                 eprintln!("warning: skill registry sync failed: {e}");
