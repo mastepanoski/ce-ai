@@ -1085,37 +1085,31 @@ fn workflow_failure_lines(err: &CeError) -> Vec<String> {
 
 /// Saves the `[1-7]` stage-transition checkpoint and builds its confirmation modal.
 fn workflow_stage_transition_lines(ctx: &Context, stage_num: u32) -> Vec<String> {
-    let (phase, task) = match stage_num {
-        1 => (
-            "Stage 1: Ideation",
-            "1.0 Ideation & Brainstorming (ce-brainstorm)",
-        ),
-        2 => ("Stage 2: OpenSpec Definition", "2.0 OpenSpec Specification"),
-        3 => ("Stage 3: Execution Plan", "3.0 Technical Plan (ce-plan)"),
-        4 => ("Stage 4: TDD & Work", "4.0 Implementation (ce-work)"),
-        5 => (
-            "Stage 5: Empirical Verification",
-            "5.0 Verification (project test/e2e commands)",
-        ),
-        6 => (
-            "Stage 6: Knowledge Capture",
-            "6.0 Knowledge Capture (ce-compound)",
-        ),
-        7 => (
-            "Stage 7: Git Shipping",
-            "7.0 PR Delivery (ce-commit-push-pr)",
-        ),
-        _ => ("Stage 1: Ideation", "1.0 Ideation"),
+    let stage = match crate::state::state::WorkflowStage::parse(&stage_num.to_string()) {
+        Ok(st) => st,
+        Err(err) => return workflow_failure_lines(&err),
     };
-    let mut lines = match crate::commands::workflow::checkpoint_lines(ctx, task, phase) {
+    let task = match stage_num {
+        1 => "1.0 Ideation & Brainstorming (ce-brainstorm)",
+        2 => "2.0 OpenSpec Specification",
+        3 => "3.0 Technical Plan (ce-plan)",
+        4 => "4.0 Implementation (ce-work)",
+        5 => "5.0 Verification (project test/e2e commands)",
+        6 => "6.0 Knowledge Capture (ce-compound)",
+        7 => "7.0 PR Delivery (ce-commit-push-pr)",
+        _ => "1.0 Ideation",
+    };
+    let mut lines = match crate::commands::workflow::checkpoint_lines(ctx, stage, task, None) {
         Ok(out) => out,
         Err(err) => return workflow_failure_lines(&err),
     };
-    lines.insert(0, format!("✅ Workflow Checkpoint Saved to {phase}!"));
+    lines.insert(
+        0,
+        format!("✅ Workflow Checkpoint Saved to Stage {}!", stage.number()),
+    );
     lines.push("Stage transition recorded in state.json successfully.".to_string());
     lines
 }
-
 fn run_upgrade_cmd(_ctx: &Context, app: &App) -> Vec<String> {
     let target = app.selected_harness_target().to_string();
     let mut lines = capture_cli(&["upgrade", "--harness", &target, "--force"]);
@@ -1209,16 +1203,13 @@ mod tests {
         let (_tmp, ctx) = ctx();
         let lines = workflow_stage_transition_lines(&ctx, 2);
         let joined = lines.join("\n");
-        assert!(joined.contains("✅ Workflow Checkpoint Saved to Stage 2: OpenSpec Definition!"));
+        assert!(joined.contains("✅ Workflow Checkpoint Saved to Stage 2!"));
         assert!(joined.contains("Stage transition recorded"));
 
         let state = State::load(&ctx.config_dir.join("state.json")).unwrap();
-        assert!(state
-            .last_update_check
-            .unwrap()
-            .starts_with("Stage 2: OpenSpec Definition | "));
+        let wf = state.workflow.expect("workflow should be set");
+        assert_eq!(wf.stage, crate::state::state::WorkflowStage::OpenSpec);
     }
-
     #[test]
     fn stage_transition_failure_uses_failure_class() {
         let (_tmp, ctx) = ctx();

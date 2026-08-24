@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0] - 2026-08-24
+
+### Added
+- Real 7-stage workflow FSM engine (Issue #156): `ce-ai workflow` now stores a strongly-typed `WorkflowStage` state (`state.workflow` in `state.json`) with legal-transition enforcement (advance one stage, stay, rewind, or reset to Stage 1; illegal jumps fail with exit code 2), `--stage/--task/--feature` checkpoint flags, `--json` output for `status/checkpoint/resume`, and OpenSpec context recovery on `resume`. Legacy `last_update_check` checkpoint strings are still parsed transparently.
+- Real long-running `sync --watch` loop (Issue #159): the watcher no longer exits after a single pass — it polls for drift, repairs it automatically, reports each repair with a timestamp, handles Ctrl-C gracefully via a `Once`-registered signal handler, and supports `--interval-ms` (default 2000) and `--max-passes` (for scripted/tested runs).
+- Dry-run zero-mutation contract for remote operations (Issue #160): `--dry-run install/upgrade` now extract remote tarballs into transient temporary directories instead of persisting them into the cache, and `--dry-run workflow checkpoint` no longer writes `state.json`.
+- Triple-directory snapshot test helper (`assert_dry_run_zero_mutation`) covering `config_dir`, `home_dir`, and workspace to pin the dry-run purity contract in CI.
+
+### Fixed
+- `sync --watch` drift repair is now reported on every repairing pass, including the initial pass, so watchers surface repairs immediately instead of silently fixing before entering the loop.
+
 ## [1.19.2] - 2026-08-24
 
 ### Changed

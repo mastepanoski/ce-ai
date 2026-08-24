@@ -29,6 +29,12 @@ pub struct Args {
     /// Watch managed configuration paths and continuously re-sync upon drift.
     #[arg(long)]
     pub watch: bool,
+    /// Polling interval in milliseconds (default: 2000).
+    #[arg(long)]
+    pub interval_ms: Option<u64>,
+    /// Maximum polling passes before exit (used in integration tests).
+    #[arg(long)]
+    pub max_passes: Option<u64>,
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
@@ -36,16 +42,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         .map_err(|_| CeError::Runtime("no install-manifest.json — run install first".into()))?;
     let source_root = resolve_source_root(&manifest.source)?;
     if args.watch {
-        println!("ce-ai sync --watch: monitoring managed paths for drift...");
-        // Re-sync initial pass
-        sync_with(
-            ctx,
-            &source_root,
-            &manifest.version,
-            manifest.source.clone(),
-        )?;
-        println!("ce-ai sync --watch: watching... (press Ctrl+C to stop)");
-        return Ok(());
+        return run_watch(ctx, args, &source_root, &manifest);
     }
     sync_with(
         ctx,
@@ -632,6 +629,114 @@ fn sync_skills_root(kind: HarnessKind, home_dir: &Path) -> PathBuf {
     } else {
         dir.join("skills")
     }
+}
+
+static INIT_CTRLC: std::sync::Once = std::sync::Once::new();
+static RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+fn setup_ctrlc() {
+    INIT_CTRLC.call_once(|| {
+        let _ = ctrlc::set_handler(move || {
+            RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
+        });
+    });
+    RUNNING.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+pub fn run_watch(
+    ctx: &Context,
+    args: &Args,
+    source_root: &Path,
+    manifest: &InstallManifest,
+) -> Result<(), CeError> {
+    setup_ctrlc();
+
+    let interval = std::time::Duration::from_millis(args.interval_ms.unwrap_or(2000));
+    let mut passes = 0;
+    let mut repaired_count = 0;
+
+    if !ctx.quiet {
+        println!("ce-ai sync --watch: monitoring managed paths for drift...");
+    }
+
+    while RUNNING.load(std::sync::atomic::Ordering::SeqCst) {
+        if let Some(max) = args.max_passes {
+            if passes >= max {
+                break;
+            }
+        }
+
+        if passes > 0 {
+            std::thread::sleep(interval);
+            if !RUNNING.load(std::sync::atomic::Ordering::SeqCst) {
+                break;
+            }
+        }
+
+        match check_and_repair_drift(ctx, source_root, manifest) {
+            Ok(true) => {
+                repaired_count += 1;
+                if !ctx.quiet {
+                    println!(
+                        "ce-ai sync --watch: repaired drift at {}",
+                        chrono::Utc::now().to_rfc3339()
+                    );
+                }
+            }
+            Ok(false) => {}
+            Err(err) => {
+                eprintln!("notice: sync pass error: {err} — retrying on next pass");
+            }
+        }
+        passes += 1;
+    }
+
+    if !ctx.quiet {
+        println!(
+            "ce-ai sync --watch: stopped after {passes} pass(es) ({repaired_count} drift repair(s))."
+        );
+    }
+    Ok(())
+}
+
+fn check_and_repair_drift(
+    ctx: &Context,
+    source_root: &Path,
+    manifest: &InstallManifest,
+) -> Result<bool, CeError> {
+    let managed_dir = ctx.opencode_config_dir.join(MANAGED_DIR);
+    let mut desired: BTreeMap<String, String> = BTreeMap::new();
+    for (rel, hash) in read_local_tree(source_root)? {
+        if MANAGED_PREFIXES.iter().any(|p| rel.starts_with(p)) {
+            let managed_rel = rel.trim_start_matches(".opencode/").to_string();
+            desired.insert(managed_rel, hash);
+        }
+    }
+    let installed: BTreeMap<String, String> = manifest
+        .files
+        .iter()
+        .map(|f| (f.path.clone(), f.sha256.clone()))
+        .collect();
+
+    let plan = diff::diff(&desired, &installed, &managed_dir);
+    if plan.actions.is_empty() {
+        return Ok(false);
+    }
+
+    if ctx.dry_run {
+        println!(
+            "plan: dry-run watch detected {} drift action(s)",
+            plan.actions.len()
+        );
+        for action in &plan.actions {
+            let (verb, path) = plan_verb(action);
+            println!("plan: {verb} {path}");
+        }
+        return Ok(false);
+    }
+
+    sync_with(ctx, source_root, &manifest.version, manifest.source.clone())?;
+    Ok(true)
 }
 
 fn plan_verb(action: &Action) -> (&'static str, &str) {
