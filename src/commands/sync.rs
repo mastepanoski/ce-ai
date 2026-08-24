@@ -240,144 +240,23 @@ pub(crate) fn sync_with(
                     config_mutations: manifest.config_mutations.clone(),
                 }
                 .write(&cfg.plugins_dir)?;
-            } else if h_kind == HarnessKind::Cursor {
+            } else if let Some(spec) = registration_spec(h_kind) {
+                // Strategy table: one exhaustive entry per table-driven kind
+                // (see registration_spec below).
                 let empty_env = std::collections::BTreeMap::new();
-                crate::harness::cursor::register_cursor_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::cursor::register_cursor_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-            } else if h_kind == HarnessKind::Claude {
-                let empty_env = std::collections::BTreeMap::new();
-                crate::harness::claude::register_claude_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::claude::register_claude_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
-            } else if h_kind == HarnessKind::Codex {
-                let empty_env = std::collections::BTreeMap::new();
-                crate::harness::codex::register_codex_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::codex::register_codex_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
-            } else if h_kind == HarnessKind::Copilot {
-                let empty_env = std::collections::BTreeMap::new();
-                crate::harness::copilot::register_copilot_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::copilot::register_copilot_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
-            } else if h_kind == HarnessKind::Grok {
-                let empty_env = std::collections::BTreeMap::new();
-                crate::harness::grok::register_grok_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::grok::register_grok_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
-            } else if h_kind == HarnessKind::Kimi {
-                let empty_env = std::collections::BTreeMap::new();
-                crate::harness::kimi::register_kimi_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::kimi::register_kimi_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
-            } else if h_kind == HarnessKind::Agy {
-                let empty_env = std::collections::BTreeMap::new();
-                crate::harness::agy::register_agy_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::agy::register_agy_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-                copy_managed_skills(&managed_dir, &config_dir.join("config").join("skills"))?;
-            } else if h_kind == HarnessKind::Fx {
-                let empty_env = std::collections::BTreeMap::new();
-                crate::harness::fx::register_fx_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::fx::register_fx_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
-            } else if h_kind == HarnessKind::Pi {
-                // Pi is No-MCP by design (objective 8): skills tree only.
-                copy_managed_skills(&managed_dir, &config_dir.join("skills"))?;
+                if let Some(register) = spec.register_mcp {
+                    register(
+                        &target_config,
+                        "codegraph",
+                        "codegraph",
+                        &["mcp"],
+                        &empty_env,
+                    )?;
+                    register(&target_config, "engram", "engram", &["serve"], &empty_env)?;
+                }
+                if let Some(subpath) = spec.skills_subpath {
+                    copy_managed_skills(&managed_dir, &config_dir.join(subpath))?;
+                }
             } else if h_kind == HarnessKind::Opencode {
                 // OpenCode's own registration: plugin entry + skills paths.
                 crate::opencode::config::ensure_plugin_and_skills(
@@ -675,6 +554,59 @@ impl CheckStatus {
     }
 }
 
+/// Vendor MCP registrar signature shared by every native adapter.
+type McpRegistrar = fn(
+    &Path,
+    &str,
+    &str,
+    &[&str],
+    &std::collections::BTreeMap<String, String>,
+) -> Result<(), CeError>;
+
+/// Strategy-table entry describing how `sync` re-registers one harness.
+#[derive(Clone, Copy)]
+struct RegistrationSpec {
+    /// Vendor registrar; `None` for No-MCP harnesses such as pi.
+    register_mcp: Option<McpRegistrar>,
+    /// Managed-skills destination relative to the harness dir; `None`
+    /// disables the skills recopy.
+    skills_subpath: Option<&'static str>,
+}
+
+/// Exhaustive re-registration table (Strategy via data): adding a
+/// `HarnessKind` variant breaks compilation here instead of silently
+/// falling into a fictional write path at runtime.
+fn registration_spec(kind: HarnessKind) -> Option<RegistrationSpec> {
+    let native = |reg: McpRegistrar, subpath: &'static str| RegistrationSpec {
+        register_mcp: Some(reg),
+        skills_subpath: Some(subpath),
+    };
+    Some(match kind {
+        HarnessKind::Cursor => native(crate::harness::cursor::register_cursor_mcp_server, "skills"),
+        HarnessKind::Claude => native(crate::harness::claude::register_claude_mcp_server, "skills"),
+        HarnessKind::Codex => native(crate::harness::codex::register_codex_mcp_server, "skills"),
+        HarnessKind::Copilot => native(
+            crate::harness::copilot::register_copilot_mcp_server,
+            "skills",
+        ),
+        HarnessKind::Grok => native(crate::harness::grok::register_grok_mcp_server, "skills"),
+        HarnessKind::Kimi => native(crate::harness::kimi::register_kimi_mcp_server, "skills"),
+        HarnessKind::Agy => native(
+            crate::harness::agy::register_agy_mcp_server,
+            "config/skills",
+        ),
+        HarnessKind::Fx => native(crate::harness::fx::register_fx_mcp_server, "skills"),
+        // Pi is No-MCP by design (objective 8): skills tree only.
+        HarnessKind::Pi => RegistrationSpec {
+            register_mcp: None,
+            skills_subpath: Some("skills"),
+        },
+        // Dedicated call-site arms: Custom is state-snapshot-driven,
+        // Opencode writes the plugin/skills JSON, Deepseek is de-scoped.
+        HarnessKind::Custom | HarnessKind::Opencode | HarnessKind::Deepseek => return None,
+    })
+}
+
 /// Copies the managed skills tree into a harness root, propagating IO
 /// failures (invariant #5). No-op when the source tree is absent.
 fn copy_managed_skills(managed_dir: &Path, dest: &Path) -> Result<(), CeError> {
@@ -716,8 +648,28 @@ mod tests {
 
     use tempfile::tempdir;
 
-    use super::{verify_tree_against, CheckStatus, TreeDrift};
+    use super::{registration_spec, verify_tree_against, CheckStatus, RegistrationSpec, TreeDrift};
+    use crate::harness::HarnessKind;
     use crate::state::diff::sha256_hex;
+
+    #[test]
+    fn registration_specs_cover_the_table_driven_kinds() {
+        use HarnessKind::*;
+        for kind in [Cursor, Claude, Codex, Copilot, Grok, Kimi, Agy, Fx, Pi] {
+            let spec: RegistrationSpec = registration_spec(kind).expect("table-driven kind");
+            match kind {
+                Pi => assert!(spec.register_mcp.is_none()),
+                _ => assert!(spec.register_mcp.is_some()),
+            }
+            assert!(spec.skills_subpath.is_some());
+            if kind == Agy {
+                assert_eq!(spec.skills_subpath, Some("config/skills"));
+            }
+        }
+        for kind in [Opencode, Custom, Deepseek] {
+            assert!(registration_spec(kind).is_none(), "dedicated arm kind");
+        }
+    }
 
     fn expected_map(files: &[(&str, &[u8])]) -> BTreeMap<String, String> {
         files
