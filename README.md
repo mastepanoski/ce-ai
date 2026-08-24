@@ -64,7 +64,7 @@ That's it — your harnesses are ready for Compound Engineering. Run your first 
 | 🔄 [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) | Both | How-to — drift repair, upgrades, rollbacks |
 | ⚡ [Skill Registry Guide](docs/user-guide/skill-registry-guide.md) | Both | How-to / Reference — skill index, 4-tier precedence, resolution |
 | 💾 [Backup & Uninstall](docs/user-guide/backup-and-uninstall.md) | Both | How-to — backups, clean uninstall, state cleanup |
-| 🗂️ [Harness Matrix](docs/user-guide/harness-matrix.md) | Reference | Reference — all 12 harnesses, config paths, merge strategies |
+| 🗂️ [Harness Matrix](docs/user-guide/harness-matrix.md) | Reference | Reference — all supported harnesses (10 native + custom), config paths, merge strategies |
 | 🏛️ [Architectural & Conceptual Guide](docs/user-guide/architectural-and-conceptual-guide.md) | **Senior** | Explanation — adapter traits, scope hierarchy, atomic writes |
 | 🎮 [FSM & Checkpoints Masterclass](docs/user-guide/fsm-and-checkpoints-explained.md) | **Senior** | Explanation — 7-stage cycle, savegames, sub-loops |
 | 🧭 [Workflow Panel: Native vs Agent Skills](docs/user-guide/workflow-panel-native-vs-agent-skills.md) | **Beginner** | Explanation — why the TUI dashboard runs some actions and only points to others |

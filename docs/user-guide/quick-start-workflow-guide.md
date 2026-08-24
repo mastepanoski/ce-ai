@@ -63,8 +63,8 @@ flowchart LR
    - *Goal*: Write tests first (Red), implement code (Green), and refactor cleanly. Save progress checkpoints via `ce-ai workflow checkpoint`.
 
 5. **Stage 5: Empirical Verification**
-   - Run `/ce-code-review`, unit tests (`cargo test`), and containerized E2E gates (`make e2e`).
-   - *Goal*: Zero warnings (`-D warnings`), 100% green tests.
+   - Run `/ce-code-review` plus the project's own verification suite — unit tests, linters and E2E gates as defined by your stack (e.g. `cargo test`, `npm test`, `pytest`).
+   - *Goal*: Zero lint warnings under your project's configuration and a 100% green test suite.
 
 6. **Stage 6: Knowledge Capture**
    - Run `/ce-compound`.
@@ -86,7 +86,7 @@ flowchart TD
     DEBUG --> LOGS[Inspect Un-truncated Logs]
     LOGS --> TEST[Write Failing Reproducer Test]
     TEST --> FIX[Apply Upstream Root Cause Fix]
-    FIX --> VERIFY[Stage 5: Verification cargo test / make e2e]
+    FIX --> VERIFY[Stage 5: Verification - project quality gates]
     VERIFY --> COMPOUND[Stage 6: ce-compound Store Solution]
     COMPOUND --> SHIP[Stage 7: ce-commit-push-pr Ship Fix PR]
 ```
@@ -98,7 +98,7 @@ flowchart TD
    - *Behavior*: Inspects error tracebacks, writes a minimal failing test case (Red), and applies a targeted fix to upstream logic (Green).
 
 2. **Stage 5: Verification**
-   - Run `cargo test` / `make e2e` to verify zero regressions.
+   - Re-run the failing reproducer plus the project's full verification suite to confirm zero regressions.
 
 3. **Stage 6: Knowledge Capture**
    - Run `/ce-compound`.
@@ -138,7 +138,7 @@ flowchart TD
 
 ### 3. Trivial Chores & Typo Fixes
 - **Use**: Direct `/ce-commit` or `/ce-commit-push-pr`.
-- **Workflow**: Bypasses Stages 1–3. Makes the minor edit, verifies with `cargo test`, and commits immediately.
+- **Workflow**: Bypasses Stages 1–3. Makes the minor edit, runs the project's relevant checks, and commits immediately.
 
 ---
 
@@ -237,7 +237,7 @@ flowchart TD
    - Run `/ce-plan` ➔ `/ce-work`. Build initial files, configure linters (`clippy`, `eslint`), and set up tests.
 
 6. **Establish Verification Gates (Stage 5: Verification)**:
-   - Run `cargo test` or `npm test` to ensure green tests.
+   - Configure and run the project's test suite (`cargo test`, `npm test`, `pytest`, …) to keep it green.
 
 7. **Capture Initial Architecture Concepts (Stage 6: Knowledge Capture)**:
    - Run `/ce-compound` to initialize `CONCEPTS.md` and document initial structural decisions in `docs/solutions/`.
@@ -259,7 +259,7 @@ flowchart TD
     CHOICE -->|"BDD / Scenario-First"| BDD["BDD: Write WHEN-THEN Scenarios ➔ Implement ➔ Verify"]
     CHOICE -->|"Spike / R&D Spike"| SPIKE["R&D Spike: Quick PoC ➔ Evaluate ➔ Convert to OpenSpec"]
 
-    TDD --> GATE["Stage 5: Mandatory Verification cargo test & make e2e"]
+    TDD --> GATE["Stage 5: Mandatory Verification - project quality gates"]
     CODE_FIRST --> GATE
     BDD --> GATE
     SPIKE -->|"If Retained"| GATE

@@ -5,6 +5,13 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.2] - 2026-08-24
+
+### Changed
+- Documentation truth sweep: Stage 5 (Verification) is no longer documented as `cargo test`/`make e2e` — the CE workflow is language-agnostic, so the three user guides (`quick-start-workflow-guide`, `fsm-and-checkpoints-explained`, `compound-engineering-workflow-explained`) and AGENTS.md now define it as running the project's own quality gates, with Rust commands demoted to stack-specific examples.
+- README harness-matrix pointer corrected from "all 12 harnesses" to "all supported harnesses (10 native + custom)"; DeepSeek remains de-scoped and is not a supported target.
+- Refreshed `docs/solutions/multi-harness-support-implementation.md`: replaced the v0.3.0-era architecture description (fictional `generic_json.rs` coverage, DeepSeek listed as supported) with the current native-adapter + registration-spec reality.
+
 ## [1.20.1] - 2026-08-24
 
 ### Changed
