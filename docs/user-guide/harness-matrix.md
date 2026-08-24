@@ -2,28 +2,29 @@
 
 > **Intent**: Reference — look up which configuration file and merge strategy each supported AI harness uses. For installation workflows, see the [Installation & Coexistence Guide](installation-and-coexistence-mechanisms.md).
 
-`ce-ai` supports 12 AI coding harnesses with three integration strategies:
+`ce-ai` supports 10 native AI coding agent harnesses with dedicated native adapters, plus custom mode:
 
-1. **Native JSON merger** (`opencode`, `claude`, `pi`): parses structured config, updates targeted keys, preserves unmanaged user entries.
-2. **Markdown rule-block ingestion** (`cursor`, `copilot`): injects a delimited managed block (`<!-- CE-AI MANAGED BLOCK -->`) into rules files.
-3. **Generic JSON merger** (all others): safe structural merge for harnesses without a dedicated adapter.
+1. **Native JSON Adapters** (`opencode`, `claude`, `cursor`, `copilot`, `kimi`, `agy`, `fx`): parses structured JSON, updates targeted keys, preserves unmanaged user entries.
+2. **Native TOML Adapters** (`codex`, `grok`): updates `[mcp_servers]` in native TOML configuration files.
+3. **Native Skill Directory Adapter** (`pi`): copies skills natively into `~/.pi/agent/skills/`.
+4. **Markdown & MDC Rules Ingestion** (`cursor`, `copilot`, project rules): injects non-destructive marker-delimited blocks into project rule files.
 
 ## Supported Harness Matrix
 
 | Harness Identifier | Config File / Location | Strategy |
 | :--- | :--- | :--- |
-| `opencode` | `~/.config/opencode/opencode.json` | JSON Array Merger (`plugin` & `skills`) |
-| `claude` | `~/.claude.json` / `~/.config/claude/` | JSON Config Merger |
-| `pi` | `~/.pi/config.json` / `~/.pi/skills/` | JSON Merger & Native Skill Directory Copy |
-| `cursor` | `.cursorrules` / `.cursor/rules/` | Markdown Rule Block Ingestion (`<!-- CE-AI MANAGED BLOCK -->`) |
-| `copilot` | `.github/copilot-instructions.md` | Markdown Instruction Block Ingestion |
-| `codex` | `~/.codex/config.json` | Generic JSON Config Merger |
-| `grok` | `~/.grok/config.json` | Generic JSON Config Merger |
-| `kimi` | `~/.kimi/config.json` | Generic JSON Config Merger |
-| `agy` | `~/.gemini/antigravity-cli/config.json` | Generic JSON Merger & Skill Copy |
-| `deepseek` | `~/.deepseek/config.json` | Generic JSON Config Merger |
-| `fx` | `~/.fx/config.json` | Generic JSON Config Merger |
+| `opencode` | `~/.config/opencode/opencode.json` | Native JSON Merger (`plugin` & `skills.paths`) |
+| `claude` | `~/.claude.json` / `~/.claude/settings.json` | Native JSON `mcpServers` Merger |
+| `pi` | `~/.pi/agent/skills/` | Native Skill Directory Manager |
+| `cursor` | `~/.cursor/mcp.json` / `.cursor/rules/` | Native JSON `mcpServers` Merger & MDC Rules |
+| `copilot` | `~/.config/github-copilot/mcp.json` | Native JSON `mcpServers` Merger & Markdown Rules |
+| `codex` | `~/.codex/config.toml` | Native TOML `[mcp_servers]` Merger |
+| `grok` | `~/.grok/config.toml` | Native TOML `[mcp_servers]` Merger |
+| `kimi` | `~/.kimi-code/mcp.json` | Native JSON `mcpServers` Merger |
+| `agy` | `~/.gemini/config/mcp_config.json` | Native JSON `mcpServers` Merger |
+| `fx` | `~/.fx/mcp.json` | Native JSON `mcp` Root Key Merger |
 | `custom` | Specified via CLI flags | Fallback Custom Config Mode |
+| `deepseek` | *De-scoped* (`dsh` developer preview) | Returns `CeError::Usage` (exit code 2) guiding user to native adapters |
 
 ## Safety Guarantees
 

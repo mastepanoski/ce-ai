@@ -107,10 +107,10 @@ flowchart TD
 - **Coexistence Behavior**:
   - Preserves all pre-existing repository instructions and injects/updates Compound Engineering directives within HTML comment delimiters.
 
-### 🔮 5. Coexistence in Pi, Kimi, Antigravity (AGY), Codex, Grok, DeepSeek, FX
-- **Strategy**: Generic Adaptive JSON Merger.
+### 🔮 5. Coexistence in Pi, Kimi, Antigravity (AGY), Codex, Grok, Fx
+- **Strategy**: Dedicated Native Harness Adapters.
 - **Coexistence Behavior**:
-  - Preserves existing key-value structures in each harness's respective configuration files (`~/.pi/config.json`, `~/.gemini/antigravity-cli/`, `~/.kimi/`, etc.).
+  - Preserves existing key-value structures in each harness's respective native configuration files (`~/.pi/agent/skills/`, `~/.gemini/config/mcp_config.json`, `~/.kimi-code/mcp.json`, `~/.codex/config.toml`, `~/.grok/config.toml`, `~/.fx/mcp.json`).
 
 ---
 

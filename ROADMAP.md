@@ -7,7 +7,7 @@ This document outlines the version milestones, feature criteria, and release pip
 ## 🎯 Vision & Criteria for `v1.0.0` Production Release
 
 `ce-ai` reaches **`v1.0.0`** when it achieves:
-1. **Multi-Harness Stability**: Full support and verification across all 12 AI coding agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `deepseek`, `fx`, `custom`).
+1. **Multi-Harness Stability**: Full support and verification across all 10 native AI coding agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `fx`) plus custom mode.
 2. **Zero-Data-Loss Backup & Recovery**: Complete backup listing, point-in-time snapshot recovery, and clean uninstallation guarantees.
 3. **Automated Release Pipeline**: Automated GitHub Actions CI/CD pipeline compiling and publishing signed release binaries (Linux, macOS, Windows) on version tags (`v*`).
 4. **Automated Update Checking**: Proactive update notifications in CLI and TUI for both `ce-ai` and `compound-engineering-plugin`.
