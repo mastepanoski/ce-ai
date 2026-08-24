@@ -2765,3 +2765,127 @@ fn install_pi_harness_respects_pi_coding_agent_dir_env() {
 
     assert!(!custom_pi_dir.join("skills").exists());
 }
+
+#[test]
+fn install_fx_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "fx",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let fx_dir = home.join(".fx");
+    let mcp_config = fx_dir.join("mcp.json");
+    assert!(mcp_config.exists());
+    assert!(fx_dir.join("skills/ce-brainstorm/SKILL.md").exists());
+
+    let content = fs::read_to_string(&mcp_config).unwrap();
+    let config: ce_ai::harness::fx::FxMcpConfig = serde_json::from_str(&content).unwrap();
+    assert!(config.mcp.contains_key("codegraph"));
+    assert!(config.mcp.contains_key("engram"));
+
+    let codegraph = &config.mcp["codegraph"];
+    assert_eq!(codegraph.r#type.as_deref(), Some("local"));
+    assert_eq!(codegraph.command, vec!["codegraph", "mcp"]);
+    assert!(codegraph.environment.is_empty());
+
+    let engram = &config.mcp["engram"];
+    assert_eq!(engram.r#type.as_deref(), Some("local"));
+    assert_eq!(engram.command, vec!["engram", "serve"]);
+    assert!(engram.environment.is_empty());
+
+    // opencode directory must remain pristine / non-existent
+    assert!(!home.join(".config/opencode").exists());
+}
+
+#[test]
+fn uninstall_fx_harness_cleans_native_dir_artifacts_and_preserves_user_configs() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    let mcp_config_file = home.join(".fx/mcp.json");
+    fs::create_dir_all(mcp_config_file.parent().unwrap()).unwrap();
+    let user_json = r#"{
+        "user_setting": "enabled",
+        "mcp": {
+            "user_remote": {
+                "type": "http",
+                "url": "https://mcp.example.com"
+            }
+        }
+    }"#;
+    fs::write(&mcp_config_file, user_json).unwrap();
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "fx",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "fx"])
+        .assert()
+        .success();
+
+    assert!(mcp_config_file.exists());
+    let content = fs::read_to_string(&mcp_config_file).unwrap();
+    let config: ce_ai::harness::fx::FxMcpConfig = serde_json::from_str(&content).unwrap();
+    assert_eq!(config.extra.get("user_setting").unwrap(), "enabled");
+    assert!(config.mcp.contains_key("user_remote"));
+    assert!(!config.mcp.contains_key("codegraph"));
+    assert!(!config.mcp.contains_key("engram"));
+
+    assert!(!home.join(".fx/skills").exists());
+    assert!(!home.join(".config/opencode").exists());
+
+    let state_text = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    assert!(!state_text.contains("\"fx\""));
+}
+
+#[test]
+fn install_fx_harness_respects_fx_home_env() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let custom_fx_dir = tmp.path().join("custom_fx_dir");
+    let source = ce_source(tmp.path());
+
+    ceai(&config_dir, &home)
+        .env("FX_HOME", custom_fx_dir.to_str().unwrap())
+        .args([
+            "install",
+            "--harness",
+            "fx",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(custom_fx_dir.join("mcp.json").exists());
+    assert!(custom_fx_dir.join("skills/ce-brainstorm/SKILL.md").exists());
+    assert!(!home.join(".fx").exists());
+
+    ceai(&config_dir, &home)
+        .env("FX_HOME", custom_fx_dir.to_str().unwrap())
+        .args(["uninstall", "--harness", "fx"])
+        .assert()
+        .success();
+
+    assert!(!custom_fx_dir.join("mcp.json").exists());
+    assert!(!custom_fx_dir.join("skills").exists());
+}

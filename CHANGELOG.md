@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-08-23
+
+### Added
+- Native harness adapter implementation for Vercel Labs' `fx` coding agent (`FxAdapter`, Issue #181).
+- Native MCP server registration in `~/.fx/mcp.json` (and `$FX_HOME` override) with root key `mcp`, `"type": "local"`, array-form command syntax (`["codegraph", "mcp"]`), and environment map.
+- Skills installation under `~/.fx/skills/`.
+- Project rule adoption targeting `AGENTS.md` (root) and `.fx/AGENTS.md` (derived stub).
+
 ## [1.16.0] - 2026-08-23
 
 ### Added

@@ -14,6 +14,15 @@ impl HarnessAdapter for PiAdapter {
     }
 
     fn default_config_path(&self, home: &Path) -> PathBuf {
+        if home.file_name().and_then(|n| n.to_str()) == Some("skills") {
+            return home.to_path_buf();
+        }
+        if home.file_name().and_then(|n| n.to_str()) == Some("agent") {
+            return home.join("skills");
+        }
+        if home.file_name().and_then(|n| n.to_str()) == Some(".pi") {
+            return home.join("agent").join("skills");
+        }
         self.kind().harness_dir(home).join("skills")
     }
 

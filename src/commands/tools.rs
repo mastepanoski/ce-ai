@@ -289,6 +289,30 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
             )?;
         }
 
+        let fx_installed = state
+            .installed_harnesses
+            .iter()
+            .any(|h| h["name"].as_str() == Some("fx"));
+        if fx_installed {
+            let (cmd, args_vec) = match tool_lower.as_str() {
+                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
+                "engram" => ("engram", vec!["serve"]),
+                "rtk" => ("rtk", vec!["mcp"]),
+                "codegraph" => ("codegraph", vec!["mcp"]),
+                _ => ("", vec![]),
+            };
+            let empty_env = std::collections::BTreeMap::new();
+            let fx_adapter = crate::harness::fx::FxAdapter;
+            let fx_config = fx_adapter.default_config_path(&home_dir);
+            crate::harness::fx::register_fx_mcp_server(
+                &fx_config,
+                &tool_lower,
+                cmd,
+                &args_vec,
+                &empty_env,
+            )?;
+        }
+
         let pi_installed = state
             .installed_harnesses
             .iter()
