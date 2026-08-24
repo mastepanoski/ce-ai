@@ -300,7 +300,11 @@ pub(crate) fn sync_with(
     state.save(&state_path)?;
 
     if !ctx.dry_run {
-        let _ = crate::source::registry::SkillRegistry::sync_registry(ctx);
+        if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
+            if !ctx.quiet {
+                eprintln!("warning: skill registry sync failed: {e}");
+            }
+        }
     }
 
     // Issue #161: report only what was actually verified. The OpenCode
@@ -636,9 +640,11 @@ static RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::n
 
 fn setup_ctrlc() {
     INIT_CTRLC.call_once(|| {
-        let _ = ctrlc::set_handler(move || {
+        if let Err(e) = ctrlc::set_handler(move || {
             RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
-        });
+        }) {
+            eprintln!("warning: could not install Ctrl-C handler: {e}");
+        }
     });
     RUNNING.store(true, std::sync::atomic::Ordering::SeqCst);
 }

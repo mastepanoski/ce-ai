@@ -167,7 +167,7 @@ fn sync_from_extracted(
     let source_json = serde_json::json!({ "kind": "github-release", "tag": version, "tree": root });
     let result = sync::sync_with(ctx, &root, version, source_json);
     if let Some(tmp) = tmp {
-        let _ = std::fs::remove_dir_all(tmp);
+        crate::state::report_best_effort_remove(&tmp, std::fs::remove_dir_all(&tmp));
     }
     result
 }

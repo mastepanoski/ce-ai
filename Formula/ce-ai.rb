@@ -3,7 +3,7 @@ class CeAi < Formula
   homepage "https://github.com/mastepanoski/ce-ai"
   url "https://github.com/mastepanoski/ce-ai/archive/refs/tags/v1.18.1.tar.gz"
 
-  version "1.20.0"
+  version "1.20.1"
   version "1.19.2"
   license "MIT"
 

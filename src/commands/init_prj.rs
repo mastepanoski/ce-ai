@@ -8,6 +8,7 @@ use sha2::{Digest, Sha256};
 use crate::commands::Context;
 use crate::error::CeError;
 use crate::state::state::{AdoptionTier, ProjectAdoptionEntry, State};
+use crate::state::{report_best_effort_remove, report_best_effort_write};
 
 pub const BLOCK_BEGIN_MARKER: &str = "<!-- ce-ai:block begin";
 pub const BLOCK_END_MARKER: &str = "<!-- ce-ai:block end -->";
@@ -339,10 +340,16 @@ pub fn run(
                     if text.contains(crate::harness::CE_MANAGED_BEGIN) {
                         let stripped = crate::harness::strip_managed_rule_block(&text);
                         if stripped.trim().is_empty() {
-                            let _ = fs::remove_file(&legacy_rule);
-                            let _ = fs::remove_dir(kimi_dir.join("rules"));
+                            report_best_effort_remove(&legacy_rule, fs::remove_file(&legacy_rule));
+                            report_best_effort_remove(
+                                kimi_dir.join("rules"),
+                                fs::remove_dir(kimi_dir.join("rules")),
+                            );
                         } else {
-                            let _ = crate::state::write_atomic(&legacy_rule, stripped.as_bytes());
+                            report_best_effort_write(
+                                &legacy_rule,
+                                crate::state::write_atomic(&legacy_rule, stripped.as_bytes()),
+                            );
                         }
                     }
                 }

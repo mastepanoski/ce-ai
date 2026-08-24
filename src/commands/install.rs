@@ -107,7 +107,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             source_path.display()
         )));
         if let Some(tmp) = tmp_dir {
-            let _ = std::fs::remove_dir_all(tmp);
+            crate::state::report_best_effort_remove(&tmp, std::fs::remove_dir_all(&tmp));
         }
         return err;
     }
@@ -642,11 +642,15 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     if !ctx.dry_run {
         state.save(&state_path)?;
-        let _ = crate::source::registry::SkillRegistry::sync_registry(ctx);
+        if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
+            if !ctx.quiet {
+                eprintln!("warning: skill registry sync failed: {e}");
+            }
+        }
     }
 
     if let Some(tmp) = tmp_dir {
-        let _ = std::fs::remove_dir_all(tmp);
+        crate::state::report_best_effort_remove(&tmp, std::fs::remove_dir_all(&tmp));
     }
     Ok(())
 }

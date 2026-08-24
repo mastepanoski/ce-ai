@@ -59,7 +59,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             .map(|s| s.to_string())
             .collect()
     } else {
-        let _ = args.harness.parse::<HarnessKind>()?;
+        args.harness.parse::<HarnessKind>()?;
         vec![args.harness.clone()]
     };
 
@@ -151,6 +151,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
                 // Remove CE-created roots when they ended up empty; never
                 // delete user-owned directories that still hold content.
+                // Best-effort pruning of CE-created roots. A failure here is
+                // expected whenever user content remains inside them
+                // (DirectoryNotEmpty) and must stay silent by design.
                 let _ = std::fs::remove_dir(cfg.plugins_dir.join(MANAGED_DIR));
                 let _ = std::fs::remove_dir(&cfg.plugins_dir);
                 let _ = std::fs::remove_dir(&cfg.skills_dir);
@@ -195,7 +198,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 }
                 let legacy_json = config_dir.join("antigravity-cli").join("antigravity.json");
                 if legacy_json.exists() {
-                    let _ = std::fs::remove_file(&legacy_json);
+                    crate::state::report_best_effort_remove(
+                        &legacy_json,
+                        std::fs::remove_file(&legacy_json),
+                    );
                 }
             } else if harness_kind == HarnessKind::Claude {
                 for tool in &["codegraph", "engram", "context7", "rtk"] {
