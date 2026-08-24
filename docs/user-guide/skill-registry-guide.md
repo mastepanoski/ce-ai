@@ -2,7 +2,7 @@
 <!-- Reference material (tier precedence table, degradation tags) lives inside as labeled subsections of this how-to. -->
 # Skill Registry Guide (`ce-ai skills`)
 
-The **Multi-Harness Skill Registry Engine** indexes, validates, and resolves `SKILL.md` instruction files across all 12 supported AI coding agent harnesses. It provides a central, harness-neutral master catalog stored at `~/.ce-ai/skills-registry.json` that enables agents to discover available skills, verify SHA256 integrity, and inject sub-agent prompt blocks deterministically.
+The **Multi-Harness Skill Registry Engine** indexes, validates, and resolves `SKILL.md` instruction files across all supported AI coding agent harnesses. It provides a central, harness-neutral master catalog stored at `~/.ce-ai/skills-registry.json` that enables agents to discover available skills, verify SHA256 integrity, and inject sub-agent prompt blocks deterministically.
 
 ---
 
