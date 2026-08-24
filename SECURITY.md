@@ -73,14 +73,16 @@ To understand why `ce-ai` implements these specific controls, let's explore the 
 
 ## 🛡️ Vulnerability Disclosure Protocol
 
-If you discover a security vulnerability, flaw, or unexpected behavior in `ce-ai`, please report it responsibly:
+If you discover a security vulnerability, flaw, or unexpected behavior in `ce-ai`, please report it **privately** through one of these channels (in order of preference):
 
-1. **Report via GitHub Private Security Advisory**: Submit a report directly via [GitHub Security Advisories](https://github.com/mastepanoski/ce-ai/security/advisories/new) (preferred).
-2. **Report via GitHub Security Issue**: Alternatively, open a GitHub Issue using our dedicated [Security Report Template](.github/ISSUE_TEMPLATE/security_report.yml).
+1. **GitHub Private Vulnerability Reporting** (preferred): Submit a confidential report directly via [Private Vulnerability Reporting](https://github.com/mastepanoski/ce-ai/security/advisories/new).
+2. **Email** (only if you cannot use GitHub): Contact the maintainer privately at [me@maurostepanoski.ar](mailto:me@maurostepanoski.ar).
 3. Include:
    - Detailed description of the vulnerability (e.g. path traversal, unsafe extraction, state corruption).
    - Steps to reproduce or proof-of-concept payload.
    - Impact evaluation across operating systems (Linux, macOS, Windows).
+
+> ⚠️ **Never report vulnerabilities through public channels** (public Issues, Pull Requests, or Discussions). Public reports expose proof-of-concept exploit details before a patch is available. Any public security issue will be redirected to private reporting and closed.
 
 ### Response Timelines
 - **Initial Acknowledgement**: Within 24 hours.

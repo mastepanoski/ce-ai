@@ -3,8 +3,7 @@ class CeAi < Formula
   homepage "https://github.com/mastepanoski/ce-ai"
   url "https://github.com/mastepanoski/ce-ai/archive/refs/tags/v1.18.1.tar.gz"
 
-  version "1.20.4"
-  version "1.19.2"
+  version "1.21.1"
   license "MIT"
 
   if OS.mac? && Hardware::CPU.intel?
