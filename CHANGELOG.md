@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.1] - 2026-08-24
+
+### Fixed
+- Added Serde alias `url` for `server_url` in `AgyMcpServer` and ensured `register_agy_mcp_server` cleans stale remote keys (`url`, `serverUrl`, `headers`, `transport`) from `extra` map on server name collision.
+- Used cross-platform path joining (`PathBuf::from(".agents").join("rules").join("compound-engineering.md")`) in `AgyAdapter::derived_stub_files`.
+- Documented `ANTIGRAVITY_CONFIG_DIR` and `GEMINI_HOME` as `ce-ai` extension conventions in OpenSpec `design.md`.
+- Expanded unit tests in `src/harness/agy.rs` covering environment variable precedence, serverUrl reset, and OpenCode key exclusion.
+
 ## [1.17.0] - 2026-08-23
 
 ### Added
