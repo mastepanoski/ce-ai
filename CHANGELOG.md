@@ -5,6 +5,13 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.2] - 2026-08-23
+
+### Fixed
+- Documented `$ANTIGRAVITY_CONFIG_DIR` and `$GEMINI_HOME` as `ce-ai` extension conventions for custom directory relocation in Google Antigravity OpenSpec design.
+- Documented project rules architecture (`GEMINI.md` canonical instruction file and `.agents/rules/compound-engineering.md` derived stub file).
+- Formally specified server registration name collision policy in `register_agy_mcp_server` where stdio registration explicitly resets `server_url` to `None`.
+
 ## [1.15.1] - 2026-08-23
 
 ### Fixed

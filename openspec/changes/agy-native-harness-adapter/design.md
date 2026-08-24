@@ -95,9 +95,17 @@ pub struct AgyMcpServer {
 - `pub fn unregister_agy_mcp_server(config_path: &Path, name: &str) -> Result<(), CeError>`
 
 ## Environment Resolution & Backup Matching Rules
-1. If `$ANTIGRAVITY_CONFIG_DIR` is set and non-empty, use that directory as `harness_dir`.
+1. If `$ANTIGRAVITY_CONFIG_DIR` is set and non-empty, use that directory as `harness_dir`. (Note: `$ANTIGRAVITY_CONFIG_DIR` and `$GEMINI_HOME` are `ce-ai` extension conventions for custom directory relocation).
 2. Else if `$GEMINI_HOME` is set and non-empty, use that directory as `harness_dir`.
 3. Else default to `<home_dir>/.gemini`.
 4. `config_path` is `harness_dir.join("config").join("mcp_config.json")`.
 5. Skills directory is `harness_dir.join("config").join("skills")`.
 6. Backup filter in `src/state/backups.rs` matches entries containing `"gemini"`, `"antigravity"`, or `"agy"`.
+
+## Server Registration Name Collision Policy
+- When `register_agy_mcp_server` registers a server entry under a name that previously had a remote `serverUrl` definition, `command`, `args`, and `env` are updated, and `server_url` is explicitly set to `None` to convert the entry cleanly to a stdio command server.
+- Remote server entries with distinct names (e.g. `serverUrl: "https://..."`) are preserved intact alongside native stdio tools.
+
+## Project Rules Architecture
+- Canonical instruction file is `<project_dir>/GEMINI.md`.
+- Derived stub rule file is `<project_dir>/.agents/rules/compound-engineering.md` (adopted when `.agents/` directory pre-exists).
