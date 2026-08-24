@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.1] - 2026-08-24
+
+### Changed
+- OpenSpec ledger hygiene: established `openspec/changes/archive/` with a written convention and triage table; 51 completed folders archived (35 fully-checked, 16 STATUS-annotated with feature-level ship evidence), the three changes shipped by PRs #205–#207 now have their tasks ticked, and `context_exhaustion_resilience` remains active as the only folder without observable ship evidence.
+
+### Fixed
+- Best-effort cleanup failures are no longer silently swallowed (invariant #5): `deinit-prj` stub removals/rewrites (18 sites), `init-prj` legacy migrations (3), transient tarball temp dirs (install/upgrade), skill-registry sync (install/sync) and the `sync --watch` Ctrl-C handler registration now emit stderr warnings naming path and cause, while `NotFound` stays silent; custom-mode root pruning keeps its intentional silence with a justification comment.
+
 ## [1.20.0] - 2026-08-24
 
 ### Added

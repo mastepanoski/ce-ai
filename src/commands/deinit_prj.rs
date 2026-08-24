@@ -7,6 +7,7 @@ use crate::commands::init_prj::{BLOCK_BEGIN_MARKER, BLOCK_END_MARKER};
 use crate::commands::Context;
 use crate::error::CeError;
 use crate::state::state::State;
+use crate::state::{report_best_effort_remove, report_best_effort_write};
 
 /// Executes `ce-ai deinit-prj`.
 pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeError> {
@@ -113,9 +114,12 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                     if c_text.contains(crate::harness::claude::CE_MANAGED_BEGIN) {
                         let stripped = crate::harness::claude::strip_managed_block(&c_text);
                         if stripped.trim().is_empty() || stripped.trim() == "@AGENTS.md" {
-                            let _ = fs::remove_file(claude_rule);
+                            report_best_effort_remove(claude_rule, fs::remove_file(claude_rule));
                         } else {
-                            let _ = crate::state::write_atomic(claude_rule, stripped.as_bytes());
+                            report_best_effort_write(
+                                claude_rule,
+                                crate::state::write_atomic(claude_rule, stripped.as_bytes()),
+                            );
                         }
                     }
                 }
@@ -131,9 +135,12 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                     if c_text.contains(crate::harness::codex::CE_MANAGED_BEGIN) {
                         let stripped = crate::harness::codex::strip_managed_block(&c_text);
                         if stripped.trim().is_empty() {
-                            let _ = fs::remove_file(codex_rule);
+                            report_best_effort_remove(codex_rule, fs::remove_file(codex_rule));
                         } else {
-                            let _ = crate::state::write_atomic(codex_rule, stripped.as_bytes());
+                            report_best_effort_write(
+                                codex_rule,
+                                crate::state::write_atomic(codex_rule, stripped.as_bytes()),
+                            );
                         }
                     }
                 }
@@ -147,9 +154,12 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                 if c_text.contains(crate::harness::copilot::CE_MANAGED_BEGIN) {
                     let stripped = crate::harness::copilot::strip_managed_block(&c_text);
                     if stripped.trim().is_empty() {
-                        let _ = fs::remove_file(&copilot_rule);
+                        report_best_effort_remove(&copilot_rule, fs::remove_file(&copilot_rule));
                     } else {
-                        let _ = crate::state::write_atomic(&copilot_rule, stripped.as_bytes());
+                        report_best_effort_write(
+                            &copilot_rule,
+                            crate::state::write_atomic(&copilot_rule, stripped.as_bytes()),
+                        );
                     }
                 }
             }
@@ -165,9 +175,12 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                 if c_text.contains(crate::harness::CE_MANAGED_BEGIN) {
                     let stripped = crate::harness::strip_managed_rule_block(&c_text);
                     if stripped.trim().is_empty() {
-                        let _ = fs::remove_file(&grok_rule);
+                        report_best_effort_remove(&grok_rule, fs::remove_file(&grok_rule));
                     } else {
-                        let _ = crate::state::write_atomic(&grok_rule, stripped.as_bytes());
+                        report_best_effort_write(
+                            &grok_rule,
+                            crate::state::write_atomic(&grok_rule, stripped.as_bytes()),
+                        );
                     }
                 }
             }
@@ -186,10 +199,16 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                     if c_text.contains(crate::harness::CE_MANAGED_BEGIN) {
                         let stripped = crate::harness::strip_managed_rule_block(&c_text);
                         if stripped.trim().is_empty() {
-                            let _ = fs::remove_file(kimi_path);
-                            let _ = fs::remove_dir(target_dir.join(".kimi-code").join("rules"));
+                            report_best_effort_remove(kimi_path, fs::remove_file(kimi_path));
+                            report_best_effort_remove(
+                                target_dir.join(".kimi-code").join("rules"),
+                                fs::remove_dir(target_dir.join(".kimi-code").join("rules")),
+                            );
                         } else {
-                            let _ = crate::state::write_atomic(kimi_path, stripped.as_bytes());
+                            report_best_effort_write(
+                                kimi_path,
+                                crate::state::write_atomic(kimi_path, stripped.as_bytes()),
+                            );
                         }
                     }
                 }
@@ -203,9 +222,12 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                 if c_text.contains(crate::harness::CE_MANAGED_BEGIN) {
                     let stripped = crate::harness::strip_managed_rule_block(&c_text);
                     if stripped.trim().is_empty() {
-                        let _ = fs::remove_file(&pi_agents);
+                        report_best_effort_remove(&pi_agents, fs::remove_file(&pi_agents));
                     } else {
-                        let _ = crate::state::write_atomic(&pi_agents, stripped.as_bytes());
+                        report_best_effort_write(
+                            &pi_agents,
+                            crate::state::write_atomic(&pi_agents, stripped.as_bytes()),
+                        );
                     }
                 }
             }
@@ -218,9 +240,12 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                 if c_text.contains(crate::harness::CE_MANAGED_BEGIN) {
                     let stripped = crate::harness::strip_managed_rule_block(&c_text);
                     if stripped.trim().is_empty() {
-                        let _ = fs::remove_file(&fx_agents);
+                        report_best_effort_remove(&fx_agents, fs::remove_file(&fx_agents));
                     } else {
-                        let _ = crate::state::write_atomic(&fx_agents, stripped.as_bytes());
+                        report_best_effort_write(
+                            &fx_agents,
+                            crate::state::write_atomic(&fx_agents, stripped.as_bytes()),
+                        );
                     }
                 }
             }
@@ -236,9 +261,12 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                 if c_text.contains(crate::harness::CE_MANAGED_BEGIN) {
                     let stripped = crate::harness::strip_managed_rule_block(&c_text);
                     if stripped.trim().is_empty() {
-                        let _ = fs::remove_file(&agy_rule);
+                        report_best_effort_remove(&agy_rule, fs::remove_file(&agy_rule));
                     } else {
-                        let _ = crate::state::write_atomic(&agy_rule, stripped.as_bytes());
+                        report_best_effort_write(
+                            &agy_rule,
+                            crate::state::write_atomic(&agy_rule, stripped.as_bytes()),
+                        );
                     }
                 }
             }
@@ -249,9 +277,12 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                 if c_text.contains(crate::harness::CE_MANAGED_BEGIN) {
                     let stripped = crate::harness::strip_managed_rule_block(&c_text);
                     if stripped.trim().is_empty() {
-                        let _ = fs::remove_file(&gemini_rule);
+                        report_best_effort_remove(&gemini_rule, fs::remove_file(&gemini_rule));
                     } else {
-                        let _ = crate::state::write_atomic(&gemini_rule, stripped.as_bytes());
+                        report_best_effort_write(
+                            &gemini_rule,
+                            crate::state::write_atomic(&gemini_rule, stripped.as_bytes()),
+                        );
                     }
                 }
             }

@@ -42,3 +42,79 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CeError> {
     std::fs::rename(&tmp, path)?;
     Ok(())
 }
+
+/// Reports a best-effort removal without swallowing real failures: `Ok` and
+/// `NotFound` stay silent (removing an absent artifact is success); any
+/// other error prints a stderr warning naming the path. Returns true when
+/// a warning was emitted.
+pub(crate) fn report_best_effort_remove(path: impl AsRef<Path>, res: std::io::Result<()>) -> bool {
+    match res {
+        Ok(()) => false,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => false,
+        Err(err) => {
+            eprintln!(
+                "warning: cleanup of {} failed: {err}",
+                path.as_ref().display()
+            );
+            true
+        }
+    }
+}
+
+/// Reports a best-effort config rewrite without hiding failures. Returns
+/// true when a warning was emitted.
+pub(crate) fn report_best_effort_write(path: impl AsRef<Path>, res: Result<(), CeError>) -> bool {
+    match res {
+        Ok(()) => false,
+        Err(err) => {
+            eprintln!(
+                "warning: update of {} failed: {err}",
+                path.as_ref().display()
+            );
+            true
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{report_best_effort_remove, report_best_effort_write};
+    use tempfile::tempdir;
+
+    #[test]
+    fn remove_reporter_is_silent_on_ok_and_not_found() {
+        assert!(!report_best_effort_remove("x", Ok(())));
+
+        let tmp = tempdir().unwrap();
+        let absent = tmp.path().join("absent.txt");
+        assert!(!report_best_effort_remove(
+            &absent,
+            std::fs::remove_file(&absent)
+        ));
+    }
+
+    #[test]
+    fn remove_reporter_warns_on_unexpected_io_error() {
+        // Removing a non-empty directory fails with DirectoryNotEmpty —
+        // an unexpected condition for a best-effort cleanup.
+        let dir = tempdir().unwrap();
+        let nested = dir.path().join("nested");
+        std::fs::create_dir_all(nested.join("child")).unwrap();
+        assert!(report_best_effort_remove(
+            dir.path().join("nested"),
+            std::fs::remove_dir(&nested)
+        ));
+    }
+
+    #[test]
+    fn write_reporter_warns_on_error_and_stays_silent_on_ok() {
+        assert!(!report_best_effort_write("x", Ok(())));
+        assert!(report_best_effort_write(
+            "/unreachable/path.json",
+            Err(crate::error::CeError::Io(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "denied",
+            )))
+        ));
+    }
+}
