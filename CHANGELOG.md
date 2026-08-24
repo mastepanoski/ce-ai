@@ -5,6 +5,12 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.6] - 2026-08-24
+
+### Changed
+- Homebrew distribution consolidated into the self-updating [`mastepanoski/homebrew-ce-ai`](https://github.com/mastepanoski/homebrew-ce-ai) tap: the redundant in-repo `Formula/ce-ai.rb` and the automated formula-update PR were removed. The tap's `self-update` workflow (30-minute cadence) is the single source of truth, eliminating the dual-state drift observed between consecutive releases.
+- The `release-integrity` job now publishes only `SHA256SUMS.txt`; `scripts/release-integrity.sh` was simplified accordingly (digest verification of the six release assets remains fail-closed).
+
 ## [1.21.5] - 2026-08-24
 
 ### Fixed

@@ -37,7 +37,7 @@
 - [ ] Branch name follows convention (`feature/*`, `fix/*`, `docs/*`)
 - [ ] Commits follow [Conventional Commits](https://www.conventionalcommits.org/)
 - [ ] OpenSpec change exists under `openspec/changes/<feature_name>/` (mandatory for any code change)
-- [ ] SemVer bumped in `Cargo.toml` and `Formula/ce-ai.rb`; `CHANGELOG.md` updated (shippable changes)
+- [ ] SemVer bumped in `Cargo.toml`; `CHANGELOG.md` updated (shippable changes)
 - [ ] No breaking CLI contract or JSON schema changes (or explicitly documented and reviewed)
 - [ ] Mutations to `state.json` / `opencode.json` use `crate::state::write_atomic`
 - [ ] Unmanaged user plugins/skills in `opencode.json` are preserved (no config clobbering)
