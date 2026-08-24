@@ -5,6 +5,12 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.0] - 2026-08-24
+
+### Added
+- `ce-ai doctor` branch-protection health probe (final requirement of `context_exhaustion_resilience`): resolves the GitHub `owner/repo` slug from `origin`, queries `branches/main/protection` via `gh`, and raises a finding when `main` is verifiably unprotected or missing required status checks — the exact gap that forced admin-bypass merges during recent cycles. Non-GitHub remotes and an unavailable `gh` degrade to info notices; absent PR-review requirements surface as a single-developer advisory instead of a failure (matching `scripts/protect-branch.sh`).
+- OpenSpec ledger completed: `context_exhaustion_resilience` fully implemented, tasks ticked with documented deviations, and archived — the active change folder count is now zero.
+
 ## [1.20.4] - 2026-08-24
 
 ### Fixed

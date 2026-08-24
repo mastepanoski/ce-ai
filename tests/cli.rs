@@ -3482,3 +3482,128 @@ fn sync_restores_drifted_custom_assets_and_reports_verified_surface() {
         plugins.display().to_string()
     );
 }
+
+// ---------------------------------------------------------------------------
+// context-resilience R1: doctor branch-protection health probe
+// ---------------------------------------------------------------------------
+
+/// Creates a hermetic fake `gh` executable and returns its bin dir.
+#[cfg(unix)]
+fn fake_gh(dir: &Path, behavior: &str) -> PathBuf {
+    let bin = dir.join("fake-bin");
+    fs::create_dir_all(&bin).unwrap();
+    let script = match behavior {
+        // Simulates an unprotected main (GitHub answers 404).
+        "notfound" => "#!/bin/sh\necho 'gh: Not Found (HTTP 404)' >&2\nexit 1\n",
+        // Protected main with required status checks.
+        _ => "#!/bin/sh\necho '{\"required_status_checks\":{\"contexts\":[\"ci\"]}}'\n",
+    };
+    let path = bin.join("gh");
+    fs::write(&path, script).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    bin
+}
+
+#[cfg(unix)]
+fn doctor_with_fake_gh(
+    config_dir: &Path,
+    home: &Path,
+    repo: &Path,
+    gh_bin: &Path,
+) -> assert_cmd::assert::Assert {
+    let mut cmd = ceai(config_dir, home);
+    let path_var = std::env::var("PATH").unwrap_or_default();
+    cmd.env("PATH", format!("{}:{path_var}", gh_bin.display()))
+        .current_dir(repo)
+        .arg("doctor");
+    cmd.assert()
+}
+
+#[cfg(unix)]
+#[test]
+fn doctor_flags_unprotected_github_main() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let repo = tmp.path().join("repo");
+    fs::create_dir_all(&repo).unwrap();
+
+    let mut git = std::process::Command::new("git");
+    git.current_dir(&repo)
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env_remove("GIT_INDEX_FILE")
+        .env_remove("GIT_PREFIX");
+    let isolated = || {
+        let mut c = std::process::Command::new("git");
+        c.current_dir(&repo)
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
+            .env_remove("GIT_PREFIX");
+        c
+    };
+    git.args(["init"]).output().unwrap();
+    isolated()
+        .args([
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:acme/ce-ai-test.git",
+        ])
+        .output()
+        .unwrap();
+
+    let gh_bin = fake_gh(tmp.path(), "notfound");
+    doctor_with_fake_gh(&config_dir, &home, &repo, &gh_bin)
+        .failure()
+        .code(1)
+        .stdout(predicate::str::contains(
+            "branch-protection: missing or unconfigured for main",
+        ));
+}
+
+#[cfg(unix)]
+#[test]
+fn doctor_stays_quiet_when_main_is_protected() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let repo = tmp.path().join("repo");
+    fs::create_dir_all(&repo).unwrap();
+
+    let mut git = std::process::Command::new("git");
+    git.current_dir(&repo)
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env_remove("GIT_INDEX_FILE")
+        .env_remove("GIT_PREFIX");
+    let isolated = || {
+        let mut c = std::process::Command::new("git");
+        c.current_dir(&repo)
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
+            .env_remove("GIT_PREFIX");
+        c
+    };
+    git.args(["init"]).output().unwrap();
+    isolated()
+        .args([
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/acme/ce-ai-test.git",
+        ])
+        .output()
+        .unwrap();
+
+    let gh_bin = fake_gh(tmp.path(), "protected");
+    // A bare repo trips unrelated findings (e.g. missing skill registry);
+    // what this test pins is that a *protected* main raises no
+    // branch-protection finding and reports the reviews advisory.
+    doctor_with_fake_gh(&config_dir, &home, &repo, &gh_bin)
+        .stdout(predicate::str::contains(
+            "branch-protection: PR reviews not required on main",
+        ))
+        .stdout(predicate::str::contains("branch-protection: missing or unconfigured").not());
+}
