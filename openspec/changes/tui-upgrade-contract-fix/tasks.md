@@ -1,0 +1,3 @@
+- [x] T1.1 Fix upgrade invocation; drop obsolete scope line
+- [x] T1.2 Extract builders + anti-drift contract tests (incl. dead-flag pin)
+- [x] T2.1 Gates green (fmt/clippy -D warnings/test/e2e)
