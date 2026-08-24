@@ -5,6 +5,13 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.1] - 2026-08-23
+
+### Fixed
+- Updated Kimi Code CLI project rule adoption target to `.kimi-code/AGENTS.md` (official Kimi Code CLI instruction file path), cleaning up legacy `.kimi-code/rules/compound-engineering.md` and empty `rules/` directories on deinit.
+- Extracted neutral managed rule block update and strip helpers (`update_managed_rule_md`, `strip_managed_rule_block`, `CE_MANAGED_BEGIN`) in `src/harness/mod.rs` to decouple adapters.
+- Removed stale doc comments mentioning Kimi and Antigravity in `src/harness/generic_json.rs`.
+
 ## [1.15.0] - 2026-08-23
 
 ### Added

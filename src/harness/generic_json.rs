@@ -1,4 +1,4 @@
-//! Generic JSON harness adapter implementation for Kimi, AGY, DeepSeek, FX.
+//! Generic JSON harness adapter implementation for DeepSeek, FX, and Custom.
 
 use std::path::{Path, PathBuf};
 
