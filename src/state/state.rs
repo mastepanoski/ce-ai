@@ -163,15 +163,25 @@ impl State {
 
     pub fn load(path: &Path) -> Result<Self, CeError> {
         match std::fs::read(path) {
-            Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
+            Ok(bytes) => serde_json::from_slice(&bytes).map_err(|e| {
+                CeError::State(format!("state.json at {} is corrupt: {e}", path.display()))
+            }),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(Self::new()),
-            Err(err) => Err(err.into()),
+            Err(err) => Err(CeError::State(format!(
+                "cannot read state.json at {}: {err}",
+                path.display()
+            ))),
         }
     }
 
     /// Persists state.json atomically (temp file + rename).
     pub fn save(&self, path: &Path) -> Result<(), CeError> {
-        write_atomic(path, &serde_json::to_vec(self)?)
+        write_atomic(path, &serde_json::to_vec(self)?).map_err(|e| {
+            CeError::State(format!(
+                "cannot persist state.json at {}: {e}",
+                path.display()
+            ))
+        })
     }
 
     /// Returns active `WorkflowState`, falling back to legacy `last_update_check` parsing if present.

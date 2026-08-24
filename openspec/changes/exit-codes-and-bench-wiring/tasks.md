@@ -1,0 +1,5 @@
+- [x] T1.1 Error variants + mappings + doc header
+- [x] T1.2 State::load/save wrap; security.rs test updated
+- [x] T1.3 Network sites (upgrade download, install send/bytes)
+- [x] T2.1 Bench version via CARGO_PKG_VERSION; make bench target
+- [x] T3.1 Gates green
