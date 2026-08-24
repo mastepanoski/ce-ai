@@ -52,14 +52,15 @@ This builds an isolated Linux container (`Dockerfile.e2e`) and validates `ce-ai 
 
 ## 📜 Pull Request Guidelines
 
-1. **Branch Naming**: Use descriptive branch names: `feature/description`, `fix/issue-name`, or `docs/update`.
-2. **Conventional Commits**: Commit messages must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+1. **PR Template**: Open all pull requests using the repository [PR template](./.github/PULL_REQUEST_TEMPLATE.md); every verification gate and checklist item must be satisfied before review.
+2. **Branch Naming**: Use descriptive branch names: `feature/description`, `fix/issue-name`, or `docs/update`.
+3. **Conventional Commits**: Commit messages must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
    - `feat(models): add support for custom profile export`
    - `fix(sync): resolve atomic rename lock race`
    - `docs(security): update ISO 27001 risk matrix`
-3. **100% Test Coverage**: New features or bug fixes must include unit or CLI integration tests.
-4. **No Breaking Changes**: Preserve existing CLI contracts and JSON schema formats unless explicitly documented and reviewed.
-5. **Security Audit**: Code must pass `cargo audit` without open vulnerability alerts.
+4. **100% Test Coverage**: New features or bug fixes must include unit or CLI integration tests.
+5. **No Breaking Changes**: Preserve existing CLI contracts and JSON schema formats unless explicitly documented and reviewed.
+6. **Security Audit**: Code must pass `cargo audit` without open vulnerability alerts.
 
 ---
 

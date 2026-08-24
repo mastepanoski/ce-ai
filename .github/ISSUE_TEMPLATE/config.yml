@@ -1,0 +1,12 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🛡️ Security Vulnerability Report (Private)
+    url: https://github.com/mastepanoski/ce-ai/security/advisories/new
+    about: >-
+      Report security vulnerabilities confidentially via GitHub Private Vulnerability Reporting.
+      Never open a public issue for security reports.
+      If you cannot use GitHub, email me@maurostepanoski.ar.
+  - name: 💬 Questions & Community Discussion
+    url: https://github.com/mastepanoski/ce-ai/discussions
+    about: >-
+      Ask usage questions, share setup tips, and discuss ideas with the community in GitHub Discussions.
