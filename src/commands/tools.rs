@@ -217,6 +217,30 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
             )?;
         }
 
+        let kimi_installed = state
+            .installed_harnesses
+            .iter()
+            .any(|h| h["name"].as_str() == Some("kimi"));
+        if kimi_installed {
+            let (cmd, args_vec) = match tool_lower.as_str() {
+                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
+                "engram" => ("engram", vec!["serve"]),
+                "rtk" => ("rtk", vec!["mcp"]),
+                "codegraph" => ("codegraph", vec!["mcp"]),
+                _ => ("", vec![]),
+            };
+            let empty_env = std::collections::BTreeMap::new();
+            let kimi_adapter = crate::harness::kimi::KimiAdapter;
+            let kimi_config = kimi_adapter.default_config_path(&home_dir);
+            crate::harness::kimi::register_kimi_mcp_server(
+                &kimi_config,
+                &tool_lower,
+                cmd,
+                &args_vec,
+                &empty_env,
+            )?;
+        }
+
         let grok_installed = state
             .installed_harnesses
             .iter()

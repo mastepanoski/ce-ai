@@ -326,6 +326,15 @@ pub fn run(
             crate::harness::grok::update_grok_rule_md(&grok_rule_path, inner_body)?;
         }
 
+        // Write Kimi project rule .kimi-code/rules/compound-engineering.md if .kimi-code exists
+        let kimi_dir = target_dir.join(".kimi-code");
+        if kimi_dir.exists() {
+            let kimi_rules_dir = kimi_dir.join("rules");
+            fs::create_dir_all(&kimi_rules_dir)?;
+            let kimi_rule_path = kimi_rules_dir.join("compound-engineering.md");
+            crate::harness::grok::update_grok_rule_md(&kimi_rule_path, inner_body)?;
+        }
+
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
             if !ctx.quiet {
                 eprintln!("warning: skill registry sync failed: {e}");
