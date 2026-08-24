@@ -51,6 +51,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         manifest.source.clone(),
     )
 }
+
 /// Resolves the source tree recorded in the manifest (local path or the
 /// extracted release tree recorded by upgrade).
 fn resolve_source_root(source: &serde_json::Value) -> Result<PathBuf, CeError> {
@@ -236,133 +237,38 @@ pub(crate) fn sync_with(
                     config_mutations: manifest.config_mutations.clone(),
                 }
                 .write(&cfg.plugins_dir)?;
-            } else if h_kind == HarnessKind::Cursor {
+            } else if let Some(spec) = registration_spec(h_kind) {
+                // Strategy table: one exhaustive entry per table-driven kind
+                // (see registration_spec below).
                 let empty_env = std::collections::BTreeMap::new();
-                crate::harness::cursor::register_cursor_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::cursor::register_cursor_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-            } else if h_kind == HarnessKind::Claude {
-                let empty_env = std::collections::BTreeMap::new();
-                crate::harness::claude::register_claude_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::claude::register_claude_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-                let claude_skills_dir = config_dir.join("skills");
-                let managed_skills_src = managed_dir.join("skills");
-                if managed_skills_src.exists() {
-                    let _ = crate::source::archive::copy_dir_all(
-                        &managed_skills_src,
-                        &claude_skills_dir,
-                    );
+                if let Some(register) = spec.register_mcp {
+                    register(
+                        &target_config,
+                        "codegraph",
+                        "codegraph",
+                        &["mcp"],
+                        &empty_env,
+                    )?;
+                    register(&target_config, "engram", "engram", &["serve"], &empty_env)?;
                 }
-            } else if h_kind == HarnessKind::Codex {
-                let empty_env = std::collections::BTreeMap::new();
-                crate::harness::codex::register_codex_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::codex::register_codex_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-                let codex_skills_dir = config_dir.join("skills");
-                let managed_skills_src = managed_dir.join("skills");
-                if managed_skills_src.exists() {
-                    crate::source::archive::copy_dir_all(&managed_skills_src, &codex_skills_dir)
-                        .map_err(|e| {
-                            CeError::Runtime(format!(
-                                "failed to copy managed skills to {}: {e}",
-                                codex_skills_dir.display()
-                            ))
-                        })?;
+                if let Some(subpath) = spec.skills_subpath {
+                    copy_managed_skills(&managed_dir, &config_dir.join(subpath))?;
                 }
-            } else if h_kind == HarnessKind::Copilot {
-                let empty_env = std::collections::BTreeMap::new();
-                crate::harness::copilot::register_copilot_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::copilot::register_copilot_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-                let copilot_skills_dir = config_dir.join("skills");
-                let managed_skills_src = managed_dir.join("skills");
-                if managed_skills_src.exists() {
-                    crate::source::archive::copy_dir_all(&managed_skills_src, &copilot_skills_dir)
-                        .map_err(|e| {
-                            CeError::Runtime(format!(
-                                "failed to copy managed skills to {}: {e}",
-                                copilot_skills_dir.display()
-                            ))
-                        })?;
-                }
-            } else if h_kind == HarnessKind::Grok {
-                let empty_env = std::collections::BTreeMap::new();
-                crate::harness::grok::register_grok_mcp_server(
-                    &target_config,
-                    "codegraph",
-                    "codegraph",
-                    &["mcp"],
-                    &empty_env,
-                )?;
-                crate::harness::grok::register_grok_mcp_server(
-                    &target_config,
-                    "engram",
-                    "engram",
-                    &["serve"],
-                    &empty_env,
-                )?;
-                let grok_skills_dir = config_dir.join("skills");
-                let managed_skills_src = managed_dir.join("skills");
-                if managed_skills_src.exists() {
-                    crate::source::archive::copy_dir_all(&managed_skills_src, &grok_skills_dir)
-                        .map_err(|e| {
-                            CeError::Runtime(format!(
-                                "failed to copy managed skills to {}: {e}",
-                                grok_skills_dir.display()
-                            ))
-                        })?;
-                }
-            } else {
-                let _ = crate::opencode::config::ensure_plugin_and_skills(
+            } else if h_kind == HarnessKind::Opencode {
+                // OpenCode's own registration: plugin entry + skills paths.
+                crate::opencode::config::ensure_plugin_and_skills(
                     &target_config,
                     &crate::opencode::plugins::plugin_entry(&config_dir).to_string_lossy(),
                     &crate::opencode::plugins::skills_path(&config_dir).to_string_lossy(),
-                );
+                )?;
+            } else {
+                // Every supported kind has an explicit arm above; reaching
+                // this point means state.json references an unsupported
+                // harness and OpenCode-format mutations must never be a
+                // fallback (invariant #5).
+                return Err(CeError::Runtime(format!(
+                    "cannot re-sync unsupported harness '{name}' recorded in state.json"
+                )));
             }
         }
         let mut entry = serde_json::json!({
@@ -467,9 +373,16 @@ pub(crate) fn sync_with(
                 }
             } else if matches!(
                 kind,
-                HarnessKind::Claude | HarnessKind::Codex | HarnessKind::Copilot | HarnessKind::Grok
+                HarnessKind::Claude
+                    | HarnessKind::Codex
+                    | HarnessKind::Copilot
+                    | HarnessKind::Grok
+                    | HarnessKind::Kimi
+                    | HarnessKind::Agy
+                    | HarnessKind::Pi
+                    | HarnessKind::Fx
             ) {
-                let skills_dir = kind.harness_dir(&home_dir).join("skills");
+                let skills_dir = sync_skills_root(kind, &home_dir);
                 if skills_expected.is_empty() {
                     surfaces.push(SurfaceCheck {
                         harness: name.clone(),
@@ -567,6 +480,155 @@ pub(crate) fn sync_with(
     }
 
     Ok(())
+}
+
+/// Drift found by [`verify_tree_against`]: files absent from disk or whose
+/// on-disk hash no longer matches the expected digest.
+#[derive(Debug, Default, PartialEq)]
+pub(crate) struct TreeDrift {
+    pub missing: Vec<String>,
+    pub mismatched: Vec<String>,
+}
+
+impl TreeDrift {
+    pub(crate) fn total(&self) -> usize {
+        self.missing.len() + self.mismatched.len()
+    }
+}
+
+/// Re-hashes every expected file under `root` and reports which ones are
+/// missing or hash-mismatched. Pure filesystem reads — never mutates.
+pub(crate) fn verify_tree_against(root: &Path, expected: &BTreeMap<String, String>) -> TreeDrift {
+    let mut drift = TreeDrift::default();
+    for (rel, hash) in expected {
+        let path = root.join(rel);
+        match std::fs::read(&path) {
+            Ok(bytes) => {
+                if &sha256_hex(&bytes) != hash {
+                    drift.mismatched.push(rel.clone());
+                }
+            }
+            Err(_) => drift.missing.push(rel.clone()),
+        }
+    }
+    drift
+}
+
+/// Outcome of one harness surface's post-sync verification (Issue #161):
+/// statuses are produced only by checks that actually ran.
+#[derive(Debug)]
+pub(crate) struct SurfaceCheck {
+    pub harness: String,
+    pub status: CheckStatus,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum CheckStatus {
+    /// Every expected file present and hash-matching.
+    Verified { matched: usize, total: usize },
+    /// Real drift detected on a verified surface.
+    Failed {
+        mismatched: Vec<String>,
+        missing: Vec<String>,
+    },
+    /// No hash check ran for this surface; the reason says why.
+    NotVerified { reason: &'static str },
+}
+
+impl CheckStatus {
+    fn from_drift(total: usize, drift: TreeDrift) -> Self {
+        if drift.total() == 0 {
+            Self::Verified {
+                matched: total,
+                total,
+            }
+        } else {
+            Self::Failed {
+                mismatched: drift.mismatched,
+                missing: drift.missing,
+            }
+        }
+    }
+}
+
+/// Vendor MCP registrar signature shared by every native adapter.
+type McpRegistrar = fn(
+    &Path,
+    &str,
+    &str,
+    &[&str],
+    &std::collections::BTreeMap<String, String>,
+) -> Result<(), CeError>;
+
+/// Strategy-table entry describing how `sync` re-registers one harness.
+#[derive(Clone, Copy)]
+struct RegistrationSpec {
+    /// Vendor registrar; `None` for No-MCP harnesses such as pi.
+    register_mcp: Option<McpRegistrar>,
+    /// Managed-skills destination relative to the harness dir; `None`
+    /// disables the skills recopy.
+    skills_subpath: Option<&'static str>,
+}
+
+/// Exhaustive re-registration table (Strategy via data): adding a
+/// `HarnessKind` variant breaks compilation here instead of silently
+/// falling into a fictional write path at runtime.
+fn registration_spec(kind: HarnessKind) -> Option<RegistrationSpec> {
+    let native = |reg: McpRegistrar, subpath: &'static str| RegistrationSpec {
+        register_mcp: Some(reg),
+        skills_subpath: Some(subpath),
+    };
+    Some(match kind {
+        HarnessKind::Cursor => native(crate::harness::cursor::register_cursor_mcp_server, "skills"),
+        HarnessKind::Claude => native(crate::harness::claude::register_claude_mcp_server, "skills"),
+        HarnessKind::Codex => native(crate::harness::codex::register_codex_mcp_server, "skills"),
+        HarnessKind::Copilot => native(
+            crate::harness::copilot::register_copilot_mcp_server,
+            "skills",
+        ),
+        HarnessKind::Grok => native(crate::harness::grok::register_grok_mcp_server, "skills"),
+        HarnessKind::Kimi => native(crate::harness::kimi::register_kimi_mcp_server, "skills"),
+        HarnessKind::Agy => native(
+            crate::harness::agy::register_agy_mcp_server,
+            "config/skills",
+        ),
+        HarnessKind::Fx => native(crate::harness::fx::register_fx_mcp_server, "skills"),
+        // Pi is No-MCP by design (objective 8): skills tree only.
+        HarnessKind::Pi => RegistrationSpec {
+            register_mcp: None,
+            skills_subpath: Some("skills"),
+        },
+        // Dedicated call-site arms: Custom is state-snapshot-driven,
+        // Opencode writes the plugin/skills JSON, Deepseek is de-scoped.
+        HarnessKind::Custom | HarnessKind::Opencode | HarnessKind::Deepseek => return None,
+    })
+}
+
+/// Copies the managed skills tree into a harness root, propagating IO
+/// failures (invariant #5). No-op when the source tree is absent.
+fn copy_managed_skills(managed_dir: &Path, dest: &Path) -> Result<(), CeError> {
+    let src = managed_dir.join("skills");
+    if !src.exists() {
+        return Ok(());
+    }
+    crate::source::archive::copy_dir_all(&src, dest).map_err(|e| {
+        CeError::Runtime(format!(
+            "failed to copy managed skills to {}: {e}",
+            dest.display()
+        ))
+    })
+}
+
+/// Per-kind managed-skills root used for post-sync hash verification.
+/// Agy nests its skills under `config/skills`; every other directory-copying
+/// harness uses `<harness_dir>/skills`.
+fn sync_skills_root(kind: HarnessKind, home_dir: &Path) -> PathBuf {
+    let dir = kind.harness_dir(home_dir);
+    if kind == HarnessKind::Agy {
+        dir.join("config").join("skills")
+    } else {
+        dir.join("skills")
+    }
 }
 
 static INIT_CTRLC: std::sync::Once = std::sync::Once::new();
@@ -676,74 +738,6 @@ fn check_and_repair_drift(
     sync_with(ctx, source_root, &manifest.version, manifest.source.clone())?;
     Ok(true)
 }
-/// Drift found by [`verify_tree_against`]: files absent from disk or whose
-/// on-disk hash no longer matches the expected digest.
-#[derive(Debug, Default, PartialEq)]
-pub(crate) struct TreeDrift {
-    pub missing: Vec<String>,
-    pub mismatched: Vec<String>,
-}
-
-impl TreeDrift {
-    pub(crate) fn total(&self) -> usize {
-        self.missing.len() + self.mismatched.len()
-    }
-}
-
-/// Re-hashes every expected file under `root` and reports which ones are
-/// missing or hash-mismatched. Pure filesystem reads — never mutates.
-pub(crate) fn verify_tree_against(root: &Path, expected: &BTreeMap<String, String>) -> TreeDrift {
-    let mut drift = TreeDrift::default();
-    for (rel, hash) in expected {
-        let path = root.join(rel);
-        match std::fs::read(&path) {
-            Ok(bytes) => {
-                if &sha256_hex(&bytes) != hash {
-                    drift.mismatched.push(rel.clone());
-                }
-            }
-            Err(_) => drift.missing.push(rel.clone()),
-        }
-    }
-    drift
-}
-
-/// Outcome of one harness surface's post-sync verification (Issue #161):
-/// statuses are produced only by checks that actually ran.
-#[derive(Debug)]
-pub(crate) struct SurfaceCheck {
-    pub harness: String,
-    pub status: CheckStatus,
-}
-
-#[derive(Debug, PartialEq)]
-pub(crate) enum CheckStatus {
-    /// Every expected file present and hash-matching.
-    Verified { matched: usize, total: usize },
-    /// Real drift detected on a verified surface.
-    Failed {
-        mismatched: Vec<String>,
-        missing: Vec<String>,
-    },
-    /// No hash check ran for this surface; the reason says why.
-    NotVerified { reason: &'static str },
-}
-
-impl CheckStatus {
-    fn from_drift(total: usize, drift: TreeDrift) -> Self {
-        if drift.total() == 0 {
-            Self::Verified {
-                matched: total,
-                total,
-            }
-        } else {
-            Self::Failed {
-                mismatched: drift.mismatched,
-                missing: drift.missing,
-            }
-        }
-    }
-}
 
 fn plan_verb(action: &Action) -> (&'static str, &str) {
     match action {
@@ -759,8 +753,28 @@ mod tests {
 
     use tempfile::tempdir;
 
-    use super::{verify_tree_against, CheckStatus, TreeDrift};
+    use super::{registration_spec, verify_tree_against, CheckStatus, RegistrationSpec, TreeDrift};
+    use crate::harness::HarnessKind;
     use crate::state::diff::sha256_hex;
+
+    #[test]
+    fn registration_specs_cover_the_table_driven_kinds() {
+        use HarnessKind::*;
+        for kind in [Cursor, Claude, Codex, Copilot, Grok, Kimi, Agy, Fx, Pi] {
+            let spec: RegistrationSpec = registration_spec(kind).expect("table-driven kind");
+            match kind {
+                Pi => assert!(spec.register_mcp.is_none()),
+                _ => assert!(spec.register_mcp.is_some()),
+            }
+            assert!(spec.skills_subpath.is_some());
+            if kind == Agy {
+                assert_eq!(spec.skills_subpath, Some("config/skills"));
+            }
+        }
+        for kind in [Opencode, Custom, Deepseek] {
+            assert!(registration_spec(kind).is_none(), "dedicated arm kind");
+        }
+    }
 
     fn expected_map(files: &[(&str, &[u8])]) -> BTreeMap<String, String> {
         files
