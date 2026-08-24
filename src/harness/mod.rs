@@ -8,7 +8,6 @@ pub mod copilot;
 pub mod cursor;
 pub mod custom;
 pub mod fx;
-pub mod generic_json;
 pub mod grok;
 pub mod kimi;
 pub mod opencode;
@@ -270,7 +269,9 @@ impl HarnessKind {
             HarnessKind::Fx => std::env::var_os("FX_HOME")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| home_dir.join(".fx")),
-            HarnessKind::Custom => home_dir.join(".config").join("custom"),
+            // Single custom-mode contract: the config file lives directly
+            // under ~/.ce-ai (see harness::custom::CONFIG_FILE_NAME).
+            HarnessKind::Custom => home_dir.join(".ce-ai"),
         }
     }
 
@@ -292,7 +293,7 @@ impl HarnessKind {
             HarnessKind::Agy => crate::harness::agy::AgyAdapter.default_config_path(base_dir),
             HarnessKind::Deepseek => base_dir.join("deepseek.json"),
             HarnessKind::Fx => crate::harness::fx::FxAdapter.default_config_path(base_dir),
-            HarnessKind::Custom => base_dir.join("custom.json"),
+            HarnessKind::Custom => base_dir.join(custom::CONFIG_FILE_NAME),
         }
     }
 }

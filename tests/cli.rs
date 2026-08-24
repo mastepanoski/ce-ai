@@ -3034,3 +3034,350 @@ fn install_fx_harness_respects_fx_home_env() {
     assert!(!custom_fx_dir.join("mcp.json").exists());
     assert!(!custom_fx_dir.join("skills").exists());
 }
+
+// ---------------------------------------------------------------------------
+// R4: --harness custom fallback mode (openspec/changes/custom-harness-r4)
+// ---------------------------------------------------------------------------
+
+fn custom_install(config_dir: &Path, home: &Path, source: &Path, plugins: &Path, skills: &Path) {
+    ceai(config_dir, home)
+        .args(["install", "--harness", "custom", "--plugins-dir"])
+        .arg(plugins)
+        .arg("--skills-dir")
+        .arg(skills)
+        .arg("--source")
+        .arg(source)
+        .assert()
+        .success();
+}
+
+fn custom_manifest_path(plugins_dir: &Path) -> PathBuf {
+    plugins_dir.join("compound-engineering/install-manifest.json")
+}
+
+#[test]
+fn install_custom_without_configuration_fails_fast_with_usage_exit() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    // No flags, no ~/.ce-ai/custom_harness.json → Usage (exit 2), zero writes.
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("--plugins-dir"));
+
+    assert!(!home.join(".config/custom").exists(), "no fictional dir");
+    assert!(!home.join(".custom").exists(), "no legacy dir");
+    assert!(!home.join(".ce-ai/custom_harness.json").exists());
+    assert!(
+        !config_dir.join("state.json").exists() || {
+            let state = read_json(&config_dir.join("state.json"));
+            state["installed_harnesses"].as_array().unwrap().is_empty()
+        },
+        "no custom state entry"
+    );
+}
+
+#[test]
+fn install_custom_dry_run_prints_resolved_plan_without_writing() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let (plugins, skills, rules) = (
+        home.join("my/plugins"),
+        home.join("my/skills"),
+        home.join("my/rules.md"),
+    );
+
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "custom", "--plugins-dir"])
+        .arg(&plugins)
+        .arg("--skills-dir")
+        .arg(&skills)
+        .arg("--rules-file")
+        .arg(&rules)
+        .arg("--source")
+        .arg(&source)
+        .arg("--dry-run")
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains(format!("plan: create {}", plugins.display()))
+                .and(predicate::str::contains(format!(
+                    "plan: create {}",
+                    skills.display()
+                )))
+                .and(predicate::str::contains(format!(
+                    "plan: ensure managed CE block in {}",
+                    rules.display()
+                ))),
+        );
+
+    assert!(
+        !plugins.exists() && !skills.exists() && !rules.exists(),
+        "SU-4"
+    );
+}
+
+#[test]
+fn install_custom_with_flags_copies_layout_manifest_state_and_rules_block() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let (plugins, skills, rules) = (
+        home.join("harness/plugins"),
+        home.join("harness/skills"),
+        home.join("harness/rules.md"),
+    );
+    fs::create_dir_all(rules.parent().unwrap()).unwrap();
+    fs::write(&rules, "# my harness rules\nkeep me\n").unwrap();
+
+    custom_install(&config_dir, &home, &source, &plugins, &skills);
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "custom", "--plugins-dir"])
+        .arg(&plugins)
+        .arg("--skills-dir")
+        .arg(&skills)
+        .arg("--rules-file")
+        .arg(&rules)
+        .arg("--source")
+        .arg(&source)
+        .assert()
+        .success();
+
+    // Layout: managed rel paths map directly under the configured roots.
+    assert_eq!(
+        fs::read_to_string(plugins.join("compound-engineering.js")).unwrap(),
+        "export default function ceLoader() {}\n"
+    );
+    assert_eq!(
+        fs::read_to_string(skills.join("ce-brainstorm/SKILL.md")).unwrap(),
+        "# ce-brainstorm\n"
+    );
+
+    // Manifest with per-file SHA256 under the managed dir.
+    let manifest = read_json(&custom_manifest_path(&plugins));
+    let files = manifest["files"].as_array().unwrap();
+    assert_eq!(files.len(), 2);
+    let loader = files
+        .iter()
+        .find(|f| f["path"] == "plugins/compound-engineering.js")
+        .unwrap();
+    assert_eq!(
+        loader["sha256"],
+        sha256_hex(b"export default function ceLoader() {}\n")
+    );
+    assert_eq!(
+        manifest["config_mutations"][0]["file"],
+        rules.display().to_string()
+    );
+
+    // Rules file keeps user bytes and gains exactly one current block.
+    let text = fs::read_to_string(&rules).unwrap();
+    assert!(text.starts_with("# my harness rules\nkeep me\n"));
+    assert!(text.contains("ce-ai:block begin v=2 tier=full"));
+    assert_eq!(text.matches("ce-ai:block begin").count(), 1);
+
+    // State entry embeds the resolved configuration.
+    let state = read_json(&config_dir.join("state.json"));
+    let entry = state["installed_harnesses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|h| h["name"] == "custom")
+        .expect("custom state entry");
+    assert_eq!(
+        entry["custom"]["plugins_dir"],
+        plugins.display().to_string()
+    );
+    assert_eq!(entry["custom"]["skills_dir"], skills.display().to_string());
+
+    // Idempotent reinstall: no duplicated blocks or entries.
+    let state = read_json(&config_dir.join("state.json"));
+    assert_eq!(
+        state["installed_harnesses"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|h| h["name"] == "custom")
+            .count(),
+        1
+    );
+
+    assert!(!home.join(".config/custom").exists());
+}
+
+#[test]
+fn install_custom_config_file_works_and_flags_take_precedence() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let cfg_file = home.join(".ce-ai/custom_harness.json");
+    fs::create_dir_all(cfg_file.parent().unwrap()).unwrap();
+    fs::write(
+        &cfg_file,
+        serde_json::json!({
+            "plugins_dir": "~/file/plugins",
+            "skills_dir": "~/file/skills"
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    // Config-file-only install resolves ~ against the hermetic HOME.
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "custom", "--source"])
+        .arg(&source)
+        .assert()
+        .success();
+    assert!(home.join("file/plugins/compound-engineering.js").exists());
+    assert!(home.join("file/skills/ce-brainstorm/SKILL.md").exists());
+
+    // Flags override the persisted file values.
+    let flag_plugins = home.join("flag/plugins");
+    let flag_skills = home.join("flag/skills");
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "custom", "--plugins-dir"])
+        .arg(&flag_plugins)
+        .arg("--skills-dir")
+        .arg(&flag_skills)
+        .arg("--source")
+        .arg(&source)
+        .assert()
+        .success();
+    assert!(flag_plugins.join("compound-engineering.js").exists());
+    assert!(!flag_plugins.join("custom_harness.json").exists());
+
+    let state = read_json(&config_dir.join("state.json"));
+    let entry = state["installed_harnesses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|h| h["name"] == "custom")
+        .unwrap();
+    assert_eq!(
+        entry["custom"]["plugins_dir"],
+        flag_plugins.display().to_string()
+    );
+}
+
+#[test]
+fn uninstall_custom_is_surgical_and_strips_managed_block() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let (plugins, skills, rules) = (
+        home.join("harness/plugins"),
+        home.join("harness/skills"),
+        home.join("harness/rules.md"),
+    );
+    fs::create_dir_all(rules.parent().unwrap()).unwrap();
+    fs::write(&rules, "# mine\nstay\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "custom", "--plugins-dir"])
+        .arg(&plugins)
+        .arg("--skills-dir")
+        .arg(&skills)
+        .arg("--rules-file")
+        .arg(&rules)
+        .arg("--source")
+        .arg(&source)
+        .assert()
+        .success();
+
+    // Foreign content the user owns inside the same roots.
+    fs::write(skills.join("user-notes.md"), "user data\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "custom", "-y"])
+        .assert()
+        .success();
+
+    // Manifest-recorded files gone; foreign content untouched.
+    assert!(!plugins.join("compound-engineering.js").exists());
+    assert!(!skills.join("ce-brainstorm/SKILL.md").exists());
+    assert!(!custom_manifest_path(&plugins).exists());
+    assert_eq!(
+        fs::read_to_string(skills.join("user-notes.md")).unwrap(),
+        "user data\n"
+    );
+
+    // Block stripped; every other byte preserved.
+    assert_eq!(fs::read_to_string(&rules).unwrap(), "# mine\nstay\n");
+
+    // State entry dropped.
+    let state = read_json(&config_dir.join("state.json"));
+    assert!(state["installed_harnesses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|h| h["name"] != "custom"));
+}
+
+#[test]
+fn uninstall_all_skips_absent_custom_install_gracefully() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "all", "-y"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn sync_restores_drifted_custom_assets_and_reports_verified_surface() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let (plugins, skills) = (home.join("p"), home.join("s"));
+
+    // Sync is opencode-anchored: it needs the opencode manifest to resolve
+    // the desired tree, then reconciles every active harness including custom.
+    install(&config_dir, &home, &source);
+    custom_install(&config_dir, &home, &source, &plugins, &skills);
+
+    // Drift: a custom skill file disappears from disk.
+    let drifted = skills.join("ce-brainstorm/SKILL.md");
+    fs::remove_file(&drifted).unwrap();
+
+    ceai(&config_dir, &home).arg("sync").assert().success();
+
+    // Repaired and hash-verified like native skill surfaces.
+    assert_eq!(fs::read_to_string(&drifted).unwrap(), "# ce-brainstorm\n");
+    let manifest = read_json(&custom_manifest_path(&plugins));
+    for file in manifest["files"].as_array().unwrap() {
+        let rel = file["path"].as_str().unwrap();
+        let disk = if let Some(rest) = rel.strip_prefix("plugins/") {
+            fs::read(plugins.join(rest)).unwrap()
+        } else {
+            fs::read(skills.join(rel.strip_prefix("skills/").unwrap())).unwrap()
+        };
+        assert_eq!(file["sha256"].as_str().unwrap(), sha256_hex(&disk));
+    }
+
+    // State rebuild preserved the directory snapshot (SU-5/R4.4).
+    let state = read_json(&config_dir.join("state.json"));
+    let entry = state["installed_harnesses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|h| h["name"] == "custom")
+        .expect("snapshot survived sync");
+    assert_eq!(
+        entry["custom"]["plugins_dir"],
+        plugins.display().to_string()
+    );
+}

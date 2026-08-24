@@ -1,8 +1,15 @@
 //! `ce-ai uninstall`: restore pre-install config and optionally remove all managed assets (CC-3).
 
+use std::path::PathBuf;
+
 use crate::commands::Context;
 use crate::error::CeError;
+use crate::harness::custom::{
+    plugin_rel, prune_empty_dirs, skill_rel, strip_rules_block, CustomConfigFlags,
+    CustomHarnessConfig,
+};
 use crate::harness::HarnessKind;
+use crate::opencode::manifest::InstallManifest;
 use crate::opencode::plugins::MANAGED_DIR;
 use crate::state::state::State;
 
@@ -19,6 +26,17 @@ pub struct Args {
     /// Bypass interactive confirmation prompt.
     #[arg(short = 'y', long, default_value_t = false)]
     pub yes: bool,
+
+    /// Custom mode (--harness custom): directory holding CE plugin assets.
+    #[arg(long)]
+    pub plugins_dir: Option<PathBuf>,
+    /// Custom mode (--harness custom): directory holding CE skill folders.
+    #[arg(long)]
+    pub skills_dir: Option<PathBuf>,
+    /// Custom mode (--harness custom): markdown rules file carrying the
+    /// managed CE block.
+    #[arg(long)]
+    pub rules_file: Option<PathBuf>,
 }
 
 impl Default for Args {
@@ -27,6 +45,9 @@ impl Default for Args {
             harness: "opencode".into(),
             all: false,
             yes: true,
+            plugins_dir: None,
+            skills_dir: None,
+            rules_file: None,
         }
     }
 }
@@ -60,6 +81,94 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 return Err(CeError::Usage(
                     "deepseek harness is unsupported during developer preview (DeepSeek Harness 'dsh' uses YAML patch layers under ~/.dsh). Please use a supported native harness (opencode, claude, codex, copilot, cursor, grok, kimi, agy, pi, fx).".to_string()
                 ));
+            }
+            if harness_kind == HarnessKind::Custom {
+                // R4 surgical removal: state snapshot ▸ flags ▸ config file.
+                let snapshot = state
+                    .installed_harnesses
+                    .iter()
+                    .find(|h| h["name"].as_str() == Some("custom"))
+                    .and_then(|h| CustomHarnessConfig::from_state_json(&h["custom"]));
+                let cfg = match snapshot {
+                    Some(cfg) => cfg,
+                    None => {
+                        match CustomHarnessConfig::resolve(
+                            &home_dir,
+                            &CustomConfigFlags {
+                                plugins_dir: args.plugins_dir.clone(),
+                                skills_dir: args.skills_dir.clone(),
+                                rules_file: args.rules_file.clone(),
+                            },
+                        ) {
+                            Ok(cfg) => cfg,
+                            Err(err @ CeError::Usage(_)) => {
+                                // `--all` must not abort just because no
+                                // custom install exists on this host.
+                                if targets.len() > 1 {
+                                    continue;
+                                }
+                                return Err(err);
+                            }
+                            Err(err) => return Err(err),
+                        }
+                    }
+                };
+
+                match InstallManifest::load(&cfg.plugins_dir) {
+                    Ok(manifest) => {
+                        for file in &manifest.files {
+                            let dest = if let Some(rest) = plugin_rel(&file.path) {
+                                cfg.plugins_dir.join(rest)
+                            } else if let Some(rest) = skill_rel(&file.path) {
+                                cfg.skills_dir.join(rest)
+                            } else {
+                                continue;
+                            };
+                            if dest.is_file() {
+                                std::fs::remove_file(&dest)?;
+                            }
+                            if let Some(parent) = dest.parent() {
+                                prune_empty_dirs(parent, &[&cfg.plugins_dir, &cfg.skills_dir]);
+                            }
+                        }
+                        let manifest_path = cfg
+                            .plugins_dir
+                            .join(MANAGED_DIR)
+                            .join("install-manifest.json");
+                        if manifest_path.is_file() {
+                            std::fs::remove_file(&manifest_path)?;
+                        }
+                    }
+                    Err(_) => {
+                        if !ctx.quiet {
+                            eprintln!(
+                                "warning: no install manifest under {}; nothing surgical to remove",
+                                cfg.plugins_dir.display()
+                            );
+                        }
+                    }
+                }
+
+                // Remove CE-created roots when they ended up empty; never
+                // delete user-owned directories that still hold content.
+                let _ = std::fs::remove_dir(cfg.plugins_dir.join(MANAGED_DIR));
+                let _ = std::fs::remove_dir(&cfg.plugins_dir);
+                let _ = std::fs::remove_dir(&cfg.skills_dir);
+
+                if let Some(rules) = &cfg.rules_file {
+                    if strip_rules_block(rules)? && !ctx.quiet {
+                        println!(
+                            "uninstall: managed CE block stripped from {}",
+                            rules.display()
+                        );
+                    }
+                }
+
+                state
+                    .installed_harnesses
+                    .retain(|h| h["name"].as_str() != Some(target.as_str()));
+                state.save(&state_path)?;
+                continue;
             }
             let config_dir = if harness_kind == HarnessKind::Opencode {
                 ctx.opencode_config_dir.clone()
