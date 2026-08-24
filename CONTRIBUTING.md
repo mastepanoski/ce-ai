@@ -73,7 +73,7 @@ These boundaries apply equally to human and AI-agent contributors. Documentation
 
 ### Review Boundary
 
-**400 changed lines** per pull request (added + deleted per the counting contract).
+**400 changed lines** per pull request (added + deleted per the counting contract). In Gentle AI this boundary is enforced by the **Review Workload Guard** as a delivery-policy decision — single PR vs chained PRs (`stacked-to-main` or `feature-branch-chain`) with strategies `ask-on-risk`, `auto-chain`, `single-pr`, `exception-ok`. It is a review-workload split signal, never a cap on what an agent may write.
 
 - Below the boundary: zero extra ceremony.
 - Above it: chain into independently shippable slices (each with its own tests and rollback boundary) or attach an explicitly approved **size exception** documented in the PR.
@@ -107,6 +107,8 @@ changed lines per review cycle.
 Volume triggers splitting and review-burden handling only. Risk classification stays evidence-based — authentication, payments, data-loss surfaces, shell/process execution — regardless of line count.
 
 ### Source Constants
+
+Guard trigger conditions live in the SDD orchestrator asset (`internal/assets/hermes/sdd-orchestrator.md`: `400-line budget risk: High`, `estimated changed lines exceed 400`).
 
 Adopted from Gentle AI v2.4.0 (`Gentleman-Programming/gentle-ai`): `LargeChangeLines=400`, `MaxCorrectionChangedLines=200`, `CorrectionBudget` (floor-two variant), `MaxCompactCorrectionAttempts=1` (`internal/reviewtransaction/{risk,compact}.go`); `DefaultRuntimeChangedLines=200`, `DefaultRuntimeAttemptLimit=2` (`internal/sddstatus/runtime_ledger.go`). This document is authoritative for this repository regardless of upstream drift.
 
