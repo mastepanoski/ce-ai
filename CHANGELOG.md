@@ -5,6 +5,20 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] - 2026-08-24
+
+### Added
+- Real `--harness custom` fallback mode (R4 of `multi_harness_support`): `install --harness custom --plugins-dir <dir> --skills-dir <dir> [--rules-file <file>]` copies managed CE plugin assets and skill folders into user-configured directories, records a SHA256 install manifest under `<plugins-dir>/compound-engineering/`, and snapshots the resolved configuration inside the `state.json` entry.
+- Persisted custom-mode configuration at `~/.ce-ai/custom_harness.json` (`plugins_dir`, `skills_dir`, optional `rules_file`) with flag-over-file precedence, `~` expansion, and a fast-fail usage error (exit code 2) when unresolvable.
+- Managed CE block injection into the configured rules markdown file (idempotent; user content preserved verbatim) with surgical uninstall: removes exactly the manifest-recorded files, prunes emptied CE-owned directories, and strips the block while keeping every other byte.
+
+### Changed
+- `sync` re-copies and SHA256-verifies custom-mode plugin/skill surfaces in its verification matrix and preserves directory snapshots across state rebuilds.
+- Single path contract for custom mode: `~/.ce-ai/custom_harness.json`; the fictional `~/.config/custom/custom.json` default and the dead `~/.custom/config.json` adapter were removed.
+
+### Fixed
+- `install`/`uninstall --harness custom` no longer fall through the OpenCode-format branch writing fabricated `{plugin, skills.paths}` JSON into `~/.config/custom/custom.json`.
+
 ## [1.18.1] - 2026-08-24
 
 ### Changed

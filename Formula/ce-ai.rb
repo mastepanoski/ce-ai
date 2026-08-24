@@ -2,7 +2,7 @@ class CeAi < Formula
   desc "Compound Engineering AI plugin installer and manager"
   homepage "https://github.com/mastepanoski/ce-ai"
   url "https://github.com/mastepanoski/ce-ai/archive/refs/tags/v1.18.1.tar.gz"
-  version "1.18.1"
+  version "1.19.0"
   license "MIT"
 
   if OS.mac? && Hardware::CPU.intel?

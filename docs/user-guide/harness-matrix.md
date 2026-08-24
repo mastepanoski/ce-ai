@@ -23,7 +23,7 @@
 | `kimi` | `~/.kimi-code/mcp.json` | Native JSON `mcpServers` Merger |
 | `agy` | `~/.gemini/config/mcp_config.json` | Native JSON `mcpServers` Merger |
 | `fx` | `~/.fx/mcp.json` | Native JSON `mcp` Root Key Merger |
-| `custom` | Specified via CLI flags | Fallback Custom Config Mode |
+| `custom` | `~/.ce-ai/custom_harness.json` or `--plugins-dir/--skills-dir/--rules-file` | User-Configured Directory Install; surgical manifest-driven uninstall |
 | `deepseek` | *De-scoped* (`dsh` developer preview) | Returns `CeError::Usage` (exit code 2) guiding user to native adapters |
 
 ## Safety Guarantees
