@@ -701,7 +701,17 @@ fn resolve_source(
         .map_err(|err| CeError::Runtime(format!("release download failed: {err}")))?
         .bytes()
         .map_err(|err| CeError::Runtime(err.to_string()))?;
-    let (tarball, hex) = Cache::new(ctx.config_dir.join("cache")).cache_tarball(&bytes)?;
+    let (tarball, hex, _dry_run_tmp) = if ctx.dry_run {
+        let tmp = tempfile::TempDir::new()?;
+        let tarball_path = tmp.path().join("dry_run.tar.gz");
+        std::fs::write(&tarball_path, &bytes)?;
+        use sha2::Digest;
+        let hex = format!("{:x}", sha2::Sha256::digest(&bytes));
+        (tarball_path, hex, Some(tmp))
+    } else {
+        let (tarball, hex) = Cache::new(ctx.config_dir.join("cache")).cache_tarball(&bytes)?;
+        (tarball, hex, None)
+    };
     let (root, tmp) = extract_to_source(&ctx.config_dir, ctx.dry_run, &tarball, &version)?;
     if !ctx.dry_run {
         record_tarball_provenance(

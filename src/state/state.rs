@@ -62,6 +62,71 @@ pub struct ReleaseProvenance {
     pub extraction_path: PathBuf,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum WorkflowStage {
+    #[default]
+    Ideation = 1,
+    OpenSpec = 2,
+    ExecutionPlan = 3,
+    WorkTdd = 4,
+    Verification = 5,
+    KnowledgeCapture = 6,
+    GitShipping = 7,
+}
+
+impl WorkflowStage {
+    pub fn number(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            WorkflowStage::Ideation => "ideation",
+            WorkflowStage::OpenSpec => "openspec",
+            WorkflowStage::ExecutionPlan => "plan",
+            WorkflowStage::WorkTdd => "work",
+            WorkflowStage::Verification => "verify",
+            WorkflowStage::KnowledgeCapture => "compound",
+            WorkflowStage::GitShipping => "ship",
+        }
+    }
+
+    pub fn parse(s: &str) -> Result<Self, CeError> {
+        let clean = s.trim().to_lowercase();
+        match clean.as_str() {
+            "1" | "ideation" | "brainstorm" => Ok(WorkflowStage::Ideation),
+            "2" | "openspec" | "spec" => Ok(WorkflowStage::OpenSpec),
+            "3" | "plan" | "executionplan" => Ok(WorkflowStage::ExecutionPlan),
+            "4" | "work" | "tdd" | "worktdd" => Ok(WorkflowStage::WorkTdd),
+            "5" | "verify" | "verification" => Ok(WorkflowStage::Verification),
+            "6" | "compound" | "knowledgecapture" => Ok(WorkflowStage::KnowledgeCapture),
+            "7" | "ship" | "gitshipping" => Ok(WorkflowStage::GitShipping),
+            _ => Err(CeError::Usage(format!(
+                "invalid workflow stage '{s}'. Valid stages: 1 (ideation), 2 (openspec), 3 (plan), 4 (work), 5 (verify), 6 (compound), 7 (ship)"
+            ))),
+        }
+    }
+
+    pub fn can_transition_to(&self, target: WorkflowStage) -> bool {
+        let current_num = self.number();
+        let target_num = target.number();
+        target_num == 1
+            || target_num == current_num
+            || target_num == current_num + 1
+            || (current_num > 1 && target_num == current_num - 1)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct WorkflowState {
+    pub stage: WorkflowStage,
+    pub task: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feature_name: Option<String>,
+    pub updated_at: String,
+}
+
 /// Canonical state file at `~/.ce-ai/state.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
@@ -78,11 +143,12 @@ pub struct State {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_update_check: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow: Option<WorkflowState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_release_tag: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub projects: Vec<ProjectAdoptionEntry>,
 }
-
 fn default_version() -> u32 {
     1
 }
@@ -108,6 +174,63 @@ impl State {
         write_atomic(path, &serde_json::to_vec(self)?)
     }
 
+    /// Returns active `WorkflowState`, falling back to legacy `last_update_check` parsing if present.
+    pub fn current_workflow(&self) -> Option<WorkflowState> {
+        if let Some(wf) = &self.workflow {
+            return Some(wf.clone());
+        }
+        if let Some(entry) = &self.last_update_check {
+            let mut parts = entry.splitn(3, " | ");
+            let phase = parts.next()?.trim();
+            let task = parts.next()?.trim();
+            let ts = parts.next().unwrap_or("").trim().to_string();
+            if let Ok(stage) = WorkflowStage::parse(phase) {
+                return Some(WorkflowState {
+                    stage,
+                    task: task.to_string(),
+                    feature_name: None,
+                    updated_at: if ts.is_empty() {
+                        chrono::Utc::now().to_rfc3339()
+                    } else {
+                        ts
+                    },
+                });
+            }
+        }
+        None
+    }
+
+    /// Validates stage transition and updates state.workflow.
+    pub fn validate_and_set_workflow(
+        &mut self,
+        target_stage: WorkflowStage,
+        task: &str,
+        feature: Option<String>,
+    ) -> Result<(), CeError> {
+        let current_stage = self
+            .current_workflow()
+            .map(|wf| wf.stage)
+            .unwrap_or(WorkflowStage::Ideation);
+        if !current_stage.can_transition_to(target_stage) {
+            return Err(CeError::Usage(format!(
+                "invalid workflow transition: cannot jump from Stage {} ({}) directly to Stage {} ({}). Legal transitions: rewind, reset to Stage 1, stay on current stage, or advance to Stage {}.",
+                current_stage.number(),
+                current_stage.as_str(),
+                target_stage.number(),
+                target_stage.as_str(),
+                current_stage.number() + 1
+            )));
+        }
+        let feature_name =
+            feature.or_else(|| self.current_workflow().and_then(|wf| wf.feature_name));
+        self.workflow = Some(WorkflowState {
+            stage: target_stage,
+            task: task.to_string(),
+            feature_name,
+            updated_at: chrono::Utc::now().to_rfc3339(),
+        });
+        Ok(())
+    }
     /// Default model assignments for Compound Engineering workflow slots.
     pub fn default_model_assignments() -> BTreeMap<String, ModelAssignment> {
         let defaults = [
@@ -195,6 +318,7 @@ mod tests {
                 },
             )]),
             last_update_check: None,
+            workflow: None,
             latest_release_tag: None,
             projects: vec![],
         }

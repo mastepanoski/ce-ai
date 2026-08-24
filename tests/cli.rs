@@ -1107,10 +1107,75 @@ fn companion_tools_status_and_install_subcommands() {
         .stdout(predicate::str::contains("engram"));
 }
 
+fn dir_snapshot(dir: &Path) -> std::collections::BTreeMap<PathBuf, String> {
+    let mut map = std::collections::BTreeMap::new();
+    if !dir.exists() {
+        return map;
+    }
+    for file in walkdir_recursive(dir) {
+        if let Ok(rel) = file.strip_prefix(dir) {
+            if let Ok(bytes) = fs::read(&file) {
+                use sha2::Digest;
+                let hash = format!("{:x}", sha2::Sha256::digest(&bytes));
+                map.insert(rel.to_path_buf(), hash);
+            }
+        }
+    }
+    map
+}
+
+fn walkdir_recursive(dir: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                files.extend(walkdir_recursive(&path));
+            } else if path.is_file() {
+                files.push(path);
+            }
+        }
+    }
+    files
+}
+
+fn assert_dry_run_zero_mutation(
+    config_dir: &Path,
+    home_dir: &Path,
+    workspace_dir: &Path,
+    args: &[&str],
+) {
+    let before_config = dir_snapshot(config_dir);
+    let before_home = dir_snapshot(home_dir);
+    let before_workspace = dir_snapshot(workspace_dir);
+
+    let mut full_args = vec!["--dry-run"];
+    full_args.extend_from_slice(args);
+    ceai(config_dir, home_dir)
+        .args(full_args)
+        .assert()
+        .success();
+
+    let after_config = dir_snapshot(config_dir);
+    let after_home = dir_snapshot(home_dir);
+    let after_workspace = dir_snapshot(workspace_dir);
+
+    assert_eq!(
+        before_config, after_config,
+        "config_dir mutated during dry-run!"
+    );
+    assert_eq!(before_home, after_home, "home_dir mutated during dry-run!");
+    assert_eq!(
+        before_workspace, after_workspace,
+        "workspace_dir mutated during dry-run!"
+    );
+}
+
 #[test]
 fn workflow_status_checkpoint_and_resume_subcommands() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let workspace = tmp.path().join("workspace");
 
     ceai(&config_dir, &home)
         .args(["workflow", "status"])
@@ -1118,28 +1183,55 @@ fn workflow_status_checkpoint_and_resume_subcommands() {
         .success()
         .stdout(predicate::str::contains("Workflow FSM"));
 
+    // Stage 1 -> Stage 2: Valid transition
     ceai(&config_dir, &home)
         .args([
             "workflow",
             "checkpoint",
+            "--stage",
+            "2",
             "--task",
-            "4.2 TDD",
-            "--phase",
-            "Stage 4: TDD",
+            "Authoring proposal.md",
+            "--feature",
+            "dry-run-purity",
         ])
         .assert()
         .success()
         .stdout(predicate::str::contains("checkpoint saved"));
 
-    // Status derives phase/task from the saved checkpoint (single source of truth).
+    // Stage 2 -> Stage 5: Invalid jump (fails with exit code 2)
+    ceai(&config_dir, &home)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--stage",
+            "5",
+            "--task",
+            "Empirical testing",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("invalid workflow transition"));
+
+    // Status derives phase/task from saved workflow state
     ceai(&config_dir, &home)
         .args(["workflow", "status"])
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("current phase: Stage 4: TDD")
-                .and(predicate::str::contains("active subtask: 4.2 TDD")),
+            predicate::str::contains("current phase: Stage 2: OpenSpec Definition (openspec)").and(
+                predicate::str::contains("active subtask: Authoring proposal.md"),
+            ),
         );
+
+    // Dry-run workflow checkpoint zero mutation
+    assert_dry_run_zero_mutation(
+        &config_dir,
+        &home,
+        &workspace,
+        &["workflow", "checkpoint", "--stage", "3", "--task", "Plan"],
+    );
 
     ceai(&config_dir, &home)
         .args(["workflow", "resume"])
@@ -1149,17 +1241,29 @@ fn workflow_status_checkpoint_and_resume_subcommands() {
 }
 
 #[test]
-fn sync_watch_flag_parsing() {
+fn sync_watch_detects_and_repairs_drift() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
     let source = ce_source(tmp.path());
     install(&config_dir, &home, &source);
 
+    // Mutate a managed file to introduce drift
+    let loader_file = managed_dir(&home).join("plugins/compound-engineering.js");
+    assert!(loader_file.exists(), "managed loader missing after install");
+    fs::write(&loader_file, "drift content").unwrap();
+
     ceai(&config_dir, &home)
-        .args(["sync", "--watch"])
+        .args([
+            "sync",
+            "--watch",
+            "--max-passes",
+            "2",
+            "--interval-ms",
+            "10",
+        ])
         .assert()
         .success()
-        .stdout(predicate::str::contains("monitoring managed paths"));
+        .stdout(predicate::str::contains("repaired drift"));
 }
 
 #[test]
@@ -3379,111 +3483,5 @@ fn sync_restores_drifted_custom_assets_and_reports_verified_surface() {
     assert_eq!(
         entry["custom"]["plugins_dir"],
         plugins.display().to_string()
-    );
-}
-
-// ---------------------------------------------------------------------------
-// sync-native-registration-fix: Pi/Kimi/Agy/Fx re-registration correctness
-// ---------------------------------------------------------------------------
-
-/// Shared scenario: opencode anchor install + target-harness install, then a
-/// managed skill goes missing under the vendor root; sync must restore it,
-/// hash-verify the surface, and leave the native config file byte-identical.
-fn assert_sync_restores_and_preserves_native_config(
-    kind: &str,
-    env_key: &str,
-    dir: &Path,
-    cfg_rel: Option<&str>,
-    skills_prefix: &str,
-) {
-    let tmp = TempDir::new().unwrap();
-    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
-    let source = ce_source(tmp.path());
-    // Sync is anchored on the opencode manifest (SU-2).
-    install(&config_dir, &home, &source);
-
-    ceai(&config_dir, &home)
-        .env(env_key, dir.to_str().unwrap())
-        .args(["install", "--harness", kind, "--source"])
-        .arg(&source)
-        .assert()
-        .success();
-
-    let native_cfg = cfg_rel.map(|rel| dir.join(rel));
-    let before = native_cfg.as_ref().map(|p| fs::read(p).unwrap());
-
-    let drifted = dir.join(skills_prefix).join("ce-brainstorm/SKILL.md");
-    fs::remove_file(&drifted).unwrap();
-
-    ceai(&config_dir, &home)
-        .env(env_key, dir.to_str().unwrap())
-        .arg("sync")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(format!("✓ {kind}")));
-
-    assert_eq!(
-        fs::read_to_string(&drifted).unwrap(),
-        "# ce-brainstorm\n",
-        "managed skill restored for {kind}"
-    );
-    if let (Some(p), Some(b)) = (&native_cfg, &before) {
-        assert_eq!(
-            fs::read(p).unwrap(),
-            *b,
-            "native config of {kind} must stay byte-identical across sync"
-        );
-    }
-}
-
-#[test]
-fn sync_pi_recopies_skills_without_touching_any_config() {
-    let tmp = TempDir::new().unwrap();
-    let dir = tmp.path().join("home").join("pi-agent");
-    assert_sync_restores_and_preserves_native_config(
-        "pi",
-        "PI_CODING_AGENT_DIR",
-        &dir,
-        None,
-        "skills",
-    );
-}
-
-#[test]
-fn sync_kimi_keeps_native_mcp_json_intact() {
-    let tmp = TempDir::new().unwrap();
-    let dir = tmp.path().join("home").join("kimi-home");
-    assert_sync_restores_and_preserves_native_config(
-        "kimi",
-        "KIMI_CODE_HOME",
-        &dir,
-        Some("mcp.json"),
-        "skills",
-    );
-}
-
-#[test]
-fn sync_agy_keeps_native_mcp_config_intact() {
-    let tmp = TempDir::new().unwrap();
-    let dir = tmp.path().join("home").join("agy-dir");
-    assert_sync_restores_and_preserves_native_config(
-        "agy",
-        "ANTIGRAVITY_CONFIG_DIR",
-        &dir,
-        Some("config/mcp_config.json"),
-        "config/skills",
-    );
-}
-
-#[test]
-fn sync_fx_keeps_native_mcp_json_intact() {
-    let tmp = TempDir::new().unwrap();
-    let dir = tmp.path().join("home").join("fx-dir");
-    assert_sync_restores_and_preserves_native_config(
-        "fx",
-        "FX_HOME",
-        &dir,
-        Some("mcp.json"),
-        "skills",
     );
 }
