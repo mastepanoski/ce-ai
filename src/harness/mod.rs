@@ -86,7 +86,10 @@ impl HarnessKind {
                     || home_dir.join(".claude.json").exists()
                     || dir.join("settings.json").exists()
             }
-            HarnessKind::Pi => home_dir.join(".pi").exists() || home_dir.join(".pi-lens").exists(),
+            HarnessKind::Pi => {
+                let dir = self.harness_dir(home_dir);
+                dir.exists() || home_dir.join(".pi").exists()
+            }
             HarnessKind::Cursor => {
                 home_dir.join(".cursor").exists() || home_dir.join(".cursorrules").exists()
             }
@@ -157,8 +160,8 @@ impl HarnessKind {
                     || dir.join("settings.json").exists()
             }
             HarnessKind::Pi => {
-                home_dir.join(".pi").join("config.json").exists()
-                    || home_dir.join(".pi").join("plugins").exists()
+                let dir = self.harness_dir(home_dir);
+                dir.join("skills").exists()
             }
             HarnessKind::Cursor => {
                 home_dir.join(".cursorrules").exists()
@@ -253,7 +256,9 @@ impl HarnessKind {
             HarnessKind::Claude => std::env::var_os("CLAUDE_CONFIG_DIR")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| home_dir.join(".claude")),
-            HarnessKind::Pi => home_dir.join(".pi"),
+            HarnessKind::Pi => std::env::var_os("PI_CODING_AGENT_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home_dir.join(".pi").join("agent")),
             HarnessKind::Cursor => home_dir.join(".cursor"),
             HarnessKind::Copilot => std::env::var_os("COPILOT_CONFIG_DIR")
                 .map(PathBuf::from)
@@ -281,7 +286,7 @@ impl HarnessKind {
             HarnessKind::Claude => {
                 crate::harness::claude::ClaudeAdapter.default_config_path(base_dir)
             }
-            HarnessKind::Pi => base_dir.join("config.json"),
+            HarnessKind::Pi => crate::harness::pi::PiAdapter.default_config_path(base_dir),
             HarnessKind::Cursor => base_dir.join("mcp.json"),
             HarnessKind::Copilot => {
                 crate::harness::copilot::CopilotAdapter.default_config_path(base_dir)
@@ -460,6 +465,7 @@ mod tests {
         std::env::remove_var("KIMI_CODE_HOME");
         std::env::remove_var("ANTIGRAVITY_CONFIG_DIR");
         std::env::remove_var("GEMINI_HOME");
+        std::env::remove_var("PI_CODING_AGENT_DIR");
         let home = Path::new("/tmp/home");
         assert_eq!(
             HarnessKind::Opencode.harness_dir(home),
@@ -467,7 +473,10 @@ mod tests {
         );
         assert_eq!(HarnessKind::Claude.harness_dir(home), home.join(".claude"));
         assert_eq!(HarnessKind::Cursor.harness_dir(home), home.join(".cursor"));
-        assert_eq!(HarnessKind::Pi.harness_dir(home), home.join(".pi"));
+        assert_eq!(
+            HarnessKind::Pi.harness_dir(home),
+            home.join(".pi").join("agent")
+        );
         assert_eq!(
             HarnessKind::Copilot.harness_dir(home),
             home.join(".copilot")

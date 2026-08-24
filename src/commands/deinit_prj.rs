@@ -196,6 +196,21 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             }
         }
 
+        // Clean up Pi rule file (.pi/AGENTS.md)
+        let pi_agents = target_dir.join(".pi").join("AGENTS.md");
+        if pi_agents.exists() {
+            if let Ok(c_text) = fs::read_to_string(&pi_agents) {
+                if c_text.contains(crate::harness::CE_MANAGED_BEGIN) {
+                    let stripped = crate::harness::strip_managed_rule_block(&c_text);
+                    if stripped.trim().is_empty() {
+                        let _ = fs::remove_file(&pi_agents);
+                    } else {
+                        let _ = crate::state::write_atomic(&pi_agents, stripped.as_bytes());
+                    }
+                }
+            }
+        }
+
         // Clean up Antigravity rule files (.agents/rules/compound-engineering.md, GEMINI.md)
         let agy_rule = target_dir
             .join(".agents")

@@ -288,6 +288,14 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
                 &empty_env,
             )?;
         }
+
+        let pi_installed = state
+            .installed_harnesses
+            .iter()
+            .any(|h| h["name"].as_str() == Some("pi"));
+        if pi_installed && !ctx.quiet {
+            println!("info: pi harness does not support native MCP servers by design");
+        }
     }
 
     let probe_version = extract_tool_version(&tool_lower);
