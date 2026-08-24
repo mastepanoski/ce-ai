@@ -356,6 +356,13 @@ pub fn run(
             crate::harness::update_managed_rule_md(&pi_agents, inner_body)?;
         }
 
+        // Write fx project rule .fx/AGENTS.md if .fx exists
+        let fx_dir = target_dir.join(".fx");
+        if fx_dir.exists() {
+            let fx_agents = fx_dir.join("AGENTS.md");
+            crate::harness::update_managed_rule_md(&fx_agents, inner_body)?;
+        }
+
         // Write Antigravity project rules if .agents or GEMINI.md exists
         let agents_dir = target_dir.join(".agents");
         if agents_dir.exists() {

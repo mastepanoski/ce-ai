@@ -234,7 +234,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 &empty_env,
             )?;
             let copilot_skills_dir = config_dir.join("skills");
-            let managed_skills_src = managed_dir.join("skills");
+            let managed_skills_src = if managed_dir.join("skills").exists() {
+                managed_dir.join("skills")
+            } else {
+                managed_dir.join(".opencode").join("skills")
+            };
             if managed_skills_src.exists() {
                 crate::source::archive::copy_dir_all(&managed_skills_src, &copilot_skills_dir)
                     .map_err(|e| {
@@ -270,7 +274,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 &empty_env,
             )?;
             let kimi_skills_dir = config_dir.join("skills");
-            let managed_skills_src = managed_dir.join("skills");
+            let managed_skills_src = if managed_dir.join("skills").exists() {
+                managed_dir.join("skills")
+            } else {
+                managed_dir.join(".opencode").join("skills")
+            };
             if managed_skills_src.exists() {
                 crate::source::archive::copy_dir_all(&managed_skills_src, &kimi_skills_dir)
                     .map_err(|e| {
@@ -306,7 +314,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 &empty_env,
             )?;
             let grok_skills_dir = config_dir.join("skills");
-            let managed_skills_src = managed_dir.join("skills");
+            let managed_skills_src = if managed_dir.join("skills").exists() {
+                managed_dir.join("skills")
+            } else {
+                managed_dir.join(".opencode").join("skills")
+            };
             if managed_skills_src.exists() {
                 crate::source::archive::copy_dir_all(&managed_skills_src, &grok_skills_dir)
                     .map_err(|e| {
@@ -342,7 +354,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 &empty_env,
             )?;
             let agy_skills_dir = config_dir.join("config").join("skills");
-            let managed_skills_src = managed_dir.join("skills");
+            let managed_skills_src = if managed_dir.join("skills").exists() {
+                managed_dir.join("skills")
+            } else {
+                managed_dir.join(".opencode").join("skills")
+            };
             if managed_skills_src.exists() {
                 crate::source::archive::copy_dir_all(&managed_skills_src, &agy_skills_dir)
                     .map_err(|e| {
@@ -378,7 +394,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 &empty_env,
             )?;
             let codex_skills_dir = config_dir.join("skills");
-            let managed_skills_src = managed_dir.join("skills");
+            let managed_skills_src = if managed_dir.join("skills").exists() {
+                managed_dir.join("skills")
+            } else {
+                managed_dir.join(".opencode").join("skills")
+            };
             if managed_skills_src.exists() {
                 crate::source::archive::copy_dir_all(&managed_skills_src, &codex_skills_dir)
                     .map_err(|e| {
@@ -397,9 +417,50 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 config_mutations: vec![],
             }
             .write(&config_dir)?;
+        } else if *harness_kind == HarnessKind::Fx {
+            let empty_env = std::collections::BTreeMap::new();
+            crate::harness::fx::register_fx_mcp_server(
+                &target_config,
+                "codegraph",
+                "codegraph",
+                &["mcp"],
+                &empty_env,
+            )?;
+            crate::harness::fx::register_fx_mcp_server(
+                &target_config,
+                "engram",
+                "engram",
+                &["serve"],
+                &empty_env,
+            )?;
+            let fx_skills_dir = config_dir.join("skills");
+            let managed_skills_src = managed_dir.join("skills");
+            if managed_skills_src.exists() {
+                crate::source::archive::copy_dir_all(&managed_skills_src, &fx_skills_dir).map_err(
+                    |e| {
+                        CeError::Runtime(format!(
+                            "failed to copy managed skills to {}: {e}",
+                            fx_skills_dir.display()
+                        ))
+                    },
+                )?;
+            }
+            InstallManifest {
+                version: version.to_string(),
+                plugin_name: "compound-engineering".into(),
+                installed_at: chrono::Utc::now().to_rfc3339(),
+                source: source_json.clone(),
+                files,
+                config_mutations: vec![],
+            }
+            .write(&config_dir)?;
         } else if *harness_kind == HarnessKind::Pi {
             let pi_skills_dir = config_dir.join("skills");
-            let managed_skills_src = managed_dir.join("skills");
+            let managed_skills_src = if managed_dir.join("skills").exists() {
+                managed_dir.join("skills")
+            } else {
+                managed_dir.join(".opencode").join("skills")
+            };
             if managed_skills_src.exists() {
                 crate::source::archive::copy_dir_all(&managed_skills_src, &pi_skills_dir).map_err(
                     |e| {

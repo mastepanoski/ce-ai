@@ -7,6 +7,7 @@ pub mod codex;
 pub mod copilot;
 pub mod cursor;
 pub mod custom;
+pub mod fx;
 pub mod generic_json;
 pub mod grok;
 pub mod kimi;
@@ -118,7 +119,8 @@ impl HarnessKind {
                     || home_dir.join(".config").join("deepseek").exists()
             }
             HarnessKind::Fx => {
-                home_dir.join(".fx").exists() || home_dir.join(".config").join("fx").exists()
+                let dir = self.harness_dir(home_dir);
+                dir.exists() || home_dir.join(".fx").exists()
             }
             HarnessKind::Custom => false,
         }
@@ -204,8 +206,8 @@ impl HarnessKind {
                     || home_dir.join(".config").join("deepseek").exists()
             }
             HarnessKind::Fx => {
-                home_dir.join(".fx").join("fx.json").exists()
-                    || home_dir.join(".config").join("fx").exists()
+                let dir = self.harness_dir(home_dir);
+                dir.join("mcp.json").exists() || dir.join("skills").exists()
             }
             HarnessKind::Custom => false,
         }
@@ -274,7 +276,9 @@ impl HarnessKind {
                 .unwrap_or_else(|| home_dir.join(".kimi-code")),
             HarnessKind::Agy => crate::harness::agy::AgyAdapter.harness_dir(home_dir),
             HarnessKind::Deepseek => home_dir.join(".config").join("deepseek"),
-            HarnessKind::Fx => home_dir.join(".config").join("fx"),
+            HarnessKind::Fx => std::env::var_os("FX_HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home_dir.join(".fx")),
             HarnessKind::Custom => home_dir.join(".config").join("custom"),
         }
     }
@@ -296,7 +300,7 @@ impl HarnessKind {
             HarnessKind::Kimi => crate::harness::kimi::KimiAdapter.default_config_path(base_dir),
             HarnessKind::Agy => crate::harness::agy::AgyAdapter.default_config_path(base_dir),
             HarnessKind::Deepseek => base_dir.join("deepseek.json"),
-            HarnessKind::Fx => base_dir.join("fx.json"),
+            HarnessKind::Fx => crate::harness::fx::FxAdapter.default_config_path(base_dir),
             HarnessKind::Custom => base_dir.join("custom.json"),
         }
     }
@@ -466,6 +470,7 @@ mod tests {
         std::env::remove_var("ANTIGRAVITY_CONFIG_DIR");
         std::env::remove_var("GEMINI_HOME");
         std::env::remove_var("PI_CODING_AGENT_DIR");
+        std::env::remove_var("FX_HOME");
         let home = Path::new("/tmp/home");
         assert_eq!(
             HarnessKind::Opencode.harness_dir(home),
@@ -484,5 +489,6 @@ mod tests {
         assert_eq!(HarnessKind::Grok.harness_dir(home), home.join(".grok"));
         assert_eq!(HarnessKind::Kimi.harness_dir(home), home.join(".kimi-code"));
         assert_eq!(HarnessKind::Agy.harness_dir(home), home.join(".gemini"));
+        assert_eq!(HarnessKind::Fx.harness_dir(home), home.join(".fx"));
     }
 }
