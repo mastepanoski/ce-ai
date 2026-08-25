@@ -5,6 +5,11 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.0] - 2026-08-25
+
+### Changed
+- **Retention-default SSOT rule (adoption block v3)**: the Single Source of Truth rule now states explicitly that ideation artifacts (`docs/brainstorms/`, `docs/ideation/`) are retained by default as the permanent raw-history record OpenSpec deliberately does not duplicate — "disposable inputs" means *not maintained in sync*, never a deletion mandate. Applied to root `AGENTS.md` and both managed-block surfaces (`full` tier SSOT paragraph, `orchestrator` tier line); the managed block version bumps to `v=3`. Existing adoptions keep working but will report **stale block version** hints in `ce-ai status` / `ce-ai doctor` until `ce-ai init-prj <project> --tier <tier>` is re-run — re-adoption replaces the block in place, preserving all surrounding content and requiring no migration step.
+
 ## [1.23.1] - 2026-08-24
 
 ### Changed
