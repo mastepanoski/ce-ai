@@ -5,6 +5,15 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.0] - 2026-08-24
+
+### Changed
+- **Deterministic source resolution**: `install`/`upgrade` no longer fall back to the mutable `main` branch tarball. Network, HTTP, and payload failures now exit with code 5 (`Network`), and a release list with zero `compound-engineering-v*` tags exits with code 2 (`Usage`) — both with actionable guidance to pin via `--to <tag>` or install a local tree via `--source <path>`. Scripts relying on the silent offline fallback must migrate to pinned tags.
+- **Byte-stable skill resolution output**: `skills resolve` markdown no longer embeds a wall-clock timestamp in its header; identical registry state produces byte-identical output. The machine-readable `status=` tag is unchanged.
+
+### Added
+- Beginner-level explanation doc [`docs/user-guide/determinism-explained.md`](docs/user-guide/determinism-explained.md): what determinism means, the asset-layer guarantees of ce-ai, why LLM-driven workflow execution cannot be made deterministic by any technical means today, environment-relative behaviors, and compensating controls.
+
 ## [1.22.2] - 2026-08-24
 
 ### Changed
