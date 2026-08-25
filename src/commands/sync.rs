@@ -372,7 +372,7 @@ pub(crate) fn sync_with(
                             surfaces.push(SurfaceCheck {
                                 harness: name.clone(),
                                 status: CheckStatus::NotVerified {
-                                    reason: "no managed tree present",
+                                    reason: REASON_NO_MANAGED_FILES,
                                 },
                             });
                             continue;
@@ -391,7 +391,7 @@ pub(crate) fn sync_with(
                     None => surfaces.push(SurfaceCheck {
                         harness: name.clone(),
                         status: CheckStatus::NotVerified {
-                            reason: "no directory snapshot",
+                            reason: REASON_NO_SNAPSHOT,
                         },
                     }),
                 }
@@ -411,7 +411,7 @@ pub(crate) fn sync_with(
                     surfaces.push(SurfaceCheck {
                         harness: name.clone(),
                         status: CheckStatus::NotVerified {
-                            reason: "no managed skills tree present",
+                            reason: REASON_NO_MANAGED_SKILLS,
                         },
                     });
                     continue;
@@ -425,7 +425,7 @@ pub(crate) fn sync_with(
                 surfaces.push(SurfaceCheck {
                     harness: name.clone(),
                     status: CheckStatus::NotVerified {
-                        reason: "config registration only — asset hashes not checked",
+                        reason: REASON_CONFIG_ONLY,
                     },
                 });
             }
@@ -440,28 +440,15 @@ pub(crate) fn sync_with(
             println!("version: {version}");
             println!("source: {source_kind}");
             for surface in &surfaces {
-                match &surface.status {
-                    CheckStatus::Verified { matched, total } => println!(
-                        "  ✓ {harness}: verified — {matched}/{total} files match SHA256",
-                        harness = surface.harness,
-                    ),
-                    CheckStatus::Failed {
-                        mismatched,
-                        missing,
-                    } => {
-                        println!(
-                            "  ✗ {harness}: FAILED — {count} file(s) drifted",
-                            harness = surface.harness,
-                            count = mismatched.len() + missing.len()
-                        );
-                        for path in mismatched.iter().chain(missing.iter()) {
-                            println!("      {path}");
-                        }
+                println!("{}", matrix_line(&surface.harness, &surface.status));
+                if let CheckStatus::Failed {
+                    mismatched,
+                    missing,
+                } = &surface.status
+                {
+                    for line in failed_detail_lines(mismatched, missing) {
+                        println!("{line}");
                     }
-                    CheckStatus::NotVerified { reason } => println!(
-                        "  ○ {harness}: synced — verification not performed ({reason})",
-                        harness = surface.harness,
-                    ),
                 }
             }
             let verified = surfaces
@@ -476,9 +463,12 @@ pub(crate) fn sync_with(
                 .iter()
                 .filter(|s| matches!(s.status, CheckStatus::NotVerified { .. }))
                 .count();
-            println!(
-                "reconciliation status: {verified} verified, {unverified} unverified, {failed} failed"
-            );
+            println!("{}", reconciliation_line(verified, unverified, failed));
+            if unverified > 0 {
+                for line in guidance_note_lines() {
+                    println!("{line}");
+                }
+            }
         }
 
         let failed_surfaces: Vec<String> = surfaces
@@ -573,6 +563,76 @@ impl CheckStatus {
             }
         }
     }
+}
+
+/// Reason shown for native skills harnesses when the installed source ships
+/// no managed skills tree (SVX-1): nothing was hash-verified and that is the
+/// expected state, not an error.
+const REASON_NO_MANAGED_SKILLS: &str =
+    "ce-ai manages no skill files here (MCP companions only; nothing to hash-verify)";
+
+/// Reason shown for registration-only adapters such as cursor (SVX-1).
+const REASON_CONFIG_ONLY: &str = "config registration only — no managed assets to hash-verify";
+
+/// Reason shown for custom harnesses whose desired tree is empty.
+const REASON_NO_MANAGED_FILES: &str = "no managed files — nothing to hash-verify";
+
+/// Reason shown when a custom harness entry lacks its directory snapshot.
+const REASON_NO_SNAPSHOT: &str = "no directory snapshot — re-run 'ce-ai install --harness custom'";
+
+/// Renders one matrix line for a harness surface (SVX-1/SVX-2 wording).
+/// `registered` states are healthy: ce-ai manages no files there, so there
+/// is nothing to hash-verify.
+fn matrix_line(harness: &str, status: &CheckStatus) -> String {
+    match status {
+        CheckStatus::Verified { matched, total } => {
+            format!("  ✓ {harness}: verified — {matched}/{total} managed files match SHA256")
+        }
+        CheckStatus::Failed {
+            mismatched,
+            missing,
+        } => format!(
+            "  ✗ {harness}: FAILED — {} file(s) drifted",
+            mismatched.len() + missing.len()
+        ),
+        CheckStatus::NotVerified { reason } => {
+            format!("  ○ {harness}: registered — {reason}")
+        }
+    }
+}
+
+/// Indented detail lines for a FAILED surface, one per drifted path (SVX-2).
+fn failed_detail_lines(mismatched: &[String], missing: &[String]) -> Vec<String> {
+    mismatched
+        .iter()
+        .chain(missing.iter())
+        .map(|path| format!("      {path}"))
+        .collect()
+}
+
+/// Reconciliation summary line (SVX-1): unmanaged surfaces count as
+/// `registered (nothing to verify)`, never as `unverified`.
+fn reconciliation_line(verified: usize, unverified: usize, failed: usize) -> String {
+    format!(
+        "reconciliation status: {verified} verified, {unverified} registered (nothing to verify), {failed} failed"
+    )
+}
+
+/// Newbie guidance printed after the matrix when any surface is unverified
+/// (SVX-3): what `registered` means, how to put a harness under ce-ai
+/// management, and the verification-scope boundary.
+fn guidance_note_lines() -> Vec<String> {
+    vec![
+        "note: 'registered' = ce-ai wrote harness config only; it manages no files on that"
+            .to_string(),
+        "      surface, so there is nothing to hash-verify. CE installed via other channels"
+            .to_string(),
+        "      (plugin marketplaces, manual copies) is outside ce-ai's verification scope."
+            .to_string(),
+        "      To put a harness under ce-ai management: ce-ai install --harness <name>".to_string(),
+        "      (or --harness all). Skill files are managed per harness only when the".to_string(),
+        "      installed source ships a managed skills tree.".to_string(),
+    ]
 }
 
 /// Per-kind managed-skills root used for post-sync hash verification.
@@ -711,7 +771,10 @@ mod tests {
 
     use tempfile::tempdir;
 
-    use super::{sync_skills_root, verify_tree_against, CheckStatus, TreeDrift};
+    use super::{
+        failed_detail_lines, guidance_note_lines, matrix_line, reconciliation_line,
+        sync_skills_root, verify_tree_against, CheckStatus, TreeDrift,
+    };
     use crate::harness::registration::registration_spec;
     use crate::harness::HarnessKind;
     use crate::state::diff::sha256_hex;
@@ -828,5 +891,82 @@ mod tests {
         let skills_root = dir.path().join("skills");
         let drift = verify_tree_against(&skills_root, &expected);
         assert_eq!(drift, TreeDrift::default());
+    }
+
+    #[test]
+    fn matrix_line_pins_registered_wording() {
+        let line = matrix_line(
+            "claude",
+            &CheckStatus::NotVerified {
+                reason: super::REASON_NO_MANAGED_SKILLS,
+            },
+        );
+        assert_eq!(
+            line,
+            "  ○ claude: registered — ce-ai manages no skill files here (MCP companions only; nothing to hash-verify)"
+        );
+
+        let cursor = matrix_line(
+            "cursor",
+            &CheckStatus::NotVerified {
+                reason: super::REASON_CONFIG_ONLY,
+            },
+        );
+        assert_eq!(
+            cursor,
+            "  ○ cursor: registered — config registration only — no managed assets to hash-verify"
+        );
+    }
+
+    #[test]
+    fn matrix_line_pins_verified_and_failed_wording() {
+        assert_eq!(
+            matrix_line(
+                "opencode",
+                &CheckStatus::Verified {
+                    matched: 1,
+                    total: 1
+                }
+            ),
+            "  ✓ opencode: verified — 1/1 managed files match SHA256"
+        );
+
+        let failed = matrix_line(
+            "opencode",
+            &CheckStatus::Failed {
+                mismatched: vec!["plugins/x.js".to_string()],
+                missing: vec![],
+            },
+        );
+        assert_eq!(failed, "  ✗ opencode: FAILED — 1 file(s) drifted");
+        assert_eq!(
+            failed_detail_lines(&["plugins/x.js".to_string()], &[]),
+            vec!["      plugins/x.js".to_string()]
+        );
+    }
+
+    #[test]
+    fn reconciliation_line_uses_registered_not_unverified() {
+        let line = reconciliation_line(1, 9, 0);
+        assert_eq!(
+            line,
+            "reconciliation status: 1 verified, 9 registered (nothing to verify), 0 failed"
+        );
+        assert!(!line.contains("unverified"));
+    }
+
+    #[test]
+    fn guidance_note_explains_adoption_and_scope() {
+        let lines = guidance_note_lines();
+        let joined = lines.join("\n");
+        assert!(joined.contains("install --harness"));
+        assert!(joined.contains("outside ce-ai's verification scope"));
+        assert!(joined.contains("managed skills tree"));
+        assert!(
+            lines
+                .iter()
+                .all(|l| l.starts_with("note:") || l.starts_with("      ")),
+            "note block must be visually grouped"
+        );
     }
 }
