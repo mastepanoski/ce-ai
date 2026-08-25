@@ -10,7 +10,7 @@ The project is **experimental software under active development**. It is being c
 
 ## Origin & Scope Evolution
 
-This tool was **originally created as a personal utility** to keep the [Compound Engineering Plugin](https://github.com/Every-One-AI/compound-engineering) installation and its linked tools up to date across multiple AI harnesses. It has since been **extended beyond its original scope**, incorporating ideas and patterns discovered in other environments and ecosystems — including [`gentle-ai`](https://github.com/Gentleman-Programming), open research lines, and community tooling practices.
+This tool was **originally created as a personal utility** to keep the [Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin) installation and its linked tools up to date across multiple AI harnesses. It has since been **extended beyond its original scope**, incorporating ideas and patterns discovered in other environments and ecosystems — including [`gentle-ai`](https://github.com/Gentleman-Programming), open research lines, and community tooling practices.
 
 As a result, some capabilities may reflect opinions tuned for specific workflows rather than general-purpose solutions.
 
