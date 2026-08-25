@@ -269,7 +269,7 @@ flowchart TD
 
 1. **Code-First + Post-Verification**:
    - *Flow*: Implement code directly in Stage 4 based on OpenSpec requirements (`spec.md`), then write tests afterwards.
-   - *FSM Rule*: The FSM does not restrict whether code or test files were written first. However, **Stage 5 (Empirical Verification)** strictly mandates that unit/integration tests must exist and pass 100% green before shipping.
+   - *FSM Rule*: The FSM does not restrict whether code or test files were written first. However, **Stage 5 (Empirical Verification)** requires — by workflow contract and review policy, not by a CLI gate — that unit/integration tests exist and pass 100% green before shipping.
 
 2. **Behavior-Driven Development (BDD)**:
    - *Flow*: Define acceptance scenarios using explicit `WHEN <condition> THEN <expected outcome>` blocks in Stage 2 (`OpenSpec`). Tests are written to validate high-level behavior contracts.

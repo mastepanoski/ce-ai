@@ -42,7 +42,7 @@ stateDiagram-v2
 
 ### ⚙️ The FSM in `ce-ai`: The 7-Stage Lifecycle
 
-In `ce-ai`, an AI agent is governed by an FSM that enforces a strict 7-stage lifecycle directly derived from the **Compound Engineering Philosophy**. The agent is **never** allowed to skip a stage.
+In `ce-ai`, an AI agent's **recorded** progress is governed by an FSM with a strict 7-stage lifecycle directly derived from the **Compound Engineering Philosophy**: every checkpoint write to `state.json` is validated against legal-transition rules (reset, stay, advance one, rewind one). The boundary matters, so it is stated plainly: the FSM validates what agents *declare*. An agent that records checkpoints honestly can never skip a stage **in the ledger**; an agent that never calls `workflow checkpoint` skips stages in reality with no technical rejection. Checkpointing is the discipline that makes the FSM real.
 
 ```mermaid
 flowchart LR
@@ -56,7 +56,7 @@ flowchart LR
 
 ---
 
-## 3. How the FSM Enforces the Compound Engineering Flywheel
+## 3. How the FSM Governs the Compound Engineering Flywheel
 
 **Compound Engineering** is the foundational philosophy behind `ce-ai`. Its core premise is that software engineering should act as a **compounding flywheel**: every solved bug, architectural decision, and feature implementation must store durable knowledge so that future development becomes exponentially faster, safer, and higher quality.
 
@@ -75,15 +75,16 @@ flowchart TD
 
 ### Why the FSM is Essential for Compound Engineering:
 
-1. **Eliminates "Zero-Knowledge" Patching**:
-   - Without an FSM, AI agents tend to perform superficial symptom patches (editing code without recording *why*). 
-   - The FSM forces the agent to enter **Stage 6: Compound (`ce-compound`)**, capturing hard-earned learnings in `docs/solutions/` and `CONCEPTS.md` before a task can be closed.
+1. **Discourages "Zero-Knowledge" Patching**:
+   - Without a recorded lifecycle, AI agents tend to perform superficial symptom patches (editing code without recording *why*). 
+   - The FSM routes the agent through **Stage 6: Compound (`ce-compound`)** so hard-earned learnings land in `docs/solutions/` and `CONCEPTS.md` while context is fresh — closing a task without compounding violates the workflow contract, though no technical lock prevents it.
 
-2. **Guarantees Upstream Spec Grounding**:
-   - Stage 4 (`ce-work`) is strictly blocked until Stage 2 (`OpenSpec`) defines explicit `WHEN ... THEN ...` acceptance criteria. This prevents agents from inventing product behavior on the fly.
+2. **Promotes Upstream Spec Grounding**:
+   - Stage 4 (`ce-work`) is contracted to consume the Stage 2 (`OpenSpec`) acceptance criteria (`WHEN ... THEN ...`) instead of inventing product behavior on the fly.
+   - `ce-ai` surfaces missing or stale specs rather than hiding them (`workflow resume` reports proposal/spec/tasks presence; `doctor` flags adoption drift), but the gate is advisory for the LLM — enforced by policy and review, not by the CLI refusing to run.
 
 3. **Self-Reinforcing Quality**:
-   - Each completed FSM cycle enriches Engram persistent memory and `docs/solutions/`. In subsequent sessions, agents query these artifacts via `ce-ai tools` and `mem_search`, preventing old bugs from ever re-occurring.
+   - Each completed FSM cycle enriches Engram persistent memory and `docs/solutions/`. In subsequent sessions, agents query these artifacts via `ce-ai tools` and `mem_search`, surfacing known failure modes before they repeat.
 
 #### The 7 Stages & Skill Alignment Matrix:
 
@@ -153,7 +154,7 @@ flowchart TD
    - *Root Cause Fix*: Traces the defect upstream and applies a targeted fix (never masking symptoms with dummy fallbacks or swallowing exceptions).
 4. **Mandatory Knowledge Capture (Stage 6: `ce-compound`)**:
    - Once verified in Stage 5, if the bug fix uncovered a non-obvious discovery, architectural gotcha, or edge case, `ce-debug` triggers **Stage 6 (`ce-compound`)**.
-   - Captures the solution in `docs/solutions/` and updates `CONCEPTS.md`, enriching Engram memory so the bug never re-occurs in future sessions.
+   - Captures the solution in `docs/solutions/` and updates `CONCEPTS.md`, enriching Engram memory so the same bug class is recognized before it repeats in future sessions.
 5. **Git Delivery (Stage 7: `ce-commit-push-pr`)**: Ships the fix via a `fix/<name>` feature branch and Pull Request.
 
 ---
