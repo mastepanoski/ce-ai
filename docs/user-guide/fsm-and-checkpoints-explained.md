@@ -126,7 +126,7 @@ flowchart TD
 ### 1. How `ce-ideate` Operates in Stage 1 (Ideation)
 - **Role**: `ce-ideate` is an **Idea Discovery Sub-Loop** within **Stage 1 (Ideation)**.
 - **Behavior**: When a user or agent doesn't have a concrete feature description yet, `ce-ideate` runs first to generate and evaluate candidate directions. It writes a ranked dossier to `docs/ideation/` — it does **not** produce requirements, plans, or code.
-- **Transition**: Once an idea is chosen from the dossier, the FSM transitions to `ce-brainstorm` (to build the formal requirements document) and then moves forward to Stage 2 (`OpenSpec`), where the chosen idea plus one-line rejection reasons for the alternatives are distilled into `exploration.md`. The dossier itself is disposable input, not a maintained document.
+- **Transition**: Once an idea is chosen from the dossier, the FSM transitions to `ce-brainstorm` (to build the formal requirements document) and then moves forward to Stage 2 (`OpenSpec`), where the chosen idea plus one-line rejection reasons for the alternatives are distilled into `exploration.md`. The dossier itself is disposable input — kept as raw history, not a maintained document.
 
 ### 2. How `ce-debug` Operates in Stage 4/5 (Diagnostic Sub-Loop & Direct Entry Point)
 

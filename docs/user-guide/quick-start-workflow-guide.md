@@ -43,7 +43,7 @@ flowchart LR
 
 1. **Stage 1: Ideation & Requirements**
    - Run `/ce-brainstorm` when requirements are fuzzy. Only run `/ce-ideate` first if even the technical approach is uncertain (see Section 7 FAQ 0).
-   - *Goal*: Clarify scope, user constraints, and out-of-scope boundaries. Writes `docs/brainstorms/<date>-<name>-requirements.md` — disposable input for Stage 2, never a second source of truth.
+   - *Goal*: Clarify scope, user constraints, and out-of-scope boundaries. Writes `docs/brainstorms/<date>-<name>-requirements.md` — disposable input for Stage 2 (retained on disk as raw history, never deleted by rule), never a second source of truth.
 
 2. **Stage 2: OpenSpec Definition — Contract Authoring (Progressive Lifecycle)**
    - Create a dedicated change directory: `openspec/changes/<feature_name>/`.
@@ -348,7 +348,7 @@ flowchart TD
 
 | Stage | Skill | Reads (Input) | Writes (Output) | Relationship to OpenSpec |
 | :--- | :--- | :--- | :--- | :--- |
-| 0. Idea Discovery *(optional)* | `/ce-ideate` | Focus hint + repo scan | `docs/ideation/*.md` dossier | **Feeds it**: the chosen idea plus rejected alternatives distill into `exploration.md`. Dossier is disposable input. Expensive (~9 sub-agents) — skip when the approach is already known |
+| 0. Idea Discovery *(optional)* | `/ce-ideate` | Focus hint + repo scan | `docs/ideation/*.md` dossier | **Feeds it**: the chosen idea plus rejected alternatives distill into `exploration.md`. Dossier is disposable input — retained as raw history, not a maintained document. Expensive (~9 sub-agents) — skip when the approach is already known |
 | 1. Ideation | `/ce-brainstorm` | Your idea + constraints | `docs/brainstorms/*.md` | **Feeds it**: raw material to distill into `proposal.md` / `exploration.md` |
 | 2. Spec | You (+ agent) | Brainstorm doc | `proposal.md`, `exploration.md`, `design.md`, `spec.md` | **IS the contract**: single source of truth |
 | Gate | `/ce-doc-review` | Brainstorm or plan docs | Findings only | **Audits it**: flags gaps; never rewrites specs |
@@ -364,7 +364,7 @@ flowchart TD
    No. KISS: if requirements AND approach are clear, write OpenSpec directly. Brainstorm only when requirements are fuzzy; ideate only when even the approach is uncertain (and remember it dispatches ~9 sub-agents — the most expensive skill in the pipeline).
 
 1. *"If I already wrote `proposal.md`, does `/ce-brainstorm` duplicate it?"*
-   No. Run brainstorm **before** Stage 2. Its conclusions get distilled into `proposal.md`; the brainstorm doc is disposable input, not a second source of truth.
+   No. Run brainstorm **before** Stage 2. Its conclusions get distilled into `proposal.md`; the brainstorm doc is disposable input — retained on disk as raw history, never a second source of truth.
 
 1b. *"Doesn't `/ce-ideate` duplicate `exploration.md`?"*
    No — same distillation rule, different target. The ideation dossier (`docs/ideation/`) lists many ideas with critiques; `exploration.md` records only the ONE chosen direction plus one-line reasons for the rejected alternatives, linking back to the dossier:
