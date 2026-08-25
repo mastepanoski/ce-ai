@@ -12,6 +12,7 @@ pub mod grok;
 pub mod kimi;
 pub mod pi;
 pub mod registration;
+pub mod usage;
 
 pub use grok::{
     strip_managed_block as strip_managed_rule_block, update_grok_rule_md as update_managed_rule_md,
