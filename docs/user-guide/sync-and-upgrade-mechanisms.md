@@ -68,14 +68,48 @@ flowchart TD
 - Upon completion, `ce-ai` outputs an itemized integrity verification audit table:
   ```text
   == [Sync Verification Matrix] ==
-  version: v0.4.0
+  version: compound-engineering-v3.23.3
   source: github-release
-    ✓ harness 'opencode': synced & verified (12 files, SHA256 integrity match)
-    ✓ harness 'claude': synced & verified (12 files, SHA256 integrity match)
-    ✓ harness 'agy': synced & verified (12 files, SHA256 integrity match)
-    ✓ harness 'kimi': synced & verified (12 files, SHA256 integrity match)
-  reconciliation status: 100% Verified (0 drift)
+    ✓ opencode: verified — 1/1 managed files match SHA256
+    ○ claude: registered — ce-ai manages no skill files here (MCP companions only; nothing to hash-verify)
+    ○ pi: registered — ce-ai manages no skill files here (MCP companions only; nothing to hash-verify)
+    ○ cursor: registered — config registration only — no managed assets to hash-verify
+
+  reconciliation status: 1 verified, 9 registered (nothing to verify), 0 failed
+  note: 'registered' = ce-ai wrote harness config only; it manages no files on that
+        surface, so there is nothing to hash-verify. CE installed via other channels
+        (plugin marketplaces, manual copies) is outside ce-ai's verification scope.
+        To put a harness under ce-ai management: ce-ai install --harness <name>
+        (or --harness all). Skill files are managed per harness only when the
+        installed source ships a managed skills tree.
   ```
+
+##### Verification States
+
+| Symbol | State | Meaning |
+|---|---|---|
+| `✓` | `verified` | ce-ai-managed files exist on this surface and all match their manifest SHA256. |
+| `○` | `registered` | Healthy. ce-ai only wrote harness config here (MCP companions / plugin registration); it manages no files, so there is nothing to hash-verify. |
+| `✗` | `FAILED` | Drift detected on ce-ai-managed files. Sync exits with code 6 (`Verification`). |
+
+`registered` never means "broken" or "missing" — it means *ce-ai does not manage
+files on that surface*. Compound Engineering installed through other channels
+(for example the Claude Code plugin marketplace or manual skill copies) is real
+and works, but it is outside ce-ai's verification scope.
+
+##### How ce-ai manages each harness
+
+| Harness | What ce-ai writes | Managed files to verify |
+|---|---|---|
+| `opencode` | CE plugin loader + `install-manifest.json` (SHA256 index) under `~/.config/opencode/compound-engineering/`; plugin + skills-path entries in `opencode.json` | Loader (and skills, when the source ships a managed skills tree) |
+| `claude`, `codex`, `copilot`, `grok`, `kimi`, `agy`, `fx`, `pi` | MCP companion registration (`codegraph`, `engram`) in the harness config; skills copy **only** when the installed source ships a managed skills tree | Skills copy, when present |
+| `cursor` | MCP registration in config only (it consumes no skills tree) | None — config registration only |
+| `custom` | Files copied to your `--plugins-dir` / `--skills-dir` + manifest snapshot | All copied files |
+
+To put a harness under ce-ai management (or re-apply it): `ce-ai install
+--harness <name>`, or `ce-ai install --harness all` for every detected
+harness. After installing, `ce-ai sync` verifies whatever ce-ai manages on
+that surface.
 
 ---
 
