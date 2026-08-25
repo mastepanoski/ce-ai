@@ -127,7 +127,7 @@ OpenSpec is authored **progressively**: Stage 2 writes `proposal.md`, `explorati
 - When authoring `tasks.md`, work units MUST carry per-work-unit changed-line estimates (~200 LOC target; rescopes may only narrow them) so the PR-level forecast is derivable — see [CONTRIBUTING.md](CONTRIBUTING.md) §4. (Adopted policy, v1.22.1.)
 
 ### Single Source of Truth Rule
-Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into the OpenSpec files above (`proposal.md`, `exploration.md`) and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with OpenSpec — that duplicates work and burns tokens. Skip ideation skills entirely when requirements and approach are already clear.
+Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into the OpenSpec files above (`proposal.md`, `exploration.md`) and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with OpenSpec — that duplicates work and burns tokens. Ideation artifacts are retained by default as the permanent raw-history record that OpenSpec deliberately does not duplicate — "disposable" never means deleting them; removal is an ordinary reversible git decision, never a workflow step. Skip ideation skills entirely when requirements and approach are already clear.
 
 ## ✅ Definition of Done (DoD) & Technical Justifications
 
