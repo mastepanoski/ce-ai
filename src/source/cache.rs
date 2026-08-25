@@ -56,6 +56,38 @@ pub fn read_local_tree(root: &Path) -> Result<BTreeMap<String, String>, CeError>
     Ok(tree)
 }
 
+/// Harvested managed set: managed-relative path -> (source-relative path,
+/// sha256). Managed prefixes: `.opencode/plugins`, `.opencode/skills` (the
+/// `.opencode/` strip applies), and top-level `skills/`. Deterministic
+/// precedence: legacy `.opencode/`-prefixed assets are collected first, then
+/// top-level `skills/` overwrites on collision (warning emitted).
+pub fn managed_tree(source_root: &Path) -> Result<BTreeMap<String, (String, String)>, CeError> {
+    let tree = read_local_tree(source_root)?;
+    let mut managed: BTreeMap<String, (String, String)> = BTreeMap::new();
+    for (rel, hash) in &tree {
+        if rel.starts_with(".opencode/plugins") || rel.starts_with(".opencode/skills") {
+            let managed_rel = rel.trim_start_matches(".opencode/").to_string();
+            managed.insert(managed_rel, (rel.clone(), hash.clone()));
+        }
+    }
+    let mut overlapped = false;
+    for (rel, hash) in &tree {
+        if rel.starts_with("skills/")
+            && managed
+                .insert(rel.clone(), (rel.clone(), hash.clone()))
+                .is_some()
+        {
+            overlapped = true;
+        }
+    }
+    if overlapped {
+        eprintln!(
+            "warning: source ships both .opencode/skills and top-level skills/; top-level wins"
+        );
+    }
+    Ok(managed)
+}
+
 fn walk_tree(root: &Path, dir: &Path, tree: &mut BTreeMap<String, String>) -> Result<(), CeError> {
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;

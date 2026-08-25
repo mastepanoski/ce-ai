@@ -33,6 +33,10 @@ test -f "$HOME/.config/opencode/compound-engineering/install-manifest.json" || {
   echo "FAIL: install-manifest.json missing"
   exit 1
 }
+test -f "$HOME/.config/opencode/compound-engineering/skills/ce-brainstorm/SKILL.md" || {
+  echo "FAIL: top-level skills/ tree not harvested into the managed dir"
+  exit 1
+}
 
 echo "== [E2E 3] Running ce-ai sync --dry-run =="
 SYNC_OUT=$(ce-ai sync --dry-run)

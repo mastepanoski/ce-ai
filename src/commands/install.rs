@@ -13,7 +13,7 @@ use crate::opencode::plugins::{
     install_loader, plugin_entry, skills_path, LOADER_REL_PATH, MANAGED_DIR,
 };
 use crate::source::archive::extract_to_source;
-use crate::source::cache::{read_local_tree, record_tarball_provenance, Cache};
+use crate::source::cache::{managed_tree, record_tarball_provenance, Cache};
 use crate::source::release::{
     github_token_from_env, pinned_version_and_url, resolve_latest_release,
 };
@@ -21,8 +21,7 @@ use crate::state::backups::backup_file;
 use crate::state::state::{ReleaseProvenance, State};
 use crate::state::write_atomic;
 
-/// Source-tree dirs ce-ai manages; the `.opencode/` prefix is stripped on copy.
-const MANAGED_PREFIXES: [&str; 2] = [".opencode/plugins", ".opencode/skills"];
+/// Source-tree dirs ce-ai manages; see `crate::source::cache::MANAGED_PREFIXES`.
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -47,7 +46,6 @@ pub struct Args {
     pub rules_file: Option<PathBuf>,
 }
 
-use crate::harness::registration::copy_managed_skills;
 use crate::harness::HarnessKind;
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
@@ -94,14 +92,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     let (source_path, version, source_json, tmp_dir) = resolve_source(ctx, &args.source)?;
 
-    let managed: BTreeMap<String, (String, String)> = read_local_tree(&source_path)?
-        .into_iter()
-        .filter(|(rel, _)| MANAGED_PREFIXES.iter().any(|p| rel.starts_with(p)))
-        .map(|(rel, hash)| {
-            let managed_rel = rel.trim_start_matches(".opencode/").to_string();
-            (managed_rel, (rel, hash))
-        })
-        .collect();
+    let managed: BTreeMap<String, (String, String)> = managed_tree(&source_path)?;
     if !managed.contains_key(LOADER_REL_PATH) {
         let err = Err(CeError::Runtime(format!(
             "CE loader not found at {}/.opencode/plugins/compound-engineering.js",
@@ -288,11 +279,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             .write(&cfg.plugins_dir)?;
         } else if let Some(spec) = crate::harness::registration::registration_spec(*harness_kind) {
             // Strategy table: one exhaustive entry per table-driven kind
-            // (see harness::registration).
+            // (see harness::registration). Skills are never copied into
+            // harness-owned directories — adoption (skills adopt) is the only
+            // delivery path (token-neutrality, R4).
             spec.register_companions(&target_config)?;
-            if let Some(subpath) = spec.skills_subpath {
-                copy_managed_skills(&managed_dir, &config_dir.join(subpath))?;
-            }
             arm!(&config_dir.join(MANAGED_DIR).join("install-manifest.json"));
             InstallManifest {
                 version: version.to_string(),
