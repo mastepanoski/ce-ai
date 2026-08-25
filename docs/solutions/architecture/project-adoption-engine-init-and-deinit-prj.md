@@ -39,7 +39,7 @@ When building managed configuration injection engines or project adoption tools,
 ### 1. Marker-Delimited Managed Blocks
 - Use HTML comment markers to encapsulate injected instructions inside markdown files (`AGENTS.md`).
 - Standardize the header format with explicit metadata attributes: `<!-- ce-ai:block begin v={version} tier={tier} sha256={sha} -->` and `<!-- ce-ai:block end -->`.
-- Derive the version from a single shared constant (`pub const BLOCK_VERSION: u32 = 2;`) consumed by BOTH the on-disk header and the `state.json` entry (`block_version`) — two independent version literals drift silently (this bit us once: the header said `v=1` while the state literal was a separate `1`).
+- Derive the version from a single shared constant (`pub const BLOCK_VERSION: u32 = 3;` — the invariant is the single shared constant, not its value) consumed by BOTH the on-disk header and the `state.json` entry (`block_version`) — two independent version literals drift silently (this bit us once: the header said `v=1` while the state literal was a separate `1`).
 - HTML comment markers render invisibly in standard GitHub Flavored Markdown (GFM) viewers while remaining fully parsable by CLI tools.
 - Include a cryptographic hash (`sha256`) of the managed block body within the marker to enable instant integrity verification and drift detection without re-rendering templates. Idempotent re-runs compare the whole rendered block, so content changes (e.g. block v2's Single Source of Truth guidance in `full`/`orchestrator` tiers) upgrade adopted projects in place — no migration command needed.
 
@@ -152,7 +152,7 @@ pub const BLOCK_END_MARKER: &str = "<!-- ce-ai:block end -->";
 
 /// Managed block schema version, shared by the on-disk header and the
 /// state.json adoption entry so the two cannot drift apart.
-pub const BLOCK_VERSION: u32 = 2;
+pub const BLOCK_VERSION: u32 = 3;
 
 pub fn run(
     ctx: &Context,
