@@ -51,7 +51,8 @@ pub struct ModelAssignment {
 /// cached artifact can never be relabelled as a different requested version.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReleaseProvenance {
-    /// GitHub release tag (e.g. `v1.2.3`) or `main` for the SF-2 fallback.
+    /// GitHub release tag (e.g. `v1.2.3`); ce-ai only ever records immutable
+    /// release tags — never a mutable branch.
     pub tag: String,
     /// Archive download URL that produced the cached artifact.
     pub url: String,

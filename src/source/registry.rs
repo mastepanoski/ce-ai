@@ -244,12 +244,12 @@ impl SkillRegistry {
             "paths-injected".to_string()
         };
 
-        let now_iso = chrono::Utc::now().to_rfc3339();
-
+        // No wall-clock data here: identical registry state must produce
+        // byte-identical output so harness-facing prompts stay reproducible.
         let mut markdown = String::new();
         markdown.push_str(&format!(
-            "<!-- ce-ai:skill_resolution status={} timestamp={} -->\n",
-            status_tag, now_iso
+            "<!-- ce-ai:skill_resolution status={} -->\n",
+            status_tag
         ));
         markdown.push_str("## Skills to load before work:\n");
 
@@ -555,6 +555,32 @@ pub fn check_skill_registry_health(ctx: &Context) -> Result<Vec<String>, CeError
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_resolve_markdown_is_byte_stable() {
+        let entry = SkillEntry {
+            name: "ce-brainstorm".to_string(),
+            description: "Explore requirements".to_string(),
+            scope: "global".to_string(),
+            triggers: vec!["brainstorm".to_string()],
+            sha256: "deadbeef".to_string(),
+            harness_paths: BTreeMap::from([(
+                "opencode".to_string(),
+                "/tmp/nonexistent-ce-brainstorm/SKILL.md".to_string(),
+            )]),
+        };
+        let registry = SkillRegistry {
+            skills: vec![entry],
+            ..SkillRegistry::default()
+        };
+
+        let (status_a, _, md_a) = registry.resolve(HarnessKind::Opencode, "brainstorm");
+        let (status_b, _, md_b) = registry.resolve(HarnessKind::Opencode, "brainstorm");
+        assert_eq!(md_a, md_b);
+        assert_eq!(status_a, status_b);
+        assert!(md_a.contains("<!-- ce-ai:skill_resolution status="));
+        assert!(!md_a.contains("timestamp="));
+    }
 
     #[test]
     fn test_frontmatter_extraction_yaml_lists() {
