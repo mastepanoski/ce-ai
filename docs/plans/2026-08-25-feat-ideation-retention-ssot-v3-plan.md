@@ -1,7 +1,7 @@
 ---
 title: "feat: Ideation artifact retention — SSOT clarification (adoption block v3)"
 type: feat
-status: active
+status: completed
 date: 2026-08-25
 origin: docs/brainstorms/2026-08-25-ideation-retention-ssot-clarification-requirements.md
 ---
