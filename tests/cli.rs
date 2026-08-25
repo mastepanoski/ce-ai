@@ -34,6 +34,18 @@ fn ce_source(dir: &Path) -> PathBuf {
     dir.join("ce-tree")
 }
 
+/// Local CE source-tree fixture with the real release layout: loader under
+/// `.opencode/plugins`, skills at the top-level `skills/` directory.
+fn ce_source_top_level_skills(dir: &Path) -> PathBuf {
+    let loader = dir.join("ce-tree/.opencode/plugins/compound-engineering.js");
+    fs::create_dir_all(loader.parent().unwrap()).unwrap();
+    fs::write(&loader, "export default function ceLoader() {}\n").unwrap();
+    let skill = dir.join("ce-tree/skills/ce-brainstorm/SKILL.md");
+    fs::create_dir_all(skill.parent().unwrap()).unwrap();
+    fs::write(&skill, "# ce-brainstorm\n").unwrap();
+    dir.join("ce-tree")
+}
+
 fn user_config(home: &Path, content: &str) {
     let path = home.join(".config/opencode/opencode.json");
     fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -50,6 +62,100 @@ fn install(config_dir: &Path, home: &Path, source: &Path) {
         .arg(source)
         .assert()
         .success();
+}
+
+#[test]
+fn install_harvests_top_level_skills_into_managed_dir_and_manifest() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source_top_level_skills(tmp.path());
+
+    install(&config_dir, &home, &source);
+
+    let managed_skill =
+        home.join(".config/opencode/compound-engineering/skills/ce-brainstorm/SKILL.md");
+    assert!(managed_skill.exists());
+    let manifest = read_json(
+        &home
+            .join(".config/opencode/compound-engineering")
+            .join("install-manifest.json"),
+    );
+    let paths: Vec<&str> = manifest["files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f["path"].as_str().unwrap())
+        .collect();
+    assert!(paths.contains(&"skills/ce-brainstorm/SKILL.md"));
+}
+
+#[test]
+fn install_harness_receives_no_skill_files_from_harvest() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source_top_level_skills(tmp.path());
+    // claude must be detected so `--harness all` targets it.
+    fs::create_dir_all(home.join(".claude")).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "all", "--source"])
+        .arg(&source)
+        .assert()
+        .success();
+
+    // Token-neutrality: harvested skills stay in the OpenCode managed dir;
+    // harness-owned directories receive nothing. Install opencode explicitly
+    // so the managed surface exists regardless of host detection.
+    assert!(!home.join(".claude/skills").exists());
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "opencode", "--source"])
+        .arg(&source)
+        .assert()
+        .success();
+    assert!(home
+        .join(".config/opencode/compound-engineering/skills/ce-brainstorm/SKILL.md")
+        .exists());
+}
+
+#[test]
+fn sync_matrix_verifies_harvested_managed_surface() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source_top_level_skills(tmp.path());
+
+    install(&config_dir, &home, &source);
+    ceai(&config_dir, &home)
+        .args(["sync"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("managed files match SHA256"));
+}
+
+#[test]
+fn install_prefers_top_level_skills_on_overlap() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    // Overlap: same skill in both layouts with different content.
+    let legacy = source.join(".opencode/skills/ce-brainstorm/SKILL.md");
+    fs::write(&legacy, "# legacy version\n").unwrap();
+    let top = source.join("skills/ce-brainstorm/SKILL.md");
+    fs::create_dir_all(top.parent().unwrap()).unwrap();
+    fs::write(&top, "# top-level version\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "opencode", "--source"])
+        .arg(&source)
+        .assert()
+        .success()
+        .stderr(predicates::str::contains("top-level wins"));
+
+    let managed_skill =
+        home.join(".config/opencode/compound-engineering/skills/ce-brainstorm/SKILL.md");
+    assert_eq!(
+        fs::read_to_string(&managed_skill).unwrap(),
+        "# top-level version\n"
+    );
 }
 
 #[test]
@@ -2068,7 +2174,7 @@ fn install_claude_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
 
     let claude_json = home.join(".claude.json");
     assert!(claude_json.exists());
-    assert!(home.join(".claude/skills").exists());
+    assert!(!home.join(".claude/skills").exists());
 
     let content = fs::read_to_string(&claude_json).unwrap();
     let config: ce_ai::harness::claude::ClaudeMcpConfig = serde_json::from_str(&content).unwrap();
@@ -2155,7 +2261,7 @@ fn install_codex_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
 
     let config_toml = home.join(".codex/config.toml");
     assert!(config_toml.exists());
-    assert!(home.join(".codex/skills").exists());
+    assert!(!home.join(".codex/skills").exists());
 
     let content = fs::read_to_string(&config_toml).unwrap();
     let root: toml::Table = content.parse().unwrap();
@@ -2266,7 +2372,7 @@ fn install_copilot_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
 
     let mcp_config = home.join(".copilot/mcp-config.json");
     assert!(mcp_config.exists());
-    assert!(home.join(".copilot/skills").exists());
+    assert!(!home.join(".copilot/skills").exists());
 
     let content = fs::read_to_string(&mcp_config).unwrap();
     let json_val: serde_json::Value = serde_json::from_str(&content).unwrap();
@@ -2334,7 +2440,7 @@ fn uninstall_copilot_harness_clean_install_lifecycle() {
         .success();
 
     assert!(home.join(".copilot/mcp-config.json").exists());
-    assert!(home.join(".copilot/skills").exists());
+    assert!(!home.join(".copilot/skills").exists());
 
     ceai(&config_dir, &home)
         .args(["uninstall", "--harness", "copilot"])
@@ -2415,7 +2521,7 @@ fn install_grok_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
 
     let grok_config = home.join(".grok/config.toml");
     assert!(grok_config.exists());
-    assert!(home.join(".grok/skills").exists());
+    assert!(!home.join(".grok/skills").exists());
 
     let content = fs::read_to_string(&grok_config).unwrap();
     let root: toml::Table = content.parse().unwrap();
@@ -2488,7 +2594,7 @@ fn uninstall_grok_harness_clean_install_lifecycle() {
         .success();
 
     assert!(home.join(".grok/config.toml").exists());
-    assert!(home.join(".grok/skills").exists());
+    assert!(!home.join(".grok/skills").exists());
 
     ceai(&config_dir, &home)
         .args(["uninstall", "--harness", "grok"])
@@ -2663,7 +2769,7 @@ fn install_kimi_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
 
     let kimi_config = home.join(".kimi-code/mcp.json");
     assert!(kimi_config.exists());
-    assert!(home.join(".kimi-code/skills").exists());
+    assert!(!home.join(".kimi-code/skills").exists());
 
     let content = fs::read_to_string(&kimi_config).unwrap();
     let config: serde_json::Value = serde_json::from_str(&content).unwrap();
@@ -2711,7 +2817,7 @@ fn uninstall_kimi_harness_clean_install_lifecycle() {
         .success();
 
     assert!(home.join(".kimi-code/mcp.json").exists());
-    assert!(home.join(".kimi-code/skills").exists());
+    assert!(!home.join(".kimi-code/skills").exists());
 
     ceai(&config_dir, &home)
         .args(["uninstall", "--harness", "kimi"])
@@ -2841,7 +2947,7 @@ fn install_agy_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
 
     let agy_config = home.join(".gemini/config/mcp_config.json");
     assert!(agy_config.exists());
-    assert!(home.join(".gemini/config/skills").exists());
+    assert!(!home.join(".gemini/config/skills").exists());
 
     let content = fs::read_to_string(&agy_config).unwrap();
     let config: serde_json::Value = serde_json::from_str(&content).unwrap();
@@ -2880,7 +2986,7 @@ fn uninstall_agy_harness_clean_install_lifecycle() {
         .success();
 
     assert!(home.join(".gemini/config/mcp_config.json").exists());
-    assert!(home.join(".gemini/config/skills").exists());
+    assert!(!home.join(".gemini/config/skills").exists());
 
     ceai(&config_dir, &home)
         .args(["uninstall", "--harness", "agy"])
@@ -2996,8 +3102,8 @@ fn install_pi_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
         .success();
 
     let pi_dir = home.join(".pi/agent");
-    assert!(pi_dir.join("skills").exists());
-    assert!(pi_dir.join("skills/ce-brainstorm/SKILL.md").exists());
+    assert!(!pi_dir.join("skills").exists());
+    assert!(!pi_dir.join("skills/ce-brainstorm/SKILL.md").exists());
 
     // Pi does NOT write any mcp.json, config.json, mcp-config.json or plugins.json
     assert!(!pi_dir.join("config.json").exists());
@@ -3068,8 +3174,8 @@ fn install_pi_harness_respects_pi_coding_agent_dir_env() {
         .assert()
         .success();
 
-    assert!(custom_pi_dir.join("skills").exists());
-    assert!(custom_pi_dir.join("skills/ce-brainstorm/SKILL.md").exists());
+    assert!(!custom_pi_dir.join("skills").exists());
+    assert!(!custom_pi_dir.join("skills/ce-brainstorm/SKILL.md").exists());
     assert!(!home.join(".pi").exists());
 
     ceai(&config_dir, &home)
@@ -3101,7 +3207,7 @@ fn install_fx_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
     let fx_dir = home.join(".fx");
     let mcp_config = fx_dir.join("mcp.json");
     assert!(mcp_config.exists());
-    assert!(fx_dir.join("skills/ce-brainstorm/SKILL.md").exists());
+    assert!(!fx_dir.join("skills/ce-brainstorm/SKILL.md").exists());
 
     let content = fs::read_to_string(&mcp_config).unwrap();
     let config: ce_ai::harness::fx::FxMcpConfig = serde_json::from_str(&content).unwrap();
@@ -3192,7 +3298,7 @@ fn install_fx_harness_respects_fx_home_env() {
         .success();
 
     assert!(custom_fx_dir.join("mcp.json").exists());
-    assert!(custom_fx_dir.join("skills/ce-brainstorm/SKILL.md").exists());
+    assert!(!custom_fx_dir.join("skills/ce-brainstorm/SKILL.md").exists());
     assert!(!home.join(".fx").exists());
 
     ceai(&config_dir, &home)
@@ -3755,5 +3861,101 @@ mod journal_fault_injection {
             .join(".config/opencode/compound-engineering/plugins/compound-engineering.js")
             .exists());
         assert!(config_dir.join("install-journal.json").exists());
+    }
+
+    #[test]
+    fn adopt_non_interactive_report_only_and_requires_yes_to_confirm() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source_top_level_skills(tmp.path());
+        install(&config_dir, &home, &source);
+        // Stale local copy in the harness skills root (adoptable candidate).
+        let stale = home.join(".config/opencode/skills/ce-brainstorm/SKILL.md");
+        fs::create_dir_all(stale.parent().unwrap()).unwrap();
+        fs::write(
+            &stale,
+            "---\nname: ce-brainstorm\ndescription: brainstorm\n---\n# stale local copy\n",
+        )
+        .unwrap();
+
+        // Non-TTY without --yes: report-only, nothing adopted, nothing recorded.
+        ceai(&config_dir, &home)
+            .args(["skills", "adopt", "--harness", "opencode"])
+            .write_stdin("\n")
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("pending-adoption"))
+            .stdout(predicates::str::contains("ce-brainstorm — adoptable"));
+        let state = read_json(&config_dir.join("state.json"));
+        assert!(
+            state.get("skill_surfaces").is_none()
+                || state["skill_surfaces"]
+                    .as_array()
+                    .is_none_or(|a| a.is_empty())
+        );
+        assert!(fs::read_to_string(&stale)
+            .unwrap()
+            .contains("# stale local copy"));
+    }
+
+    #[test]
+    fn adopt_yes_hits_engine_gate_and_leaves_surface_untouched() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source_top_level_skills(tmp.path());
+        install(&config_dir, &home, &source);
+        let stale = home.join(".config/opencode/skills/ce-brainstorm/SKILL.md");
+        fs::create_dir_all(stale.parent().unwrap()).unwrap();
+        fs::write(
+            &stale,
+            "---\nname: ce-brainstorm\ndescription: brainstorm\n---\n# stale local copy\n",
+        )
+        .unwrap();
+
+        ceai(&config_dir, &home)
+            .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+            .assert()
+            .failure()
+            .stderr(predicates::str::contains(
+                "adoption engine ships in the next release",
+            ));
+
+        // Gate leaves everything untouched: stale content intact, no ledger.
+        assert!(fs::read_to_string(&stale)
+            .unwrap()
+            .contains("# stale local copy"));
+        let state = read_json(&config_dir.join("state.json"));
+        assert!(
+            state.get("skill_surfaces").is_none()
+                || state["skill_surfaces"]
+                    .as_array()
+                    .is_none_or(|a| a.is_empty())
+        );
+    }
+
+    #[test]
+    fn adopt_reports_unrecognized_ce_dirs_and_never_touches_them() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source_top_level_skills(tmp.path());
+        install(&config_dir, &home, &source);
+        // User-authored ce-* skill: frontmatter name is NOT in the canonical set.
+        let own = home.join(".config/opencode/skills/ce-my-own/SKILL.md");
+        fs::create_dir_all(own.parent().unwrap()).unwrap();
+        fs::write(&own, "---\nname: ce-my-own\ndescription: mine\n---\nbody\n").unwrap();
+
+        // Only unrecognized dirs → nothing adoptable → report-only success.
+        ceai(&config_dir, &home)
+            .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains(
+                "unrecognized ce-* skill (frontmatter not in the canonical set)",
+            ));
+
+        assert_eq!(
+            fs::read_to_string(&own).unwrap(),
+            "---\nname: ce-my-own\ndescription: mine\n---\nbody\n"
+        );
     }
 }
