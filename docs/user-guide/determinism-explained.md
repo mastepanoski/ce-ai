@@ -35,7 +35,7 @@ These are concrete, verified mechanisms — not promises:
 - **Pinned sources.** Installs and upgrades download immutable release tags only. A network failure is a loud error with exit code 5 — ce-ai never quietly substitutes a moving branch ([Sync & Upgrade](sync-and-upgrade-mechanisms.md)).
 - **Cryptographic provenance.** Every downloaded archive is hashed (SHA256) and bound to its release tag in `state.json`. Re-running `upgrade --to <tag>` re-verifies those bytes before using them.
 - **Ordered, write-free planning.** Drift detection walks files in sorted order and plans actions without touching disk, so planning is repeatable.
-- **Validated stage transitions.** The 7-stage workflow FSM rejects illegal jumps between stages ([FSM & Checkpoints](fsm-and-checkpoints-explained.md)).
+- **Validated checkpoint writes.** Every *recorded* stage change passes the FSM gate: `state.json` can never hold an illegal jump such as Stage 2 → Stage 5 — only reset to Stage 1, stay, advance one, or rewind one ([FSM & Checkpoints](fsm-and-checkpoints-explained.md)). Honest boundary: recording checkpoints is opt-in. An LLM that never calls `workflow checkpoint` can move through stages without any technical rejection — the gate validates declarations, not behavior.
 - **Atomic writes.** Config files are written via temp-file-and-rename, so a crash mid-write can never leave them half-corrupted.
 - **Byte-stable skill resolution.** Resolving the same skills from an unchanged tree emits byte-identical output every time — no hidden clocks stamped into what your agent reads.
 
