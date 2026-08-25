@@ -12,18 +12,14 @@ use crate::error::CeError;
 use crate::harness::custom::{
     plugin_rel as custom_plugin_rel, skill_rel as custom_skill_rel, CustomHarnessConfig,
 };
-use crate::harness::registration::{copy_managed_skills, registration_spec};
+use crate::harness::registration::registration_spec;
 use crate::harness::HarnessKind;
 use crate::opencode::manifest::{InstallManifest, ManifestFile};
 use crate::opencode::plugins::MANAGED_DIR;
-use crate::source::cache::read_local_tree;
+use crate::source::cache::managed_tree;
 use crate::state::diff::{self, sha256_hex, Action};
 use crate::state::state::State;
 use crate::state::write_atomic;
-
-/// Source-tree dirs ce-ai manages; the `.opencode/` prefix is stripped on copy
-/// (mirrors the install command's filter).
-const MANAGED_PREFIXES: [&str; 2] = [".opencode/plugins", ".opencode/skills"];
 
 #[derive(clap::Args, Debug, Default)]
 pub struct Args {
@@ -86,12 +82,9 @@ pub(crate) fn sync_with(
     // Desired: managed-rel path -> sha256, plus the source-rel path to copy from.
     let mut desired: BTreeMap<String, String> = BTreeMap::new();
     let mut source_rel: BTreeMap<String, String> = BTreeMap::new();
-    for (rel, hash) in read_local_tree(source_root)? {
-        if MANAGED_PREFIXES.iter().any(|p| rel.starts_with(p)) {
-            let managed_rel = rel.trim_start_matches(".opencode/").to_string();
-            desired.insert(managed_rel.clone(), hash);
-            source_rel.insert(managed_rel, rel);
-        }
+    for (managed_rel, (src_rel, hash)) in managed_tree(source_root)? {
+        desired.insert(managed_rel.clone(), hash);
+        source_rel.insert(managed_rel, src_rel);
     }
     let installed: BTreeMap<String, String> = manifest
         .files
@@ -266,11 +259,10 @@ pub(crate) fn sync_with(
                 .write(&cfg.plugins_dir)?;
             } else if let Some(spec) = registration_spec(h_kind) {
                 // Strategy table: one exhaustive entry per table-driven kind
-                // (see harness::registration).
+                // (see harness::registration). Skills are never copied into
+                // harness-owned directories — adoption is the only delivery
+                // path (token-neutrality, R4).
                 spec.register_companions(&target_config)?;
-                if let Some(subpath) = spec.skills_subpath {
-                    copy_managed_skills(&managed_dir, &config_dir.join(subpath))?;
-                }
             } else if h_kind == HarnessKind::Opencode {
                 // OpenCode's own registration: plugin entry + skills paths.
                 crate::opencode::config::ensure_plugin_and_skills(
@@ -635,10 +627,10 @@ fn guidance_note_lines() -> Vec<String> {
     ]
 }
 
-/// Per-kind managed-skills root used for post-sync hash verification.
-/// Agy nests its skills under `config/skills`; every other directory-copying
-/// harness uses `<harness_dir>/skills`.
-fn sync_skills_root(kind: HarnessKind, home_dir: &Path) -> PathBuf {
+/// Per-kind managed-skills root used for post-sync hash verification and
+/// adoption detection. Agy nests its skills under `config/skills`; every
+/// other directory-copying harness uses `<harness_dir>/skills`.
+pub(crate) fn sync_skills_root(kind: HarnessKind, home_dir: &Path) -> PathBuf {
     let dir = kind.harness_dir(home_dir);
     if kind == HarnessKind::Agy {
         dir.join("config").join("skills")
@@ -723,13 +715,10 @@ fn check_and_repair_drift(
     manifest: &InstallManifest,
 ) -> Result<bool, CeError> {
     let managed_dir = ctx.opencode_config_dir.join(MANAGED_DIR);
-    let mut desired: BTreeMap<String, String> = BTreeMap::new();
-    for (rel, hash) in read_local_tree(source_root)? {
-        if MANAGED_PREFIXES.iter().any(|p| rel.starts_with(p)) {
-            let managed_rel = rel.trim_start_matches(".opencode/").to_string();
-            desired.insert(managed_rel, hash);
-        }
-    }
+    let desired: BTreeMap<String, String> = managed_tree(source_root)?
+        .into_iter()
+        .map(|(managed_rel, (_, hash))| (managed_rel, hash))
+        .collect();
     let installed: BTreeMap<String, String> = manifest
         .files
         .iter()
@@ -785,22 +774,17 @@ mod tests {
         for kind in [Claude, Codex, Copilot, Grok, Kimi, Agy, Fx] {
             let spec = registration_spec(kind).expect("table-driven kind");
             assert!(spec.register_mcp.is_some());
-            assert!(spec.skills_subpath.is_some());
-            if kind == Agy {
-                assert_eq!(spec.skills_subpath, Some("config/skills"));
-            }
         }
 
         // Pi: skills tree only — No-MCP by design (objective 8).
         let pi = registration_spec(Pi).expect("pi spec");
         assert!(pi.register_mcp.is_none());
-        assert_eq!(pi.skills_subpath, Some("skills"));
 
         // Cursor consumes MCP servers only; copying a skills tree into its
-        // directory would pollute user storage (regression pin).
+        // directory would pollute user storage (regression pin). Skills-root
+        // conventions live in sync_skills_root, not in this table.
         let cursor = registration_spec(Cursor).expect("cursor spec");
         assert!(cursor.register_mcp.is_some());
-        assert_eq!(cursor.skills_subpath, None);
 
         for kind in [Opencode, Custom, Deepseek] {
             assert!(registration_spec(kind).is_none(), "dedicated arm kind");

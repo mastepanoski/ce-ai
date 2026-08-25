@@ -128,6 +128,28 @@ pub struct WorkflowState {
     pub updated_at: String,
 }
 
+/// One tracked file of an adopted skills surface (path relative to the
+/// surface root + expected sha256).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillSurfaceFile {
+    pub path: String,
+    pub sha256: String,
+}
+
+/// Adoption ledger entry: a harness skills root put under ce-ai management
+/// (`adopted`), explicitly declined by the user (`declined`), or whose root
+/// vanished (`orphaned`). Canonical-skills-adoption R2/R3/R19.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillSurface {
+    pub harness: String,
+    pub root: PathBuf,
+    pub status: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<SkillSurfaceFile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adopted_at: Option<String>,
+}
+
 /// Canonical state file at `~/.ce-ai/state.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
@@ -149,6 +171,8 @@ pub struct State {
     pub latest_release_tag: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub projects: Vec<ProjectAdoptionEntry>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skill_surfaces: Vec<SkillSurface>,
 }
 fn default_version() -> u32 {
     1
@@ -307,6 +331,7 @@ mod tests {
             workflow: None,
             latest_release_tag: None,
             projects: vec![],
+            skill_surfaces: vec![],
         }
     }
 
@@ -317,6 +342,34 @@ mod tests {
         let state = state_with("ce-brainstorm");
         state.save(&path).unwrap();
         assert_eq!(State::load(&path).unwrap(), state);
+    }
+
+    #[test]
+    fn skill_surfaces_ledger_round_trips_and_defaults_empty() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("state.json");
+        let mut state = State::new();
+        state
+            .skill_surfaces
+            .push(crate::state::state::SkillSurface {
+                harness: "opencode".into(),
+                root: std::path::PathBuf::from("/tmp/skills"),
+                status: "adopted".into(),
+                files: vec![crate::state::state::SkillSurfaceFile {
+                    path: "ce-brainstorm/SKILL.md".into(),
+                    sha256: "a".repeat(64),
+                }],
+                adopted_at: Some("2026-08-24T00:00:00Z".into()),
+            });
+        state.save(&path).unwrap();
+        let loaded = State::load(&path).unwrap();
+        assert_eq!(loaded.skill_surfaces.len(), 1);
+        assert_eq!(loaded.skill_surfaces[0].status, "adopted");
+
+        // Legacy state.json without the ledger loads with an empty default.
+        let legacy = dir.path().join("legacy.json");
+        std::fs::write(&legacy, r#"{"version":1}"#).unwrap();
+        assert!(State::load(&legacy).unwrap().skill_surfaces.is_empty());
     }
 
     #[test]

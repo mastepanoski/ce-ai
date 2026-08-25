@@ -43,6 +43,16 @@ pub enum Action {
     },
     /// Run diagnostic health check on skill registry integrity (alias to ce-ai doctor probe).
     Doctor,
+    /// Put pre-existing `ce-*` skill copies under ce-ai management.
+    Adopt {
+        /// Harness whose skills root is scanned (name or `all`).
+        #[arg(long, default_value = "all")]
+        harness: String,
+
+        /// Confirm every adoptable surface without an interactive prompt.
+        #[arg(long, default_value_t = false)]
+        yes: bool,
+    },
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
@@ -141,6 +151,15 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                     "skill registry integrity check failed".into(),
                 ));
             }
+        }
+        Action::Adopt { harness, yes } => {
+            crate::commands::adopt::run(
+                ctx,
+                &crate::commands::adopt::Args {
+                    harness: harness.clone(),
+                    yes: *yes,
+                },
+            )?;
         }
     }
 
