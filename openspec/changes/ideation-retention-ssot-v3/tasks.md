@@ -10,30 +10,30 @@ well under).
 
 ## T2 — Reword surfaces, bump version, update pinned tests
 
-- [ ] Append retention clarification to `AGENTS.md` SSOT rule; reword both managed-block
+- [x] Append retention clarification to `AGENTS.md` SSOT rule; reword both managed-block
   surfaces in `src/commands/init_prj.rs`; bump `BLOCK_VERSION` to 3. (~20 LOC)
-- [ ] Update literal `v=2` pins to `v=3` in the five enumerated tests; update content pins
+- [x] Update literal `v=2` pins to `v=3` in the five enumerated tests; update content pins
   (`init_prj_full_tier_contains_ssot_rule`, orchestrator count==1); retarget and rename
   `doctor_reports_generic_drift_for_tampered_v2_body`. (~40 LOC)
-- [ ] Add v2→v3 upgrade integration test preserving provenance (`created_file`) and
+- [x] Add v2→v3 upgrade integration test preserving provenance (`created_file`) and
   line-ending style. (~60 LOC)
-- [ ] Verification: `cargo test`, clippy `-D warnings`, grep sweep shows no live-template
+- [x] Verification: `cargo test`, clippy `-D warnings`, grep sweep shows no live-template
   `v=2` literals.
 
 ## T3 — Documentation alignment
 
-- [ ] `docs/user-guide/project-adoption-guide.md`: v3 example header, upgrade section,
+- [x] `docs/user-guide/project-adoption-guide.md`: v3 example header, upgrade section,
   tier rows. (~15 LOC)
-- [ ] `docs/user-guide/quick-start-workflow-guide.md`: realign three mentions. (~6 LOC)
-- [ ] `docs/user-guide/fsm-and-checkpoints-explained.md`: realign one mention. (~3 LOC)
-- [ ] Verification: grep "disposable" across `docs/` returns only retention-consistent
+- [x] `docs/user-guide/quick-start-workflow-guide.md`: realign three mentions. (~6 LOC)
+- [x] `docs/user-guide/fsm-and-checkpoints-explained.md`: realign one mention. (~3 LOC)
+- [x] Verification: grep "disposable" across `docs/` returns only retention-consistent
   usages outside whitelisted historical artifacts (docs/solutions/, archived openspec,
   CHANGELOG history).
 
 ## T4 — Changelog and version
 
-- [ ] `Cargo.toml`: MINOR bump per Key Technical Decisions (precedent: v2 → 1.5.0). (~1 LOC)
-- [ ] `CHANGELOG.md`: new MINOR heading + entry noting stale-version hints for existing
+- [x] `Cargo.toml`: MINOR bump per Key Technical Decisions (precedent: v2 → 1.5.0). (~1 LOC)
+- [x] `CHANGELOG.md`: new MINOR heading + entry noting stale-version hints for existing
   adoptions until re-run. (~12 LOC)
 
 ## TDD notes
