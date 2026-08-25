@@ -1443,7 +1443,7 @@ fn init_prj_minimal_block_matches_v1_bytes() {
 }
 
 #[test]
-fn init_prj_replaces_v1_block_with_v2_preserving_content_and_crlf() {
+fn init_prj_replaces_stale_v1_block_with_current_preserving_content_and_crlf() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
     let prj_dir = tmp.path().join("v1-adopted-project");
