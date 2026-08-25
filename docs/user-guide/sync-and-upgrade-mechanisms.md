@@ -131,6 +131,8 @@ flowchart TD
 
 #### Step 1: Query GitHub Release API
 - `ce-ai` queries GitHub API to resolve the latest release tag of `everyinc/compound-engineering-plugin` (or the specific tag supplied via `--to <tag>`).
+- **Fail-loudly contract**: ce-ai only ever downloads immutable release tags. If the API is unreachable, returns an HTTP error, or answers with an unparseable payload, the command exits with code `5` (`Network`) instead of guessing. If no `compound-engineering-v*` release exists yet, it exits with code `2` (`Usage`). There is no silent fallback to a moving branch — pin a tag with `--to <tag>` or install a local tree with `--source <path>`.
+- See [Determinism & ce-ai Explained](determinism-explained.md) for why this matters.
 
 #### Step 2: Download & Cache Tarball (`~/.ce-ai/cache/`)
 - Downloads the official `.tar.gz` archive and computes its SHA256 digest.

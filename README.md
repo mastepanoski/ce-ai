@@ -1,9 +1,9 @@
 # `ce-ai` — Compound Engineering CLI Orchestrator & Workflow FSM Engine
 
-`ce-ai` is a fast, safe Rust CLI for orchestrating the **[Compound Engineering Plugin](https://github.com/Every-One-AI/compound-engineering)** across 10 native AI agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `fx`) plus custom fallback mode. It governs the **7-stage Compound Engineering Flywheel** via a deterministic FSM engine with workspace scope isolation, atomic POSIX disk writes, and zero-context-loss checkpointing.
+`ce-ai` is a fast, safe Rust CLI for orchestrating the **[Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin)** across 10 native AI agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `fx`) plus custom fallback mode. It governs the **7-stage Compound Engineering Flywheel** via a deterministic FSM engine with workspace scope isolation, atomic POSIX disk writes, and zero-context-loss checkpointing.
 
 > [!NOTE]
-> `ce-ai` orchestrates distributions of the open-source **[Compound Engineering Plugin](https://github.com/Every-One-AI/compound-engineering)** — a suite of specialized skills, roles, and workflow guidelines for AI coding assistants.
+> `ce-ai` orchestrates distributions of the open-source **[Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin)** — a suite of specialized skills, roles, and workflow guidelines for AI coding assistants.
 
 ## Quick Path
 
@@ -63,6 +63,7 @@ That's it — your harnesses are ready for Compound Engineering. Run your first 
 | 🎓 [Compound Workflow Explained](docs/user-guide/compound-engineering-workflow-explained.md) | **Beginner** | Explanation — strategy to code, 6-level hierarchy, OpenSpec vs Brainstorm |
 | 📁 [Project Adoption Guide](docs/user-guide/project-adoption-guide.md) | Both | How-to — non-destructive AGENTS.md adoption, de-init, tiers |
 | 🎓 [Harnesses, Loops & Context Masterclass](docs/user-guide/harnesses-loops-and-context-masterclass.md) | **Beginner** | Explanation — what a harness is, MCP sidecars, token economics |
+| 🎓 [Determinism & ce-ai Explained](docs/user-guide/determinism-explained.md) | **Beginner** | Explanation — what ce-ai guarantees, why LLM execution cannot be deterministic |
 | 🔧 [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) | Both | How-to — scopes, non-destructive JSON merging, discovery |
 | 🔄 [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) | Both | How-to — drift repair, upgrades, rollbacks |
 | ⚡ [Skill Registry Guide](docs/user-guide/skill-registry-guide.md) | Both | How-to / Reference — skill index, 4-tier precedence, resolution |
@@ -71,14 +72,15 @@ That's it — your harnesses are ready for Compound Engineering. Run your first 
 | 🏛️ [Architectural & Conceptual Guide](docs/user-guide/architectural-and-conceptual-guide.md) | **Senior** | Explanation — adapter traits, scope hierarchy, atomic writes |
 | 🎮 [FSM & Checkpoints Masterclass](docs/user-guide/fsm-and-checkpoints-explained.md) | **Senior** | Explanation — 7-stage cycle, savegames, sub-loops |
 | 🧭 [Workflow Panel: Native vs Agent Skills](docs/user-guide/workflow-panel-native-vs-agent-skills.md) | **Beginner** | Explanation — why the TUI dashboard runs some actions and only points to others |
-| 📐 [OpenSpec specifications](openspec/changes/ce-ai/) | **Senior** | Reference — design, requirements matrix, proposal, roadmap |
+| 📐 [OpenSpec specifications](openspec/changes/archive/ce-ai/) | **Senior** | Reference — archived SSOT package: proposal, exploration, design, spec, tasks |
+| 🧠 [Solutions Library](docs/solutions/) · [Plans & Audits](docs/plans/) | Contributor | Reference — solved problems, architecture decisions, delivery history |
 
 ## Security, Governance & Quality Gates
 
 - **Security policy**: [`SECURITY.md`](./SECURITY.md) — ISO/IEC 27001/27002, NIST CSF 2.0, vulnerability disclosure.
 - **AI governance**: [`AI_POLICY.md`](./AI_POLICY.md) — ISO/IEC 42001, NIST AI RMF 1.0.
 - **Disclaimer**: [`DISCLAIMER.md`](./DISCLAIMER.md) — AI-co-created, experimental software under active development.
-- **Contributing**: [`CONTRIBUTING.md`](./CONTRIBUTING.md) · Code of Conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md).
+- **Contributing**: [`CONTRIBUTING.md`](./CONTRIBUTING.md) · Code of Conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) · Docs style guide: [`docs/references/docs-styling.md`](./docs/references/docs-styling.md).
 - **CI**: GitHub Actions runs build + tests, `clippy -D warnings`, `cargo audit`, and a Docker E2E gate on every PR.
 - **Local verification**: `cargo test` (unit/integration) · `make e2e` (containerized E2E).
 

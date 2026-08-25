@@ -1,6 +1,7 @@
-//! GitHub releases resolution for the CE plugin (SF-1, SF-2) with optional
-//! `CE_AI_GITHUB_TOKEN` passthrough. Unit tests never touch the network —
-//! parsing is exercised on fixture payloads.
+//! GitHub releases resolution for the CE plugin (SF-1) with optional
+//! `CE_AI_GITHUB_TOKEN` passthrough. Resolution never falls back to the
+//! mutable `main` branch: every failure is an explicit error. Unit tests
+//! never touch the network — parsing is exercised on fixture payloads.
 
 use std::cmp::Ordering;
 
@@ -14,11 +15,6 @@ pub const PLUGIN_REPO: &str = "everyinc/compound-engineering-plugin";
 /// Releases API endpoint (SF-1).
 pub fn releases_api_url() -> String {
     format!("https://api.github.com/repos/{PLUGIN_REPO}/releases")
-}
-
-/// Fallback tarball URL for the `main` branch (SF-2).
-pub fn main_tarball_url() -> String {
-    format!("https://github.com/{PLUGIN_REPO}/archive/refs/heads/main.tar.gz")
 }
 
 /// Tarball URL for a specific release tag (upgrade).
@@ -88,9 +84,25 @@ pub fn github_token_from_env() -> Option<String> {
         .filter(|t| !t.is_empty())
 }
 
+/// Maps a resolved release tag to its pinned `(version, url)` pair. A
+/// missing tag is a usage error — ce-ai never falls back to the mutable
+/// `main` branch.
+pub fn pinned_version_and_url(tag: Option<String>) -> Result<(String, String), CeError> {
+    match tag {
+        Some(tag) => {
+            let url = tag_tarball_url(&tag);
+            Ok((tag, url))
+        }
+        None => Err(CeError::Usage(
+            "no 'compound-engineering-v*' release found on GitHub — install a pinned tag with '--to <tag>' or a local tree with '--source <path>'".to_string(),
+        )),
+    }
+}
+
 /// Resolves the latest CE release tag via the GitHub API (SF-1); network call,
-/// exercised by E2E rather than unit tests. `None` when no `compound-engineering-v*`
-/// release exists (callers fall back to `main_tarball_url`, SF-2).
+/// exercised by E2E rather than unit tests. Every transport, HTTP, or payload
+/// failure is an explicit [`CeError::Network`]; `Ok(None)` means the API
+/// answered successfully but no `compound-engineering-v*` release exists.
 pub fn resolve_latest_release(
     client: &reqwest::blocking::Client,
     token: Option<&str>,
@@ -99,50 +111,43 @@ pub fn resolve_latest_release(
     if let Some(header) = auth_header(token) {
         request = request.header(reqwest::header::AUTHORIZATION, header);
     }
+    let guidance = "pin a tag with '--to <tag>' or use a local tree with '--source <path>'; tip: set CE_AI_GITHUB_TOKEN to authenticate requests";
     let response = match request
         .header(reqwest::header::USER_AGENT, "ce-ai/0.1.0")
         .send()
     {
         Ok(res) => res,
         Err(err) => {
-            eprintln!(
-                "notice: GitHub API release query network error ({err}). Falling back to main branch source tarball. Tip: set CE_AI_GITHUB_TOKEN to authenticate requests."
-            );
-            return Ok(None);
+            return Err(CeError::Network(format!(
+                "GitHub API release query failed ({err}) — ce-ai never falls back to the mutable main branch; {guidance}"
+            )));
         }
     };
 
     if !response.status().is_success() {
-        eprintln!(
-            "notice: GitHub API returned HTTP {} when querying releases. Falling back to main branch source tarball. Tip: set CE_AI_GITHUB_TOKEN to authenticate requests.",
+        return Err(CeError::Network(format!(
+            "GitHub API returned HTTP {} when querying releases — ce-ai never falls back to the mutable main branch; pin a tag with '--to <tag>' or use a local tree with '--source <path>'; tip: set CE_AI_GITHUB_TOKEN to authenticate or raise rate limits",
             response.status()
-        );
-        return Ok(None);
+        )));
     }
     let body = match response.bytes() {
         Ok(bytes) => bytes,
         Err(err) => {
-            eprintln!(
-                "notice: Failed to read GitHub API response bytes ({err}). Falling back to main branch source tarball."
-            );
-            return Ok(None);
+            return Err(CeError::Network(format!(
+                "failed to read GitHub API response bytes ({err}) — ce-ai never falls back to the mutable main branch; pin a tag with '--to <tag>' or use a local tree with '--source <path>'"
+            )));
         }
     };
-    match latest_ce_release(&body) {
-        Ok(res) => Ok(res),
-        Err(err) => {
-            eprintln!(
-                "notice: Failed to parse GitHub API release payload ({err}). Falling back to main branch source tarball."
-            );
-            Ok(None)
-        }
-    }
+    latest_ce_release(&body).map_err(|err| {
+        CeError::Network(format!("failed to parse GitHub API release payload: {err}"))
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use crate::source::release::{
-        auth_header, github_token_from_env, latest_ce_release, main_tarball_url, tag_tarball_url,
+        auth_header, github_token_from_env, latest_ce_release, pinned_version_and_url,
+        tag_tarball_url,
     };
 
     #[test]
@@ -167,11 +172,19 @@ mod tests {
     }
 
     #[test]
-    fn main_tarball_fallback_url_points_at_main_branch() {
-        let url = main_tarball_url();
-        assert!(
-            url.ends_with("/everyinc/compound-engineering-plugin/archive/refs/heads/main.tar.gz")
-        );
+    fn pinned_version_resolves_tag_tarball_url() {
+        let (version, url) =
+            pinned_version_and_url(Some("compound-engineering-v3.4.2".to_string())).unwrap();
+        assert_eq!(version, "compound-engineering-v3.4.2");
+        assert_eq!(url, tag_tarball_url("compound-engineering-v3.4.2"));
+    }
+
+    #[test]
+    fn missing_release_is_a_usage_error_never_main_fallback() {
+        let err = pinned_version_and_url(None).unwrap_err();
+        assert_eq!(err.exit_code(), 2);
+        assert!(err.to_string().contains("--to <tag>"));
+        assert!(!err.to_string().contains("main.tar.gz"));
     }
 
     #[test]

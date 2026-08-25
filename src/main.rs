@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod capture;
 mod commands;
 mod error;
 mod harness;
@@ -16,7 +17,7 @@ use clap::{Parser, Subcommand};
 
 use crate::commands::{
     audit, backups, deinit_prj, doctor, init_prj, install, models, skills, status, sync, tools,
-    uninstall, upgrade, workflow, Context,
+    uninstall, upgrade, usage, workflow, Context,
 };
 use crate::error::result_exit_code;
 
@@ -61,6 +62,8 @@ enum Commands {
     Backups(backups::BackupsArgs),
     /// Companion developer sidecars and memory tools manager (Engram, CodeGraph, Context7, RTK).
     Tools(tools::Args),
+    /// Usage analytics: token capture and reporting.
+    Usage(usage::Args),
     /// Workflow FSM & progress recovery system across 7 development stages.
     Workflow(workflow::Args),
     /// Multi-harness token-efficiency and context-quality audit engine.
@@ -105,6 +108,7 @@ fn main() {
         Some(Commands::Doctor(args)) => doctor::run(&ctx, &args),
         Some(Commands::Backups(args)) => backups::run(&ctx, &args),
         Some(Commands::Tools(args)) => tools::run(&ctx, &args),
+        Some(Commands::Usage(sub)) => crate::commands::usage::run(&ctx, &sub),
         Some(Commands::Workflow(args)) => workflow::run(&ctx, &args),
         Some(Commands::Audit(args)) => audit::run(&ctx, &args),
         Some(Commands::InitPrj { path, tier, force }) => init_prj::run(&ctx, path, &tier, force),

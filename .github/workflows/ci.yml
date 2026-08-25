@@ -73,6 +73,50 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+  pr-size-budget:
+    name: PR Size Budget (#108)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Compute changed lines
+        id: size
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          # Exclude lockfiles and binary files per CONTRIBUTING.md §2 counting contract.
+          ADDED=$(git diff --numstat "$BASE"...HEAD -- ':!Cargo.lock' ':!*.lock' | awk '{a+=$1} END {print a+0}')
+          DELETED=$(git diff --numstat "$BASE"...HEAD -- ':!Cargo.lock' ':!*.lock' | awk '{d+=$2} END {print d+0}')
+          TOTAL=$((ADDED + DELETED))
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          {
+            echo "## PR Size Budget"
+            echo ""
+            echo "| Metric | Count |"
+            echo "|---|---|"
+            echo "| Added | $ADDED |"
+            echo "| Deleted | $DELETED |"
+            echo "| **Total** | **$TOTAL** |"
+            echo ""
+            if [ "$TOTAL" -gt 400 ]; then
+              echo "> ⚠️ Exceeds the 400-line review boundary. Split into chained slices or request a \`size:exception\` label."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check boundary
+        run: |
+          TOTAL=${{ steps.size.outputs.total }}
+          if [ "$TOTAL" -gt 400 ]; then
+            HAS_LABEL=$(gh pr view "${{ github.event.pull_request.number }}" --json labels --jq '[.labels[].name] | contains(["size:exception"])')
+            if [ "$HAS_LABEL" != "true" ]; then
+              echo "::error::PR exceeds the 400-line review boundary ($TOTAL lines) without a size:exception label. Split into chained slices or request an exception."
+              exit 1
+            fi
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   docker-e2e-gate:
     name: Containerized E2E Gate (NIST AI RMF & ISO 42001)
     runs-on: ubuntu-latest

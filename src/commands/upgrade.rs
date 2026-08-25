@@ -11,7 +11,7 @@ use crate::error::CeError;
 use crate::source::archive::extract_to_source;
 use crate::source::cache::{record_tarball_provenance, Cache};
 use crate::source::release::{
-    github_token_from_env, main_tarball_url, resolve_latest_release, tag_tarball_url,
+    github_token_from_env, pinned_version_and_url, resolve_latest_release,
 };
 use crate::state::diff::sha256_hex;
 use crate::state::state::{ReleaseProvenance, State};
@@ -52,14 +52,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         return sync_from_extracted(ctx, &tarball, tag, tag, None);
     }
     // Default: fetch the latest release from GitHub, cache it with full
-    // provenance, then sync (SU-5).
+    // provenance, then sync (SU-5). No implicit fallback: every failure is an
+    // explicit error and the resolved tag is immutable.
     let client = reqwest::blocking::Client::new();
     let token = github_token_from_env();
     let tag = resolve_latest_release(&client, token.as_deref())?;
-    let (version, url) = match tag {
-        Some(tag) => (tag.clone(), tag_tarball_url(&tag)),
-        None => ("main".to_string(), main_tarball_url()),
-    };
+    let (version, url) = pinned_version_and_url(tag)?;
     let bytes = client
         .get(&url)
         .header(reqwest::header::USER_AGENT, "ce-ai/0.1.0")
