@@ -54,7 +54,7 @@ Inside `AGENTS.md`, the injected block takes this exact structure:
 # Pre-Existing Developer Notes (Preserved Unchanged)
 Custom project guidelines written by the developer stay here.
 
-<!-- ce-ai:block begin v=2 tier=full sha256=a1b2c3d4e5f6... -->
+<!-- ce-ai:block begin v=3 tier=full sha256=a1b2c3d4e5f6... -->
 # AGENTS.md — AI Agent Operating Directives
 
 ## 🛡️ Governance & Compliance Standards
@@ -92,16 +92,17 @@ ce-ai init-prj --force
 
 | Tier | Purpose | Recommended for |
 | :--- | :--- | :--- |
-| `full` **(Default)** | Complete 7-stage development cycle, OpenSpec requirements, Single Source of Truth rule for ideation artifacts, DoD checklist, and security policies. | Production repositories, core services, critical products. |
+| `full` **(Default)** | Complete 7-stage development cycle, OpenSpec requirements, Single Source of Truth rule (ideation artifacts are retained as raw history — "disposable" never means deleting them), DoD checklist, and security policies. | Production repositories, core services, critical products. |
 | `minimal` | Core DoD guidelines, atomic write rules, and basic testing verification. | Small libraries, scripts, internal tools. |
-| `orchestrator` | Multi-repo orchestration directives and delegation protocols, plus a directive to distill ideation outputs into specs rather than maintaining them in parallel. | Monorepos, parent workspace folders. |
+| `orchestrator` | Multi-repo orchestration directives and delegation protocols, plus a directive to distill ideation outputs into specs rather than maintaining them in parallel — and retain them as raw history instead of deleting them. | Monorepos, parent workspace folders. |
 
-#### Upgrading Adopted Projects (v1 ➔ v2)
+#### Upgrading Adopted Projects (v2 ➔ v3)
 
-Blocks injected by older binaries (`v=1`) remain valid but lack the Single
-Source of Truth guidance. To upgrade an adopted project, re-run the command
-after upgrading your `ce-ai` binary — the managed block is replaced in place
-between markers and all user content around it is preserved:
+Blocks injected by older binaries (`v=2`) remain valid but predate the
+retention clarification of the Single Source of Truth rule. To upgrade an
+adopted project, re-run the command after upgrading your `ce-ai` binary — the
+managed block is replaced in place between markers and all user content around
+it is preserved:
 
 ```bash
 ce-ai init-prj /path/to/my-project --tier full
@@ -109,8 +110,9 @@ ce-ai init-prj /path/to/my-project --tier full
 
 > ℹ️ **Expected after upgrading**: `ce-ai doctor` and `ce-ai status` compare
 > each adopted project's on-disk block against the current template and will
-> report **SHA drift** for v1 adoptions until they are re-adopted. This is the
-> intended signal prompting the re-run above, not a regression.
+> report **stale block version** hints for older-version adoptions until they
+> are re-adopted. This is the intended signal prompting the re-run above, not
+> a regression.
 
 ---
 
