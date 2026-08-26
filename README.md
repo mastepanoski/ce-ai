@@ -1,6 +1,6 @@
 # `ce-ai` — Compound Engineering CLI Orchestrator & Workflow FSM Engine
 
-`ce-ai` is a fast, safe Rust CLI for orchestrating the **[Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin)** across 10 native AI agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `fx`) plus custom fallback mode. It governs the **7-stage Compound Engineering Flywheel** via a deterministic FSM engine with workspace scope isolation, atomic POSIX disk writes, and zero-context-loss checkpointing.
+`ce-ai` is a fast, safe Rust CLI for orchestrating the **[Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin)** across 10 native AI agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `fx`) plus custom fallback mode. It governs the **7-stage Compound Engineering Flywheel** via a stage-gated FSM whose bookkeeping (stage transitions, checkpoint recording) is deterministic — agent execution itself is probabilistic — with workspace scope isolation, atomic POSIX disk writes, and zero-context-loss checkpointing.
 
 > [!NOTE]
 > `ce-ai` orchestrates distributions of the open-source **[Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin)** — a suite of specialized skills, roles, and workflow guidelines for AI coding assistants.

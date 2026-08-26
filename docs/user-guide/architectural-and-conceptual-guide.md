@@ -83,7 +83,7 @@ The system enforces a **Scope-Aware Configuration Hierarchy**.
 ## 4. Finite State Machine & Compound Engineering Flywheel (Workflow FSM & Checkpointing)
 
 ### 📐 Architectural Concept
-AI-assisted development in `ce-ai` is governed by a **Finite State Machine (FSM)** structuring the lifecycle into 7 deterministic stages directly enforcing the **Compound Engineering Flywheel**:
+AI-assisted development in `ce-ai` is governed by a **Finite State Machine (FSM)** structuring the lifecycle into 7 fixed stages directly enforcing the **Compound Engineering Flywheel** (stage bookkeeping is deterministic; agent execution within each stage is probabilistic):
 
 $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \xrightarrow{3} \text{Work/TDD} \xrightarrow{4} \text{Verify} \xrightarrow{5} \text{Compound} \xrightarrow{6} \text{Ship}$$
 
