@@ -9,6 +9,16 @@ use predicates::prelude::*;
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
+/// Current managed adoption-block version under test. Every test literal that
+/// embeds a block header must derive from this constant: a stale hardcoded
+/// version flips classifier branches after a bump (see
+/// docs/solutions/test-failures/adoption-block-version-bump-test-coordination-2026-08-25.md).
+const CUR_BLOCK_VERSION: u32 = 3;
+
+fn block_begin_prefix(tier: &str) -> String {
+    format!("<!-- ce-ai:block begin v={CUR_BLOCK_VERSION} tier={tier}")
+}
+
 fn ceai(config_dir: &Path, home: &Path) -> Command {
     let mut cmd = Command::cargo_bin("ce-ai").unwrap();
     cmd.arg("--config-dir")
@@ -1585,7 +1595,7 @@ fn init_prj_and_deinit_prj_roundtrip_fresh_repo() {
     assert!(claude_stub.exists());
 
     let agents_text = fs::read_to_string(&agents_file).unwrap();
-    assert!(agents_text.contains("<!-- ce-ai:block begin v=3 tier=full"));
+    assert!(agents_text.contains(&block_begin_prefix("full")));
     assert!(agents_text.contains("<!-- ce-ai:block end -->"));
 
     let claude_text = fs::read_to_string(&claude_stub).unwrap();
@@ -1629,7 +1639,7 @@ fn init_prj_preserves_preexisting_content_and_crlf() {
 
     let updated_text = fs::read_to_string(&agents_file).unwrap();
     assert!(updated_text.starts_with("# My Existing Project\r\n"));
-    assert!(updated_text.contains("<!-- ce-ai:block begin v=3 tier=minimal"));
+    assert!(updated_text.contains(&block_begin_prefix("minimal")));
     assert!(updated_text.contains("\r\n"));
 
     // 2. Run deinit-prj
@@ -1751,12 +1761,12 @@ fn init_prj_replaces_stale_v1_block_with_current_preserving_content_and_crlf() {
     assert!(updated_text.starts_with(user_head));
     assert!(updated_text.ends_with(user_tail));
     assert!(!updated_text.contains("Stale v1 content."));
-    assert!(updated_text.contains("<!-- ce-ai:block begin v=3 tier=full"));
+    assert!(updated_text.contains(&block_begin_prefix("full")));
     assert!(updated_text.contains("### Single Source of Truth Rule"));
 
     let state_text = fs::read_to_string(config_dir.join("state.json")).unwrap();
     let state_val: serde_json::Value = serde_json::from_str(&state_text).unwrap();
-    assert_eq!(state_val["projects"][0]["block_version"], 3);
+    assert_eq!(state_val["projects"][0]["block_version"], CUR_BLOCK_VERSION);
 }
 
 #[test]
@@ -1852,7 +1862,7 @@ fn init_prj_replaces_lf_only_v1_block_preserving_content() {
     assert!(updated_text.starts_with(user_head));
     assert!(updated_text.ends_with(user_tail));
     assert!(!updated_text.contains("Stale v1 content."));
-    assert!(updated_text.contains("<!-- ce-ai:block begin v=3 tier=full"));
+    assert!(updated_text.contains(&block_begin_prefix("full")));
     assert!(!updated_text.contains("\r\n"));
     assert!(updated_text.contains("### Single Source of Truth Rule"));
 }
@@ -1903,17 +1913,173 @@ fn init_prj_upgrades_stale_v2_block_to_v3_preserving_provenance() {
     assert!(updated_text.starts_with(user_head));
     assert!(updated_text.ends_with(user_tail));
     assert!(!updated_text.contains("Stale v2 content."));
-    assert!(updated_text.contains("<!-- ce-ai:block begin v=3 tier=full"));
+    assert!(updated_text.contains(&block_begin_prefix("full")));
     assert!(updated_text.contains("retained by default as the permanent raw-history record"));
     assert!(updated_text.contains("\r\n"));
 
     let state_val: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(config_dir.join("state.json")).unwrap()).unwrap();
-    assert_eq!(state_val["projects"][0]["block_version"], 3);
+    assert_eq!(state_val["projects"][0]["block_version"], CUR_BLOCK_VERSION);
     // Provenance is carried forward through the replacement path, not
     // recomputed (see init-prj-created-file-clobber learning): the initial
     // adoption created this file, so the flag must survive the upgrade.
     assert_eq!(state_val["projects"][0]["created_file"], true);
+
+    // Third run: the upgraded block must hit the already-adopted early-return
+    // and stay byte-identical (post-upgrade idempotency).
+    let upgraded = fs::read_to_string(&agents_file).unwrap();
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("already adopted"));
+    assert_eq!(fs::read_to_string(&agents_file).unwrap(), upgraded);
+}
+
+#[test]
+fn init_prj_upgrades_stale_v2_block_to_v3_orchestrator_tier() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("v2-orchestrator-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args([
+            "init-prj",
+            prj_dir.to_str().unwrap(),
+            "--tier",
+            "orchestrator",
+        ])
+        .assert()
+        .success();
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    let user_head = "# Orchestrator Workspace\n\nCustom notes.\n\n";
+    let v2_block = "<!-- ce-ai:block begin v=2 tier=orchestrator sha256=deadbeef -->\n## \u{1f504} Orchestrator Agent Governance & Delegation Directives\n\nStale orchestrator content.\n<!-- ce-ai:block end -->";
+    fs::write(
+        &agents_file,
+        format!("{}{}{}", user_head, v2_block, "\nTrailing section.\n"),
+    )
+    .unwrap();
+
+    // The upgrade hint must interpolate the registered tier.
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("stale block version v=2"))
+        .stdout(predicate::str::contains(
+            "re-run ce-ai init-prj --tier orchestrator to upgrade",
+        ));
+
+    ceai(&config_dir, &home)
+        .args([
+            "init-prj",
+            prj_dir.to_str().unwrap(),
+            "--tier",
+            "orchestrator",
+        ])
+        .assert()
+        .success();
+
+    let updated_text = fs::read_to_string(&agents_file).unwrap();
+    assert!(updated_text.starts_with(user_head));
+    assert!(!updated_text.contains("Stale orchestrator content."));
+    assert!(updated_text.contains(&block_begin_prefix("orchestrator")));
+    assert_eq!(
+        updated_text
+            .matches("retain them as raw history instead of deleting them")
+            .count(),
+        1
+    );
+
+    let state_val: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(config_dir.join("state.json")).unwrap()).unwrap();
+    assert_eq!(state_val["projects"][0]["block_version"], CUR_BLOCK_VERSION);
+    assert_eq!(state_val["projects"][0]["created_file"], true);
+}
+
+#[test]
+fn doctor_classifies_byte_identical_minimal_v2_body_as_healthy() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("minimal-v2-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "minimal"])
+        .assert()
+        .success();
+
+    // Rewrite the header as if adopted while BLOCK_VERSION was 2, keeping the
+    // body byte-identical to the current template and the SHA matching it.
+    // The SHA short-circuit precedes the declared-version check, so this must
+    // classify Ok — no stale hint — even though v=2 < BLOCK_VERSION.
+    let agents_file = prj_dir.join("AGENTS.md");
+    let text = fs::read_to_string(&agents_file).unwrap();
+    let begin = text.find("<!-- ce-ai:block begin").unwrap();
+    let line_end = begin + text[begin..].find('\n').unwrap();
+    let body_start = line_end + 1;
+    let body_end = text.find("<!-- ce-ai:block end -->").unwrap();
+    let body = text[body_start..body_end].trim_end_matches(['\n', '\r']);
+    let mut hasher = Sha256::new();
+    hasher.update(body.as_bytes());
+    let body_sha = format!("{:x}", hasher.finalize());
+    let mut rewritten = text.clone();
+    rewritten.replace_range(
+        begin..line_end,
+        &format!("<!-- ce-ai:block begin v=2 tier=minimal sha256={body_sha} -->"),
+    );
+    drop(text);
+    fs::write(&agents_file, rewritten).unwrap();
+
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("stale block version").not());
+
+    ceai(&config_dir, &home)
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("STALE BLOCK").not());
+}
+
+#[test]
+fn ssot_retention_core_phrasing_is_consistent_across_surfaces() {
+    const SHARED_PHRASES: [&str; 2] = [
+        "retained by default as the permanent raw-history record",
+        "\"disposable\" never means deleting them",
+    ];
+
+    // Surface A: repo-root AGENTS.md (located via the compile-time manifest
+    // path — deterministic, independent of ambient cwd).
+    let root_agents =
+        std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("AGENTS.md"))
+            .expect("root AGENTS.md readable");
+
+    // Surface B: the rendered full-tier managed block.
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("surface-parity-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+    let agents_text = fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap();
+
+    for phrase in SHARED_PHRASES {
+        assert!(
+            root_agents.contains(phrase),
+            "root AGENTS.md drifted from shared retention phrasing: {phrase}"
+        );
+        assert!(
+            agents_text.contains(phrase),
+            "rendered full-tier block drifted from shared retention phrasing: {phrase}"
+        );
+    }
 }
 
 #[test]
@@ -2036,7 +2202,7 @@ fn doctor_reports_generic_drift_for_tampered_current_body() {
     let mut tampered = text.clone();
     tampered.replace_range(
         begin..line_end,
-        "<!-- ce-ai:block begin v=3 tier=full sha256=fedcba -->",
+        &format!("<!-- ce-ai:block begin v={CUR_BLOCK_VERSION} tier=full sha256=fedcba -->"),
     );
     drop(text);
     fs::write(&agents_file, tampered).unwrap();
@@ -3637,7 +3803,9 @@ fn install_custom_with_flags_copies_layout_manifest_state_and_rules_block() {
     // Rules file keeps user bytes and gains exactly one current block.
     let text = fs::read_to_string(&rules).unwrap();
     assert!(text.starts_with("# my harness rules\nkeep me\n"));
-    assert!(text.contains("ce-ai:block begin v=3 tier=full"));
+    assert!(text.contains(&format!(
+        "ce-ai:block begin v={CUR_BLOCK_VERSION} tier=full"
+    )));
     assert_eq!(text.matches("ce-ai:block begin").count(), 1);
 
     // State entry embeds the resolved configuration.
