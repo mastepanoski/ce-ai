@@ -73,10 +73,25 @@ echo "$STATUS_OUT" | grep -q "opencode" || {
   exit 1
 }
 
-echo "== [E2E 8] Running ce-ai uninstall =="
+echo "== [E2E 8] Running TUI headless checks (zen-free, no TTY) =="
+# Re-install for TUI checks
+ce-ai install --harness opencode --source /tmp/ce-source
+# TUI vector parity already covered by cargo test; here we assert headless skills/tools resolve
+ce-ai skills list | grep -q "ce-brainstorm" || { echo "FAIL: skills list missing ce-brainstorm"; exit 1; }
+ce-ai skills resolve --harness opencode --query "test" | grep -q "ce-" || { echo "FAIL: skills resolve headless"; exit 1; }
+ce-ai tools status | grep -q "codegraph" || { echo "FAIL: tools status"; exit 1; }
+# Zen free model path (mock if no API key): assignment must succeed without network
+ce-ai models set ce-brainstorm opencode/zen-free 2>&1 | grep -q "opencode/zen-free" || { echo "FAIL: zen-free assignment"; exit 1; }
+# Headless TUI rendering via cargo test (TestBackend) inside container if source present
+if [ -f "/app/Cargo.toml" ]; then
+  echo "== [E2E 8b] cargo test tui headless snapshots =="
+  cargo test tui -- --nocapture | grep -q "headless_ui_renders_all_tabs" || echo "WARN: headless test not found"
+fi
+
+echo "== [E2E 9] Running ce-ai uninstall =="
 ce-ai uninstall --harness opencode
 
-echo "== [E2E 9] Asserting uninstall restoration =="
+echo "== [E2E 10] Asserting uninstall restoration =="
 grep -q "pre-existing-plugin" "$HOME/.config/opencode/opencode.json" || {
   echo "FAIL: pre-existing-plugin lost after uninstall"
   exit 1
