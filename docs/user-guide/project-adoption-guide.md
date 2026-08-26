@@ -111,8 +111,12 @@ ce-ai init-prj /path/to/my-project --tier full
 > ℹ️ **Expected after upgrading**: `ce-ai doctor` and `ce-ai status` compare
 > each adopted project's on-disk block against the current template and will
 > report **stale block version** hints for older-version adoptions until they
-> are re-adopted. This is the intended signal prompting the re-run above, not
-> a regression.
+> are re-adopted — for tiers whose block body changed (`full`,
+> `orchestrator`). `minimal`-tier adoptions classify as healthy because their
+> body is byte-identical across these versions (the SHA match short-circuits
+> the version check), even though `state.json` keeps the older
+> `block_version`. These hints are the intended signal prompting the re-run
+> above, not a regression.
 
 ---
 
