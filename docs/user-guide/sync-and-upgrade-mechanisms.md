@@ -111,6 +111,38 @@ To put a harness under ce-ai management (or re-apply it): `ce-ai install
 harness. After installing, `ce-ai sync` verifies whatever ce-ai manages on
 that surface.
 
+### Canonical skills adoption (`ce-ai skills adopt`)
+
+ce-ai harvests the release's top-level `skills/` tree as the canonical CE
+skill source. If a harness skills directory already holds `ce-*` skill
+folders (manual installs, older tooling), `skills adopt` puts that location
+under ce-ai management instead of creating a second copy — one indexed set
+per harness, always fresh, no duplicated skill descriptions in your
+sessions.
+
+```text
+ce-ai skills adopt --harness opencode   # scan + confirm + adopt
+ce-ai skills adopt --harness all --yes  # non-interactive
+```
+
+- **Adoptable**: `ce-*` directories whose SKILL.md frontmatter matches the
+  canonical set. Adoption rewrites stale copies (each backed up first),
+  completes missing canonical skills, and records the surface in the
+  adoption ledger.
+- **Never touched**: user-authored `ce-*` skills whose frontmatter is not in
+  the canonical set, and symlinked entries.
+- **Declined**: surfaces stay unmanaged and are not re-prompted until you
+  re-run the command.
+
+After adoption, `sync` keeps the surface current (manual edits are backed up
+and restored as `restored-drift`), the matrix hash-verifies it as
+`verified N/N`, and `skills resolve` serves its paths to any harness. The
+matrix may also show `pending-adoption` (adoptable, not yet adopted —
+non-interactive runs never adopt), `external-duplicate` (CE copies under
+plugin caches; remove manually if unwanted), and `orphaned` (adopted root
+deleted; re-adopt to restore). `ce-ai status` and `ce-ai doctor` surface
+the same states.
+
 ---
 
 ## 2. Upgrade Release Mechanism (`ce-ai upgrade`)

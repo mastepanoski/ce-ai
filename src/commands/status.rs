@@ -61,6 +61,36 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
         }
     }
 
+    // Adoption states (canonical-skills-adoption R19).
+    if !state.skill_surfaces.is_empty() {
+        for surface in &state.skill_surfaces {
+            match surface.status.as_str() {
+                "adopted" => {
+                    println!(
+                        "skills: {} adopted ({})",
+                        surface.harness,
+                        surface.root.display()
+                    );
+                }
+                "declined" => {
+                    println!(
+                        "skills: {} declined ({}) — run 'ce-ai skills adopt' to reconsider",
+                        surface.harness,
+                        surface.root.display()
+                    );
+                }
+                "orphaned" => {
+                    println!(
+                        "skills: {} orphaned ({}) — run 'ce-ai skills adopt' to re-adopt",
+                        surface.harness,
+                        surface.root.display()
+                    );
+                }
+                _ => {}
+            }
+        }
+    }
+
     // Drift: compare managed files on disk against the install manifest (SU-3).
     let managed = ctx.opencode_config_dir.join(MANAGED_DIR);
     match InstallManifest::load(&ctx.opencode_config_dir) {

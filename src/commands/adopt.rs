@@ -375,6 +375,12 @@ fn execute_adoption(ctx: &Context, report: &SurfaceReport) -> Result<(), CeError
             if let Some(j) = journal.take() {
                 j.complete()?;
             }
+            // Registry refresh (R5): the new surface is indexable immediately.
+            if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
+                if !ctx.quiet {
+                    eprintln!("warning: skill registry sync failed: {e}");
+                }
+            }
             Ok(())
         }
         Err(e) => {
@@ -535,8 +541,10 @@ fn retire_prior_surfaces(tx: &mut AdoptionTx) -> Result<(), CeError> {
         state.skill_surfaces.retain(|s| s.root != *root);
     }
 
-    // Manifest-tracked managed-dir skills tree: the fresh-machine canonical
-    // copy written by install/sync (retired with backup, manifest updated).
+    // Managed-dir skills tree: ce-ai-owned territory (its uninstall is a
+    // whole-dir removal), so retirement takes the entire subtree — covering
+    // legacy installs whose manifests predate skills tracking — and the
+    // manifest drops its skills entries.
     let Ok(manifest) = InstallManifest::load(&ctx.opencode_config_dir) else {
         return Ok(());
     };
@@ -546,38 +554,28 @@ fn retire_prior_surfaces(tx: &mut AdoptionTx) -> Result<(), CeError> {
         .filter(|f| f.path.starts_with("skills/"))
         .cloned()
         .collect();
-    if retired.is_empty() {
-        return Ok(());
-    }
     let managed_dir = ctx
         .opencode_config_dir
         .join(crate::opencode::plugins::MANAGED_DIR);
-    for f in &retired {
-        let p = managed_dir.join(&f.path);
-        if !p.exists() {
-            continue;
-        }
-        backup_file(backups, &p)?;
-        mutations.push(Mutation {
-            path: p.clone(),
-            prior: fs::read(&p).ok(),
-        });
-        if let Some(j) = journal.as_mut() {
-            j.arm(&p)?;
-        }
-        fs::remove_file(&p)?;
-        prune_empty_parents(&managed_dir, &p);
+    let managed_skills = managed_dir.join("skills");
+    if managed_skills.exists() {
+        std::fs::remove_dir_all(&managed_skills)?;
     }
-    let remaining: Vec<crate::opencode::manifest::ManifestFile> = manifest
-        .files
-        .into_iter()
-        .filter(|f| !f.path.starts_with("skills/"))
-        .collect();
-    InstallManifest {
-        files: remaining,
-        ..manifest
+    if !retired.is_empty() {
+        for f in &retired {
+            prune_empty_parents(&managed_dir, &managed_dir.join(&f.path));
+        }
+        let remaining: Vec<crate::opencode::manifest::ManifestFile> = manifest
+            .files
+            .into_iter()
+            .filter(|f| !f.path.starts_with("skills/"))
+            .collect();
+        InstallManifest {
+            files: remaining,
+            ..manifest
+        }
+        .write(&ctx.opencode_config_dir)?;
     }
-    .write(&ctx.opencode_config_dir)?;
     Ok(())
 }
 
