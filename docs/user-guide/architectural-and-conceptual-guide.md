@@ -147,5 +147,5 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
 | **Adaptability** | `HarnessAdapter` (Traits) | Heterogeneous AI editors and configuration file formats. |
 | **Scope Isolation** | Hierarchical Scope (Global vs. Workspace) | Cross-contamination of agent rules across different repositories. |
 | **External Persistence** | Sidecars & MCP (Engram / CodeGraph) | Context window saturation and memory loss between sessions. |
-| **Flow Determinism** | Workflow FSM & Checkpointing | Probabilistic instability and state loss post context compaction. |
+| **Checkpoint-Validated Flow** | Workflow FSM & Checkpointing | Probabilistic instability and state loss post context compaction. |
 | **Fault Tolerance** | Atomic Writes & SHA256 Manifest Indexing | File corruption during process crashes or unbuffered overwrites. |
