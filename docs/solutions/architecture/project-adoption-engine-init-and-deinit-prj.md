@@ -91,7 +91,7 @@ Apply these patterns when:
 # My Pre-Existing Project Notes
 User-written notes and repository docs remain untouched here.
 
-<!-- ce-ai:block begin v=2 tier=full sha256=a1b2c3d4e5f6... -->
+<!-- ce-ai:block begin v=3 tier=full sha256=a1b2c3d4e5f6... -->
 ## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement
 
 All AI agents MUST follow the 7-stage Compound Engineering development cycle:
