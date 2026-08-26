@@ -95,10 +95,12 @@ struct App {
     picker_items: Vec<String>,
     picker_selected: usize,
     output_modal: Option<(String, Vec<String>)>, // (title, lines)
+    output_scroll: usize,
     selected_harness_idx: usize,
     harness_targets: Vec<String>,
     selected_backup_idx: usize,
     backups: Vec<crate::state::backups::BackupEntry>,
+    state_error: Option<String>,
 }
 
 impl App {
@@ -115,9 +117,11 @@ impl App {
             picker_items: Vec::new(),
             picker_selected: 0,
             output_modal: None,
+            output_scroll: 0,
             selected_harness_idx: 0,
             selected_backup_idx: 0,
             backups: Vec::new(),
+            state_error: None,
             harness_targets: vec![
                 "all".into(),
                 "opencode".into(),
@@ -173,15 +177,22 @@ impl App {
 
         let mut seen = std::collections::HashSet::new();
 
-        // Load harness status from state.json
+        // Load harness status from state.json — banner on corrupt
         let state_path = ctx.config_dir.join("state.json");
-        if let Ok(state) = State::load(&state_path) {
-            for h in &state.installed_harnesses {
-                let name = h["name"].as_str().unwrap_or("unknown").to_string();
-                let version = h["version"].as_str().unwrap_or("unknown").to_string();
-                let source = h["source"]["kind"].as_str().unwrap_or("local").to_string();
-                seen.insert(name.clone());
-                self.harnesses.push((name, version, source));
+        match State::load(&state_path) {
+            Ok(state) => {
+                for h in &state.installed_harnesses {
+                    let name = h["name"].as_str().unwrap_or("unknown").to_string();
+                    let version = h["version"].as_str().unwrap_or("unknown").to_string();
+                    let source = h["source"]["kind"].as_str().unwrap_or("local").to_string();
+                    seen.insert(name.clone());
+                    self.harnesses.push((name, version, source));
+                }
+                self.state_error = None;
+            }
+            Err(e) => {
+                // Keep harnesses empty but surface banner; not silent
+                self.state_error = Some(format!("{e}"));
             }
         }
 
@@ -231,14 +242,25 @@ impl App {
     }
 }
 
+struct RawModeGuard;
+impl Drop for RawModeGuard {
+    fn drop(&mut self) {
+        let _ = disable_raw_mode();
+        let mut stdout = stdout();
+        let _ = execute!(stdout, LeaveAlternateScreen);
+        let _ = Terminal::new(CrosstermBackend::new(stdout)).map(|mut t| t.show_cursor());
+    }
+}
+
 pub fn run_interactive(ctx: &Context) -> Result<(), CeError> {
-    if !std::io::stdin().is_terminal() {
+    if !std::io::stdout().is_terminal() {
         return Err(CeError::Usage(
             "no subcommand provided — run 'ce-ai --help' for usage or run in an interactive terminal for TUI mode".into(),
         ));
     }
 
     enable_raw_mode().map_err(|e| CeError::Runtime(format!("raw mode error: {e}")))?;
+    let _guard = RawModeGuard;
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen)
         .map_err(|e| CeError::Runtime(format!("screen error: {e}")))?;
@@ -252,6 +274,7 @@ pub fn run_interactive(ctx: &Context) -> Result<(), CeError> {
     disable_raw_mode().ok();
     execute!(terminal.backend_mut(), LeaveAlternateScreen).ok();
     terminal.show_cursor().ok();
+    drop(_guard);
 
     if let Err(err) = res {
         eprintln!("error: {err}");
@@ -275,13 +298,7 @@ fn run_app(
             if let Event::Key(key) =
                 event::read().map_err(|e| CeError::Runtime(format!("read error: {e}")))?
             {
-                if app.output_modal.is_some() {
-                    // Any key closes the modal
-                    app.output_modal = None;
-                    app.reload_state(ctx);
-                    continue;
-                }
-
+                // Precedence: picker > modal > tabs (R3)
                 if app.model_picker_open {
                     match key.code {
                         KeyCode::Esc => app.model_picker_open = false,
@@ -308,6 +325,30 @@ fn run_app(
                                     Err(err) => vec![format!("❌ Failed to set {slot}: {err}")],
                                 };
                             execute_action(app, "Model Assignment", move || lines);
+                        }
+                        _ => {}
+                    }
+                    continue;
+                }
+
+                if app.output_modal.is_some() {
+                    match key.code {
+                        KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
+                            app.output_modal = None;
+                            app.output_scroll = 0;
+                            app.reload_state(ctx);
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            app.output_scroll = app.output_scroll.saturating_sub(1);
+                        }
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            app.output_scroll = app.output_scroll.saturating_add(1);
+                        }
+                        KeyCode::PageUp => {
+                            app.output_scroll = app.output_scroll.saturating_sub(5);
+                        }
+                        KeyCode::PageDown => {
+                            app.output_scroll = app.output_scroll.saturating_add(5);
                         }
                         _ => {}
                     }
@@ -575,7 +616,7 @@ fn ui(f: &mut ratatui::Frame, app: &App, ctx: &Context) {
 
     // 4. Output Modal (if active)
     if let Some((ref title, ref lines)) = app.output_modal {
-        render_modal(f, title, lines);
+        render_modal(f, title, lines, app.output_scroll);
     }
 
     // 5. Model Picker Modal (if active)
@@ -638,6 +679,13 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
                 Line::from(Span::styled("Harness Installation Status:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
                 Line::from(""),
             ];
+            if let Some(err) = &app.state_error {
+                lines.push(Line::from(Span::styled(
+                    format!("  ❌ state.json corrupt: {err} — run ce-ai doctor"),
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                )));
+                lines.push(Line::from(""));
+            }
             if app.harnesses.is_empty() {
                 lines.push(Line::from(Span::styled("  ⚠️  No active harnesses installed yet.", Style::default().fg(Color::Red))));
                 lines.push(Line::from("  Use 'Install Plugin' tab to install CE into your host harness."));
@@ -940,7 +988,7 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
     f.render_widget(p, area);
 }
 
-fn render_modal(f: &mut ratatui::Frame, title: &str, lines: &[String]) {
+fn render_modal(f: &mut ratatui::Frame, title: &str, lines: &[String], scroll: usize) {
     let area = centered_rect(80, 70, f.area());
     f.render_widget(Clear, area);
 
@@ -949,14 +997,26 @@ fn render_modal(f: &mut ratatui::Frame, title: &str, lines: &[String]) {
         .title(format!(" {title} "))
         .border_style(Style::default().fg(Color::Yellow));
 
-    let mut modal_lines: Vec<Line> = lines.iter().map(|l| Line::from(l.as_str())).collect();
+    let scroll = scroll.min(lines.len().saturating_sub(1));
+    let mut modal_lines: Vec<Line> = lines
+        .iter()
+        .skip(scroll)
+        .map(|l| Line::from(l.as_str()))
+        .collect();
     modal_lines.push(Line::from(""));
-    modal_lines.push(Line::from(Span::styled(
-        "Press any key to close this window...",
-        Style::default()
-            .fg(Color::Yellow)
-            .add_modifier(Modifier::BOLD),
-    )));
+    if scroll > 0 {
+        modal_lines.push(Line::from(Span::styled(
+            format!("↑ scrolled {scroll} — PgUp/PgDn/j/k to scroll, Esc/Enter/q to close"),
+            Style::default().fg(Color::Yellow),
+        )));
+    } else {
+        modal_lines.push(Line::from(Span::styled(
+            "j/k/PgUp/PgDn to scroll, Esc/Enter/q to close",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )));
+    }
 
     let p = Paragraph::new(modal_lines)
         .block(block)
@@ -989,6 +1049,7 @@ where
     F: FnOnce() -> Vec<String>,
 {
     let lines = f();
+    app.output_scroll = 0;
     app.output_modal = Some((title.to_string(), lines));
 }
 
