@@ -36,7 +36,7 @@ pub struct Args {
 }
 
 /// Classification of one `ce-*` directory found under a skills root.
-struct FoundSkill {
+pub(crate) struct FoundSkill {
     dir_name: String,
     /// Frontmatter name matches the canonical harvested set.
     canonical: bool,
@@ -53,7 +53,7 @@ impl FoundSkill {
 }
 
 /// A harness skills root holding at least one `ce-*` directory.
-struct SurfaceReport {
+pub(crate) struct SurfaceReport {
     harness: String,
     root: PathBuf,
     found: Vec<FoundSkill>,
@@ -156,7 +156,7 @@ fn classify_found(
 }
 
 /// Scans one harness skills root for `ce-*` directories (pure filesystem).
-fn detect_surface(
+pub(crate) fn detect_surface(
     harness: &str,
     root: &Path,
     canonical: &BTreeMap<String, BTreeMap<String, String>>,
@@ -183,6 +183,61 @@ fn detect_surface(
             found,
         })
     }
+}
+
+/// Adoptable-but-untracked surfaces for the matrix's `pending-adoption`
+/// state (R17): canonical-verified `ce-*` content under a harness skills
+/// root that the ledger does not track. Best-effort — detection failures
+/// yield an empty list rather than failing sync.
+pub(crate) fn pending_adoptions(
+    ctx: &Context,
+    home_dir: &Path,
+    ledger_roots: &[(String, PathBuf)],
+) -> Vec<(String, PathBuf)> {
+    let Ok(tree_path) = canonical_source_tree(ctx) else {
+        return Vec::new();
+    };
+    let Ok(tree) = managed_tree(&tree_path) else {
+        return Vec::new();
+    };
+    let canonical = canonical_skills(&tree);
+    if canonical.is_empty() {
+        return Vec::new();
+    }
+    let mut pending = Vec::new();
+    for kind in HarnessKind::all() {
+        let root = sync_skills_root(kind, home_dir);
+        if ledger_roots
+            .iter()
+            .any(|(h, r)| h == kind.as_str() && r == &root)
+        {
+            continue;
+        }
+        if let Some(report) = detect_surface(kind.as_str(), &root, &canonical) {
+            if report.adoptable_count() > 0 {
+                pending.push((report.harness.clone(), report.root.clone()));
+            }
+        }
+    }
+    pending
+}
+
+/// CE content sitting under known plugin-cache/marketplace roots (R18):
+/// reported as `external-duplicate`, never adopted or modified.
+pub(crate) fn external_duplicates(home_dir: &Path) -> Vec<String> {
+    let mut hits = Vec::new();
+    let cache = home_dir.join(".claude/plugins/cache");
+    let Ok(entries) = fs::read_dir(&cache) else {
+        return hits;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.contains("compound-engineering") {
+            hits.push(entry.path().to_string_lossy().to_string());
+        }
+    }
+    hits.sort();
+    hits
 }
 
 fn record_decline(ctx: &Context, surface: &SurfaceReport) -> Result<(), CeError> {

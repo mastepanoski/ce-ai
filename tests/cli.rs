@@ -4132,4 +4132,101 @@ mod journal_fault_injection {
             "---\nname: ce-my-own\ndescription: mine\n---\nbody\n"
         );
     }
+
+    #[test]
+    fn adopt_then_sync_reports_verified_adopted_surface() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source_top_level_skills(tmp.path());
+        install(&config_dir, &home, &source);
+        stale_local_copy(&home);
+        ceai(&config_dir, &home)
+            .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+            .assert()
+            .success();
+
+        ceai(&config_dir, &home)
+            .args(["sync"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("opencode: verified"));
+    }
+
+    #[test]
+    fn sync_rewrites_adopted_surface_and_reports_restored_drift() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source_top_level_skills(tmp.path());
+        install(&config_dir, &home, &source);
+        stale_local_copy(&home);
+        ceai(&config_dir, &home)
+            .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+            .assert()
+            .success();
+
+        // User edit after adoption = drift; sync restores canonical (R16).
+        let adopted = stale_local_copy_path(&home);
+        fs::write(&adopted, "# my local tweak\n").unwrap();
+        ceai(&config_dir, &home)
+            .args(["sync"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("restored-drift"));
+        assert_eq!(fs::read_to_string(&adopted).unwrap(), "# ce-brainstorm\n");
+    }
+
+    #[test]
+    fn sync_matrix_reports_pending_adoption_for_untracked_surface() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source_top_level_skills(tmp.path());
+        install(&config_dir, &home, &source);
+        stale_local_copy(&home);
+
+        ceai(&config_dir, &home)
+            .args(["sync"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("pending-adoption"));
+    }
+
+    #[test]
+    fn sync_matrix_reports_orphaned_when_adopted_root_vanishes() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source_top_level_skills(tmp.path());
+        install(&config_dir, &home, &source);
+        stale_local_copy(&home);
+        ceai(&config_dir, &home)
+            .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+            .assert()
+            .success();
+        fs::remove_dir_all(home.join(".config/opencode/skills")).unwrap();
+
+        ceai(&config_dir, &home)
+            .args(["sync"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("orphaned"));
+        let state = read_json(&config_dir.join("state.json"));
+        assert_eq!(state["skill_surfaces"][0]["status"], "orphaned");
+    }
+
+    #[test]
+    fn sync_reports_external_duplicate_from_plugin_cache() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source_top_level_skills(tmp.path());
+        install(&config_dir, &home, &source);
+        let cache_hit =
+            home.join(".claude/plugins/cache/compound-engineering-plugin/skills/ce-x/SKILL.md");
+        fs::create_dir_all(cache_hit.parent().unwrap()).unwrap();
+        fs::write(&cache_hit, "# ce-x\n").unwrap();
+
+        ceai(&config_dir, &home)
+            .args(["sync"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("external-duplicate"));
+    }
 }
