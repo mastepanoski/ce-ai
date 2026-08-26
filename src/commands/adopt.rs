@@ -21,6 +21,7 @@ use crate::harness::HarnessKind;
 use crate::opencode::manifest::InstallManifest;
 use crate::source::cache::managed_tree;
 use crate::source::registry::parse_skill_frontmatter;
+use crate::state::backups::backup_file;
 use crate::state::state::{SkillSurface, State};
 
 #[derive(ClapArgs, Debug, Clone)]
@@ -231,7 +232,6 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 
     let interactive = std::io::stdin().is_terminal();
-    let mut confirmed_any = false;
     for report in &reports {
         println!(
             "== surface {} ({}) ==",
@@ -261,27 +261,292 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             continue;
         }
         if args.yes {
-            confirmed_any = true;
+            execute_adoption(ctx, report)?;
+            println!("  → adopted under ce-ai management");
         } else if interactive {
             if prompt_decline(ctx, report)? {
                 continue;
             }
-            confirmed_any = true;
+            execute_adoption(ctx, report)?;
+            println!("  → adopted under ce-ai management");
         } else {
             println!("  pending-adoption: re-run with --yes to confirm adoption");
         }
     }
 
-    if !confirmed_any {
-        return Ok(());
+    Ok(())
+}
+
+/// One filesystem mutation recorded for auto-restore on failure (R15).
+struct Mutation {
+    path: PathBuf,
+    /// Prior bytes; `None` when this adoption created the file.
+    prior: Option<Vec<u8>>,
+}
+
+/// Executes the transactional adoption of one confirmed surface (R15):
+/// per-file backup → journal arm → atomic writes (completing the set) →
+/// retire prior managed surfaces (ledger roots and the manifest-tracked
+/// managed-dir `skills/` tree) → ledger saved atomically last. Any failure
+/// auto-restores every mutation in reverse order and leaves the surface
+/// unadopted.
+fn execute_adoption(ctx: &Context, report: &SurfaceReport) -> Result<(), CeError> {
+    let source_tree = canonical_source_tree(ctx)?;
+    let tree = managed_tree(&source_tree)?;
+    let canonical = canonical_skills(&tree);
+    let backups = ctx.config_dir.join("backups");
+    let state_path = ctx.config_dir.join("state.json");
+    let mut state = State::load(&state_path)?;
+    let mut journal = Some(crate::state::journal::Journal::begin(
+        &ctx.config_dir,
+        "adopt",
+    )?);
+    let mut mutations: Vec<Mutation> = Vec::new();
+
+    let outcome = adopt_surface(&mut AdoptionTx {
+        ctx,
+        report,
+        source_tree: &source_tree,
+        canonical: &canonical,
+        state: &mut state,
+        journal: &mut journal,
+        mutations: &mut mutations,
+        backups: &backups,
+    });
+
+    match outcome {
+        Ok(()) => {
+            state.save(&state_path)?;
+            if let Some(j) = journal.take() {
+                j.complete()?;
+            }
+            Ok(())
+        }
+        Err(e) => {
+            for m in mutations.iter().rev() {
+                match &m.prior {
+                    Some(bytes) => {
+                        let _ = fs::write(&m.path, bytes);
+                    }
+                    None => {
+                        let _ = fs::remove_file(&m.path);
+                    }
+                }
+            }
+            if let Some(j) = journal.take() {
+                let _ = j.complete();
+            }
+            Err(e)
+        }
+    }
+}
+
+/// Borrowed transaction context shared by the adoption steps.
+struct AdoptionTx<'a> {
+    ctx: &'a Context,
+    report: &'a SurfaceReport,
+    source_tree: &'a Path,
+    canonical: &'a BTreeMap<String, BTreeMap<String, String>>,
+    state: &'a mut State,
+    journal: &'a mut Option<crate::state::journal::Journal>,
+    mutations: &'a mut Vec<Mutation>,
+    backups: &'a Path,
+}
+
+/// The adoption transaction body. `state` is saved by the caller only on
+/// success — the ledger write is the last durable action (R15).
+fn adopt_surface(tx: &mut AdoptionTx) -> Result<(), CeError> {
+    let AdoptionTx {
+        ctx,
+        report,
+        source_tree,
+        canonical,
+        state,
+        journal,
+        mutations,
+        backups,
+    } = tx;
+    // 1. Rewrite stale + create missing canonical skills (completion, R2).
+    for (skill_dir, files) in canonical.iter() {
+        for (file, hash) in files {
+            let dest = report.root.join(skill_dir).join(file);
+            let prior = fs::read(&dest).ok();
+            if let Some(bytes) = &prior {
+                if crate::state::diff::sha256_hex(bytes) == *hash {
+                    continue;
+                }
+                backup_file(backups, &dest)?;
+            }
+            mutations.push(Mutation {
+                path: dest.clone(),
+                prior,
+            });
+            if let Some(j) = journal.as_mut() {
+                j.arm(&dest)?;
+            }
+            let content = fs::read(source_tree.join("skills").join(skill_dir).join(file))?;
+            if let Some(parent) = dest.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            crate::state::write_atomic(&dest, &content)?;
+        }
     }
 
-    // Transactional rewrite engine lands with the uninstall scoping rework
-    // (plan U3/U6 — no released adoption before uninstall is safe). The gate
-    // leaves every surface untouched: no writes, no ledger changes.
-    Err(CeError::Runtime(
-        "adoption engine ships in the next release (canonical-skills-adoption PR 2); surfaces left untouched".to_string(),
-    ))
+    // 2. Retire prior managed surfaces for this harness (R13).
+    retire_prior_surfaces(&mut AdoptionTx {
+        ctx,
+        report,
+        source_tree,
+        canonical,
+        state,
+        journal,
+        mutations,
+        backups,
+    })?;
+
+    // 3. Ledger adopted entry — the last durable action. Re-adoption
+    //    preserves the original `adopted_at` provenance.
+    let previous_adopted_at = state
+        .skill_surfaces
+        .iter()
+        .find(|s| s.harness == report.harness && s.root == report.root)
+        .and_then(|s| s.adopted_at.clone());
+    state
+        .skill_surfaces
+        .retain(|s| !(s.harness == report.harness && s.root == report.root));
+    let mut files: Vec<crate::state::state::SkillSurfaceFile> = Vec::new();
+    for (skill_dir, expected) in canonical.iter() {
+        for (file, hash) in expected {
+            files.push(crate::state::state::SkillSurfaceFile {
+                path: format!("{skill_dir}/{file}"),
+                sha256: hash.clone(),
+            });
+        }
+    }
+    state.skill_surfaces.push(SkillSurface {
+        harness: report.harness.clone(),
+        root: report.root.clone(),
+        status: "adopted".to_string(),
+        files,
+        adopted_at: Some(previous_adopted_at.unwrap_or_else(|| chrono::Utc::now().to_rfc3339())),
+    });
+    Ok(())
+}
+
+/// Removes every prior managed skills surface for this harness except the
+/// one being adopted: ledger-tracked adopted roots and the manifest-tracked
+/// managed-dir `skills/` tree (R13). Each removed file is backed up first.
+fn retire_prior_surfaces(tx: &mut AdoptionTx) -> Result<(), CeError> {
+    let AdoptionTx {
+        ctx,
+        report,
+        state,
+        journal,
+        mutations,
+        backups,
+        ..
+    } = tx;
+    let prior_roots: Vec<PathBuf> = state
+        .skill_surfaces
+        .iter()
+        .filter(|s| s.harness == report.harness && s.root != report.root && s.status == "adopted")
+        .map(|s| s.root.clone())
+        .collect();
+    for root in &prior_roots {
+        let tracked: Vec<String> = state
+            .skill_surfaces
+            .iter()
+            .filter(|s| s.root == *root)
+            .flat_map(|s| s.files.iter().map(|f| f.path.clone()))
+            .collect();
+        for rel in &tracked {
+            let p = root.join(rel);
+            if !p.exists() {
+                continue;
+            }
+            backup_file(backups, &p)?;
+            mutations.push(Mutation {
+                path: p.clone(),
+                prior: fs::read(&p).ok(),
+            });
+            if let Some(j) = journal.as_mut() {
+                j.arm(&p)?;
+            }
+            fs::remove_file(&p)?;
+        }
+        for rel in &tracked {
+            prune_empty_parents(root, &root.join(rel));
+        }
+        state.skill_surfaces.retain(|s| s.root != *root);
+    }
+
+    // Manifest-tracked managed-dir skills tree: the fresh-machine canonical
+    // copy written by install/sync (retired with backup, manifest updated).
+    let Ok(manifest) = InstallManifest::load(&ctx.opencode_config_dir) else {
+        return Ok(());
+    };
+    let retired: Vec<crate::opencode::manifest::ManifestFile> = manifest
+        .files
+        .iter()
+        .filter(|f| f.path.starts_with("skills/"))
+        .cloned()
+        .collect();
+    if retired.is_empty() {
+        return Ok(());
+    }
+    let managed_dir = ctx
+        .opencode_config_dir
+        .join(crate::opencode::plugins::MANAGED_DIR);
+    for f in &retired {
+        let p = managed_dir.join(&f.path);
+        if !p.exists() {
+            continue;
+        }
+        backup_file(backups, &p)?;
+        mutations.push(Mutation {
+            path: p.clone(),
+            prior: fs::read(&p).ok(),
+        });
+        if let Some(j) = journal.as_mut() {
+            j.arm(&p)?;
+        }
+        fs::remove_file(&p)?;
+        prune_empty_parents(&managed_dir, &p);
+    }
+    let remaining: Vec<crate::opencode::manifest::ManifestFile> = manifest
+        .files
+        .into_iter()
+        .filter(|f| !f.path.starts_with("skills/"))
+        .collect();
+    InstallManifest {
+        files: remaining,
+        ..manifest
+    }
+    .write(&ctx.opencode_config_dir)?;
+    Ok(())
+}
+
+/// Best-effort removal of directories left empty between `start` (a removed
+/// file's parent) and `root` (the surface root, never removed). Shared with
+/// uninstall's ledger-scoped removal.
+pub(crate) fn prune_empty_parents(root: &Path, start: &Path) {
+    let mut dir = start.to_path_buf();
+    while dir.starts_with(root) && dir != root {
+        match fs::read_dir(&dir) {
+            Ok(mut entries) => {
+                if entries.next().is_some() {
+                    break;
+                }
+                if fs::remove_dir(&dir).is_err() {
+                    break;
+                }
+            }
+            Err(_) => break,
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
 }
 
 /// Interactive per-surface confirmation. Returns `true` when the user
