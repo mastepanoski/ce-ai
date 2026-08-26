@@ -4167,7 +4167,13 @@ mod journal_fault_injection {
             .assert()
             .success()
             .stdout(predicates::str::contains(
-                ".pi/agent/skills/ce-brainstorm/SKILL.md",
+                std::path::Path::new(".pi")
+                    .join("agent")
+                    .join("skills")
+                    .join("ce-brainstorm")
+                    .join("SKILL.md")
+                    .to_string_lossy()
+                    .to_string(),
             ));
     }
 
