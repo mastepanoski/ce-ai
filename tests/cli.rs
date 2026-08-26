@@ -158,6 +158,183 @@ fn install_prefers_top_level_skills_on_overlap() {
     );
 }
 
+/// Local CE source-tree fixture with the real release layout and two skills,
+/// for partial-set completion scenarios.
+fn ce_source_top_level_skills_two(dir: &Path) -> PathBuf {
+    let source = ce_source_top_level_skills(dir);
+    let extra = source.join("skills/ce-work/SKILL.md");
+    fs::create_dir_all(extra.parent().unwrap()).unwrap();
+    fs::write(&extra, "# ce-work\n").unwrap();
+    source
+}
+
+fn stale_local_copy(home: &Path) -> PathBuf {
+    let stale = home.join(".config/opencode/skills/ce-brainstorm/SKILL.md");
+    fs::create_dir_all(stale.parent().unwrap()).unwrap();
+    fs::write(
+        &stale,
+        "---\nname: ce-brainstorm\ndescription: brainstorm\n---\n# stale local copy\n",
+    )
+    .unwrap();
+    stale
+}
+
+#[test]
+fn adopt_yes_executes_transactional_adoption_and_retires_managed_copy() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source_top_level_skills(tmp.path());
+    install(&config_dir, &home, &source);
+    let stale = stale_local_copy(&home);
+
+    ceai(&config_dir, &home)
+        .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("adopted under ce-ai management"));
+
+    // Stale copy rewritten to canonical content.
+    assert_eq!(fs::read_to_string(&stale).unwrap(), "# ce-brainstorm\n");
+    // Managed-dir skills tree retired (R13): file gone, manifest updated.
+    assert!(!home
+        .join(".config/opencode/compound-engineering/skills/ce-brainstorm/SKILL.md")
+        .exists());
+    let manifest = read_json(
+        &home
+            .join(".config/opencode/compound-engineering")
+            .join("install-manifest.json"),
+    );
+    let manifest_skills: Vec<&serde_json::Value> = manifest["files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|f| {
+            f["path"]
+                .as_str()
+                .unwrap_or_default()
+                .starts_with("skills/")
+        })
+        .collect();
+    assert!(manifest_skills.is_empty());
+    // Ledger records the adopted surface with tracked files.
+    let state = read_json(&config_dir.join("state.json"));
+    let surfaces = state["skill_surfaces"].as_array().unwrap();
+    assert_eq!(surfaces.len(), 1);
+    assert_eq!(surfaces[0]["status"], "adopted");
+    assert_eq!(surfaces[0]["harness"], "opencode");
+    assert!(!surfaces[0]["files"].as_array().unwrap().is_empty());
+    assert!(surfaces[0]["adopted_at"].is_string());
+}
+
+#[test]
+fn adopt_completes_partial_surfaces_to_full_canonical_set() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source_top_level_skills_two(tmp.path());
+    install(&config_dir, &home, &source);
+    // User only holds one of the two canonical skills, and stale.
+    let stale = stale_local_copy(&home);
+
+    ceai(&config_dir, &home)
+        .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+        .assert()
+        .success();
+
+    assert_eq!(fs::read_to_string(&stale).unwrap(), "# ce-brainstorm\n");
+    let completed = home.join(".config/opencode/skills/ce-work/SKILL.md");
+    assert_eq!(fs::read_to_string(&completed).unwrap(), "# ce-work\n");
+    let state = read_json(&config_dir.join("state.json"));
+    let files = state["skill_surfaces"][0]["files"].as_array().unwrap();
+    assert_eq!(files.len(), 2);
+}
+
+#[test]
+fn adopt_is_idempotent_and_preserves_adopted_at() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source_top_level_skills(tmp.path());
+    install(&config_dir, &home, &source);
+    stale_local_copy(&home);
+
+    ceai(&config_dir, &home)
+        .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+        .assert()
+        .success();
+    let first =
+        read_json(&config_dir.join("state.json"))["skill_surfaces"][0]["adopted_at"].clone();
+
+    ceai(&config_dir, &home)
+        .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+        .assert()
+        .success();
+    let second =
+        read_json(&config_dir.join("state.json"))["skill_surfaces"][0]["adopted_at"].clone();
+    assert_eq!(first, second);
+    assert_eq!(
+        fs::read_to_string(stale_local_copy_path(&home)).unwrap(),
+        "# ce-brainstorm\n"
+    );
+}
+
+fn stale_local_copy_path(home: &Path) -> PathBuf {
+    home.join(".config/opencode/skills/ce-brainstorm/SKILL.md")
+}
+
+#[test]
+fn uninstall_adopted_surface_is_scoped_and_cleans_ledger() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source_top_level_skills(tmp.path());
+    install(&config_dir, &home, &source);
+    stale_local_copy(&home);
+    ceai(&config_dir, &home)
+        .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+        .assert()
+        .success();
+    // User-authored file inside the adopted root: never tracked, never removed.
+    let notes = home.join(".config/opencode/skills/user-notes.md");
+    fs::write(&notes, "mine\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "opencode", "--yes"])
+        .assert()
+        .success();
+
+    assert!(!stale_local_copy_path(&home).exists());
+    assert!(notes.exists());
+    let state = read_json(&config_dir.join("state.json"));
+    assert!(
+        state.get("skill_surfaces").is_none()
+            || state["skill_surfaces"]
+                .as_array()
+                .is_none_or(|a| a.is_empty())
+    );
+}
+
+#[test]
+fn uninstall_without_adoption_never_touches_harness_skills_dir() {
+    // Regression pin: the legacy whole-dir skills removal is gone. User
+    // content in a harness skills root survives install+uninstall cycles.
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let own = home.join(".claude/skills/user-own/SKILL.md");
+    fs::create_dir_all(own.parent().unwrap()).unwrap();
+    fs::write(&own, "user authored\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "claude", "--source"])
+        .arg(&source)
+        .assert()
+        .success();
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "claude", "--yes"])
+        .assert()
+        .success();
+
+    assert_eq!(fs::read_to_string(&own).unwrap(), "user authored\n");
+}
+
 #[test]
 fn install_fresh_install_creates_backup_entry_loader_skills_and_manifest() {
     let tmp = TempDir::new().unwrap();
@@ -3790,6 +3967,38 @@ fn doctor_stays_quiet_when_main_is_protected() {
 mod journal_fault_injection {
     use super::*;
 
+    #[test]
+    fn injected_fault_mid_adopt_auto_restores_surface_and_ledger() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source_top_level_skills(tmp.path());
+        install(&config_dir, &home, &source);
+        let stale = stale_local_copy(&home);
+        let managed_skill =
+            home.join(".config/opencode/compound-engineering/skills/ce-brainstorm/SKILL.md");
+        assert!(managed_skill.exists());
+
+        ceai(&config_dir, &home)
+            .env("CE_AI_FAIL_AFTER_WRITES", "0")
+            .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+            .assert()
+            .failure();
+
+        // Auto-restore (R15): stale content back, managed copy untouched
+        // (retirement runs after the writes), no adopted ledger entry.
+        assert!(fs::read_to_string(&stale)
+            .unwrap()
+            .contains("# stale local copy"));
+        assert!(managed_skill.exists());
+        let state = read_json(&config_dir.join("state.json"));
+        assert!(
+            state.get("skill_surfaces").is_none()
+                || state["skill_surfaces"]
+                    .as_array()
+                    .is_none_or(|a| a.is_empty())
+        );
+    }
+
     fn user_opencode_config(home: &Path) {
         let dir = home.join(".config/opencode");
         fs::create_dir_all(&dir).unwrap();
@@ -3896,41 +4105,6 @@ mod journal_fault_injection {
         assert!(fs::read_to_string(&stale)
             .unwrap()
             .contains("# stale local copy"));
-    }
-
-    #[test]
-    fn adopt_yes_hits_engine_gate_and_leaves_surface_untouched() {
-        let tmp = TempDir::new().unwrap();
-        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
-        let source = ce_source_top_level_skills(tmp.path());
-        install(&config_dir, &home, &source);
-        let stale = home.join(".config/opencode/skills/ce-brainstorm/SKILL.md");
-        fs::create_dir_all(stale.parent().unwrap()).unwrap();
-        fs::write(
-            &stale,
-            "---\nname: ce-brainstorm\ndescription: brainstorm\n---\n# stale local copy\n",
-        )
-        .unwrap();
-
-        ceai(&config_dir, &home)
-            .args(["skills", "adopt", "--harness", "opencode", "--yes"])
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains(
-                "adoption engine ships in the next release",
-            ));
-
-        // Gate leaves everything untouched: stale content intact, no ledger.
-        assert!(fs::read_to_string(&stale)
-            .unwrap()
-            .contains("# stale local copy"));
-        let state = read_json(&config_dir.join("state.json"));
-        assert!(
-            state.get("skill_surfaces").is_none()
-                || state["skill_surfaces"]
-                    .as_array()
-                    .is_none_or(|a| a.is_empty())
-        );
     }
 
     #[test]

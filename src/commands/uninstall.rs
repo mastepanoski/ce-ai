@@ -230,31 +230,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             if managed_dir.exists() {
                 std::fs::remove_dir_all(&managed_dir)?;
             }
-            if harness_kind == HarnessKind::Claude
-                || harness_kind == HarnessKind::Codex
-                || harness_kind == HarnessKind::Copilot
-                || harness_kind == HarnessKind::Grok
-                || harness_kind == HarnessKind::Kimi
-                || harness_kind == HarnessKind::Agy
-                || harness_kind == HarnessKind::Pi
-                || harness_kind == HarnessKind::Fx
-            {
-                let skills_dir = if harness_kind == HarnessKind::Agy {
-                    config_dir.join("config").join("skills")
-                } else {
-                    config_dir.join("skills")
-                };
-                if skills_dir.exists() {
-                    if let Err(e) = std::fs::remove_dir_all(&skills_dir) {
-                        if !ctx.quiet {
-                            eprintln!(
-                                "warning: failed to clean skills directory at {}: {e}",
-                                skills_dir.display()
-                            );
-                        }
-                    }
-                }
-            }
+            // Adopted skills surfaces are ce-ai-managed but live inside
+            // user-owned roots: removal is ledger-scoped, never whole-dir
+            // (hard-gate #4; canonical-skills-adoption CSA-5).
+            remove_adopted_surfaces(&mut state, target, &backups)?;
         }
         state
             .installed_harnesses
@@ -275,5 +254,37 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             println!("✅ Uninstalled {} cleanly.", args.harness);
         }
     }
+    Ok(())
+}
+
+/// Removes ledger-tracked adopted skills surfaces for one harness: each
+/// tracked file is backed up then deleted, empty parent directories are
+/// pruned, and the ledger entries are dropped with the removal (CSA-5).
+/// User-authored files inside the surface root are never touched.
+fn remove_adopted_surfaces(
+    state: &mut State,
+    harness: &str,
+    backups: &std::path::Path,
+) -> Result<(), CeError> {
+    let mine: Vec<crate::state::state::SkillSurface> = state
+        .skill_surfaces
+        .iter()
+        .filter(|s| s.harness == harness && s.status == "adopted")
+        .cloned()
+        .collect();
+    for surface in &mine {
+        for f in &surface.files {
+            let p = surface.root.join(&f.path);
+            if !p.exists() {
+                continue;
+            }
+            crate::state::backups::backup_file(backups, &p)?;
+            std::fs::remove_file(&p)?;
+            crate::commands::adopt::prune_empty_parents(&surface.root, &p);
+        }
+    }
+    state
+        .skill_surfaces
+        .retain(|s| !(s.harness == harness && s.status == "adopted"));
     Ok(())
 }
