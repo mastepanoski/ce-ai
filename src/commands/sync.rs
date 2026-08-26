@@ -174,6 +174,17 @@ pub(crate) fn sync_with(
     let mut state =
         State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())?;
 
+    // Retirement respect (R13): once an opencode surface is adopted, the
+    // managed-dir skills tree stays retired — sync must not re-harvest it.
+    let skip_managed_skills_harvest = state
+        .skill_surfaces
+        .iter()
+        .any(|s| s.harness == "opencode" && s.status == "adopted");
+    if skip_managed_skills_harvest {
+        desired.retain(|k, _| !k.starts_with("skills/"));
+        source_rel.retain(|k, _| !k.starts_with("skills/"));
+    }
+
     let mut active_harnesses: Vec<String> = state
         .installed_harnesses
         .iter()
@@ -306,6 +317,46 @@ pub(crate) fn sync_with(
             println!("sync: purged stale assignment {slot}");
         }
     }
+
+    // Adopted surfaces: rewrite drift back to canonical (U4/R16) and flag
+    // vanished roots as orphaned (R19). Runs before the state save so the
+    // ledger status changes persist.
+    let mut restored_drift: Vec<String> = Vec::new();
+    let mut orphaned: Vec<String> = Vec::new();
+    let adopted: Vec<crate::state::state::SkillSurface> = state
+        .skill_surfaces
+        .iter()
+        .filter(|s| s.status == "adopted")
+        .cloned()
+        .collect();
+    for surface in &adopted {
+        if !surface.root.exists() {
+            if let Some(entry) = state
+                .skill_surfaces
+                .iter_mut()
+                .find(|s| s.root == surface.root && s.harness == surface.harness)
+            {
+                entry.status = "orphaned".to_string();
+            }
+            orphaned.push(format!("{} ({})", surface.harness, surface.root.display()));
+            continue;
+        }
+        for f in &surface.files {
+            let dest = surface.root.join(&f.path);
+            let current = std::fs::read(&dest)
+                .map(|bytes| crate::state::diff::sha256_hex(&bytes))
+                .ok();
+            if current.as_deref() == Some(f.sha256.as_str()) {
+                continue;
+            }
+            let _ = crate::state::backups::backup_file(&ctx.config_dir.join("backups"), &dest);
+            arm!(&dest);
+            let content = std::fs::read(source_root.join("skills").join(&f.path))?;
+            crate::state::write_atomic(&dest, &content)?;
+            restored_drift.push(format!("{}/{}", surface.harness, f.path));
+        }
+    }
+
     state.save(&state_path)?;
     if let Some(j) = journal.take() {
         j.complete()?;
@@ -347,7 +398,48 @@ pub(crate) fn sync_with(
                 )
             })
             .collect();
+        // Adoption-aware surfaces (U5): a ledger-tracked adopted surface is
+        // the harness's managed surface; untracked adoptable content renders
+        // as pending-adoption; marketplace/plugin-cache CE copies render as
+        // external-duplicate (R17/R18/R19).
+        let ledger_roots: Vec<(String, PathBuf)> = state
+            .skill_surfaces
+            .iter()
+            .filter(|s| s.status == "adopted")
+            .map(|s| (s.harness.clone(), s.root.clone()))
+            .collect();
+        let pending = crate::commands::adopt::pending_adoptions(ctx, &home_dir, &ledger_roots);
+        let external = crate::commands::adopt::external_duplicates(&home_dir);
         for name in &active_harnesses {
+            if let Some(surface) = state
+                .skill_surfaces
+                .iter()
+                .find(|s| s.harness == *name && (s.status == "adopted" || s.status == "orphaned"))
+            {
+                let status = if surface.status == "orphaned" || !surface.root.exists() {
+                    CheckStatus::Orphaned
+                } else {
+                    let expected: BTreeMap<String, String> = surface
+                        .files
+                        .iter()
+                        .map(|f| (f.path.clone(), f.sha256.clone()))
+                        .collect();
+                    let drift = verify_tree_against(&surface.root, &expected);
+                    CheckStatus::from_drift(surface.files.len(), drift)
+                };
+                surfaces.push(SurfaceCheck {
+                    harness: name.clone(),
+                    status,
+                });
+                continue;
+            }
+            if pending.iter().any(|(h, _)| h == name) {
+                surfaces.push(SurfaceCheck {
+                    harness: name.clone(),
+                    status: CheckStatus::PendingAdoption,
+                });
+                continue;
+            }
             if name == "opencode" {
                 continue;
             }
@@ -422,6 +514,12 @@ pub(crate) fn sync_with(
                 });
             }
         }
+        if !external.is_empty() {
+            surfaces.push(SurfaceCheck {
+                harness: "external-duplicate".into(),
+                status: CheckStatus::ExternalDuplicate { paths: external },
+            });
+        }
 
         if !ctx.quiet {
             let source_kind = source_json
@@ -456,6 +554,9 @@ pub(crate) fn sync_with(
                 .filter(|s| matches!(s.status, CheckStatus::NotVerified { .. }))
                 .count();
             println!("{}", reconciliation_line(verified, unverified, failed));
+            for path in &restored_drift {
+                println!("  ↻ restored-drift: {path}");
+            }
             if unverified > 0 {
                 for line in guidance_note_lines() {
                     println!("{line}");
@@ -539,6 +640,15 @@ pub(crate) enum CheckStatus {
     },
     /// No hash check ran for this surface; the reason says why.
     NotVerified { reason: &'static str },
+    /// Adoptable `ce-*` content under a harness skills root the ledger does
+    /// not track (R17) — non-failing, adoption is explicit.
+    PendingAdoption,
+    /// CE copies under marketplace/plugin-cache roots (R18) — reported with
+    /// paths, never adopted or modified.
+    ExternalDuplicate { paths: Vec<String> },
+    /// A ledger-tracked adopted root vanished from disk (R19) — re-adoption
+    /// required.
+    Orphaned,
 }
 
 impl CheckStatus {
@@ -589,6 +699,16 @@ fn matrix_line(harness: &str, status: &CheckStatus) -> String {
         ),
         CheckStatus::NotVerified { reason } => {
             format!("  ○ {harness}: registered — {reason}")
+        }
+        CheckStatus::PendingAdoption => {
+            format!("  ○ {harness}: pending-adoption — run `skills adopt` to put it under management")
+        }
+        CheckStatus::ExternalDuplicate { paths } => format!(
+            "  ○ external-duplicate — marketplace/plugin-cache CE copies (never adopted; remove manually): {}",
+            paths.join(", ")
+        ),
+        CheckStatus::Orphaned => {
+            format!("  ○ {harness}: orphaned — adopted root vanished; re-run `skills adopt`")
         }
     }
 }
@@ -715,10 +835,22 @@ fn check_and_repair_drift(
     manifest: &InstallManifest,
 ) -> Result<bool, CeError> {
     let managed_dir = ctx.opencode_config_dir.join(MANAGED_DIR);
-    let desired: BTreeMap<String, String> = managed_tree(source_root)?
+    let mut desired: BTreeMap<String, String> = managed_tree(source_root)?
         .into_iter()
         .map(|(managed_rel, (_, hash))| (managed_rel, hash))
         .collect();
+    // Retirement respect (R13): the opencode surface is adopted; the
+    // managed-dir skills tree stays retired.
+    let opencode_adopted = State::load(&ctx.config_dir.join("state.json"))
+        .map(|s| {
+            s.skill_surfaces
+                .iter()
+                .any(|s| s.harness == "opencode" && s.status == "adopted")
+        })
+        .unwrap_or(false);
+    if opencode_adopted {
+        desired.retain(|k, _| !k.starts_with("skills/"));
+    }
     let installed: BTreeMap<String, String> = manifest
         .files
         .iter()
