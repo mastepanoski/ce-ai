@@ -90,22 +90,28 @@ entries, a real adoption is what connects any on-disk fixture to the classifier 
 - **Bump checklist**: when changing `BLOCK_VERSION`, grep `tests/cli.rs` for `v=<n>`
   literals and version numerals in `fn` names within the same commit.
 
-## Known Coverage Gaps (accepted P3/FYI, PR #236 review)
+## Known Coverage Gaps — CLOSED (coverage follow-up, 2026-08-25)
 
-Surfaced by Tier-2 review and deliberately deferred; recorded here so the next bump's
-planner inherits them:
+All four gaps surfaced by the PR #236 review are now implemented in `tests/cli.rs`:
 
-- The upgrade lifecycle test exercises `--tier full` only — the orchestrator tier received
-  new retention wording in the same diff but has no stale-detection/upgrade-rerun variant,
-  and the doctor hint interpolation is only asserted for `full`.
-- No test pins the post-bump classification of a v2-era **minimal** adoption (classifies
-  `Ok` via the unchanged-body SHA short-circuit, not `StaleVersion`): the R5 byte-parity
-  test covers rendering but not the diagnostic consequence.
-- Post-upgrade idempotency is unverified: the upgrade rerun asserts success, but no third
-  run confirms the already-adopted early-return fires against the v3 block.
-- Root `AGENTS.md` and the `full`-tier block share retention meaning but no test pins their
-  clauses byte-for-byte against each other — substring assertions allow silent surface
-  drift to recur.
+- [x] Orchestrator-tier stale-upgrade variant (`init_prj_upgrades_stale_v2_block_to_v3_orchestrator_tier`) — also pins the doctor hint's tier interpolation.
+- [x] Minimal-tier post-bump diagnostic pin (`doctor_classifies_byte_identical_minimal_v2_body_as_healthy`) — pins the SHA short-circuit precedence for doctor and status.
+- [x] Post-upgrade idempotency third run — appended to `init_prj_upgrades_stale_v2_block_to_v3_preserving_provenance`.
+- [x] Root-vs-block retention phrasing pin (`ssot_retention_core_phrasing_is_consistent_across_surfaces`).
+
+Additionally, all block-header literals in `tests/cli.rs` now derive from a single
+test-local `CUR_BLOCK_VERSION` constant with a helper, eliminating the per-bump literal
+churn this doc was written after.
+
+## Residual Disposition: removal-carve-out parity (closed 2026-08-25)
+
+Review residual #5 asked whether the root `AGENTS.md` neutral stance ("removal is an
+ordinary reversible git decision, never a workflow step") should also appear in the
+managed `full`-tier block, which only states "'disposable' never means deleting them".
+**Decision: close without syncing.** Managed blocks are deliberately terser than the root
+rule, and the actionable ambiguity — whether deletion is authorized — is already resolved
+identically on both surfaces. The nuance is repo-maintainer-facing context, so closing it
+does not warrant a `BLOCK_VERSION` bump.
 
 ## Related Notes
 
