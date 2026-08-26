@@ -90,6 +90,23 @@ entries, a real adoption is what connects any on-disk fixture to the classifier 
 - **Bump checklist**: when changing `BLOCK_VERSION`, grep `tests/cli.rs` for `v=<n>`
   literals and version numerals in `fn` names within the same commit.
 
+## Known Coverage Gaps (accepted P3/FYI, PR #236 review)
+
+Surfaced by Tier-2 review and deliberately deferred; recorded here so the next bump's
+planner inherits them:
+
+- The upgrade lifecycle test exercises `--tier full` only — the orchestrator tier received
+  new retention wording in the same diff but has no stale-detection/upgrade-rerun variant,
+  and the doctor hint interpolation is only asserted for `full`.
+- No test pins the post-bump classification of a v2-era **minimal** adoption (classifies
+  `Ok` via the unchanged-body SHA short-circuit, not `StaleVersion`): the R5 byte-parity
+  test covers rendering but not the diagnostic consequence.
+- Post-upgrade idempotency is unverified: the upgrade rerun asserts success, but no third
+  run confirms the already-adopted early-return fires against the v3 block.
+- Root `AGENTS.md` and the `full`-tier block share retention meaning but no test pins their
+  clauses byte-for-byte against each other — substring assertions allow silent surface
+  drift to recur.
+
 ## Related Notes
 
 - **Known limitation (discovered, unfixed)**: the SHA short-circuit precedes the version
