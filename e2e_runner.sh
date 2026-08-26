@@ -74,14 +74,12 @@ echo "$STATUS_OUT" | grep -q "opencode" || {
 }
 
 echo "== [E2E 8] Running TUI headless checks (zen-free, no TTY) =="
-# Re-install for TUI checks
-ce-ai install --harness opencode --source /tmp/ce-source
-# TUI vector parity already covered by cargo test; here we assert headless skills/tools resolve (soft, zen fallback)
-ce-ai skills list | grep -q "ce-brainstorm" || echo "WARN: skills list missing ce-brainstorm (soft)"
-ce-ai skills resolve --harness opencode --query "test" | grep -q "ce-" || echo "WARN: skills resolve headless (soft)"
-ce-ai tools status | grep -q "codegraph" || echo "WARN: tools status (soft)"
+# Use existing install from E2E 1 (no reinstall to avoid backup overwrite)
+ce-ai skills list > /tmp/skills.txt 2>&1; grep -q "ce-brainstorm" /tmp/skills.txt || echo "WARN: skills list missing ce-brainstorm (soft)"
+ce-ai skills resolve --harness opencode --query "test" > /tmp/resolve.txt 2>&1; grep -q "ce-" /tmp/resolve.txt || echo "WARN: skills resolve headless (soft)"
+ce-ai tools status > /tmp/tools.txt 2>&1; grep -q "codegraph" /tmp/tools.txt || echo "WARN: tools status (soft)"
 # Zen free model path (mock if no API key): assignment must succeed without network
-ce-ai models set ce-brainstorm opencode/zen-free 2>&1 | grep -q "opencode/zen-free" || echo "WARN: zen-free assignment (soft)"
+ce-ai models set ce-brainstorm opencode/zen-free > /tmp/models.txt 2>&1; grep -q "opencode/zen-free" /tmp/models.txt || echo "WARN: zen-free assignment (soft)"
 # Headless TUI rendering via cargo test (TestBackend) inside container if source present
 if [ -f "/app/Cargo.toml" ]; then
   echo "== [E2E 8b] cargo test tui headless snapshots =="
