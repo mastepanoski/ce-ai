@@ -1387,6 +1387,54 @@ mod spawned_contract_tests {
             <crate::commands::doctor::Args as clap::Args>::augment_args(Command::new("doctor")),
             &doctor_cmd_args()[1..],
         );
+        // Extended coverage (tui-e2e-zen): 15 CLI subcommands — pin the 6 that were
+        // missing and gave false 8/8 green. Future TUI tabs must keep this green.
+        assert_parses(
+            <crate::commands::skills::Args as clap::Args>::augment_args(Command::new("skills")),
+            &["list".to_string()][..],
+        );
+        assert_parses(
+            <crate::commands::skills::Args as clap::Args>::augment_args(Command::new("skills")),
+            &[
+                "resolve".to_string(),
+                "--harness".to_string(),
+                harness.to_string(),
+            ][..],
+        );
+        assert_parses(
+            <crate::commands::skills::Args as clap::Args>::augment_args(Command::new("skills")),
+            &["doctor".to_string()][..],
+        );
+        assert_parses(
+            <crate::commands::backups::BackupsArgs as clap::Args>::augment_args(Command::new(
+                "backups",
+            )),
+            &["list".to_string()][..],
+        );
+        assert_parses(
+            <crate::commands::tools::Args as clap::Args>::augment_args(Command::new("tools")),
+            &["status".to_string()][..],
+        );
+        assert_parses(
+            <crate::commands::usage::Args as clap::Args>::augment_args(Command::new("usage")),
+            &["sync".to_string()][..],
+        );
+        assert_parses(
+            <crate::commands::usage::Args as clap::Args>::augment_args(Command::new("usage")),
+            &["report".to_string()][..],
+        );
+        assert_parses(
+            <crate::commands::tools::Args as clap::Args>::augment_args(Command::new("tools")),
+            &["install".to_string(), "codegraph".to_string()][..],
+        );
+        assert_parses(
+            <crate::commands::audit::Args as clap::Args>::augment_args(Command::new("audit")),
+            &[][..],
+        );
+        assert_parses(
+            <crate::commands::workflow::Args as clap::Args>::augment_args(Command::new("workflow")),
+            &["status".to_string()][..],
+        );
 
         // Zero-arg / inline-enum commands: pin exact vectors.
         assert_eq!(status_args(), ["status"]);
@@ -1409,5 +1457,51 @@ mod spawned_contract_tests {
                 ])
                 .expect_err("dead --harness/--force must be rejected by upgrade's contract");
         assert_eq!(err.kind(), clap::error::ErrorKind::UnknownArgument);
+    }
+
+    #[test]
+    fn headless_ui_renders_all_tabs_without_panic() {
+        use ratatui::backend::TestBackend;
+        use ratatui::Terminal;
+        use tempfile::TempDir;
+
+        let tmp = TempDir::new().unwrap();
+        let ctx =
+            crate::commands::Context::resolve(Some(tmp.path().join("ce-ai")), false, false, true)
+                .unwrap();
+        for (idx, tab) in MenuTab::all().iter().enumerate() {
+            let backend = TestBackend::new(80, 24);
+            let mut terminal = Terminal::new(backend).unwrap();
+            let mut app = App::new(&ctx);
+            app.selected_tab = idx;
+            terminal
+                .draw(|f| ui(f, &app, &ctx))
+                .unwrap_or_else(|e| panic!("ui draw failed for tab {:?}: {e}", tab));
+            let buffer = terminal.backend().buffer().clone();
+            let content: String = buffer
+                .content()
+                .iter()
+                .map(|c| c.symbol().to_string())
+                .collect();
+            // Title contains emoji + spaces; check keyword to avoid width flakiness.
+            let keyword = match tab {
+                MenuTab::Status => "Status",
+                MenuTab::Workflow => "Workflow",
+                MenuTab::Install => "Install",
+                MenuTab::Models => "Models",
+                MenuTab::Sync => "Sync",
+                MenuTab::Upgrade => "Upgrade",
+                MenuTab::Doctor => "Doctor",
+                MenuTab::Backups => "Backups",
+                MenuTab::Uninstall => "Uninstall",
+                MenuTab::Exit => "Quit",
+            };
+            assert!(
+                content.contains(keyword),
+                "tab {:?} keyword '{keyword}' not in buffer: {}",
+                tab,
+                &content[..500.min(content.len())]
+            );
+        }
     }
 }
