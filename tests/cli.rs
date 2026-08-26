@@ -205,9 +205,9 @@ fn adopt_yes_executes_transactional_adoption_and_retires_managed_copy() {
 
     // Stale copy rewritten to canonical content.
     assert_eq!(fs::read_to_string(&stale).unwrap(), "# ce-brainstorm\n");
-    // Managed-dir skills tree retired (R13): file gone, manifest updated.
+    // Managed-dir skills tree retired whole (R13): ce-ai-owned territory.
     assert!(!home
-        .join(".config/opencode/compound-engineering/skills/ce-brainstorm/SKILL.md")
+        .join(".config/opencode/compound-engineering/skills")
         .exists());
     let manifest = read_json(
         &home
@@ -4299,6 +4299,91 @@ mod journal_fault_injection {
             fs::read_to_string(&own).unwrap(),
             "---\nname: ce-my-own\ndescription: mine\n---\nbody\n"
         );
+    }
+
+    #[test]
+    fn registry_resolves_adopted_surface_for_any_harness() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source_top_level_skills(tmp.path());
+        install(&config_dir, &home, &source);
+        // Stale pi-side copy (pi root: ~/.pi/agent/skills).
+        let pi_skill = home.join(".pi/agent/skills/ce-brainstorm/SKILL.md");
+        fs::create_dir_all(pi_skill.parent().unwrap()).unwrap();
+        fs::write(
+            &pi_skill,
+            "---\nname: ce-brainstorm\ndescription: brainstorm\n---\n# stale pi copy\n",
+        )
+        .unwrap();
+
+        ceai(&config_dir, &home)
+            .args(["skills", "adopt", "--harness", "pi", "--yes"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("adopted under ce-ai management"));
+
+        // AE6: resolution serves the adopted root (not ~/.ce-ai/harness-pi).
+        ceai(&config_dir, &home)
+            .args([
+                "skills",
+                "resolve",
+                "--harness",
+                "pi",
+                "--query",
+                "brainstorm",
+            ])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains(
+                std::path::Path::new(".pi")
+                    .join("agent")
+                    .join("skills")
+                    .join("ce-brainstorm")
+                    .join("SKILL.md")
+                    .to_string_lossy()
+                    .to_string(),
+            ));
+    }
+
+    #[test]
+    fn doctor_reports_orphaned_adopted_surface() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source_top_level_skills(tmp.path());
+        install(&config_dir, &home, &source);
+        stale_local_copy(&home);
+        ceai(&config_dir, &home)
+            .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+            .assert()
+            .success();
+        fs::remove_dir_all(home.join(".config/opencode/skills")).unwrap();
+
+        ceai(&config_dir, &home)
+            .args(["skills", "doctor"])
+            .assert()
+            .failure()
+            .stdout(predicates::str::contains(
+                "orphaned adopted skills surface for opencode",
+            ));
+    }
+
+    #[test]
+    fn status_reports_adopted_surface() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+        let source = ce_source_top_level_skills(tmp.path());
+        install(&config_dir, &home, &source);
+        stale_local_copy(&home);
+        ceai(&config_dir, &home)
+            .args(["skills", "adopt", "--harness", "opencode", "--yes"])
+            .assert()
+            .success();
+
+        ceai(&config_dir, &home)
+            .args(["status"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("skills: opencode adopted"));
     }
 
     #[test]

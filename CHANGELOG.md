@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.24.0] - 2026-08-25
 
+### Added
+- **Canonical skills adoption**: `ce-ai skills adopt` puts pre-existing `ce-*` skill copies under ce-ai management — transactional rewrite with per-file backup, partial-set completion to the full canonical inventory, and retirement of superseded managed copies — while user-authored `ce-*` skills and symlinked entries are never touched. Adoption is recorded in a `skill_surfaces` ledger; the transactional engine and ledger-scoped uninstall shipped together (no destructive window).
+- **Sync currency for adopted surfaces**: `sync` rewrites adopted-surface drift back to canonical (reported as `restored-drift`), respects managed-copy retirement (no re-harvest), and the verification matrix renders the adoption lifecycle: `verified N/N` per adopted surface, `pending-adoption`, `external-duplicate`, and `orphaned`.
+- **Registry + visibility**: the SkillRegistry indexes adopted surfaces for all harnesses (resolution works for copy-less harnesses via canonical paths); `status` and `doctor` surface adoption states, including orphaned surfaces requiring re-adoption. User guide gains the canonical/adoption model (R11).
+
 ### Changed
 - **Retention-default SSOT rule (adoption block v3)**: the Single Source of Truth rule now states explicitly that ideation artifacts (`docs/brainstorms/`, `docs/ideation/`) are retained by default as the permanent raw-history record OpenSpec deliberately does not duplicate — "disposable inputs" means *not maintained in sync*, never a deletion mandate. Applied to root `AGENTS.md` and both managed-block surfaces (`full` tier SSOT paragraph, `orchestrator` tier line); the managed block version bumps to `v=3`. Existing `full`/`orchestrator` adoptions keep working but will report **stale block version** hints in `ce-ai status` / `ce-ai doctor` until `ce-ai init-prj <project> --tier <tier>` is re-run — re-adoption replaces the block in place, preserving all surrounding content and requiring no migration step. Existing `minimal`-tier adoptions classify as healthy without hints (their block body is byte-identical across these versions; SHA match short-circuits the version check).
+- **Harvest the real release layout**: `install`/`sync` harvest the release's top-level `skills/` tree (top-level wins over the legacy `.opencode/skills` prefix, overlap warns). Harvested skills are never copied into harness-owned directories — adoption is the only delivery path, keeping one indexed skill set per harness (token economy: duplicated skill descriptions are a per-session cost).
+
+### Measurement
+- Token-overhead tracking (origin success criterion): on the reference machine, the pre-change state indexed 35 stale `ce-*` skill descriptions (single user-dir set; the managed dir held no tracked skills). Post-adoption: the 33-skill canonical set is indexed once, refreshed to the release version, with 12 user-authored `ce-*` skills preserved untouched and the managed-dir duplicate prevented by retirement. Net: descriptions went 35 stale → 33 current with zero duplication, and the design structurally prevents the managed+user double-indexing that motivates this feature.
 
 ## [1.23.1] - 2026-08-24
 

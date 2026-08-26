@@ -164,14 +164,23 @@ impl SkillRegistry {
             &mut skill_map,
         )?;
 
-        // Precedence Tier 3: Global User Harness Roots (~/.config/<harness>/skills/)
-        for harness in HarnessKind::all() {
-            let harness_dir = ctx.config_dir.join(format!("harness-{}", harness.as_str()));
-            let harness_skills = harness_dir.join("skills");
+        // Adopted CE surfaces (canonical-skills-adoption): ledger-tracked
+        // harness skills roots indexed for ALL harnesses (all-harness path
+        // mapping, same as the global tiers). Replaces the never-populated
+        // legacy `~/.ce-ai/harness-<kind>/skills` scan. Later scans overwrite
+        // earlier entries, so canonical/adopted content wins over stale
+        // same-name copies while workspace tiers keep their precedence.
+        let state = crate::state::state::State::load(&ctx.config_dir.join("state.json"))
+            .unwrap_or_default();
+        for surface in state
+            .skill_surfaces
+            .iter()
+            .filter(|s| s.status == "adopted")
+        {
             scan_skill_directory(
-                &harness_skills,
+                &surface.root,
                 "global",
-                Some(harness),
+                None,
                 &authorized_roots,
                 &mut skill_map,
             )?;
@@ -503,6 +512,30 @@ pub fn parse_skill_frontmatter(content: &str) -> SkillFrontmatter {
 pub fn check_skill_registry_health(ctx: &Context) -> Result<Vec<String>, CeError> {
     let mut findings: Vec<String> = Vec::new();
     let registry_path = ctx.config_dir.join("skills-registry.json");
+
+    // Adoption ledger health (canonical-skills-adoption R19): adopted roots
+    // that vanished from disk need explicit re-adoption.
+    let state =
+        crate::state::state::State::load(&ctx.config_dir.join("state.json")).unwrap_or_default();
+    for surface in state.skill_surfaces.iter() {
+        match surface.status.as_str() {
+            "adopted" if !surface.root.exists() => {
+                findings.push(format!(
+                    "orphaned adopted skills surface for {} at '{}' (run 'ce-ai skills adopt' to re-adopt)",
+                    surface.harness,
+                    surface.root.display()
+                ));
+            }
+            "orphaned" => {
+                findings.push(format!(
+                    "orphaned adopted skills surface for {} at '{}' (run 'ce-ai skills adopt' to re-adopt)",
+                    surface.harness,
+                    surface.root.display()
+                ));
+            }
+            _ => {}
+        }
+    }
 
     if !registry_path.exists() {
         findings.push(format!(
