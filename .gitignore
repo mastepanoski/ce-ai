@@ -3,3 +3,6 @@
 .atl/
 .pi/
 .codegraph/
+tui-screenshots/
+*.png
+*.snap.png

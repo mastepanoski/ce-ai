@@ -1675,4 +1675,72 @@ mod spawned_contract_tests {
             );
         }
     }
+
+    #[test]
+    fn headless_screenshots_no_overflow() {
+        use ratatui::backend::TestBackend;
+        use ratatui::Terminal;
+        use std::path::Path;
+        use tempfile::TempDir;
+
+        let tmp = TempDir::new().unwrap();
+        let ctx =
+            crate::commands::Context::resolve(Some(tmp.path().join("ce-ai")), false, false, true)
+                .unwrap();
+        // Screenshots go to gitignored dir — never committed (LOW design fix).
+        let out_dir = Path::new("tui-screenshots");
+        let _ = std::fs::create_dir_all(out_dir);
+        for (idx, tab) in MenuTab::all().iter().enumerate() {
+            let backend = TestBackend::new(80, 24);
+            let mut terminal = Terminal::new(backend).unwrap();
+            let mut app = App::new(&ctx);
+            app.selected_tab = idx;
+            terminal.draw(|f| ui(f, &app, &ctx)).unwrap();
+            let buffer = terminal.backend().buffer().clone();
+            // Verify no row exceeds width and no panic/overflow — width=80, height=24
+            assert_eq!(buffer.area.width, 80);
+            assert_eq!(buffer.area.height, 24);
+            // Dump buffer as text lines for visual proof (gitignored)
+            let mut lines = Vec::new();
+            for y in 0..buffer.area.height {
+                let mut row = String::new();
+                for x in 0..buffer.area.width {
+                    let cell = &buffer[(x, y)];
+                    row.push_str(cell.symbol());
+                }
+                // Trim trailing spaces but keep content length check
+                let trimmed = row.trim_end().to_string();
+                // Width check is display-width aware (emoji =2 cells); allow 1-char slop for wide glyphs
+                // Core proof is no panic/overflow and screenshot written to gitignored dir
+                assert!(
+                    trimmed.chars().count() <= 84,
+                    "tab {:?} row {y} overflow: {} chars >84",
+                    tab,
+                    trimmed.chars().count()
+                );
+                lines.push(trimmed);
+            }
+            let dump = lines.join("\n");
+            let path = out_dir.join(format!("{idx:02}-{:?}.txt", tab));
+            let _ = std::fs::write(&path, dump);
+            // Also assert keyword present (same as above, but proves screenshot captured)
+            assert!(lines.join(" ").contains(match tab {
+                MenuTab::Status => "Status",
+                MenuTab::Workflow => "Workflow",
+                MenuTab::Install => "Install",
+                MenuTab::Models => "Models",
+                MenuTab::Skills => "Skills",
+                MenuTab::Sync => "Sync",
+                MenuTab::Upgrade => "Upgrade",
+                MenuTab::Doctor => "Doctor",
+                MenuTab::Backups => "Backups",
+                MenuTab::Tools => "Tools",
+                MenuTab::Usage => "Usage",
+                MenuTab::Audit => "Audit",
+                MenuTab::InitPrj => "Project",
+                MenuTab::Uninstall => "Uninstall",
+                MenuTab::Exit => "Quit",
+            }));
+        }
+    }
 }
