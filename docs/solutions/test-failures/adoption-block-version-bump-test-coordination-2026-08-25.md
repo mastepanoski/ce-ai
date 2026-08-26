@@ -103,6 +103,16 @@ Additionally, all block-header literals in `tests/cli.rs` now derive from a sing
 test-local `CUR_BLOCK_VERSION` constant with a helper, eliminating the per-bump literal
 churn this doc was written after.
 
+## Residual Disposition: removal-carve-out parity (closed 2026-08-25)
+
+Review residual #5 asked whether the root `AGENTS.md` neutral stance ("removal is an
+ordinary reversible git decision, never a workflow step") should also appear in the
+managed `full`-tier block, which only states "'disposable' never means deleting them".
+**Decision: close without syncing.** Managed blocks are deliberately terser than the root
+rule, and the actionable ambiguity — whether deletion is authorized — is already resolved
+identically on both surfaces. The nuance is repo-maintainer-facing context, so closing it
+does not warrant a `BLOCK_VERSION` bump.
+
 ## Related Notes
 
 - **Known limitation (discovered, unfixed)**: the SHA short-circuit precedes the version
