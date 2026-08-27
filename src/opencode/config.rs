@@ -6,7 +6,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::error::CeError;
-use crate::state::write_atomic;
+use crate::state::{ConfigStore, FsConfigStore};
 
 /// A config mutation recorded in the install manifest (OI-5, design §Interfaces).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -72,16 +72,17 @@ fn merge_skills_path(config: &mut serde_json::Value, skills_path: &str) -> Resul
     Ok(())
 }
 
-/// Returns the mutation record for the install manifest (OI-5).
-pub fn ensure_plugin_and_skills(
+/// Returns the mutation record for the install manifest using an explicit `ConfigStore` (KTD4).
+pub fn ensure_plugin_and_skills_with_store(
+    store: &dyn ConfigStore,
     config_path: &Path,
     plugin_entry: &str,
     skills_path: &str,
 ) -> Result<ConfigMutation, CeError> {
-    let mut config = read_config(config_path)?;
+    let mut config = store.read_config(config_path)?;
     merge_plugin(&mut config, plugin_entry)?;
     merge_skills_path(&mut config, skills_path)?;
-    write_atomic(config_path, &serde_json::to_vec_pretty(&config)?)?;
+    store.write_config(config_path, &config)?;
     Ok(ConfigMutation {
         file: config_path.display().to_string(),
         backup: None,
@@ -89,14 +90,23 @@ pub fn ensure_plugin_and_skills(
     })
 }
 
-/// Merges an MCP server definition into `opencode.json` under `mcpServers.<tool_name>`.
-/// Preserves pre-existing user MCP servers and custom config. Writes atomically.
-pub fn register_mcp_server(
+/// Returns the mutation record for the install manifest (OI-5).
+pub fn ensure_plugin_and_skills(
+    config_path: &Path,
+    plugin_entry: &str,
+    skills_path: &str,
+) -> Result<ConfigMutation, CeError> {
+    ensure_plugin_and_skills_with_store(&FsConfigStore, config_path, plugin_entry, skills_path)
+}
+
+/// Merges an MCP server definition into `opencode.json` using an explicit `ConfigStore` (KTD4).
+pub fn register_mcp_server_with_store(
+    store: &dyn ConfigStore,
     config_path: &Path,
     tool_name: &str,
     server_def: serde_json::Value,
 ) -> Result<(), CeError> {
-    let mut config = read_config(config_path)?;
+    let mut config = store.read_config(config_path)?;
     if !config.is_object() {
         return Err(CeError::Runtime(format!(
             "{} must be a JSON object; refusing to overwrite it. Fix the file manually, then re-run.",
@@ -119,8 +129,18 @@ pub fn register_mcp_server(
             ));
         }
     }
-    write_atomic(config_path, &serde_json::to_vec_pretty(&config)?)?;
+    store.write_config(config_path, &config)?;
     Ok(())
+}
+
+/// Merges an MCP server definition into `opencode.json` under `mcpServers.<tool_name>`.
+/// Preserves pre-existing user MCP servers and custom config. Writes atomically.
+pub fn register_mcp_server(
+    config_path: &Path,
+    tool_name: &str,
+    server_def: serde_json::Value,
+) -> Result<(), CeError> {
+    register_mcp_server_with_store(&FsConfigStore, config_path, tool_name, server_def)
 }
 
 #[cfg(test)]
@@ -275,5 +295,39 @@ mod tests {
             register_mcp_server(&path, "rtk", serde_json::json!({"command": "rtk"})).unwrap_err();
         assert!(err.to_string().contains("mcpServers"));
         assert_eq!(read_json(&path)["mcpServers"], "invalid-string");
+    }
+
+    #[test]
+    fn in_memory_config_store_works_with_ensure_and_register() {
+        let store = crate::state::InMemoryConfigStore::new();
+        let path = Path::new("/virtual/config/opencode.json");
+
+        let mutation = ensure_plugin_and_skills_with_store(
+            &store,
+            path,
+            "/virtual/plugin.js",
+            "/virtual/skills",
+        )
+        .unwrap();
+        assert_eq!(mutation.keys, vec!["plugin", "skills.paths"]);
+
+        register_mcp_server_with_store(
+            &store,
+            path,
+            "codegraph",
+            serde_json::json!({ "command": "codegraph" }),
+        )
+        .unwrap();
+
+        let cfg = store.read_config(path).unwrap();
+        assert_eq!(cfg["plugin"], serde_json::json!(["/virtual/plugin.js"]));
+        assert_eq!(
+            cfg["skills"]["paths"],
+            serde_json::json!(["/virtual/skills"])
+        );
+        assert_eq!(
+            cfg["mcpServers"]["codegraph"],
+            serde_json::json!({ "command": "codegraph" })
+        );
     }
 }

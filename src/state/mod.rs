@@ -4,10 +4,15 @@
 pub mod backups;
 pub mod diff;
 pub mod journal;
+pub mod ports;
 pub mod profiles;
 // `state::state` holds the State type; module_inception is intentional.
 #[allow(clippy::module_inception)]
 pub mod state;
+
+pub use ports::{
+    ConfigStore, FsConfigStore, FsStateStore, InMemoryConfigStore, InMemoryStateStore, StateStore,
+};
 
 use crate::error::CeError;
 use std::io::Write;
