@@ -5,6 +5,20 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.0] - 2026-08-26
+
+### Added
+- **TUI paridad 9→15 (R1):** 5 tabs espejo `Skills/Tools/Usage/Audit/InitPrj` con `render_*` + `run_*_cmd` thin vía `capture_cli` — cada vector validado en `every_tui_spawned_vector` 15/15.
+- **TUI estabilidad (R3-R6+I8):** `RawModeGuard` Drop restaura `disable_raw_mode`/`LeaveAlternateScreen` incluso en panic, input precedence `picker > modal > tabs`, modal `List+Scrollbar` con `j/k/PgUp/PgDn`, gate `j/k` context-aware, `stdout.is_terminal()` guard + banner `state.json corrupt` en Status.
+- **Headless E2E zen:** `headless_ui_renders_all_tabs` + `headless_screenshots_no_overflow` (`TestBackend 80×24`, dumps a `tui-screenshots/` gitignored, slop 84 para emoji wide), `e2e_runner.sh` TUI headless checks con `opencode/zen-free` fallback y `cargo test tui` soft, `Dockerfile.e2e` mantiene `opencode-ai`.
+
+### Changed
+- **Upgrade honesto (R2):** `Upgrade` sin selector harness (global, `run_upgrade_cmd` ignora `selected_harness_target`) — cierra mentira UI.
+- **Modal scroll + TTY:** `render_modal` ahora scrolleable con indicador `↑ scrolled`.
+
+### Fixed
+- **E2E broken pipe:** `e2e_runner.sh` evita `| grep` directo (redirige a `/tmp/*.txt` antes de `grep`) y no reinstala en E2E 8 para no sobrescribir backup.
+
 ## [1.25.0] - 2026-08-26
 
 ### Added
