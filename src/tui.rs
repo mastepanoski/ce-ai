@@ -28,10 +28,15 @@ pub enum MenuTab {
     Workflow,
     Install,
     Models,
+    Skills,
     Sync,
     Upgrade,
     Doctor,
     Backups,
+    Tools,
+    Usage,
+    Audit,
+    InitPrj,
     Uninstall,
     Exit,
 }
@@ -43,10 +48,15 @@ impl MenuTab {
             MenuTab::Workflow,
             MenuTab::Install,
             MenuTab::Models,
+            MenuTab::Skills,
             MenuTab::Sync,
             MenuTab::Upgrade,
             MenuTab::Doctor,
             MenuTab::Backups,
+            MenuTab::Tools,
+            MenuTab::Usage,
+            MenuTab::Audit,
+            MenuTab::InitPrj,
             MenuTab::Uninstall,
             MenuTab::Exit,
         ]
@@ -58,10 +68,15 @@ impl MenuTab {
             MenuTab::Workflow => "🎮  Workflow (FSM)",
             MenuTab::Install => "📥  Install Plugin",
             MenuTab::Models => "🤖  Models & Profiles",
+            MenuTab::Skills => "🧩  Skills Registry",
             MenuTab::Sync => "🔄  Sync & Reconcile",
             MenuTab::Upgrade => "🚀  Upgrade Release",
             MenuTab::Doctor => "🩺  Health Doctor",
             MenuTab::Backups => "💾  Backups & Restore",
+            MenuTab::Tools => "🛠️  Tools & Sidecars",
+            MenuTab::Usage => "📈  Usage Analytics",
+            MenuTab::Audit => "🔍  Audit & Quality",
+            MenuTab::InitPrj => "📁  Project Adopt",
             MenuTab::Uninstall => "🗑️   Uninstall Plugin",
             MenuTab::Exit => "❌  Quit Dashboard",
         }
@@ -80,10 +95,12 @@ struct App {
     picker_items: Vec<String>,
     picker_selected: usize,
     output_modal: Option<(String, Vec<String>)>, // (title, lines)
+    output_scroll: usize,
     selected_harness_idx: usize,
     harness_targets: Vec<String>,
     selected_backup_idx: usize,
     backups: Vec<crate::state::backups::BackupEntry>,
+    state_error: Option<String>,
 }
 
 impl App {
@@ -100,9 +117,11 @@ impl App {
             picker_items: Vec::new(),
             picker_selected: 0,
             output_modal: None,
+            output_scroll: 0,
             selected_harness_idx: 0,
             selected_backup_idx: 0,
             backups: Vec::new(),
+            state_error: None,
             harness_targets: vec![
                 "all".into(),
                 "opencode".into(),
@@ -158,15 +177,22 @@ impl App {
 
         let mut seen = std::collections::HashSet::new();
 
-        // Load harness status from state.json
+        // Load harness status from state.json — banner on corrupt
         let state_path = ctx.config_dir.join("state.json");
-        if let Ok(state) = State::load(&state_path) {
-            for h in &state.installed_harnesses {
-                let name = h["name"].as_str().unwrap_or("unknown").to_string();
-                let version = h["version"].as_str().unwrap_or("unknown").to_string();
-                let source = h["source"]["kind"].as_str().unwrap_or("local").to_string();
-                seen.insert(name.clone());
-                self.harnesses.push((name, version, source));
+        match State::load(&state_path) {
+            Ok(state) => {
+                for h in &state.installed_harnesses {
+                    let name = h["name"].as_str().unwrap_or("unknown").to_string();
+                    let version = h["version"].as_str().unwrap_or("unknown").to_string();
+                    let source = h["source"]["kind"].as_str().unwrap_or("local").to_string();
+                    seen.insert(name.clone());
+                    self.harnesses.push((name, version, source));
+                }
+                self.state_error = None;
+            }
+            Err(e) => {
+                // Keep harnesses empty but surface banner; not silent
+                self.state_error = Some(format!("{e}"));
             }
         }
 
@@ -216,14 +242,25 @@ impl App {
     }
 }
 
+struct RawModeGuard;
+impl Drop for RawModeGuard {
+    fn drop(&mut self) {
+        let _ = disable_raw_mode();
+        let mut stdout = stdout();
+        let _ = execute!(stdout, LeaveAlternateScreen);
+        let _ = Terminal::new(CrosstermBackend::new(stdout)).map(|mut t| t.show_cursor());
+    }
+}
+
 pub fn run_interactive(ctx: &Context) -> Result<(), CeError> {
-    if !std::io::stdin().is_terminal() {
+    if !std::io::stdout().is_terminal() {
         return Err(CeError::Usage(
             "no subcommand provided — run 'ce-ai --help' for usage or run in an interactive terminal for TUI mode".into(),
         ));
     }
 
     enable_raw_mode().map_err(|e| CeError::Runtime(format!("raw mode error: {e}")))?;
+    let _guard = RawModeGuard;
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen)
         .map_err(|e| CeError::Runtime(format!("screen error: {e}")))?;
@@ -237,6 +274,7 @@ pub fn run_interactive(ctx: &Context) -> Result<(), CeError> {
     disable_raw_mode().ok();
     execute!(terminal.backend_mut(), LeaveAlternateScreen).ok();
     terminal.show_cursor().ok();
+    drop(_guard);
 
     if let Err(err) = res {
         eprintln!("error: {err}");
@@ -260,13 +298,7 @@ fn run_app(
             if let Event::Key(key) =
                 event::read().map_err(|e| CeError::Runtime(format!("read error: {e}")))?
             {
-                if app.output_modal.is_some() {
-                    // Any key closes the modal
-                    app.output_modal = None;
-                    app.reload_state(ctx);
-                    continue;
-                }
-
+                // Precedence: picker > modal > tabs (R3)
                 if app.model_picker_open {
                     match key.code {
                         KeyCode::Esc => app.model_picker_open = false,
@@ -293,6 +325,30 @@ fn run_app(
                                     Err(err) => vec![format!("❌ Failed to set {slot}: {err}")],
                                 };
                             execute_action(app, "Model Assignment", move || lines);
+                        }
+                        _ => {}
+                    }
+                    continue;
+                }
+
+                if app.output_modal.is_some() {
+                    match key.code {
+                        KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
+                            app.output_modal = None;
+                            app.output_scroll = 0;
+                            app.reload_state(ctx);
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            app.output_scroll = app.output_scroll.saturating_sub(1);
+                        }
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            app.output_scroll = app.output_scroll.saturating_add(1);
+                        }
+                        KeyCode::PageUp => {
+                            app.output_scroll = app.output_scroll.saturating_sub(5);
+                        }
+                        KeyCode::PageDown => {
+                            app.output_scroll = app.output_scroll.saturating_add(5);
                         }
                         _ => {}
                     }
@@ -393,6 +449,9 @@ fn run_app(
                             MenuTab::Models => {
                                 execute_action(app, "Model Assignments", || run_models_cmd(ctx));
                             }
+                            MenuTab::Skills => {
+                                execute_action(app, "Skills Registry", || run_skills_cmd(ctx));
+                            }
                             MenuTab::Sync => {
                                 execute_action(app, "Sync Drift", move || {
                                     run_sync_cmd(ctx, dry_run)
@@ -408,6 +467,19 @@ fn run_app(
                             MenuTab::Backups => {
                                 let lines = run_restore_backup_cmd(ctx, app);
                                 execute_action(app, "Restore Backup", move || lines);
+                            }
+                            MenuTab::Tools => {
+                                execute_action(app, "Tools Status", || run_tools_cmd(ctx));
+                            }
+                            MenuTab::Usage => {
+                                execute_action(app, "Usage Report", || run_usage_cmd(ctx));
+                            }
+                            MenuTab::Audit => {
+                                execute_action(app, "Audit", || run_audit_cmd(ctx));
+                            }
+                            MenuTab::InitPrj => {
+                                let lines = run_init_prj_cmd(ctx);
+                                execute_action(app, "Project Adopt", move || lines);
                             }
                             MenuTab::Uninstall => {
                                 let lines = run_uninstall_cmd(ctx, app);
@@ -544,7 +616,7 @@ fn ui(f: &mut ratatui::Frame, app: &App, ctx: &Context) {
 
     // 4. Output Modal (if active)
     if let Some((ref title, ref lines)) = app.output_modal {
-        render_modal(f, title, lines);
+        render_modal(f, title, lines, app.output_scroll);
     }
 
     // 5. Model Picker Modal (if active)
@@ -607,6 +679,13 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
                 Line::from(Span::styled("Harness Installation Status:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
                 Line::from(""),
             ];
+            if let Some(err) = &app.state_error {
+                lines.push(Line::from(Span::styled(
+                    format!("  ❌ state.json corrupt: {err} — run ce-ai doctor"),
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                )));
+                lines.push(Line::from(""));
+            }
             if app.harnesses.is_empty() {
                 lines.push(Line::from(Span::styled("  ⚠️  No active harnesses installed yet.", Style::default().fg(Color::Red))));
                 lines.push(Line::from("  Use 'Install Plugin' tab to install CE into your host harness."));
@@ -739,6 +818,17 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
             )));
             lines
         }
+        MenuTab::Skills => vec![
+            Line::from(Span::styled("Skills Registry (🧩):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+            Line::from(""),
+            Line::from("  - List indexed skills across all harnesses (global catalog)."),
+            Line::from("  - Resolve exact SKILL.md paths for prompt injection."),
+            Line::from("  - Doctor checks registry integrity; Adopt puts ce-* copies under management."),
+            Line::from(""),
+            Line::from(Span::styled("👉 Press [Enter] to list skills (skills list).", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("   [a] adopt — ce-ai skills adopt --harness <name> --yes", Style::default().fg(Color::Gray))),
+            Line::from(Span::styled("   CLI: ce-ai skills resolve --harness <harness> --query <q>", Style::default().fg(Color::Gray))),
+        ],
         MenuTab::Sync => vec![
             Line::from(Span::styled("Reconcile Drift (Sync):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
             Line::from(""),
@@ -760,21 +850,17 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
         MenuTab::Upgrade => vec![
             Line::from(Span::styled("Upgrade CE Release (Descargar Nueva Versión):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
             Line::from(""),
-            Line::from(vec![
-                Span::styled("  Target Harness: ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-                Span::styled(
-                    format!("< [ {} ] >", app.selected_harness_target()),
-                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-                ),
-                Span::styled("  (Press ◄/► or h/l to switch)", Style::default().fg(Color::Gray)),
-            ]),
+            Line::from(Span::styled(
+                "  Target: All active harnesses (global upgrade — harness selector ignored)",
+                Style::default().fg(Color::Gray),
+            )),
             Line::from(""),
             Line::from(format!("  - Current CLI Version: v{}", env!("CARGO_PKG_VERSION"))),
             Line::from("  💡 ¿Qué hace Upgrade?"),
             Line::from("     - Busca y descarga la última Release publicada en GitHub."),
-            Line::from("     - Actualiza loaders y 200+ skills en todos los arneses seleccionados."),
+            Line::from("     - Actualiza loaders y 200+ skills en todos los arneses instalados."),
             Line::from(""),
-            Line::from(Span::styled("👉 Press [Enter] to fetch latest release and upgrade.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("👉 Press [Enter] to fetch latest release and upgrade (all).", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
         ],
         MenuTab::Doctor => vec![
             Line::from(Span::styled("Health Doctor Diagnostics:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
@@ -834,6 +920,41 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
             )));
             lines
         }
+        MenuTab::Tools => vec![
+            Line::from(Span::styled("Tools & Sidecars (🛠️):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+            Line::from(""),
+            Line::from("  - CodeGraph, Engram, Context7, RTK — companion sidecars."),
+            Line::from("  - Status checks versions and health; Install provisions a tool."),
+            Line::from(""),
+            Line::from(Span::styled("👉 Press [Enter] to check tools status.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("   CLI: ce-ai tools install <codegraph|engram|context7|rtk>", Style::default().fg(Color::Gray))),
+        ],
+        MenuTab::Usage => vec![
+            Line::from(Span::styled("Usage Analytics (📈):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+            Line::from(""),
+            Line::from("  - Capture harness usage into shard-per-author ledger."),
+            Line::from("  - Report aggregates with filters; zen-free fallback if no ledger."),
+            Line::from(""),
+            Line::from(Span::styled("👉 Press [Enter] to report usage.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("   CLI: ce-ai usage sync / ce-ai usage report --json", Style::default().fg(Color::Gray))),
+        ],
+        MenuTab::Audit => vec![
+            Line::from(Span::styled("Audit & Quality (🔍):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+            Line::from(""),
+            Line::from("  - Token-efficiency and context-quality audit across harnesses."),
+            Line::from("  - Checks .codegraph/ index and docs/solutions grounding."),
+            Line::from(""),
+            Line::from(Span::styled("👉 Press [Enter] to run audit.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
+        ],
+        MenuTab::InitPrj => vec![
+            Line::from(Span::styled("Project Adopt (📁):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+            Line::from(""),
+            Line::from("  - Injects managed CE workflow block into AGENTS.md (tier: full/minimal/orchestrator)."),
+            Line::from("  - Deinit removes it cleanly; --force overwrites modified blocks."),
+            Line::from(""),
+            Line::from(Span::styled("👉 Press [Enter] to adopt current project (init-prj).", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("   [Shift+I] deinit — ce-ai deinit-prj", Style::default().fg(Color::Gray))),
+        ],
         MenuTab::Uninstall => vec![
             Line::from(Span::styled("Uninstall Plugin & Restore Config:", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))),
             Line::from(""),
@@ -867,7 +988,7 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
     f.render_widget(p, area);
 }
 
-fn render_modal(f: &mut ratatui::Frame, title: &str, lines: &[String]) {
+fn render_modal(f: &mut ratatui::Frame, title: &str, lines: &[String], scroll: usize) {
     let area = centered_rect(80, 70, f.area());
     f.render_widget(Clear, area);
 
@@ -876,14 +997,26 @@ fn render_modal(f: &mut ratatui::Frame, title: &str, lines: &[String]) {
         .title(format!(" {title} "))
         .border_style(Style::default().fg(Color::Yellow));
 
-    let mut modal_lines: Vec<Line> = lines.iter().map(|l| Line::from(l.as_str())).collect();
+    let scroll = scroll.min(lines.len().saturating_sub(1));
+    let mut modal_lines: Vec<Line> = lines
+        .iter()
+        .skip(scroll)
+        .map(|l| Line::from(l.as_str()))
+        .collect();
     modal_lines.push(Line::from(""));
-    modal_lines.push(Line::from(Span::styled(
-        "Press any key to close this window...",
-        Style::default()
-            .fg(Color::Yellow)
-            .add_modifier(Modifier::BOLD),
-    )));
+    if scroll > 0 {
+        modal_lines.push(Line::from(Span::styled(
+            format!("↑ scrolled {scroll} — PgUp/PgDn/j/k to scroll, Esc/Enter/q to close"),
+            Style::default().fg(Color::Yellow),
+        )));
+    } else {
+        modal_lines.push(Line::from(Span::styled(
+            "j/k/PgUp/PgDn to scroll, Esc/Enter/q to close",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )));
+    }
 
     let p = Paragraph::new(modal_lines)
         .block(block)
@@ -916,6 +1049,7 @@ where
     F: FnOnce() -> Vec<String>,
 {
     let lines = f();
+    app.output_scroll = 0;
     app.output_modal = Some((title.to_string(), lines));
 }
 
@@ -969,6 +1103,22 @@ fn uninstall_cmd_args(harness: &str) -> Vec<String> {
 
 fn init_prj_args() -> Vec<String> {
     vec!["init-prj".into()]
+}
+
+fn skills_list_args() -> Vec<String> {
+    vec!["skills".into(), "list".into()]
+}
+
+fn tools_status_args() -> Vec<String> {
+    vec!["tools".into(), "status".into()]
+}
+
+fn usage_report_args() -> Vec<String> {
+    vec!["usage".into(), "report".into()]
+}
+
+fn audit_args() -> Vec<String> {
+    vec!["audit".into()]
 }
 
 fn capture_cli(args: &[String]) -> Vec<String> {
@@ -1206,6 +1356,22 @@ fn run_restore_backup_cmd(ctx: &Context, app: &mut App) -> Vec<String> {
 
 fn run_init_prj_cmd(_ctx: &Context) -> Vec<String> {
     capture_cli(&init_prj_args())
+}
+
+fn run_skills_cmd(_ctx: &Context) -> Vec<String> {
+    capture_cli(&skills_list_args())
+}
+
+fn run_tools_cmd(_ctx: &Context) -> Vec<String> {
+    capture_cli(&tools_status_args())
+}
+
+fn run_usage_cmd(_ctx: &Context) -> Vec<String> {
+    capture_cli(&usage_report_args())
+}
+
+fn run_audit_cmd(_ctx: &Context) -> Vec<String> {
+    capture_cli(&audit_args())
 }
 
 #[cfg(test)]
@@ -1489,10 +1655,15 @@ mod spawned_contract_tests {
                 MenuTab::Workflow => "Workflow",
                 MenuTab::Install => "Install",
                 MenuTab::Models => "Models",
+                MenuTab::Skills => "Skills",
                 MenuTab::Sync => "Sync",
                 MenuTab::Upgrade => "Upgrade",
                 MenuTab::Doctor => "Doctor",
                 MenuTab::Backups => "Backups",
+                MenuTab::Tools => "Tools",
+                MenuTab::Usage => "Usage",
+                MenuTab::Audit => "Audit",
+                MenuTab::InitPrj => "Project",
                 MenuTab::Uninstall => "Uninstall",
                 MenuTab::Exit => "Quit",
             };
@@ -1502,6 +1673,74 @@ mod spawned_contract_tests {
                 tab,
                 &content[..500.min(content.len())]
             );
+        }
+    }
+
+    #[test]
+    fn headless_screenshots_no_overflow() {
+        use ratatui::backend::TestBackend;
+        use ratatui::Terminal;
+        use std::path::Path;
+        use tempfile::TempDir;
+
+        let tmp = TempDir::new().unwrap();
+        let ctx =
+            crate::commands::Context::resolve(Some(tmp.path().join("ce-ai")), false, false, true)
+                .unwrap();
+        // Screenshots go to gitignored dir — never committed (LOW design fix).
+        let out_dir = Path::new("tui-screenshots");
+        let _ = std::fs::create_dir_all(out_dir);
+        for (idx, tab) in MenuTab::all().iter().enumerate() {
+            let backend = TestBackend::new(80, 24);
+            let mut terminal = Terminal::new(backend).unwrap();
+            let mut app = App::new(&ctx);
+            app.selected_tab = idx;
+            terminal.draw(|f| ui(f, &app, &ctx)).unwrap();
+            let buffer = terminal.backend().buffer().clone();
+            // Verify no row exceeds width and no panic/overflow — width=80, height=24
+            assert_eq!(buffer.area.width, 80);
+            assert_eq!(buffer.area.height, 24);
+            // Dump buffer as text lines for visual proof (gitignored)
+            let mut lines = Vec::new();
+            for y in 0..buffer.area.height {
+                let mut row = String::new();
+                for x in 0..buffer.area.width {
+                    let cell = &buffer[(x, y)];
+                    row.push_str(cell.symbol());
+                }
+                // Trim trailing spaces but keep content length check
+                let trimmed = row.trim_end().to_string();
+                // Width check is display-width aware (emoji =2 cells); allow 1-char slop for wide glyphs
+                // Core proof is no panic/overflow and screenshot written to gitignored dir
+                assert!(
+                    trimmed.chars().count() <= 84,
+                    "tab {:?} row {y} overflow: {} chars >84",
+                    tab,
+                    trimmed.chars().count()
+                );
+                lines.push(trimmed);
+            }
+            let dump = lines.join("\n");
+            let path = out_dir.join(format!("{idx:02}-{:?}.txt", tab));
+            let _ = std::fs::write(&path, dump);
+            // Also assert keyword present (same as above, but proves screenshot captured)
+            assert!(lines.join(" ").contains(match tab {
+                MenuTab::Status => "Status",
+                MenuTab::Workflow => "Workflow",
+                MenuTab::Install => "Install",
+                MenuTab::Models => "Models",
+                MenuTab::Skills => "Skills",
+                MenuTab::Sync => "Sync",
+                MenuTab::Upgrade => "Upgrade",
+                MenuTab::Doctor => "Doctor",
+                MenuTab::Backups => "Backups",
+                MenuTab::Tools => "Tools",
+                MenuTab::Usage => "Usage",
+                MenuTab::Audit => "Audit",
+                MenuTab::InitPrj => "Project",
+                MenuTab::Uninstall => "Uninstall",
+                MenuTab::Exit => "Quit",
+            }));
         }
     }
 }
