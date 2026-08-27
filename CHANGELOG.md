@@ -5,6 +5,13 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.1] - 2026-08-27
+
+### Fixed
+- **TUI English (artifact contract):** `Sync`/`Upgrade`/`Status` panels to English + `ui_is_english_only` headless test (no Spanish).
+- **opencode.json trailing comma:** `review-validator` `    },` → `    }` at line 135 — `sync` now `verified 393/393`, `doctor: ok`, journal cleared.
+- **Onboarding token hint:** `README` Quick Path + `docs/user-guide/sync-and-upgrade-mechanisms.md` Step 1 + `doctor` `github-token` info + TUI `Upgrade` tip for first-time `403`.
+
 ## [1.26.0] - 2026-08-26
 
 ### Added

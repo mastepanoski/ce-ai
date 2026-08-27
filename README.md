@@ -40,7 +40,7 @@ ce-ai doctor
 
 That's it — your harnesses are ready for Compound Engineering. Run your first 7-stage cycle with the [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md).
 
-## Common Operations
+> **First install hitting `403 Forbidden`?** GitHub allows 60 unauth requests/hour per IP. `ce-ai install/upgrade` queries `api.github.com` — without a token you can hit the limit. Set `CE_AI_GITHUB_TOKEN=ghp_xxx` (or `GITHUB_TOKEN` / `gh auth login`) or pin a release: `ce-ai upgrade --to v1.26.0` / `ce-ai install --source <path>`.
 
 | Command | Purpose | Full guide |
 | :--- | :--- | :--- |
