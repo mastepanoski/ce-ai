@@ -295,6 +295,68 @@ impl HarnessKind {
             HarnessKind::Custom => base_dir.join(custom::CONFIG_FILE_NAME),
         }
     }
+
+    /// Factory for per-harness MCP registration (KTD2, R4).
+    /// Delegates to the concrete `register_*_mcp_server` for this kind.
+    /// `pi` and unregistered kinds are no-ops handled by caller.
+    pub fn register_tool_mcp(
+        &self,
+        home_dir: &Path,
+        tool: &str,
+        cmd: &str,
+        args: &[&str],
+    ) -> Result<(), CeError> {
+        use std::collections::BTreeMap;
+        let empty_env: BTreeMap<String, String> = BTreeMap::new();
+        match self {
+            HarnessKind::Cursor => {
+                let path = home_dir.join(".cursor").join("mcp.json");
+                crate::harness::cursor::register_cursor_mcp_server(
+                    &path, tool, cmd, args, &empty_env,
+                )
+            }
+            HarnessKind::Claude => {
+                let adapter = crate::harness::claude::ClaudeAdapter;
+                let cfg = adapter.default_config_path(home_dir);
+                crate::harness::claude::register_claude_mcp_server(
+                    &cfg, tool, cmd, args, &empty_env,
+                )
+            }
+            HarnessKind::Codex => {
+                let adapter = crate::harness::codex::CodexAdapter;
+                let cfg = adapter.default_config_path(home_dir);
+                crate::harness::codex::register_codex_mcp_server(&cfg, tool, cmd, args, &empty_env)
+            }
+            HarnessKind::Copilot => {
+                let adapter = crate::harness::copilot::CopilotAdapter;
+                let cfg = adapter.default_config_path(home_dir);
+                crate::harness::copilot::register_copilot_mcp_server(
+                    &cfg, tool, cmd, args, &empty_env,
+                )
+            }
+            HarnessKind::Kimi => {
+                let adapter = crate::harness::kimi::KimiAdapter;
+                let cfg = adapter.default_config_path(home_dir);
+                crate::harness::kimi::register_kimi_mcp_server(&cfg, tool, cmd, args, &empty_env)
+            }
+            HarnessKind::Grok => {
+                let adapter = crate::harness::grok::GrokAdapter;
+                let cfg = adapter.default_config_path(home_dir);
+                crate::harness::grok::register_grok_mcp_server(&cfg, tool, cmd, args, &empty_env)
+            }
+            HarnessKind::Agy => {
+                let adapter = crate::harness::agy::AgyAdapter;
+                let cfg = adapter.default_config_path(home_dir);
+                crate::harness::agy::register_agy_mcp_server(&cfg, tool, cmd, args, &empty_env)
+            }
+            HarnessKind::Fx => {
+                let adapter = crate::harness::fx::FxAdapter;
+                let cfg = adapter.default_config_path(home_dir);
+                crate::harness::fx::register_fx_mcp_server(&cfg, tool, cmd, args, &empty_env)
+            }
+            _ => Ok(()),
+        }
+    }
 }
 
 /// Resolves the home/base directory from context for native harness directories.
