@@ -848,7 +848,7 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
             Line::from(Span::styled("👉 Press [Enter] to execute local sync.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
         ],
         MenuTab::Upgrade => vec![
-            Line::from(Span::styled("Upgrade CE Release (Descargar Nueva Versión):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("Upgrade CE Release (Download New Version):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
             Line::from(""),
             Line::from(Span::styled(
                 "  Target: All active harnesses (global upgrade — harness selector ignored)",
@@ -856,10 +856,11 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
             )),
             Line::from(""),
             Line::from(format!("  - Current CLI Version: v{}", env!("CARGO_PKG_VERSION"))),
-            Line::from("  💡 ¿Qué hace Upgrade?"),
-            Line::from("     - Busca y descarga la última Release publicada en GitHub."),
-            Line::from("     - Actualiza loaders y 200+ skills en todos los arneses instalados."),
+            Line::from("  💡 What does Upgrade do?"),
+            Line::from("     - Fetches the latest published Release from GitHub."),
+            Line::from("     - Updates loaders and 200+ skills on all installed harnesses."),
             Line::from(""),
+            Line::from(Span::styled("   Tip: set CE_AI_GITHUB_TOKEN to avoid 403 rate-limit, or pin with --to <tag> / --source <path>", Style::default().fg(Color::Gray))),
             Line::from(Span::styled("👉 Press [Enter] to fetch latest release and upgrade (all).", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
         ],
         MenuTab::Doctor => vec![

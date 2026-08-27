@@ -26,6 +26,8 @@ cargo install --path .
 Every release publishes `SHA256SUMS.txt` alongside its binaries — verify any
 download before running it (ISO/IEC 27002 integrity control).
 
+> **First install hitting `403 Forbidden`?** GitHub allows 60 unauth requests/hour per IP. `ce-ai install/upgrade` queries `api.github.com/repos/.../releases` — without a token you can hit the limit. Set `CE_AI_GITHUB_TOKEN=ghp_xxx` (or `GITHUB_TOKEN` / `gh auth login`) or pin a release: `ce-ai upgrade --to v1.26.0` / `ce-ai install --source <path>`.
+
 **2. Preview the plugin installation** (modifies nothing):
 
 ```bash

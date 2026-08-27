@@ -148,6 +148,18 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         );
     }
 
+    // GitHub token hint for first-time install/upgrade (avoids 403 rate-limit)
+    if std::env::var("CE_AI_GITHUB_TOKEN").is_ok()
+        || std::env::var("GITHUB_TOKEN").is_ok()
+        || std::env::var("GH_TOKEN").is_ok()
+    {
+        println!("doctor-info: github-token present (rate-limit safe)");
+    } else {
+        println!(
+            "doctor-info: github-token not set — first install/upgrade may hit 403; set CE_AI_GITHUB_TOKEN or use --to/--source"
+        );
+    }
+
     // Project adoption health checks
     for p in &state.projects {
         let agents_file = p.path.join(&p.file);
