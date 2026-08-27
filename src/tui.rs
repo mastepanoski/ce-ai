@@ -700,9 +700,9 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
                 let has_local = app.harnesses.iter().any(|(_, ver, src)| ver == "local" || src == "local");
                 if has_local {
                     lines.push(Line::from(""));
-                    lines.push(Line::from(Span::styled("  💡 Aviso de Versión (Fuente Local):", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))));
-                    lines.push(Line::from("     Instalación realizada desde código fuente local (dev)."));
-                    lines.push(Line::from(Span::styled("     Para actualizar a la última Release publicada en GitHub, usa la pestaña '🚀 Upgrade Release'.", Style::default().fg(Color::Yellow))));
+                    lines.push(Line::from(Span::styled("  💡 Local Source Notice:", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))));
+                    lines.push(Line::from("     Installed from local source tree (dev)."));
+                    lines.push(Line::from(Span::styled("     To fetch the latest published Release, use the '🚀 Upgrade Release' tab.", Style::default().fg(Color::Yellow))));
                 }
             }
             lines.push(Line::from(""));
@@ -841,14 +841,14 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
                 Span::styled("  (Press ◄/► or h/l to switch)", Style::default().fg(Color::Gray)),
             ]),
             Line::from(""),
-            Line::from("  💡 ¿Qué hace Sync?"),
-            Line::from("     - Reconcilia archivos contra el manifiesto SHA256 actual (repara archivos borrados/dañados)."),
-            Line::from("     - NO descarga versiones nuevas de internet; mantiene la versión instalada."),
+            Line::from("  💡 What does Sync do?"),
+            Line::from("     - Reconciles files against current SHA256 manifest (repairs deleted/corrupted files)."),
+            Line::from("     - Does NOT download new versions; keeps installed version."),
             Line::from(""),
             Line::from(Span::styled("👉 Press [Enter] to execute local sync.", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
         ],
         MenuTab::Upgrade => vec![
-            Line::from(Span::styled("Upgrade CE Release (Descargar Nueva Versión):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled("Upgrade CE Release (Download New Version):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
             Line::from(""),
             Line::from(Span::styled(
                 "  Target: All active harnesses (global upgrade — harness selector ignored)",
@@ -856,9 +856,9 @@ fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App, ctx: &Con
             )),
             Line::from(""),
             Line::from(format!("  - Current CLI Version: v{}", env!("CARGO_PKG_VERSION"))),
-            Line::from("  💡 ¿Qué hace Upgrade?"),
-            Line::from("     - Busca y descarga la última Release publicada en GitHub."),
-            Line::from("     - Actualiza loaders y 200+ skills en todos los arneses instalados."),
+            Line::from("  💡 What does Upgrade do?"),
+            Line::from("     - Fetches the latest published Release from GitHub."),
+            Line::from("     - Updates loaders and 200+ skills on all installed harnesses."),
             Line::from(""),
             Line::from(Span::styled("👉 Press [Enter] to fetch latest release and upgrade (all).", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
         ],
@@ -1741,6 +1741,50 @@ mod spawned_contract_tests {
                 MenuTab::Uninstall => "Uninstall",
                 MenuTab::Exit => "Quit",
             }));
+        }
+    }
+
+    #[test]
+    fn ui_is_english_only() {
+        // Regression net for artifact language contract: TUI must be English, never Spanish.
+        use ratatui::backend::TestBackend;
+        use ratatui::Terminal;
+        use tempfile::TempDir;
+
+        let tmp = TempDir::new().unwrap();
+        let ctx =
+            crate::commands::Context::resolve(Some(tmp.path().join("ce-ai")), false, false, true)
+                .unwrap();
+        let forbidden = [
+            "¿",
+            "Descargar",
+            "Aviso",
+            "Fuente",
+            "Instalación",
+            "Reconcilia",
+            "Busca",
+            "Versión",
+        ];
+        for (idx, tab) in MenuTab::all().iter().enumerate() {
+            let backend = TestBackend::new(80, 24);
+            let mut terminal = Terminal::new(backend).unwrap();
+            let mut app = App::new(&ctx);
+            app.selected_tab = idx;
+            terminal.draw(|f| ui(f, &app, &ctx)).unwrap();
+            let buffer = terminal.backend().buffer().clone();
+            let content: String = buffer
+                .content()
+                .iter()
+                .map(|c| c.symbol().to_string())
+                .collect();
+            for word in &forbidden {
+                assert!(
+                    !content.contains(word),
+                    "tab {:?} contains Spanish '{}' — UI must be English per artifact contract",
+                    tab,
+                    word
+                );
+            }
         }
     }
 }
