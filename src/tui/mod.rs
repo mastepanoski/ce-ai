@@ -23,6 +23,7 @@ use crate::harness::HarnessKind;
 use crate::state::state::State;
 
 mod app;
+mod spawn;
 mod tabs;
 use app::App;
 pub use tabs::MenuTab;
@@ -842,71 +843,6 @@ where
 /// Runs the installed ce-ai binary as a subprocess and captures its output.
 /// Commands that `println!` would otherwise paint straight onto the
 /// alternate screen and corrupt the dashboard layout (#72-class breakage).
-fn status_args() -> Vec<String> {
-    vec!["status".into()]
-}
-
-fn install_cmd_args(harness: &str, dry_run: bool) -> Vec<String> {
-    let mut args = vec!["install".into(), "--harness".into(), harness.into()];
-    if dry_run {
-        args.push("--dry-run".into());
-    }
-    args
-}
-
-fn models_list_args() -> Vec<String> {
-    vec!["models".into(), "list".into()]
-}
-
-fn sync_cmd_args(dry_run: bool) -> Vec<String> {
-    let mut args = vec!["sync".into()];
-    if dry_run {
-        args.push("--dry-run".into());
-    }
-    args
-}
-
-fn workflow_status_args() -> Vec<String> {
-    vec!["workflow".into(), "status".into()]
-}
-
-fn upgrade_cmd_args() -> Vec<String> {
-    vec!["upgrade".into()]
-}
-
-fn doctor_cmd_args() -> Vec<String> {
-    vec!["doctor".into()]
-}
-
-fn uninstall_cmd_args(harness: &str) -> Vec<String> {
-    vec![
-        "uninstall".into(),
-        "--harness".into(),
-        harness.into(),
-        "--yes".into(),
-    ]
-}
-
-fn init_prj_args() -> Vec<String> {
-    vec!["init-prj".into()]
-}
-
-fn skills_list_args() -> Vec<String> {
-    vec!["skills".into(), "list".into()]
-}
-
-fn tools_status_args() -> Vec<String> {
-    vec!["tools".into(), "status".into()]
-}
-
-fn usage_report_args() -> Vec<String> {
-    vec!["usage".into(), "report".into()]
-}
-
-fn audit_args() -> Vec<String> {
-    vec!["audit".into()]
-}
-
 fn capture_cli(args: &[String]) -> Vec<String> {
     let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("ce-ai"));
     match std::process::Command::new(&exe).args(args).output() {
@@ -937,15 +873,18 @@ fn capture_cli(args: &[String]) -> Vec<String> {
 }
 
 fn run_status_cmd(_ctx: &Context) -> Vec<String> {
-    capture_cli(&status_args())
+    capture_cli(&spawn::status_args())
 }
 
 fn run_install_cmd(_ctx: &Context, app: &App, dry_run: bool) -> Vec<String> {
-    capture_cli(&install_cmd_args(app.selected_harness_target(), dry_run))
+    capture_cli(&spawn::install_cmd_args(
+        app.selected_harness_target(),
+        dry_run,
+    ))
 }
 
 fn run_models_cmd(_ctx: &Context) -> Vec<String> {
-    let mut lines = capture_cli(&models_list_args());
+    let mut lines = capture_cli(&spawn::models_list_args());
     lines.push(String::new());
     lines.push("Assign a slot or manage profiles:".to_string());
     lines.push("  ce-ai models set <slot> <provider/model>".to_string());
@@ -958,14 +897,14 @@ fn run_models_cmd(_ctx: &Context) -> Vec<String> {
 
 fn run_sync_cmd(_ctx: &Context, dry_run: bool) -> Vec<String> {
     if dry_run {
-        capture_cli(&sync_cmd_args(true))
+        capture_cli(&spawn::sync_cmd_args(true))
     } else {
-        capture_cli(&sync_cmd_args(false))
+        capture_cli(&spawn::sync_cmd_args(false))
     }
 }
 
 fn run_workflow_cmd(_ctx: &Context) -> Vec<String> {
-    capture_cli(&workflow_status_args())
+    capture_cli(&spawn::workflow_status_args())
 }
 
 /// Workflow panel content: native actions marked `[run]`, agent-session stages
@@ -1081,11 +1020,11 @@ fn workflow_stage_transition_lines(ctx: &Context, stage_num: u32) -> Vec<String>
 fn run_upgrade_cmd(_ctx: &Context, _app: &App) -> Vec<String> {
     // Plain `upgrade` reconciles every active harness; --harness/--force were
     // removed from the CLI contract in v1.18.1 (Issue #161).
-    capture_cli(&upgrade_cmd_args())
+    capture_cli(&spawn::upgrade_cmd_args())
 }
 
 fn run_doctor_cmd(_ctx: &Context) -> Vec<String> {
-    let mut lines = capture_cli(&doctor_cmd_args());
+    let mut lines = capture_cli(&spawn::doctor_cmd_args());
     if !lines.iter().any(|l| l.contains("doctor: ok")) {
         lines.push("❌ doctor reported findings (exit non-zero)".to_string());
     }
@@ -1106,7 +1045,7 @@ fn run_uninstall_cmd(_ctx: &Context, app: &App) -> Vec<String> {
     };
 
     for harness in &target_harnesses {
-        out.extend(capture_cli(&uninstall_cmd_args(harness)));
+        out.extend(capture_cli(&spawn::uninstall_cmd_args(harness)));
     }
     out
 }
@@ -1141,23 +1080,23 @@ fn run_restore_backup_cmd(ctx: &Context, app: &mut App) -> Vec<String> {
 }
 
 fn run_init_prj_cmd(_ctx: &Context) -> Vec<String> {
-    capture_cli(&init_prj_args())
+    capture_cli(&spawn::init_prj_args())
 }
 
 fn run_skills_cmd(_ctx: &Context) -> Vec<String> {
-    capture_cli(&skills_list_args())
+    capture_cli(&spawn::skills_list_args())
 }
 
 fn run_tools_cmd(_ctx: &Context) -> Vec<String> {
-    capture_cli(&tools_status_args())
+    capture_cli(&spawn::tools_status_args())
 }
 
 fn run_usage_cmd(_ctx: &Context) -> Vec<String> {
-    capture_cli(&usage_report_args())
+    capture_cli(&spawn::usage_report_args())
 }
 
 fn run_audit_cmd(_ctx: &Context) -> Vec<String> {
-    capture_cli(&audit_args())
+    capture_cli(&spawn::audit_args())
 }
 
 #[cfg(test)]
@@ -1317,27 +1256,27 @@ mod spawned_contract_tests {
                     "install",
                 )),
             ),
-            &install_cmd_args(harness, true)[1..],
+            &crate::tui::spawn::install_cmd_args(harness, true)[1..],
         );
         assert_parses(
             <crate::commands::models::Args as clap::Args>::augment_args(Command::new("models")),
-            &models_list_args()[1..],
+            &crate::tui::spawn::models_list_args()[1..],
         );
         assert_parses(
             with_cli_globals(<crate::commands::sync::Args as clap::Args>::augment_args(
                 Command::new("sync"),
             )),
-            &sync_cmd_args(true)[1..],
+            &crate::tui::spawn::sync_cmd_args(true)[1..],
         );
         assert_parses(
             <crate::commands::uninstall::Args as clap::Args>::augment_args(Command::new(
                 "uninstall",
             )),
-            &uninstall_cmd_args(harness)[1..],
+            &crate::tui::spawn::uninstall_cmd_args(harness)[1..],
         );
         assert_parses(
             <crate::commands::doctor::Args as clap::Args>::augment_args(Command::new("doctor")),
-            &doctor_cmd_args()[1..],
+            &crate::tui::spawn::doctor_cmd_args()[1..],
         );
         // Extended coverage (tui-e2e-zen): 15 CLI subcommands — pin the 6 that were
         // missing and gave false 8/8 green. Future TUI tabs must keep this green.
@@ -1389,10 +1328,13 @@ mod spawned_contract_tests {
         );
 
         // Zero-arg / inline-enum commands: pin exact vectors.
-        assert_eq!(status_args(), ["status"]);
-        assert_eq!(workflow_status_args(), ["workflow", "status"]);
-        assert_eq!(init_prj_args(), ["init-prj"]);
-        assert_eq!(upgrade_cmd_args(), ["upgrade"]);
+        assert_eq!(crate::tui::spawn::status_args(), ["status"]);
+        assert_eq!(
+            crate::tui::spawn::workflow_status_args(),
+            ["workflow", "status"]
+        );
+        assert_eq!(crate::tui::spawn::init_prj_args(), ["init-prj"]);
+        assert_eq!(crate::tui::spawn::upgrade_cmd_args(), ["upgrade"]);
     }
 
     #[test]
