@@ -3,7 +3,6 @@
 
 use crate::commands::Context;
 use crate::error::CeError;
-use crate::harness::HarnessAdapter;
 use crate::source::tools_registry::{
     evaluate_freshness, extract_tool_version, FreshnessStatus, ToolsRegistryCache,
 };
@@ -80,32 +79,26 @@ pub fn status(ctx: &Context) -> Result<(), CeError> {
     Ok(())
 }
 
+fn mcp_spec_for_tool(tool: &str) -> Option<(&'static str, &'static [&'static str])> {
+    match tool {
+        "context7" => Some(("npx", &["-y", "@upstash/context7-mcp@latest"])),
+        "engram" => Some(("engram", &["serve"])),
+        "rtk" => Some(("rtk", &["mcp"])),
+        "codegraph" => Some(("codegraph", &["mcp"])),
+        _ => None,
+    }
+}
+
 fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
     let tool_lower = tool.to_lowercase();
 
-    let server_def = match tool_lower.as_str() {
-        "context7" => serde_json::json!({
-            "command": "npx",
-            "args": ["-y", "@upstash/context7-mcp@latest"]
-        }),
-        "engram" => serde_json::json!({
-            "command": "engram",
-            "args": ["serve"]
-        }),
-        "rtk" => serde_json::json!({
-            "command": "rtk",
-            "args": ["mcp"]
-        }),
-        "codegraph" => serde_json::json!({
-            "command": "codegraph",
-            "args": ["mcp"]
-        }),
-        _ => {
-            return Err(CeError::Usage(format!(
-                "unknown companion tool '{tool}'. Supported tools: engram, codegraph, context7, rtk"
-            )))
-        }
-    };
+    let (cmd, args) = mcp_spec_for_tool(tool_lower.as_str()).ok_or_else(|| {
+        CeError::Usage(format!(
+            "unknown companion tool '{tool}'. Supported tools: engram, codegraph, context7, rtk"
+        ))
+    })?;
+
+    let server_def = serde_json::json!({ "command": cmd, "args": args });
 
     println!("tools: provisioning companion tool '{tool_lower}'...");
 
@@ -122,203 +115,23 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
     let home_dir = crate::harness::home_dir_from_ctx(ctx);
     let state_path = ctx.config_dir.join("state.json");
     if let Ok(state) = crate::state::state::State::load(&state_path) {
-        let cursor_installed = state
-            .installed_harnesses
-            .iter()
-            .any(|h| h["name"].as_str() == Some("cursor"));
-        if cursor_installed {
-            let (cmd, args_vec) = match tool_lower.as_str() {
-                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
-                "engram" => ("engram", vec!["serve"]),
-                "rtk" => ("rtk", vec!["mcp"]),
-                "codegraph" => ("codegraph", vec!["mcp"]),
-                _ => ("", vec![]),
+        for entry in &state.installed_harnesses {
+            let Some(name) = entry["name"].as_str() else {
+                continue;
             };
-            let empty_env = std::collections::BTreeMap::new();
-            let cursor_mcp = home_dir.join(".cursor").join("mcp.json");
-            crate::harness::cursor::register_cursor_mcp_server(
-                &cursor_mcp,
-                &tool_lower,
-                cmd,
-                &args_vec,
-                &empty_env,
-            )?;
-        }
-
-        let claude_installed = state
-            .installed_harnesses
-            .iter()
-            .any(|h| h["name"].as_str() == Some("claude"));
-        if claude_installed {
-            let (cmd, args_vec) = match tool_lower.as_str() {
-                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
-                "engram" => ("engram", vec!["serve"]),
-                "rtk" => ("rtk", vec!["mcp"]),
-                "codegraph" => ("codegraph", vec!["mcp"]),
-                _ => ("", vec![]),
+            if name == "pi" {
+                if !ctx.quiet {
+                    println!("info: pi harness does not support native MCP servers by design");
+                }
+                continue;
+            }
+            if name == "opencode" || name == "custom" || name == "deepseek" {
+                continue;
+            }
+            let Ok(kind) = name.parse::<crate::harness::HarnessKind>() else {
+                continue;
             };
-            let empty_env = std::collections::BTreeMap::new();
-            let claude_adapter = crate::harness::claude::ClaudeAdapter;
-            let claude_config = claude_adapter.default_config_path(&home_dir);
-            crate::harness::claude::register_claude_mcp_server(
-                &claude_config,
-                &tool_lower,
-                cmd,
-                &args_vec,
-                &empty_env,
-            )?;
-        }
-
-        let codex_installed = state
-            .installed_harnesses
-            .iter()
-            .any(|h| h["name"].as_str() == Some("codex"));
-        if codex_installed {
-            let (cmd, args_vec) = match tool_lower.as_str() {
-                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
-                "engram" => ("engram", vec!["serve"]),
-                "rtk" => ("rtk", vec!["mcp"]),
-                "codegraph" => ("codegraph", vec!["mcp"]),
-                _ => ("", vec![]),
-            };
-            let empty_env = std::collections::BTreeMap::new();
-            let codex_adapter = crate::harness::codex::CodexAdapter;
-            let codex_config = codex_adapter.default_config_path(&home_dir);
-            crate::harness::codex::register_codex_mcp_server(
-                &codex_config,
-                &tool_lower,
-                cmd,
-                &args_vec,
-                &empty_env,
-            )?;
-        }
-
-        let copilot_installed = state
-            .installed_harnesses
-            .iter()
-            .any(|h| h["name"].as_str() == Some("copilot"));
-        if copilot_installed {
-            let (cmd, args_vec) = match tool_lower.as_str() {
-                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
-                "engram" => ("engram", vec!["serve"]),
-                "rtk" => ("rtk", vec!["mcp"]),
-                "codegraph" => ("codegraph", vec!["mcp"]),
-                _ => ("", vec![]),
-            };
-            let empty_env = std::collections::BTreeMap::new();
-            let copilot_adapter = crate::harness::copilot::CopilotAdapter;
-            let copilot_config = copilot_adapter.default_config_path(&home_dir);
-            crate::harness::copilot::register_copilot_mcp_server(
-                &copilot_config,
-                &tool_lower,
-                cmd,
-                &args_vec,
-                &empty_env,
-            )?;
-        }
-
-        let kimi_installed = state
-            .installed_harnesses
-            .iter()
-            .any(|h| h["name"].as_str() == Some("kimi"));
-        if kimi_installed {
-            let (cmd, args_vec) = match tool_lower.as_str() {
-                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
-                "engram" => ("engram", vec!["serve"]),
-                "rtk" => ("rtk", vec!["mcp"]),
-                "codegraph" => ("codegraph", vec!["mcp"]),
-                _ => ("", vec![]),
-            };
-            let empty_env = std::collections::BTreeMap::new();
-            let kimi_adapter = crate::harness::kimi::KimiAdapter;
-            let kimi_config = kimi_adapter.default_config_path(&home_dir);
-            crate::harness::kimi::register_kimi_mcp_server(
-                &kimi_config,
-                &tool_lower,
-                cmd,
-                &args_vec,
-                &empty_env,
-            )?;
-        }
-
-        let grok_installed = state
-            .installed_harnesses
-            .iter()
-            .any(|h| h["name"].as_str() == Some("grok"));
-        if grok_installed {
-            let (cmd, args_vec) = match tool_lower.as_str() {
-                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
-                "engram" => ("engram", vec!["serve"]),
-                "rtk" => ("rtk", vec!["mcp"]),
-                "codegraph" => ("codegraph", vec!["mcp"]),
-                _ => ("", vec![]),
-            };
-            let empty_env = std::collections::BTreeMap::new();
-            let grok_adapter = crate::harness::grok::GrokAdapter;
-            let grok_config = grok_adapter.default_config_path(&home_dir);
-            crate::harness::grok::register_grok_mcp_server(
-                &grok_config,
-                &tool_lower,
-                cmd,
-                &args_vec,
-                &empty_env,
-            )?;
-        }
-
-        let agy_installed = state
-            .installed_harnesses
-            .iter()
-            .any(|h| h["name"].as_str() == Some("agy"));
-        if agy_installed {
-            let (cmd, args_vec) = match tool_lower.as_str() {
-                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
-                "engram" => ("engram", vec!["serve"]),
-                "rtk" => ("rtk", vec!["mcp"]),
-                "codegraph" => ("codegraph", vec!["mcp"]),
-                _ => ("", vec![]),
-            };
-            let empty_env = std::collections::BTreeMap::new();
-            let agy_adapter = crate::harness::agy::AgyAdapter;
-            let agy_config = agy_adapter.default_config_path(&home_dir);
-            crate::harness::agy::register_agy_mcp_server(
-                &agy_config,
-                &tool_lower,
-                cmd,
-                &args_vec,
-                &empty_env,
-            )?;
-        }
-
-        let fx_installed = state
-            .installed_harnesses
-            .iter()
-            .any(|h| h["name"].as_str() == Some("fx"));
-        if fx_installed {
-            let (cmd, args_vec) = match tool_lower.as_str() {
-                "context7" => ("npx", vec!["-y", "@upstash/context7-mcp@latest"]),
-                "engram" => ("engram", vec!["serve"]),
-                "rtk" => ("rtk", vec!["mcp"]),
-                "codegraph" => ("codegraph", vec!["mcp"]),
-                _ => ("", vec![]),
-            };
-            let empty_env = std::collections::BTreeMap::new();
-            let fx_adapter = crate::harness::fx::FxAdapter;
-            let fx_config = fx_adapter.default_config_path(&home_dir);
-            crate::harness::fx::register_fx_mcp_server(
-                &fx_config,
-                &tool_lower,
-                cmd,
-                &args_vec,
-                &empty_env,
-            )?;
-        }
-
-        let pi_installed = state
-            .installed_harnesses
-            .iter()
-            .any(|h| h["name"].as_str() == Some("pi"));
-        if pi_installed && !ctx.quiet {
-            println!("info: pi harness does not support native MCP servers by design");
+            kind.register_tool_mcp(&home_dir, &tool_lower, cmd, args)?;
         }
     }
 

@@ -13,12 +13,9 @@ mod tui;
 
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
 
-use crate::commands::{
-    audit, backups, deinit_prj, doctor, init_prj, install, models, skills, status, sync, tools,
-    uninstall, upgrade, usage, workflow, Context,
-};
+use crate::commands::{registry::Commands, Context};
 use crate::error::result_exit_code;
 
 #[derive(Parser)]
@@ -40,54 +37,6 @@ struct Cli {
     command: Option<Commands>,
 }
 
-#[derive(Subcommand)]
-enum Commands {
-    /// Install the CE plugin into a harness.
-    Install(install::Args),
-    /// Reconcile the installed plugin against the current source tree.
-    Sync(sync::Args),
-    /// Fetch a newer CE source and sync the installed plugin.
-    Upgrade(upgrade::Args),
-    /// Manage model assignments and named profiles.
-    Models(models::Args),
-    /// Multi-harness skill registry discovery, prompt resolution, and health diagnostics.
-    Skills(skills::Args),
-    /// Show installed harnesses, versions, and drift.
-    Status,
-    /// Remove the CE plugin and restore the pre-install config.
-    Uninstall(uninstall::Args),
-    /// Report config validity, drift, and state consistency.
-    Doctor(doctor::Args),
-    /// Backup listing and point-in-time config recovery.
-    Backups(backups::BackupsArgs),
-    /// Companion developer sidecars and memory tools manager (Engram, CodeGraph, Context7, RTK).
-    Tools(tools::Args),
-    /// Usage analytics: token capture and reporting.
-    Usage(usage::Args),
-    /// Workflow FSM & progress recovery system across 7 development stages.
-    Workflow(workflow::Args),
-    /// Multi-harness token-efficiency and context-quality audit engine.
-    Audit(audit::Args),
-    /// Adopt a project repository by injecting managed Compound Engineering workflow blocks into AGENTS.md.
-    #[command(name = "init-prj")]
-    InitPrj {
-        /// Target project directory path (default: current working directory)
-        path: Option<PathBuf>,
-        /// Adoption tier: full, minimal, orchestrator
-        #[arg(long, default_value = "full")]
-        tier: String,
-        /// Force overwrite of modified managed blocks
-        #[arg(long)]
-        force: bool,
-    },
-    /// Remove managed Compound Engineering workflow blocks from a project repository cleanly.
-    #[command(name = "deinit-prj")]
-    DeinitPrj {
-        /// Target project directory path (default: current working directory)
-        path: Option<PathBuf>,
-    },
-}
-
 fn main() {
     let cli = Cli::parse();
     let ctx = match Context::resolve(cli.config_dir, cli.dry_run, cli.verbose, cli.quiet) {
@@ -97,24 +46,7 @@ fn main() {
             std::process::exit(err.exit_code());
         }
     };
-    let result = match cli.command {
-        Some(Commands::Install(args)) => install::run(&ctx, &args),
-        Some(Commands::Sync(args)) => sync::run(&ctx, &args),
-        Some(Commands::Upgrade(args)) => upgrade::run(&ctx, &args),
-        Some(Commands::Models(args)) => models::run(&ctx, &args),
-        Some(Commands::Skills(args)) => skills::run(&ctx, &args),
-        Some(Commands::Status) => status::run(&ctx),
-        Some(Commands::Uninstall(args)) => uninstall::run(&ctx, &args),
-        Some(Commands::Doctor(args)) => doctor::run(&ctx, &args),
-        Some(Commands::Backups(args)) => backups::run(&ctx, &args),
-        Some(Commands::Tools(args)) => tools::run(&ctx, &args),
-        Some(Commands::Usage(sub)) => crate::commands::usage::run(&ctx, &sub),
-        Some(Commands::Workflow(args)) => workflow::run(&ctx, &args),
-        Some(Commands::Audit(args)) => audit::run(&ctx, &args),
-        Some(Commands::InitPrj { path, tier, force }) => init_prj::run(&ctx, path, &tier, force),
-        Some(Commands::DeinitPrj { path }) => deinit_prj::run(&ctx, path),
-        None => tui::run_interactive(&ctx),
-    };
+    let result = crate::commands::registry::dispatch(&ctx, cli.command);
     if let Err(err) = &result {
         eprintln!("error: {err}");
     }
