@@ -228,7 +228,7 @@ pub(crate) fn render_content_panel(f: &mut ratatui::Frame, area: Rect, app: &App
             lines.push(Line::from(Span::styled("Press [Enter] to run full status check.", Style::default().fg(Color::Gray))));
             lines
         }
-        MenuTab::Workflow => super::workflow_panel_lines(ctx),
+        MenuTab::Workflow => super::handlers::workflow_panel_lines(ctx),
         MenuTab::Install => vec![
             Line::from(Span::styled("Install Compound Engineering Plugin:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))),
             Line::from(""),
