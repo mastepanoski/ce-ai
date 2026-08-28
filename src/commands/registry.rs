@@ -9,8 +9,8 @@ use std::path::PathBuf;
 use clap::Subcommand;
 
 use crate::commands::{
-    audit, backups, deinit_prj, doctor, init_prj, install, models, skills, status, sync, tools,
-    uninstall, upgrade, usage, workflow, Context,
+    audit, backups, deinit_prj, doctor, guard, init_prj, install, models, skills, status, sync,
+    tools, uninstall, upgrade, usage, workflow, Context,
 };
 use crate::error::CeError;
 
@@ -65,6 +65,8 @@ pub enum Commands {
         /// Target project directory path (default: current working directory)
         path: Option<PathBuf>,
     },
+    /// Pedagogical Guardrail Mode for junior developer oversight (Issue #114).
+    Guard(guard::Args),
 }
 
 impl CeCommand for Commands {
@@ -87,6 +89,7 @@ impl CeCommand for Commands {
                 init_prj::run(ctx, path.clone(), tier, *force)
             }
             Commands::DeinitPrj { path } => deinit_prj::run(ctx, path.clone()),
+            Commands::Guard(args) => guard::run(ctx, args),
         }
     }
 }

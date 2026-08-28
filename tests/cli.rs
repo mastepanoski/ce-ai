@@ -4482,4 +4482,74 @@ mod journal_fault_injection {
             .success()
             .stdout(predicates::str::contains("external-duplicate"));
     }
+
+    #[test]
+    fn guard_enable_disable_and_status_cli_lifecycle() {
+        let tmp = TempDir::new().unwrap();
+        let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+        // Status on fresh directory
+        ceai(&config_dir, &home)
+            .args(["guard", "status"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("Disabled"));
+
+        // Enable default junior
+        ceai(&config_dir, &home)
+            .args(["guard", "enable"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("enabled"));
+
+        // Status confirms enabled
+        ceai(&config_dir, &home)
+            .args(["guard", "status"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("Enabled"))
+            .stdout(predicates::str::contains("junior"));
+
+        // JSON status
+        ceai(&config_dir, &home)
+            .args(["guard", "status", "--json"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("\"enabled\": true"))
+            .stdout(predicates::str::contains("\"level\": \"junior\""));
+
+        // Enable strict with harness
+        ceai(&config_dir, &home)
+            .args([
+                "guard",
+                "enable",
+                "--level",
+                "strict",
+                "--harness",
+                "claude",
+            ])
+            .assert()
+            .success();
+
+        ceai(&config_dir, &home)
+            .args(["guard", "status"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("strict"))
+            .stdout(predicates::str::contains("claude"));
+
+        // Disable
+        ceai(&config_dir, &home)
+            .args(["guard", "disable"])
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("disabled"));
+
+        // Invalid level fails with usage code 2
+        ceai(&config_dir, &home)
+            .args(["guard", "enable", "--level", "invalid-level"])
+            .assert()
+            .code(2)
+            .stderr(predicates::str::contains("invalid guard level"));
+    }
 }
