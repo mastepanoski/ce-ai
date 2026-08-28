@@ -13,17 +13,17 @@
 ---
 
 ### Unit T2: Extract State & OpenCode Domains (PR 2)
-- [ ] T2.1: Extract `src/state/state.rs` tests to `src/state/tests/state.rs`.
-- [ ] T2.2: Extract `src/state/diff.rs` tests to `src/state/tests/diff.rs`.
-- [ ] T2.3: Extract `src/state/ports.rs` tests to `src/state/tests/ports.rs`.
-- [ ] T2.4: Extract `src/state/backups.rs` tests to `src/state/tests/backups.rs`.
-- [ ] T2.5: Extract `src/state/journal.rs` tests to `src/state/tests/journal.rs`.
-- [ ] T2.6: Extract `src/state/profiles.rs` tests to `src/state/tests/profiles.rs`.
-- [ ] T2.7: Extract `src/state/mod.rs` tests to `src/state/tests/mod_tests.rs`.
-- [ ] T2.8: Extract `src/opencode/config.rs` tests to `src/opencode/tests/config.rs`.
-- [ ] T2.9: Extract `src/opencode/manifest.rs` tests to `src/opencode/tests/manifest.rs`.
-- [ ] T2.10: Extract `src/opencode/plugins.rs` tests to `src/opencode/tests/plugins.rs`.
-- [ ] T2.11: Verify quality gates (`cargo fmt --check`, `cargo clippy`, `cargo test`).
+- [x] T2.1: Extract `src/state/state.rs` tests to `src/state/tests/state.rs`.
+- [x] T2.2: Extract `src/state/diff.rs` tests to `src/state/tests/diff.rs`.
+- [x] T2.3: Extract `src/state/ports.rs` tests to `src/state/tests/ports.rs`.
+- [x] T2.4: Extract `src/state/backups.rs` tests to `src/state/tests/backups.rs`.
+- [x] T2.5: Extract `src/state/journal.rs` tests to `src/state/tests/journal.rs`.
+- [x] T2.6: Extract `src/state/profiles.rs` tests to `src/state/tests/profiles.rs`.
+- [x] T2.7: Extract `src/state/mod.rs` tests to `src/state/tests/mod_tests.rs`.
+- [x] T2.8: Extract `src/opencode/config.rs` tests to `src/opencode/tests/config.rs`.
+- [x] T2.9: Extract `src/opencode/manifest.rs` tests to `src/opencode/tests/manifest.rs`.
+- [x] T2.10: Extract `src/opencode/plugins.rs` tests to `src/opencode/tests/plugins.rs`.
+- [x] T2.11: Verify quality gates (`cargo fmt --check`, `cargo clippy`, `cargo test`).
 *Forecast: ~380 LOC net diff.*
 
 ---
