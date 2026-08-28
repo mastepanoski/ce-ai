@@ -65,13 +65,13 @@
 
 ---
 
-### Unit T6: Extract Commands — Part 1 (PR 6)
-- [ ] T6.1: Extract `src/commands/upgrade.rs` tests to `src/commands/tests/upgrade.rs`.
-- [ ] T6.2: Extract `src/commands/tools.rs` tests to `src/commands/tests/tools.rs`.
-- [ ] T6.3: Extract `src/commands/audit.rs` tests to `src/commands/tests/audit.rs`.
-- [ ] T6.4: Extract `src/commands/models.rs` tests to `src/commands/tests/models.rs`.
-- [ ] T6.5: Extract `src/commands/guard.rs` tests to `src/commands/tests/guard.rs`.
-- [ ] T6.6: Verify quality gates (`cargo fmt --check`, `cargo clippy`, `cargo test`).
+### Unit T6: Extract Command Handlers — Part 1 (PR 6)
+- [x] T6.1: Extract `src/commands/upgrade.rs` tests to `src/commands/tests/upgrade.rs`.
+- [x] T6.2: Extract `src/commands/tools.rs` tests to `src/commands/tests/tools.rs`.
+- [x] T6.3: Extract `src/commands/audit.rs` tests to `src/commands/tests/audit.rs`.
+- [x] T6.4: Extract `src/commands/models.rs` tests to `src/commands/tests/models.rs`.
+- [x] T6.5: Extract `src/commands/guard.rs` tests to `src/commands/tests/guard.rs`.
+- [x] T6.6: Verify quality gates (`cargo fmt --check`, `cargo clippy`, `cargo test`).
 *Forecast: ~380 LOC net diff.*
 
 ---
