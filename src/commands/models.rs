@@ -288,10 +288,10 @@ pub fn import_config_assignments(
             .get(slot)
             .is_some_and(|a| format!("{}/{}", a.provider_id, a.model_id) == model);
         if !matches_state {
-            // Split validated above (contains '/').
-            let (provider_id, model_id) = model.split_once('/').expect("validated split");
-            state.set_model_assignment(slot, provider_id, model_id);
-            imported.push((slot.clone(), model.to_string()));
+            if let Some((provider_id, model_id)) = model.split_once('/') {
+                state.set_model_assignment(slot, provider_id, model_id);
+                imported.push((slot.clone(), model.to_string()));
+            }
         }
     }
     imported

@@ -238,7 +238,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
         // Write target config settings (OI-2) and install-manifest.json (SU-2).
         if *harness_kind == HarnessKind::Custom {
-            let cfg = custom_cfg.as_ref().expect("custom config resolved above");
+            let Some(cfg) = custom_cfg.as_ref() else {
+                return Err(CeError::Usage(
+                    "custom harness configuration missing; supply flags or a configuration file"
+                        .into(),
+                ));
+            };
             // Route through the adapter so custom-mode behavior stays in one place.
             let adapter = crate::harness::custom::CustomAdapter::new(Some(cfg.clone()));
 
