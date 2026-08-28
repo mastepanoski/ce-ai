@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.0] - 2026-08-28
+
+### Changed
+- **Transversal Maintainability Architecture (U1-U6):**
+  - **Command Registry Pattern (`src/commands/registry.rs`):** Replaced hardcoded CLI matching in `src/main.rs` with `CeCommand` dispatch strategy.
+  - **Harness Factory (`src/harness/mod.rs`):** Centralized multi-harness tool MCP registration and harness adapter dispatch, eliminating redundant per-harness branches.
+  - **TUI Modular Decomposition (`src/tui/`):** Decomposed 1,791-line monolithic `src/tui.rs` into 6 single-responsibility modules (`app`, `handlers`, `render`, `runner`, `spawn`, `tabs`), each `<500` lines.
+  - **Ports & Adapters Architecture (`src/state/ports.rs`):** Decoupled `StateStore` and `ConfigStore` traits from direct disk I/O, introducing thread-safe `InMemoryStateStore` and `InMemoryConfigStore` adapters for hermetic unit testing.
+  - **Error Hardening & Zero-Panic Guarantee:** Eliminated all `.unwrap()` and `.expect()` calls in non-test source code; enforced crate-level `#![cfg_attr(not(test), deny(clippy::unwrap_used))]`.
+  - **Knowledge Capture:** Documented full architectural decisions, patterns, and validation metrics in `docs/solutions/architecture/refactor-transversal-maintainability-2026-08-27.md`.
+
 ## [1.26.1] - 2026-08-27
 
 ### Fixed
