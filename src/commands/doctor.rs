@@ -311,6 +311,19 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         ));
     }
 
+    // Pedagogical Guardrail status info (Issue #114)
+    if let Ok(state) = State::load(&ctx.state_path()) {
+        if let Some(guard) = &state.guardrail {
+            if guard.enabled {
+                println!(
+                    "doctor-info: pedagogical guardrail enabled (level: {}, scope: {})",
+                    guard.level,
+                    guard.harness.as_deref().unwrap_or("global")
+                );
+            }
+        }
+    }
+
     for finding in &findings {
         println!("{finding}");
     }

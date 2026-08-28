@@ -161,5 +161,18 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
         println!("projects: none adopted");
     }
 
+    // Pedagogical Guardrail Status (Issue #114)
+    if let Some(guard) = &state.guardrail {
+        if guard.enabled {
+            println!(
+                "guardrail: enabled (level: {}, scope: {})",
+                guard.level,
+                guard.harness.as_deref().unwrap_or("global")
+            );
+        } else {
+            println!("guardrail: disabled");
+        }
+    }
+
     Ok(())
 }

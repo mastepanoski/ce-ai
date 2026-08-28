@@ -150,6 +150,50 @@ pub struct SkillSurface {
     pub adopted_at: Option<String>,
 }
 
+/// Intensity level of pedagogical oversight (Issue #114).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum GuardLevel {
+    #[default]
+    Junior,
+    Strict,
+}
+
+impl GuardLevel {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            GuardLevel::Junior => "junior",
+            GuardLevel::Strict => "strict",
+        }
+    }
+
+    pub fn parse(s: &str) -> Result<Self, CeError> {
+        match s.trim().to_lowercase().as_str() {
+            "junior" => Ok(GuardLevel::Junior),
+            "strict" => Ok(GuardLevel::Strict),
+            other => Err(CeError::Usage(format!(
+                "invalid guard level '{other}'. Valid levels: junior, strict"
+            ))),
+        }
+    }
+}
+
+impl std::fmt::Display for GuardLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// Pedagogical guardrail configuration in `state.json`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GuardrailState {
+    pub enabled: bool,
+    pub level: GuardLevel,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub harness: Option<String>,
+    pub updated_at: String,
+}
+
 /// Canonical state file at `~/.ce-ai/state.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
@@ -173,6 +217,8 @@ pub struct State {
     pub projects: Vec<ProjectAdoptionEntry>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skill_surfaces: Vec<SkillSurface>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub guardrail: Option<GuardrailState>,
 }
 fn default_version() -> u32 {
     1
@@ -311,7 +357,9 @@ mod tests {
     use std::collections::BTreeMap;
     use tempfile::tempdir;
 
-    use crate::state::state::{ModelAssignment, ReleaseProvenance, State};
+    use crate::state::state::{
+        GuardLevel, GuardrailState, ModelAssignment, ReleaseProvenance, State,
+    };
 
     fn state_with(slot: &str) -> State {
         State {
@@ -332,6 +380,7 @@ mod tests {
             latest_release_tag: None,
             projects: vec![],
             skill_surfaces: vec![],
+            guardrail: None,
         }
     }
 
@@ -496,6 +545,7 @@ mod tests {
 
         let loaded = State::load(&path).unwrap();
         assert!(loaded.release_provenance.is_none());
+        assert!(loaded.guardrail.is_none());
         assert_eq!(
             loaded
                 .managed_asset_digest
@@ -503,5 +553,30 @@ mod tests {
                 .map(String::as_str),
             Some("sha256:abc")
         );
+    }
+
+    #[test]
+    fn guardrail_state_round_trips_and_parses() {
+        assert_eq!(GuardLevel::parse("junior").unwrap(), GuardLevel::Junior);
+        assert_eq!(GuardLevel::parse("strict").unwrap(), GuardLevel::Strict);
+        assert!(GuardLevel::parse("unknown").is_err());
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("state.json");
+        let mut state = State::new();
+        state.guardrail = Some(GuardrailState {
+            enabled: true,
+            level: GuardLevel::Strict,
+            harness: Some("claude".into()),
+            updated_at: "2026-08-28T00:00:00Z".into(),
+        });
+        state.save(&path).unwrap();
+
+        let loaded = State::load(&path).unwrap();
+        let guard = loaded.guardrail.expect("guardrail should exist");
+        assert!(guard.enabled);
+        assert_eq!(guard.level, GuardLevel::Strict);
+        assert_eq!(guard.harness.as_deref(), Some("claude"));
+        assert_eq!(guard.updated_at, "2026-08-28T00:00:00Z");
     }
 }

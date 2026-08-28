@@ -5,6 +5,7 @@ pub mod audit;
 pub mod backups;
 pub mod deinit_prj;
 pub mod doctor;
+pub mod guard;
 pub mod init_prj;
 pub mod install;
 pub mod models;
