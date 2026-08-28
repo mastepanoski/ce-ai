@@ -2,27 +2,23 @@
 //! Provides a modern, rich, split-panel terminal interface with live status,
 //! keyboard navigation, model slot tables, and one-key action execution.
 
-#[allow(unused_imports)]
-pub(crate) use crate::error::CeError;
-#[allow(unused_imports)]
-pub(crate) use crate::state::state::State;
+pub mod app;
+pub mod handlers;
+pub mod render;
+pub mod runner;
+pub mod spawn;
+pub mod tabs;
 
-mod app;
-mod handlers;
-mod render;
-mod runner;
-mod spawn;
-mod tabs;
-#[allow(unused_imports)]
-pub(crate) use app::App;
+pub use app::App;
 pub use runner::run_interactive;
-#[allow(unused_imports)]
 pub use tabs::MenuTab;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::commands::Context;
+    use crate::error::CeError;
+    use crate::state::state::State;
     use tempfile::TempDir;
 
     fn ctx() -> (TempDir, Context) {
