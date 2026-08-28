@@ -29,13 +29,13 @@
 ---
 
 ### Unit T3: Extract Source & Error Domains (PR 3)
-- [ ] T3.1: Extract `src/error.rs` tests to `src/tests/error.rs`.
-- [ ] T3.2: Extract `src/source/cache.rs` tests to `src/source/tests/cache.rs`.
-- [ ] T3.3: Extract `src/source/tools_registry.rs` tests to `src/source/tests/tools_registry.rs`.
-- [ ] T3.4: Extract `src/source/registry.rs` tests to `src/source/tests/registry.rs`.
-- [ ] T3.5: Extract `src/source/release.rs` tests to `src/source/tests/release.rs`.
-- [ ] T3.6: Extract `src/source/archive.rs` tests to `src/source/tests/archive.rs`.
-- [ ] T3.7: Verify quality gates (`cargo fmt --check`, `cargo clippy`, `cargo test`).
+- [x] T3.1: Extract `src/error.rs` tests to `src/tests/error.rs`.
+- [x] T3.2: Extract `src/source/cache.rs` tests to `src/source/tests/cache.rs`.
+- [x] T3.3: Extract `src/source/tools_registry.rs` tests to `src/source/tests/tools_registry.rs`.
+- [x] T3.4: Extract `src/source/registry.rs` tests to `src/source/tests/registry.rs`.
+- [x] T3.5: Extract `src/source/release.rs` tests to `src/source/tests/release.rs`.
+- [x] T3.6: Extract `src/source/archive.rs` tests to `src/source/tests/archive.rs`.
+- [x] T3.7: Verify quality gates (`cargo fmt --check`, `cargo clippy`, `cargo test`).
 *Forecast: ~360 LOC net diff.*
 
 ---
