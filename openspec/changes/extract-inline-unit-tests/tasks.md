@@ -52,15 +52,15 @@
 
 ---
 
-### Unit T5: Extract Harness Adapters Part 2 & TUI (PR 5)
-- [ ] T5.1: Extract `src/harness/custom.rs` tests to `src/harness/tests/custom.rs`.
-- [ ] T5.2: Extract `src/harness/agy.rs` tests to `src/harness/tests/agy.rs`.
-- [ ] T5.3: Extract `src/harness/cursor.rs` tests to `src/harness/tests/cursor.rs`.
-- [ ] T5.4: Extract `src/harness/fx.rs` tests to `src/harness/tests/fx.rs`.
-- [ ] T5.5: Extract `src/harness/kimi.rs` tests to `src/harness/tests/kimi.rs`.
-- [ ] T5.6: Extract `src/harness/mod.rs` tests to `src/harness/tests/mod_tests.rs`.
-- [ ] T5.7: Extract `src/tui/mod.rs` tests to `src/tui/tests/mod_tests.rs`.
-- [ ] T5.8: Verify quality gates (`cargo fmt --check`, `cargo clippy`, `cargo test`).
+### Unit T5: Extract Harness Adapters — Part 2 & TUI (PR 5)
+- [x] T5.1: Extract `src/harness/custom.rs` tests to `src/harness/tests/custom.rs`.
+- [x] T5.2: Extract `src/harness/agy.rs` tests to `src/harness/tests/agy.rs`.
+- [x] T5.3: Extract `src/harness/cursor.rs` tests to `src/harness/tests/cursor.rs`.
+- [x] T5.4: Extract `src/harness/fx.rs` tests to `src/harness/tests/fx.rs`.
+- [x] T5.5: Extract `src/harness/kimi.rs` tests to `src/harness/tests/kimi.rs`.
+- [x] T5.6: Extract `src/harness/mod.rs` tests to `src/harness/tests/mod_tests.rs`.
+- [x] T5.7: Extract `src/tui/mod.rs` tests to `src/tui/tests/mod_tests.rs`.
+- [x] T5.8: Verify quality gates (`cargo fmt --check`, `cargo clippy`, `cargo test`).
 *Forecast: ~390 LOC net diff.*
 
 ---
