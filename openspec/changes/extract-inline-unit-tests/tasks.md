@@ -41,13 +41,13 @@
 ---
 
 ### Unit T4: Extract Harness Adapters — Part 1 (PR 4)
-- [ ] T4.1: Extract `src/harness/agents.rs` tests to `src/harness/tests/agents.rs`.
-- [ ] T4.2: Extract `src/harness/pi.rs` tests to `src/harness/tests/pi.rs`.
-- [ ] T4.3: Extract `src/harness/claude.rs` tests to `src/harness/tests/claude.rs`.
-- [ ] T4.4: Extract `src/harness/copilot.rs` tests to `src/harness/tests/copilot.rs`.
-- [ ] T4.5: Extract `src/harness/grok.rs` tests to `src/harness/tests/grok.rs`.
-- [ ] T4.6: Extract `src/harness/codex.rs` tests to `src/harness/tests/codex.rs`.
-- [ ] T4.7: Verify quality gates (`cargo fmt --check`, `cargo clippy`, `cargo test`).
+- [x] T4.1: Extract `src/harness/agents.rs` tests to `src/harness/tests/agents.rs`.
+- [x] T4.2: Extract `src/harness/pi.rs` tests to `src/harness/tests/pi.rs`.
+- [x] T4.3: Extract `src/harness/claude.rs` tests to `src/harness/tests/claude.rs`.
+- [x] T4.4: Extract `src/harness/copilot.rs` tests to `src/harness/tests/copilot.rs`.
+- [x] T4.5: Extract `src/harness/grok.rs` tests to `src/harness/tests/grok.rs`.
+- [x] T4.6: Extract `src/harness/codex.rs` tests to `src/harness/tests/codex.rs`.
+- [x] T4.7: Verify quality gates (`cargo fmt --check`, `cargo clippy`, `cargo test`).
 *Forecast: ~370 LOC net diff.*
 
 ---
