@@ -2,21 +2,12 @@
 
 #![forbid(unsafe_code)]
 
-mod capture;
-mod commands;
-mod error;
-mod harness;
-mod opencode;
-mod source;
-mod state;
-mod tui;
-
 use std::path::PathBuf;
 
 use clap::Parser;
 
-use crate::commands::{registry::Commands, Context};
-use crate::error::result_exit_code;
+use ce_ai::commands::{registry::Commands, Context};
+use ce_ai::error::result_exit_code;
 
 #[derive(Parser)]
 #[command(name = "ce-ai", about = "compound-engineering plugin manager", version)]
@@ -46,7 +37,7 @@ fn main() {
             std::process::exit(err.exit_code());
         }
     };
-    let result = crate::commands::registry::dispatch(&ctx, cli.command);
+    let result = ce_ai::commands::registry::dispatch(&ctx, cli.command);
     if let Err(err) = &result {
         eprintln!("error: {err}");
     }

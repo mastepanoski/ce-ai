@@ -106,3 +106,40 @@ fn corrupted_json_state_returns_state_error() {
         err => panic!("Expected CeError::State, got {:?}", err),
     }
 }
+
+#[test]
+fn ports_state_and_config_stores_preserve_integrity() {
+    use ce_ai::state::{
+        ConfigStore, FsConfigStore, FsStateStore, InMemoryConfigStore, InMemoryStateStore,
+        StateStore,
+    };
+
+    let tmp = TempDir::new().unwrap();
+    let state_file = tmp.path().join("state.json");
+    let config_file = tmp.path().join("opencode.json");
+
+    // 1. Fs stores
+    let fs_state = FsStateStore;
+    let fs_config = FsConfigStore;
+
+    let mut state = State::new();
+    state.set_model_assignment("ce-work", "anthropic", "claude-3-7-sonnet");
+    fs_state.save(&state_file, &state).unwrap();
+    assert_eq!(fs_state.load(&state_file).unwrap(), state);
+
+    let config = serde_json::json!({ "plugin": ["ce"] });
+    fs_config.write_config(&config_file, &config).unwrap();
+    assert_eq!(fs_config.read_config(&config_file).unwrap(), config);
+
+    // 2. InMemory stores
+    let mem_state = InMemoryStateStore::new();
+    let mem_config = InMemoryConfigStore::new();
+    let mem_state_path = std::path::Path::new("/virtual/state.json");
+    let mem_config_path = std::path::Path::new("/virtual/opencode.json");
+
+    mem_state.save(mem_state_path, &state).unwrap();
+    assert_eq!(mem_state.load(mem_state_path).unwrap(), state);
+
+    mem_config.write_config(mem_config_path, &config).unwrap();
+    assert_eq!(mem_config.read_config(mem_config_path).unwrap(), config);
+}

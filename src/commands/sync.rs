@@ -1085,4 +1085,31 @@ mod tests {
             "note block must be visually grouped"
         );
     }
+
+    #[test]
+    fn sync_state_store_port_evaluates_adoption_status_in_memory() {
+        use crate::state::state::{SkillSurface, State};
+        use crate::state::{InMemoryStateStore, StateStore};
+        use std::path::{Path, PathBuf};
+
+        let store = InMemoryStateStore::new();
+        let path = Path::new("/virtual/ce-ai/state.json");
+
+        let mut state = State::new();
+        state.skill_surfaces.push(SkillSurface {
+            harness: "opencode".into(),
+            root: PathBuf::from("/virtual/opencode/skills"),
+            status: "adopted".into(),
+            files: vec![],
+            adopted_at: Some("2026-08-27T00:00:00Z".into()),
+        });
+        store.save(path, &state).unwrap();
+
+        let loaded = store.load(path).unwrap();
+        let is_adopted = loaded
+            .skill_surfaces
+            .iter()
+            .any(|s| s.harness == "opencode" && s.status == "adopted");
+        assert!(is_adopted);
+    }
 }

@@ -83,4 +83,24 @@ impl Context {
             quiet,
         })
     }
+
+    /// Returns the canonical path to `state.json`.
+    pub fn state_path(&self) -> PathBuf {
+        self.config_dir.join("state.json")
+    }
+
+    /// Returns the canonical path to `opencode.json`.
+    pub fn opencode_config_path(&self) -> PathBuf {
+        self.opencode_config_dir.join("opencode.json")
+    }
+
+    /// Returns a `StateStore` instance for state I/O.
+    pub fn state_store(&self) -> Box<dyn crate::state::StateStore> {
+        Box::new(crate::state::FsStateStore)
+    }
+
+    /// Returns a `ConfigStore` instance for config I/O.
+    pub fn config_store(&self) -> Box<dyn crate::state::ConfigStore> {
+        Box::new(crate::state::FsConfigStore)
+    }
 }
