@@ -277,10 +277,11 @@ fn run_app(
                         }
                     }
                     KeyCode::Char(c @ '1'..='7') if app.current_tab() == MenuTab::Workflow => {
-                        let stage_num = c.to_digit(10).unwrap();
-                        let lines =
-                            super::handlers::workflow_stage_transition_lines(ctx, stage_num);
-                        execute_action(app, "Workflow Stage Transition", move || lines);
+                        if let Some(stage_num) = c.to_digit(10) {
+                            let lines =
+                                super::handlers::workflow_stage_transition_lines(ctx, stage_num);
+                            execute_action(app, "Workflow Stage Transition", move || lines);
+                        }
                     }
                     _ => {}
                 }

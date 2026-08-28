@@ -48,9 +48,9 @@ pub fn apply_agent_model(config_path: &Path, slot: &str, model_value: &str) -> R
         }
         None => {
             config["agent"] = serde_json::json!({});
-            config["agent"]
-                .as_object_mut()
-                .expect("agent is an object")
+            config["agent"].as_object_mut().ok_or_else(|| {
+                CeError::Runtime("failed to initialize agent object in harness config".into())
+            })?
         }
     };
     let entry = agents
@@ -91,9 +91,9 @@ pub fn ensure_orchestrator_agent(
         }
         None => {
             config["agent"] = serde_json::json!({});
-            config["agent"]
-                .as_object_mut()
-                .expect("agent is an object")
+            config["agent"].as_object_mut().ok_or_else(|| {
+                CeError::Runtime("failed to initialize agent object in harness config".into())
+            })?
         }
     };
     if agents

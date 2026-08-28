@@ -35,7 +35,9 @@ pub fn install_loader(source_root: &Path, config_dir: &Path) -> Result<ManifestF
         CeError::Runtime(format!("CE loader not found at {}: {err}", src.display()))
     })?;
     let dest = plugin_entry(config_dir);
-    std::fs::create_dir_all(dest.parent().expect("loader path has a parent dir"))?;
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
     std::fs::write(&dest, &bytes)?;
     Ok(ManifestFile {
         path: LOADER_REL_PATH.to_string(),

@@ -1,6 +1,7 @@
 //! ce-ai: compound-engineering plugin manager CLI entry point (CC-1, CC-2).
 
 #![forbid(unsafe_code)]
+#![cfg_attr(not(test), deny(clippy::unwrap_used))]
 
 use std::path::PathBuf;
 
