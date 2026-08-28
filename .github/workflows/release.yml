@@ -109,3 +109,9 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: SHA256SUMS.txt
+
+      - name: Trigger Homebrew Tap Update
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run self-update.yml --repo mastepanoski/homebrew-ce-ai || echo "Notice: Homebrew self-update dispatch attempted (fallback: 30m cron)"

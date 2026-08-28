@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.0] - 2026-08-28
+
+### Added
+- **Pedagogical Guardrail Mode (`ce-ai guard`, Issue #114):**
+  - **State Schema:** Added `GuardLevel` (`junior`, `strict`) and `GuardrailState` with backward-compatible deserialization in `state.json`.
+  - **CLI Lifecycle Subcommands:** `ce-ai guard enable [--level junior|strict] [--harness <name>]`, `ce-ai guard disable`, and `ce-ai guard status [--json]`.
+  - **Visibility & Governance:** Wired into `doctor` health checks and `status` summary for ISO/IEC 42001 and NIST AI RMF 1.0 Human-In-The-Loop compliance.
+  - **Strategy Integration:** Registered in `Commands::Guard` within `src/commands/registry.rs`.
+  - **Knowledge Capture:** Authored architectural solution document in `docs/solutions/architecture/pedagogical-guardrail-mode-lifecycle-2026-08-28.md`.
+
 ## [1.27.0] - 2026-08-28
 
 ### Changed
