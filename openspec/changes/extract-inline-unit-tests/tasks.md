@@ -76,12 +76,12 @@
 
 ---
 
-### Unit T7: Extract Commands Part 2 & Knowledge Capture (PR 7)
-- [ ] T7.1: Extract `src/commands/sync.rs` tests to `src/commands/tests/sync.rs`.
-- [ ] T7.2: Extract `src/commands/doctor.rs` tests to `src/commands/tests/doctor.rs`.
-- [ ] T7.3: Extract `src/commands/init_prj.rs` tests to `src/commands/tests/init_prj.rs`.
-- [ ] T7.4: Extract `src/commands/workflow.rs` tests to `src/commands/tests/workflow.rs`.
-- [ ] T7.5: Extract `src/commands/install.rs` tests to `src/commands/tests/install.rs`.
-- [ ] T7.6: Knowledge capture in `docs/solutions/architecture/extract-inline-unit-tests-2026-08-28.md`.
-- [ ] T7.7: Verify full quality gates (`cargo fmt --check`, `cargo clippy`, `cargo test`, `make e2e`).
+### Unit T7: Extract Command Handlers — Part 2 & Solution Capture (PR 7)
+- [x] T7.1: Extract `src/commands/sync.rs` tests to `src/commands/tests/sync.rs`.
+- [x] T7.2: Extract `src/commands/doctor.rs` tests to `src/commands/tests/doctor.rs`.
+- [x] T7.3: Extract `src/commands/init_prj.rs` tests to `src/commands/tests/init_prj.rs`.
+- [x] T7.4: Extract `src/commands/workflow.rs` tests to `src/commands/tests/workflow.rs`.
+- [x] T7.5: Extract `src/commands/install.rs` tests to `src/commands/tests/install.rs`.
+- [x] T7.6: Create solution document `docs/solutions/architecture/extract-inline-unit-tests-2026-08-28.md`.
+- [x] T7.7: Verify quality gates (`cargo fmt --check`, `cargo clippy`, `cargo test`, `make e2e`).
 *Forecast: ~380 LOC net diff.*
