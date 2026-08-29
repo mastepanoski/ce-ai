@@ -5,6 +5,21 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.0] - 2026-08-29
+
+### Changed
+- **Test Architecture & Code Separation (Issue #265, PRs #266-#272):**
+  - **Zero Inline Tests:** Extracted all `#[cfg(test)] mod tests { ... }` inline blocks across 36 functional source files into dedicated test files located under domain-specific `tests/` directories using Rust's explicit `#[path = "..."]` attribute.
+  - **Domain Modular Layout:**
+    - `src/state/tests/`: Isolated tests for `state.rs`, `diff.rs`, `profiles.rs`, `backups.rs`, and `mod_tests.rs`.
+    - `src/opencode/tests/`: Dedicated tests for `config.rs`, `manifest.rs`, and `plugins.rs`.
+    - `src/source/tests/`: Dedicated tests for `cache.rs`, `tools_registry.rs`, `registry.rs`, `release.rs`, and `archive.rs`.
+    - `src/harness/tests/`: Dedicated tests for all 10 harness adapters (`agents.rs`, `pi.rs`, `claude.rs`, `copilot.rs`, `grok.rs`, `codex.rs`, `custom.rs`, `agy.rs`, `cursor.rs`, `fx.rs`, `kimi.rs`) and `mod_tests.rs`.
+    - `src/tui/tests/`: Isolated headless and contract tests in `mod_tests.rs`.
+    - `src/commands/tests/`: Dedicated tests for all subcommands (`upgrade.rs`, `tools.rs`, `audit.rs`, `models.rs`, `guard.rs`, `sync.rs`, `doctor.rs`, `init_prj.rs`, `workflow.rs`, `install.rs`).
+  - **Zero Assertion / Behavior Drift:** Pure mechanical extraction preserving 100% of test fixtures, assertions, synchronization mutexes, and zero production runtime modification.
+  - **Knowledge Capture:** Documented complete architectural patterns and tradeoffs in `docs/solutions/architecture/extract-inline-unit-tests-2026-08-28.md`.
+
 ## [1.28.0] - 2026-08-28
 
 ### Added
