@@ -126,10 +126,99 @@ pub fn pinned_version_and_url(tag: Option<String>) -> Result<(String, String), C
     }
 }
 
-/// Resolves the latest CE release tag via the GitHub API (SF-1); network call,
-/// exercised by E2E rather than unit tests. Every transport, HTTP, or payload
-/// failure is an explicit [`CeError::Network`]; `Ok(None)` means the API
-/// answered successfully but no `compound-engineering-v*` release exists.
+/// Public releases web page route (resolves to latest tag via 302 redirect).
+pub fn releases_latest_web_url() -> String {
+    format!("https://github.com/{PLUGIN_REPO}/releases/latest")
+}
+
+/// Public releases Atom feed (contains list of recent release tags without API rate limits).
+pub fn releases_atom_feed_url() -> String {
+    format!("https://github.com/{PLUGIN_REPO}/releases.atom")
+}
+
+/// Extracts a `compound-engineering-v*` tag from a redirect URL (e.g. `.../releases/tag/compound-engineering-v3.24.0`).
+pub fn extract_tag_from_redirect_url(url: &str) -> Option<String> {
+    let marker = "/releases/tag/";
+    if let Some(pos) = url.find(marker) {
+        let after = &url[pos + marker.len()..];
+        let tag = after
+            .trim_matches('/')
+            .split(['?', '#'])
+            .next()
+            .unwrap_or("");
+        if tag.starts_with("compound-engineering-v") && !tag.is_empty() {
+            return Some(tag.to_string());
+        }
+    }
+    None
+}
+
+/// Extracts the newest `compound-engineering-v*` release tag from an Atom feed payload.
+pub fn extract_latest_tag_from_atom_feed(feed: &str) -> Option<String> {
+    let mut matching_tags: Vec<String> = Vec::new();
+    let marker = "/releases/tag/";
+    for line in feed.lines() {
+        if let Some(pos) = line.find(marker) {
+            let after = &line[pos + marker.len()..];
+            let tag: String = after
+                .chars()
+                .take_while(|c| {
+                    *c != '"' && *c != '\'' && *c != '<' && *c != '/' && *c != '?' && *c != '#'
+                })
+                .collect();
+            if tag.starts_with("compound-engineering-v")
+                && !tag.is_empty()
+                && !matching_tags.contains(&tag)
+            {
+                matching_tags.push(tag);
+            }
+        }
+    }
+
+    matching_tags.into_iter().max_by(|a, b| {
+        let va = ce_version(a).unwrap_or(a);
+        let vb = ce_version(b).unwrap_or(b);
+        compare_versions(va, vb)
+    })
+}
+
+/// Fallback release resolver using unauthenticated web redirect and Atom feed.
+/// Free of GitHub REST API rate limits (zero friction for end users).
+pub fn resolve_latest_release_fallback(
+    client: &reqwest::blocking::Client,
+) -> Result<Option<String>, CeError> {
+    // Attempt 1: Web redirect from /releases/latest
+    if let Ok(res) = client
+        .get(releases_latest_web_url())
+        .header(reqwest::header::USER_AGENT, "ce-ai/0.1.0")
+        .send()
+    {
+        if let Some(tag) = extract_tag_from_redirect_url(res.url().as_str()) {
+            return Ok(Some(tag));
+        }
+    }
+
+    // Attempt 2: Atom feed from /releases.atom
+    if let Ok(res) = client
+        .get(releases_atom_feed_url())
+        .header(reqwest::header::USER_AGENT, "ce-ai/0.1.0")
+        .send()
+    {
+        if res.status().is_success() {
+            if let Ok(text) = res.text() {
+                if let Some(tag) = extract_latest_tag_from_atom_feed(&text) {
+                    return Ok(Some(tag));
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Resolves the latest CE release tag via the GitHub API with seamless zero-friction
+/// web fallback when unauthenticated or rate-limited (SF-1). Resolution never falls
+/// back to the mutable `main` branch.
 pub fn resolve_latest_release(
     client: &reqwest::blocking::Client,
     token: Option<&str>,
@@ -138,36 +227,31 @@ pub fn resolve_latest_release(
     if let Some(header) = auth_header(token) {
         request = request.header(reqwest::header::AUTHORIZATION, header);
     }
-    let guidance = "pin a tag with '--to <tag>' or use a local tree with '--source <path>'; tip: set CE_AI_GITHUB_TOKEN to authenticate requests";
-    let response = match request
-        .header(reqwest::header::USER_AGENT, "ce-ai/0.1.0")
-        .send()
-    {
-        Ok(res) => res,
-        Err(err) => {
-            return Err(CeError::Network(format!(
-                "GitHub API release query failed ({err}) — ce-ai never falls back to the mutable main branch; {guidance}"
-            )));
-        }
-    };
+    let guidance = "pin a tag with '--to <tag>' or use a local tree with '--source <path>'";
 
-    if !response.status().is_success() {
-        return Err(CeError::Network(format!(
-            "GitHub API returned HTTP {} when querying releases — ce-ai never falls back to the mutable main branch; pin a tag with '--to <tag>' or use a local tree with '--source <path>'; tip: set CE_AI_GITHUB_TOKEN to authenticate or raise rate limits",
-            response.status()
-        )));
-    }
-    let body = match response.bytes() {
-        Ok(bytes) => bytes,
-        Err(err) => {
-            return Err(CeError::Network(format!(
-                "failed to read GitHub API response bytes ({err}) — ce-ai never falls back to the mutable main branch; pin a tag with '--to <tag>' or use a local tree with '--source <path>'"
-            )));
+    // 1. Attempt REST API
+    let api_result = request
+        .header(reqwest::header::USER_AGENT, "ce-ai/0.1.0")
+        .send();
+
+    if let Ok(response) = api_result {
+        if response.status().is_success() {
+            if let Ok(bytes) = response.bytes() {
+                if let Ok(Some(tag)) = latest_ce_release(&bytes) {
+                    return Ok(Some(tag));
+                }
+            }
         }
-    };
-    latest_ce_release(&body).map_err(|err| {
-        CeError::Network(format!("failed to parse GitHub API release payload: {err}"))
-    })
+    }
+
+    // 2. Zero-friction web fallback (resilient against 403 rate limits)
+    if let Ok(Some(tag)) = resolve_latest_release_fallback(client) {
+        return Ok(Some(tag));
+    }
+
+    Err(CeError::Network(format!(
+        "Failed to resolve latest Compound Engineering release from GitHub (API & web fallback exhausted) — {guidance}"
+    )))
 }
 
 #[cfg(test)]
