@@ -77,11 +77,38 @@ pub fn auth_header(token: Option<&str>) -> Option<String> {
         .map(|t| format!("Bearer {t}"))
 }
 
-/// Reads the optional `CE_AI_GITHUB_TOKEN` environment variable.
+/// Reads the optional GitHub token from `CE_AI_GITHUB_TOKEN`, `GITHUB_TOKEN`,
+/// or `GH_TOKEN` environment variables.
 pub fn github_token_from_env() -> Option<String> {
-    std::env::var("CE_AI_GITHUB_TOKEN")
-        .ok()
-        .filter(|t| !t.is_empty())
+    for var in ["CE_AI_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"] {
+        if let Ok(tok) = std::env::var(var) {
+            let trimmed = tok.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Resolves a GitHub token from environment variables or falls back to
+/// GitHub CLI (`gh auth token`) when available.
+pub fn resolve_github_token() -> Option<String> {
+    github_token_from_env().or_else(|| {
+        std::process::Command::new("gh")
+            .args(["auth", "token"])
+            .output()
+            .ok()
+            .filter(|out| out.status.success())
+            .and_then(|out| {
+                let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s)
+                }
+            })
+    })
 }
 
 /// Maps a resolved release tag to its pinned `(version, url)` pair. A

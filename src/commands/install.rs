@@ -15,7 +15,7 @@ use crate::opencode::plugins::{
 use crate::source::archive::extract_to_source;
 use crate::source::cache::{managed_tree, record_tarball_provenance, Cache};
 use crate::source::release::{
-    github_token_from_env, pinned_version_and_url, resolve_latest_release,
+    pinned_version_and_url, resolve_github_token, resolve_latest_release,
 };
 use crate::state::backups::backup_file;
 use crate::state::state::{ReleaseProvenance, State};
@@ -414,7 +414,7 @@ fn resolve_source(
 
     // Default: fetch latest release from GitHub — never a mutable branch.
     let client = reqwest::blocking::Client::new();
-    let token = github_token_from_env();
+    let token = resolve_github_token();
     let tag = resolve_latest_release(&client, token.as_deref())?;
     let (version, url) = pinned_version_and_url(tag)?;
     let bytes = client

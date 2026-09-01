@@ -11,7 +11,7 @@ use crate::error::CeError;
 use crate::source::archive::extract_to_source;
 use crate::source::cache::{record_tarball_provenance, Cache};
 use crate::source::release::{
-    github_token_from_env, pinned_version_and_url, resolve_latest_release,
+    pinned_version_and_url, resolve_github_token, resolve_latest_release,
 };
 use crate::state::diff::sha256_hex;
 use crate::state::state::{ReleaseProvenance, State};
@@ -55,7 +55,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     // provenance, then sync (SU-5). No implicit fallback: every failure is an
     // explicit error and the resolved tag is immutable.
     let client = reqwest::blocking::Client::new();
-    let token = github_token_from_env();
+    let token = resolve_github_token();
     let tag = resolve_latest_release(&client, token.as_deref())?;
     let (version, url) = pinned_version_and_url(tag)?;
     let bytes = client

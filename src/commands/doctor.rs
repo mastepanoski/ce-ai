@@ -149,10 +149,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 
     // GitHub token hint for first-time install/upgrade (avoids 403 rate-limit)
-    if std::env::var("CE_AI_GITHUB_TOKEN").is_ok()
-        || std::env::var("GITHUB_TOKEN").is_ok()
-        || std::env::var("GH_TOKEN").is_ok()
-    {
+    if crate::source::release::resolve_github_token().is_some() {
         println!("doctor-info: github-token present (rate-limit safe)");
     } else {
         println!(
