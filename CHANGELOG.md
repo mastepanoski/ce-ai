@@ -5,6 +5,18 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.1] - 2026-09-01
+
+### Fixed
+- **Sync Verification Matrix for Native Harnesses (`src/commands/sync.rs`):**
+  - Resolved false verification drift error (exit code 6) where `ce-ai sync` and `ce-ai upgrade` checked native harness directories for release skills that were intentionally not copied following the R4 token-neutrality adoption model.
+  - Properly classifies registered, unadopted native harnesses as `registered — ce-ai manages no skill files here (MCP companions only; nothing to hash-verify)`.
+- **Multi-Tiered GitHub Token Discovery (`src/source/release.rs`):**
+  - Added support for `GITHUB_TOKEN` and `GH_TOKEN` environment variables alongside `CE_AI_GITHUB_TOKEN`.
+  - Added automatic fallback to GitHub CLI (`gh auth token`) to prevent unauthenticated `HTTP 403 Forbidden` errors during `ce-ai upgrade` and `install`.
+- **Doctor Token Probe Consistency (`src/commands/doctor.rs`):**
+  - Unified token resolution across `doctor`, `install`, and `upgrade` via `resolve_github_token()`.
+
 ## [1.29.0] - 2026-08-29
 
 ### Changed

@@ -142,6 +142,51 @@ fn sync_matrix_verifies_harvested_managed_surface() {
 }
 
 #[test]
+fn sync_with_host_detected_native_harnesses_reports_registered_and_succeeds() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source_top_level_skills(tmp.path());
+
+    // Create markers for host-detected harnesses
+    fs::create_dir_all(home.join(".config/opencode")).unwrap();
+    fs::write(home.join(".config/opencode/opencode.json"), "{}").unwrap();
+    fs::create_dir_all(home.join(".claude")).unwrap();
+    fs::write(home.join(".claude/settings.json"), "{}").unwrap();
+    fs::create_dir_all(home.join(".copilot")).unwrap();
+    fs::write(home.join(".copilot/mcp-config.json"), "{}").unwrap();
+    fs::create_dir_all(home.join(".codex")).unwrap();
+    fs::write(home.join(".codex/config.toml"), "").unwrap();
+
+    // Install all detected harnesses
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "all", "--source"])
+        .arg(&source)
+        .assert()
+        .success();
+
+    // Sync must report native harnesses as registered and succeed without drift
+    ceai(&config_dir, &home)
+        .args(["sync"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "✓ opencode: verified — 2/2 managed files match SHA256",
+        ))
+        .stdout(predicates::str::contains(
+            "○ claude: registered — ce-ai manages no skill files here (MCP companions only; nothing to hash-verify)",
+        ))
+        .stdout(predicates::str::contains(
+            "○ copilot: registered — ce-ai manages no skill files here (MCP companions only; nothing to hash-verify)",
+        ))
+        .stdout(predicates::str::contains(
+            "○ codex: registered — ce-ai manages no skill files here (MCP companions only; nothing to hash-verify)",
+        ))
+        .stdout(predicates::str::contains(
+            "0 failed",
+        ));
+}
+
+#[test]
 fn install_prefers_top_level_skills_on_overlap() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));

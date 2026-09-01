@@ -59,5 +59,14 @@ fn github_token_reads_from_environment() {
     std::env::set_var("CE_AI_GITHUB_TOKEN", "tok-123");
     assert_eq!(github_token_from_env().as_deref(), Some("tok-123"));
     std::env::remove_var("CE_AI_GITHUB_TOKEN");
+
+    std::env::set_var("GITHUB_TOKEN", "tok-456");
+    assert_eq!(github_token_from_env().as_deref(), Some("tok-456"));
+    std::env::remove_var("GITHUB_TOKEN");
+
+    std::env::set_var("GH_TOKEN", "tok-789");
+    assert_eq!(github_token_from_env().as_deref(), Some("tok-789"));
+    std::env::remove_var("GH_TOKEN");
+
     assert_eq!(github_token_from_env(), None);
 }

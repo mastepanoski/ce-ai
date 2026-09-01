@@ -490,20 +490,11 @@ pub(crate) fn sync_with(
                     | HarnessKind::Pi
                     | HarnessKind::Fx
             ) {
-                let skills_dir = sync_skills_root(kind, &home_dir);
-                if skills_expected.is_empty() {
-                    surfaces.push(SurfaceCheck {
-                        harness: name.clone(),
-                        status: CheckStatus::NotVerified {
-                            reason: REASON_NO_MANAGED_SKILLS,
-                        },
-                    });
-                    continue;
-                }
-                let drift = verify_tree_against(&skills_dir, &skills_expected);
                 surfaces.push(SurfaceCheck {
                     harness: name.clone(),
-                    status: CheckStatus::from_drift(skills_expected.len(), drift),
+                    status: CheckStatus::NotVerified {
+                        reason: REASON_NO_MANAGED_SKILLS,
+                    },
                 });
             } else {
                 surfaces.push(SurfaceCheck {
