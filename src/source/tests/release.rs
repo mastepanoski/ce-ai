@@ -1,5 +1,6 @@
 use crate::source::release::{
-    auth_header, github_token_from_env, latest_ce_release, pinned_version_and_url, tag_tarball_url,
+    auth_header, extract_latest_tag_from_atom_feed, extract_tag_from_redirect_url,
+    github_token_from_env, latest_ce_release, pinned_version_and_url, tag_tarball_url,
 };
 
 #[test]
@@ -69,4 +70,64 @@ fn github_token_reads_from_environment() {
     std::env::remove_var("GH_TOKEN");
 
     assert_eq!(github_token_from_env(), None);
+}
+
+#[test]
+fn extracts_tag_from_redirect_url() {
+    assert_eq!(
+        extract_tag_from_redirect_url(
+            "https://github.com/everyinc/compound-engineering-plugin/releases/tag/compound-engineering-v3.24.0"
+        ),
+        Some("compound-engineering-v3.24.0".to_string())
+    );
+
+    assert_eq!(
+        extract_tag_from_redirect_url(
+            "https://github.com/everyinc/compound-engineering-plugin/releases/tag/compound-engineering-v3.24.0/"
+        ),
+        Some("compound-engineering-v3.24.0".to_string())
+    );
+
+    // Non-matching prefix
+    assert_eq!(
+        extract_tag_from_redirect_url(
+            "https://github.com/everyinc/compound-engineering-plugin/releases/tag/v1.0.0"
+        ),
+        None
+    );
+
+    // Non-tag URL
+    assert_eq!(
+        extract_tag_from_redirect_url(
+            "https://github.com/everyinc/compound-engineering-plugin/releases"
+        ),
+        None
+    );
+}
+
+#[test]
+fn extracts_latest_tag_from_atom_feed() {
+    let feed = r#"<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>tag:github.com,2008:Repository/1073224021/compound-engineering-v3.23.4</id>
+    <link rel="alternate" type="text/html" href="https://github.com/EveryInc/compound-engineering-plugin/releases/tag/compound-engineering-v3.23.4"/>
+    <title>compound-engineering: v3.23.4</title>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1073224021/compound-engineering-v3.24.0</id>
+    <link rel="alternate" type="text/html" href="https://github.com/EveryInc/compound-engineering-plugin/releases/tag/compound-engineering-v3.24.0"/>
+    <title>compound-engineering: v3.24.0</title>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1073224021/v1.0.0</id>
+    <link rel="alternate" type="text/html" href="https://github.com/EveryInc/compound-engineering-plugin/releases/tag/v1.0.0"/>
+    <title>v1.0.0</title>
+  </entry>
+</feed>"#;
+
+    assert_eq!(
+        extract_latest_tag_from_atom_feed(feed),
+        Some("compound-engineering-v3.24.0".to_string())
+    );
 }

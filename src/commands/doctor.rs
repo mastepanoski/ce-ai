@@ -148,12 +148,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         );
     }
 
-    // GitHub token hint for first-time install/upgrade (avoids 403 rate-limit)
+    // GitHub token info for install/upgrade
     if crate::source::release::resolve_github_token().is_some() {
-        println!("doctor-info: github-token present (rate-limit safe)");
+        println!("doctor-info: github-token present (authenticated API quota)");
     } else {
         println!(
-            "doctor-info: github-token not set — first install/upgrade may hit 403; set CE_AI_GITHUB_TOKEN or use --to/--source"
+            "doctor-info: github-token not set (unauthenticated mode with resilient web fallback)"
         );
     }
 
