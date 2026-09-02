@@ -1575,7 +1575,106 @@ fn workflow_status_checkpoint_and_resume_subcommands() {
         .args(["workflow", "resume"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("resuming execution"));
+        .stdout(
+            predicate::str::contains("resuming execution").and(predicate::str::contains(
+                "== [Environment State & Drift Status] ==",
+            )),
+        );
+}
+
+#[test]
+fn workflow_resume_surfaces_live_repo_state_and_detects_drift() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // 1. Advance through workflow FSM: Stage 2 -> Stage 3 -> Stage 4
+    ceai(&config_dir, &home)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--stage",
+            "2",
+            "--task",
+            "Specifying feature",
+            "--feature",
+            "zero-step-drift-recovery",
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--stage",
+            "3",
+            "--task",
+            "Planning feature",
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--stage",
+            "4",
+            "--task",
+            "Implementing feature",
+        ])
+        .assert()
+        .success();
+
+    // 2. Resume output contains RepoState block
+    ceai(&config_dir, &home)
+        .args(["workflow", "resume"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("== [Environment State & Drift Status] ==")
+                .and(predicate::str::contains("git branch:"))
+                .and(predicate::str::contains("working tree:"))
+                .and(predicate::str::contains("manifest integrity: clean")),
+        );
+
+    // 3. Resume --json returns repo_state object
+    let assert_json = ceai(&config_dir, &home)
+        .args(["workflow", "resume", "--json"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&assert_json.get_output().stdout);
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert!(parsed.get("repo_state").is_some());
+    assert_eq!(
+        parsed["workflow"]["feature_name"].as_str().unwrap(),
+        "zero-step-drift-recovery"
+    );
+    assert_eq!(
+        parsed["repo_state"]["manifest_drift_count"]
+            .as_u64()
+            .unwrap(),
+        0
+    );
+
+    // 4. Mutate a managed file to simulate external drift
+    let loader_file = managed_dir(&home).join("plugins/compound-engineering.js");
+    fs::write(&loader_file, "external modification").unwrap();
+
+    // 5. Resume immediately surfaces drift warning in Turn 0
+    ceai(&config_dir, &home)
+        .args(["workflow", "resume"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("manifest integrity: ! 1 files modified outside ce-ai").and(
+                predicate::str::contains(
+                    "Drift detected in managed files. Run 'ce-ai sync' to reconcile.",
+                ),
+            ),
+        );
 }
 
 #[test]

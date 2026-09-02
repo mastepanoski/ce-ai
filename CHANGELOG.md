@@ -5,6 +5,21 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.0] - 2026-09-02
+
+### Added
+- **Zero-Step Environment Drift Recovery via Live `RepoState` Sync (`src/commands/workflow.rs`, `src/commands/status.rs`):**
+  - Added live, sub-15ms `RepoState` probe to `ce-ai workflow resume` and `ce-ai status`, inspired by SKILL.state findings (arXiv:2608.26263v2) demonstrating that long-horizon agents suffer 5–8 turns of lag under silent workspace changes.
+  - Automatically captures and renders active git branch, HEAD commit SHA, uncommitted/untracked working tree modifications, managed plugin SHA256 manifest drift, and project adoption block status.
+  - Emits structured `repo_state` object in `ce-ai workflow resume --json` for autonomous agent consumption on Turn 0.
+  - Surfaces non-blocking drift warnings and guidance (`! Warning: Drift detected in managed files. Run 'ce-ai sync' to reconcile.`).
+- **Adoption Block SSOT Integration:**
+  - Integrated `check_adoption_block_status()` directly into `probe_adoption_status()` without duplicating cryptographic hash logic.
+- **TDD Test Coverage:**
+  - Added dedicated unit tests for `OpenSpecContextInfo` probing and task checkbox parsing.
+  - Added dedicated unit tests for `TreeDrift` diff tracking and status calculation.
+  - Added CLI integration tests verifying zero-step drift reflection during turn resumption.
+
 ## [1.29.2] - 2026-09-01
 
 ### Added

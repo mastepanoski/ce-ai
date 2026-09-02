@@ -582,7 +582,7 @@ pub(crate) fn sync_with(
 
 /// Drift found by [`verify_tree_against`]: files absent from disk or whose
 /// on-disk hash no longer matches the expected digest.
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct TreeDrift {
     pub missing: Vec<String>,
     pub mismatched: Vec<String>,

@@ -255,6 +255,11 @@ impl State {
         })
     }
 
+    /// Finds a registered project adoption entry matching the given path.
+    pub fn project_for_path(&self, target_path: &Path) -> Option<&ProjectAdoptionEntry> {
+        self.projects.iter().find(|p| p.path == target_path)
+    }
+
     /// Returns active `WorkflowState`, falling back to legacy `last_update_check` parsing if present.
     pub fn current_workflow(&self) -> Option<WorkflowState> {
         if let Some(wf) = &self.workflow {

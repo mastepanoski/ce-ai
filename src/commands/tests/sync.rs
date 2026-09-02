@@ -222,3 +222,29 @@ fn sync_state_store_port_evaluates_adoption_status_in_memory() {
         .any(|s| s.harness == "opencode" && s.status == "adopted");
     assert!(is_adopted);
 }
+
+#[test]
+fn tree_drift_tracks_mismatches_and_missing_counts() {
+    let mut drift = TreeDrift::default();
+    assert_eq!(drift.total(), 0);
+
+    drift.mismatched.push("skill_a/SKILL.md".to_string());
+    drift.missing.push("skill_b/SKILL.md".to_string());
+    drift.missing.push("skill_c/SKILL.md".to_string());
+
+    assert_eq!(drift.total(), 3);
+    assert_eq!(drift.mismatched.len(), 1);
+    assert_eq!(drift.missing.len(), 2);
+
+    let status = CheckStatus::from_drift(5, drift.clone());
+    match status {
+        CheckStatus::Failed {
+            mismatched,
+            missing,
+        } => {
+            assert_eq!(mismatched, vec!["skill_a/SKILL.md"]);
+            assert_eq!(missing, vec!["skill_b/SKILL.md", "skill_c/SKILL.md"]);
+        }
+        _ => panic!("expected CheckStatus::Failed"),
+    }
+}

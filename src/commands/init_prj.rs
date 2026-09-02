@@ -10,6 +10,8 @@ use crate::error::CeError;
 use crate::state::state::{AdoptionTier, ProjectAdoptionEntry, State};
 use crate::state::{report_best_effort_remove, report_best_effort_write};
 
+use serde::{Deserialize, Serialize};
+
 pub const BLOCK_BEGIN_MARKER: &str = "<!-- ce-ai:block begin";
 pub const BLOCK_END_MARKER: &str = "<!-- ce-ai:block end -->";
 pub const GITIGNORE_BEGIN_MARKER: &str = "# BEGIN CE-AI MANAGED BLOCK";
@@ -19,7 +21,8 @@ pub const GITIGNORE_END_MARKER: &str = "# END CE-AI MANAGED BLOCK";
 /// `state.json` adoption entry so the two cannot drift apart.
 pub const BLOCK_VERSION: u32 = 3;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum AdoptionBlockStatus {
     Ok,
     StaleVersion { version: u32 },
