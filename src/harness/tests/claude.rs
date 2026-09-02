@@ -92,3 +92,101 @@ fn updates_and_strips_claude_md_managed_block() {
     let stripped = strip_managed_block(&content);
     assert!(!stripped.contains(CE_MANAGED_BEGIN));
 }
+
+#[test]
+fn ensures_and_removes_session_start_hook_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let settings_path = tmp.path().join(".claude").join("settings.json");
+
+    assert!(!has_session_start_hook(&settings_path));
+
+    // Fresh injection
+    let changed = ensure_session_start_hook(&settings_path).unwrap();
+    assert!(changed);
+    assert!(has_session_start_hook(&settings_path));
+
+    // Idempotent re-run
+    let changed_again = ensure_session_start_hook(&settings_path).unwrap();
+    assert!(!changed_again);
+
+    let content = std::fs::read_to_string(&settings_path).unwrap();
+    let val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(
+        val["hooks"]["SessionStart"][0]["hooks"][0]["command"],
+        "ce-ai workflow resume"
+    );
+
+    // Surgical removal cleans up empty file
+    let removed = remove_session_start_hook(&settings_path).unwrap();
+    assert!(removed);
+    assert!(!settings_path.exists());
+    assert!(!has_session_start_hook(&settings_path));
+}
+
+#[test]
+fn preserves_user_hooks_and_settings_in_claude_settings_json() {
+    let tmp = TempDir::new().unwrap();
+    let settings_path = tmp.path().join("settings.json");
+
+    let initial = serde_json::json!({
+        "mcpServers": {
+            "custom-tool": {
+                "command": "node"
+            }
+        },
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": ".*",
+                    "hooks": [{"type": "command", "command": "echo pre"}]
+                }
+            ],
+            "SessionStart": [
+                {
+                    "matcher": "git.*",
+                    "hooks": [{"type": "command", "command": "echo user-hook"}]
+                }
+            ]
+        }
+    });
+
+    std::fs::write(
+        &settings_path,
+        serde_json::to_string_pretty(&initial).unwrap(),
+    )
+    .unwrap();
+
+    let changed = ensure_session_start_hook(&settings_path).unwrap();
+    assert!(changed);
+    assert!(has_session_start_hook(&settings_path));
+
+    let content = std::fs::read_to_string(&settings_path).unwrap();
+    let val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert!(val.get("mcpServers").is_some());
+    assert_eq!(
+        val["hooks"]["PreToolUse"][0]["hooks"][0]["command"],
+        "echo pre"
+    );
+
+    // SessionStart now contains user hook + our hook
+    let s_start = val["hooks"]["SessionStart"].as_array().unwrap();
+    assert_eq!(s_start.len(), 2);
+
+    // Remove our hook: user hook and mcpServers must be preserved
+    let removed = remove_session_start_hook(&settings_path).unwrap();
+    assert!(removed);
+    assert!(!has_session_start_hook(&settings_path));
+    assert!(settings_path.exists());
+
+    let content_after = std::fs::read_to_string(&settings_path).unwrap();
+    let val_after: serde_json::Value = serde_json::from_str(&content_after).unwrap();
+    assert!(val_after.get("mcpServers").is_some());
+    assert_eq!(
+        val_after["hooks"]["PreToolUse"][0]["hooks"][0]["command"],
+        "echo pre"
+    );
+    assert_eq!(
+        val_after["hooks"]["SessionStart"][0]["hooks"][0]["command"],
+        "echo user-hook"
+    );
+}

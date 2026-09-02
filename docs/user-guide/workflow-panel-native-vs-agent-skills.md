@@ -39,9 +39,11 @@ So the panel does the honest thing: it tells you exactly which skill belongs to 
 
 > 💡 Skill names above follow the **OpenCode** convention (`/ce-...`). Other harnesses may name or file these skills differently; mapping every harness's naming is out of scope for this page.
 
-## Why there is no "resume" key
+## Why `resume` belongs in the agent session, not the TUI dashboard
 
-You might expect a button to resume from your last checkpoint. Today, `workflow resume` is a placeholder: it re-prints status rather than restoring anything, and pressing `[1-7]` already records stage transitions reversibly. Binding a key to it would show a success message without doing real work — exactly what an *honest* dashboard must never do. If checkpoint recovery ever grows beyond stage transitions (for example, restoring model assignments), it deserves its own feature.
+You might expect a button in the TUI to run `workflow resume`. However, `ce-ai workflow resume` is designed specifically to inject live environment state (`RepoState`, git branch, uncommitted modifications, manifest drift, and OpenSpec progress) directly into an **AI agent's prompt context** (via Claude Code's `SessionStart` hook or the mandatory Turn-0 prompt directive).
+
+The TUI dashboard is an interactive visual monitor. Triggering `workflow resume` inside the dashboard would only display lines in a viewer modal without delivering them to the agent runner that executes the tasks. In the dashboard, pressing `[1-7]` records stage transitions directly; re-synchronizing agent context belongs where the agent lives — in the session itself.
 
 ## The mental model
 

@@ -19,7 +19,7 @@ pub const GITIGNORE_END_MARKER: &str = "# END CE-AI MANAGED BLOCK";
 
 /// Managed block schema version, shared by the on-disk header and the
 /// `state.json` adoption entry so the two cannot drift apart.
-pub const BLOCK_VERSION: u32 = 3;
+pub const BLOCK_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -79,6 +79,11 @@ All AI agents MUST follow the 7-stage Compound Engineering development cycle:
 `[Stage 1: Ideation]` ➔ `[Stage 2: OpenSpec Definition]` ➔ `[Stage 3: Execution Plan]`
 ➔ `[Stage 4: TDD & Implementation]` ➔ `[Stage 5: Verification]` ➔ `[Stage 6: Knowledge Capture]`
 ➔ `[Stage 7: Git Shipping]`
+
+### ⚡ Turn-0 Session Directives (Zero-Step Drift Recovery)
+At the start of EVERY new session or after context compaction, before running any task or reading historical chat assumptions, the AI agent MUST run:
+`ce-ai workflow resume`
+to synchronize live Git working tree state, active branch, manifest SHA256 integrity, and active OpenSpec progress.
 
 ### Stage 2 OpenSpec Enforcement Requirements
 Before creating PRs or writing feature code, agents MUST verify `openspec/changes/<feature_name>/` contains:
@@ -183,48 +188,42 @@ pub fn run(
     );
 
     // Check if block already exists
-    let new_content = if let Some(start_idx) = existing_content.find(BLOCK_BEGIN_MARKER) {
-        if let Some(end_rel_idx) = existing_content[start_idx..].find(BLOCK_END_MARKER) {
-            let end_idx = start_idx + end_rel_idx + BLOCK_END_MARKER.len();
-            let existing_block = &existing_content[start_idx..end_idx];
+    let (new_content, is_already_up_to_date) =
+        if let Some(start_idx) = existing_content.find(BLOCK_BEGIN_MARKER) {
+            if let Some(end_rel_idx) = existing_content[start_idx..].find(BLOCK_END_MARKER) {
+                let end_idx = start_idx + end_rel_idx + BLOCK_END_MARKER.len();
+                let existing_block = &existing_content[start_idx..end_idx];
 
-            if existing_block == full_block && !force {
-                if !ctx.quiet {
-                    println!(
-                        "Project at '{}' is already adopted with up-to-date block (SHA: {}).",
-                        target_dir.display(),
-                        &body_sha256[..8]
-                    );
-                }
-                return Ok(());
+                let up_to_date = existing_block == full_block && !force;
+
+                let mut updated = String::new();
+                updated.push_str(&existing_content[..start_idx]);
+                updated.push_str(&full_block);
+                updated.push_str(&existing_content[end_idx..]);
+                (updated, up_to_date)
+            } else {
+                return Err(CeError::Runtime(format!(
+                    "malformed managed block in '{}': found begin marker without end marker",
+                    agents_file.display()
+                )));
             }
-
-            let mut updated = String::new();
-            updated.push_str(&existing_content[..start_idx]);
-            updated.push_str(&full_block);
-            updated.push_str(&existing_content[end_idx..]);
-            updated
         } else {
-            return Err(CeError::Runtime(format!(
-                "malformed managed block in '{}': found begin marker without end marker",
-                agents_file.display()
-            )));
-        }
-    } else {
-        let mut appended = existing_content.clone();
-        if !appended.is_empty() && !appended.ends_with('\n') && !appended.ends_with("\r\n") {
+            let mut appended = existing_content.clone();
+            if !appended.is_empty() && !appended.ends_with('\n') && !appended.ends_with("\r\n") {
+                appended.push_str(newline);
+            }
+            if !appended.is_empty() {
+                appended.push_str(newline);
+            }
+            appended.push_str(&full_block);
             appended.push_str(newline);
-        }
-        if !appended.is_empty() {
-            appended.push_str(newline);
-        }
-        appended.push_str(&full_block);
-        appended.push_str(newline);
-        appended
-    };
+            (appended, false)
+        };
 
     if !ctx.dry_run {
-        crate::state::write_atomic(&agents_file, new_content.as_bytes())?;
+        if !is_already_up_to_date {
+            crate::state::write_atomic(&agents_file, new_content.as_bytes())?;
+        }
 
         // Create derived stub (e.g. CLAUDE.md) if missing
         let claude_stub = target_dir.join("CLAUDE.md");
@@ -304,6 +303,9 @@ pub fn run(
                 claude_dir.join("CLAUDE.md")
             };
             crate::harness::claude::update_claude_md(&claude_rule_path, inner_body)?;
+
+            let settings_path = target_dir.join(".claude").join("settings.json");
+            let _ = crate::harness::claude::ensure_session_start_hook(&settings_path);
         }
 
         // Write Codex project rule .codex/AGENTS.md if .codex exists
@@ -393,6 +395,17 @@ pub fn run(
         }
 
         state.save(&global_state_path)?;
+    }
+
+    if is_already_up_to_date {
+        if !ctx.quiet {
+            println!(
+                "Project at '{}' is already adopted with up-to-date block (SHA: {}).",
+                target_dir.display(),
+                &body_sha256[..8]
+            );
+        }
+        return Ok(());
     }
 
     if !ctx.quiet {

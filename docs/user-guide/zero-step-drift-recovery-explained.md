@@ -72,11 +72,47 @@ Instead of asking the AI agent to guess what changed, `ce-ai workflow resume` in
              (Zero Wasted Turns / Zero Lag)
 ```
 
-Because the agent receives the exact disk state before it generates even a single line of thought, it achieves **0-step recovery**: zero hallucination turns, zero token waste.
+Because the agent receives the exact disk state before it generates even a single line of thought, it achieves **0-step recovery**: zero hallucination turns, zero token waste upon state synchronization.
 
 ---
 
-## 4. What It Looks Like in Practice
+## 4. Delivery Architecture: Automated Hooks vs Prompt Directives
+
+How does `ce-ai workflow resume` actually reach the agent at session start without relying on human or LLM memory?
+
+`ce-ai` implements a multi-tier delivery architecture:
+
+1. **Native Shell Lifecycle Hook (Automated — Claude Code):**
+   When `ce-ai init-prj` adopts a project containing a `.claude/` directory, it automatically and non-destructively injects a `SessionStart` hook into `.claude/settings.json`:
+   ```json
+   {
+     "hooks": {
+       "SessionStart": [
+         {
+           "matcher": ".*",
+           "hooks": [
+             {
+               "type": "command",
+               "command": "ce-ai workflow resume"
+             }
+           ]
+         }
+       ]
+     }
+   }
+   ```
+   Claude Code automatically executes this hook at session startup and streams its output directly into the agent's context window.
+
+2. **Universal Turn-0 Directive (Enforced — All Other Harnesses):**
+   For harnesses that do not provide native shell lifecycle hooks (Cursor, Codex, GitHub Copilot, Kimi, Grok, Pi), `ce-ai init-prj` injects a mandatory Turn-0 directive into the managed block of `AGENTS.md`:
+   > *"At the start of EVERY new session or after context compaction, before running any task or reading historical chat assumptions, the AI agent MUST run `ce-ai workflow resume`."*
+
+3. **Checkpoint Verification Gate:**
+   When an agent records progress via `ce-ai workflow checkpoint`, `ce-ai` automatically probes `RepoState` and surfaces non-blocking warnings if drift or modified files are detected.
+
+---
+
+## 5. What It Looks Like in Practice
 
 ### Interactive Developer Output
 When you run `ce-ai workflow resume` in your terminal:
