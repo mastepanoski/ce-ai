@@ -125,6 +125,13 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                 }
             }
         }
+
+        // Clean up Claude settings hook (.claude/settings.json)
+        let claude_settings = target_dir.join(".claude").join("settings.json");
+        if claude_settings.exists() {
+            let _ = crate::harness::claude::remove_session_start_hook(&claude_settings);
+        }
+
         // Clean up Codex rule files (AGENTS.md / .codex/AGENTS.md)
         for codex_rule in &[
             target_dir.join("AGENTS.md"),

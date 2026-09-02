@@ -264,6 +264,187 @@ pub fn strip_managed_block(content: &str) -> String {
     }
 }
 
+pub const RESUME_COMMAND: &str = "ce-ai workflow resume";
+
+/// Checks if `.claude/settings.json` contains a SessionStart hook executing `ce-ai workflow resume`.
+pub fn has_session_start_hook(settings_path: &Path) -> bool {
+    if !settings_path.exists() {
+        return false;
+    }
+    let Ok(content) = std::fs::read_to_string(settings_path) else {
+        return false;
+    };
+    let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return false;
+    };
+    val.get("hooks")
+        .and_then(|h| h.get("SessionStart"))
+        .and_then(|s| s.as_array())
+        .map(|arr| {
+            arr.iter().any(|entry| {
+                entry
+                    .get("hooks")
+                    .and_then(|h_arr| h_arr.as_array())
+                    .map(|cmds| {
+                        cmds.iter().any(|cmd| {
+                            cmd.get("command").and_then(|c| c.as_str()) == Some(RESUME_COMMAND)
+                        })
+                    })
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false)
+}
+
+/// Ensures `.claude/settings.json` contains the SessionStart hook for `ce-ai workflow resume`.
+/// Preserves any pre-existing user hooks or extra settings. Idempotent.
+pub fn ensure_session_start_hook(settings_path: &Path) -> Result<bool, CeError> {
+    if has_session_start_hook(settings_path) {
+        return Ok(false);
+    }
+
+    let mut root: serde_json::Value = if settings_path.exists() {
+        let content = std::fs::read_to_string(settings_path)?;
+        serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    let root_obj = root
+        .as_object_mut()
+        .ok_or_else(|| CeError::Runtime("settings root is not an object".to_string()))?;
+    let hooks_val = root_obj
+        .entry("hooks")
+        .or_insert_with(|| serde_json::json!({}));
+    if !hooks_val.is_object() {
+        *hooks_val = serde_json::json!({});
+    }
+
+    let hooks_obj = hooks_val
+        .as_object_mut()
+        .ok_or_else(|| CeError::Runtime("hooks is not an object".to_string()))?;
+    let session_start_val = hooks_obj
+        .entry("SessionStart")
+        .or_insert_with(|| serde_json::json!([]));
+    if !session_start_val.is_array() {
+        *session_start_val = serde_json::json!([]);
+    }
+
+    let session_start_arr = session_start_val
+        .as_array_mut()
+        .ok_or_else(|| CeError::Runtime("SessionStart is not an array".to_string()))?;
+
+    let target_hook = serde_json::json!({
+        "type": "command",
+        "command": RESUME_COMMAND
+    });
+
+    let wildcard_entry = session_start_arr.iter_mut().find(|entry| {
+        entry.get("matcher").and_then(|m| m.as_str()) == Some(".*")
+            && entry.get("hooks").and_then(|h| h.as_array()).is_some()
+    });
+
+    match wildcard_entry {
+        Some(entry) => {
+            if let Some(hooks_list) = entry.get_mut("hooks").and_then(|h| h.as_array_mut()) {
+                if !hooks_list
+                    .iter()
+                    .any(|c| c.get("command").and_then(|s| s.as_str()) == Some(RESUME_COMMAND))
+                {
+                    hooks_list.push(target_hook);
+                }
+            }
+        }
+        None => {
+            session_start_arr.push(serde_json::json!({
+                "matcher": ".*",
+                "hooks": [target_hook]
+            }));
+        }
+    }
+
+    if let Some(parent) = settings_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let serialized = serde_json::to_string_pretty(&root)
+        .map_err(|e| CeError::Runtime(format!("failed to serialize settings.json: {e}")))?;
+    write_atomic(settings_path, serialized.as_bytes())?;
+    Ok(true)
+}
+
+/// Surgically removes `ce-ai workflow resume` hook from `.claude/settings.json`.
+/// If the file becomes empty `{}` as a result, removes the file cleanly.
+pub fn remove_session_start_hook(settings_path: &Path) -> Result<bool, CeError> {
+    if !settings_path.exists() {
+        return Ok(false);
+    }
+
+    let content = std::fs::read_to_string(settings_path)?;
+    let Ok(mut root) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return Ok(false);
+    };
+
+    let mut changed = false;
+
+    if let Some(hooks_obj) = root.get_mut("hooks").and_then(|h| h.as_object_mut()) {
+        if let Some(session_start_arr) = hooks_obj
+            .get_mut("SessionStart")
+            .and_then(|s| s.as_array_mut())
+        {
+            for entry in session_start_arr.iter_mut() {
+                if let Some(hooks_list) = entry.get_mut("hooks").and_then(|h| h.as_array_mut()) {
+                    let prev_len = hooks_list.len();
+                    hooks_list.retain(|cmd| {
+                        cmd.get("command").and_then(|c| c.as_str()) != Some(RESUME_COMMAND)
+                    });
+                    if hooks_list.len() != prev_len {
+                        changed = true;
+                    }
+                }
+            }
+
+            let prev_len = session_start_arr.len();
+            session_start_arr.retain(|entry| {
+                entry
+                    .get("hooks")
+                    .and_then(|h| h.as_array())
+                    .map(|h| !h.is_empty())
+                    .unwrap_or(false)
+            });
+            if session_start_arr.len() != prev_len {
+                changed = true;
+            }
+
+            if session_start_arr.is_empty() {
+                hooks_obj.remove("SessionStart");
+                changed = true;
+            }
+        }
+
+        if hooks_obj.is_empty() {
+            if let Some(root_obj) = root.as_object_mut() {
+                root_obj.remove("hooks");
+                changed = true;
+            }
+        }
+    }
+
+    if !changed {
+        return Ok(false);
+    }
+
+    if root.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+        let _ = std::fs::remove_file(settings_path);
+        return Ok(true);
+    }
+
+    let serialized = serde_json::to_string_pretty(&root)
+        .map_err(|e| CeError::Runtime(format!("failed to serialize settings.json: {e}")))?;
+    write_atomic(settings_path, serialized.as_bytes())?;
+    Ok(true)
+}
+
 #[cfg(test)]
 #[path = "tests/claude.rs"]
 mod tests;

@@ -5,6 +5,21 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.0] - 2026-09-02
+
+### Added
+- **Guaranteed Turn-0 Session-Start Drift Delivery (`src/harness/claude.rs`, `src/commands/init_prj.rs`):**
+  - Native Claude Code `SessionStart` lifecycle hook support: `ce-ai init-prj` non-destructively injects a `SessionStart` command hook in `.claude/settings.json` running `ce-ai workflow resume`, injecting live `RepoState` into system context at session startup.
+  - Surgical hook cleanup: `ce-ai deinit-prj` cleanly removes the hook without affecting custom user settings or other lifecycle hooks.
+  - Universal Turn-0 directive: Added mandatory `ce-ai workflow resume` execution directive to the `AGENTS.md` managed block for instruction-driven harnesses (Cursor, Copilot, Codex, Kimi, Grok, Pi).
+  - Adoption Block v4: Bumped `BLOCK_VERSION: u32 = 4`, enabling automated stale version detection and upgrade guidance in `ce-ai doctor` and `ce-ai status`.
+- **Runtime Checkpoint & Doctor Health Gates (`src/commands/workflow.rs`, `src/commands/doctor.rs`):**
+  - `ce-ai workflow checkpoint` runs `probe_repo_state()` and surfaces prominent non-blocking warnings if managed files drifted during the session.
+  - `ce-ai doctor` audits adopted projects with `.claude/` directories to verify the `SessionStart` hook is configured.
+- **Documentation Truthfulness & Realignment:**
+  - Updated `zero-step-drift-recovery-explained.md` and `harnesses-loops-and-context-masterclass.md` to accurately delineate automated hook delivery vs prompt directives.
+  - Replaced outdated placeholder caveat in `workflow-panel-native-vs-agent-skills.md` with the production `v1.30.0`+ live probing engine capabilities.
+
 ## [1.30.0] - 2026-09-02
 
 ### Added

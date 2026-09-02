@@ -174,7 +174,7 @@ pub fn checkpoint_lines(
         state.save(&state_path)?;
     }
 
-    Ok(vec![
+    let mut lines = vec![
         "workflow: checkpoint saved successfully!".to_string(),
         format!(
             "  phase: Stage {}: {}",
@@ -182,7 +182,17 @@ pub fn checkpoint_lines(
             stage_display_name(stage)
         ),
         format!("  task: {task}"),
-    ])
+    ];
+
+    let repo_state = probe_repo_state(ctx, &state.current_workflow());
+    if repo_state.manifest_drift_count > 0 {
+        lines.push(format!(
+            "! Warning: Drift detected in {} managed files. Run 'ce-ai sync' to reconcile.",
+            repo_state.manifest_drift_count
+        ));
+    }
+
+    Ok(lines)
 }
 
 /// Resume surfaces the checkpoint-derived status plus hand-off framing lines.

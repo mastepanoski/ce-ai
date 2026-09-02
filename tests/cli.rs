@@ -13,7 +13,7 @@ use tempfile::TempDir;
 /// embeds a block header must derive from this constant: a stale hardcoded
 /// version flips classifier branches after a bump (see
 /// docs/solutions/test-failures/adoption-block-version-bump-test-coordination-2026-08-25.md).
-const CUR_BLOCK_VERSION: u32 = 3;
+const CUR_BLOCK_VERSION: u32 = 4;
 
 fn block_begin_prefix(tier: &str) -> String {
     format!("<!-- ce-ai:block begin v={CUR_BLOCK_VERSION} tier={tier}")
@@ -4696,4 +4696,71 @@ mod journal_fault_injection {
             .code(2)
             .stderr(predicates::str::contains("invalid guard level"));
     }
+}
+
+#[test]
+fn init_prj_claude_injects_and_deinits_session_start_hook() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("claude-project");
+    let claude_dir = prj_dir.join(".claude");
+    fs::create_dir_all(&claude_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let settings_file = claude_dir.join("settings.json");
+    assert!(settings_file.exists());
+    let content = fs::read_to_string(&settings_file).unwrap();
+    assert!(content.contains("\"SessionStart\""));
+    assert!(content.contains("ce-ai workflow resume"));
+
+    // Verify doctor is happy with the hook present
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains("Claude Code SessionStart hook missing").not());
+
+    // Tamper by removing the hook: doctor must report finding
+    fs::write(&settings_file, "{}").unwrap();
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains(
+            "project-adoption: Claude Code SessionStart hook missing",
+        ));
+
+    // Re-run init-prj repairs the hook
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+    let repaired = fs::read_to_string(&settings_file).unwrap();
+    assert!(repaired.contains("ce-ai workflow resume"));
+
+    // De-init cleans up the hook and the empty settings file
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success();
+    assert!(!settings_file.exists());
+}
+
+#[test]
+fn init_prj_full_tier_contains_turn_zero_directive() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("turn-zero-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let agents_text = fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap();
+    assert!(agents_text.contains("### ⚡ Turn-0 Session Directives (Zero-Step Drift Recovery)"));
+    assert!(agents_text.contains("ce-ai workflow resume"));
 }

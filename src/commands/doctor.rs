@@ -187,6 +187,18 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 ));
             }
         }
+
+        let claude_dir = p.path.join(".claude");
+        if claude_dir.exists() {
+            let settings = claude_dir.join("settings.json");
+            if !crate::harness::claude::has_session_start_hook(&settings) {
+                findings.push(format!(
+                    "project-adoption: Claude Code SessionStart hook missing at '{}' — re-run ce-ai init-prj --tier {} to configure",
+                    settings.display(),
+                    p.tier.as_str()
+                ));
+            }
+        }
     }
 
     // Git Hooks & Worktree Health Probes
