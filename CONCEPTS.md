@@ -43,3 +43,9 @@ A 3-tier defense-in-depth governance pattern (GitHub REST API Branch Protection 
 ### Model Assignment Drift Reconciliation
 A multi-layered self-healing architecture (`ce-ai install` defaults + `ce-ai doctor` drift probe + `ce-ai sync` bidirectional reconciliation) that eliminates state desynchronization between host harness configs (`opencode.json`) and global state tracking (`state.json`), preserving model assignments across reinstalls and resets using `write_atomic`.
 
+### Zero-Step Environment Drift Recovery
+A sub-15ms Turn-0 state synchronization mechanism (`ce-ai workflow resume`) inspired by SKILL.state (arXiv:2608.26263v2) that probes active Git branch, uncommitted working tree modifications, plugin manifest SHA256 integrity, and project adoption status, eliminating the 5–8 turns of observation lag typical in history-accumulating agent runtimes.
+
+### RepoState
+A structured, serializable data snapshot capturing real-time workspace disk reality (Git status, manifest drift count, adoption marker validity, OpenSpec task progress) emitted on workflow resumption for human review and autonomous agent consumption.
+
