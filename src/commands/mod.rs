@@ -85,6 +85,13 @@ impl Context {
         })
     }
 
+    /// Returns the active repository root or working directory.
+    pub fn repo_root(&self) -> PathBuf {
+        self.workspace_root
+            .clone()
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+    }
+
     /// Returns the canonical path to `state.json`.
     pub fn state_path(&self) -> PathBuf {
         self.config_dir.join("state.json")

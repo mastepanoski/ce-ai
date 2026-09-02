@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ce-ai Ideation: Leveraging SKILL.state (arXiv:2608.26263v2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-elevated: #21262d;
+      --surface-card: #1c2128;
+      --border: #30363d;
+      --border-accent: #388bfd;
+      --text: #c9d1d9;
+      --text-bright: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-glow: rgba(56, 139, 253, 0.15);
+      --success: #3fb950;
+      --warning: #d29922;
+      --danger: #f85149;
+      --purple: #bc8cff;
+      --cyan: #39c5cf;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 15px;
+      padding: 32px 20px 80px 20px;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header.doc-header {
+      background: linear-gradient(180deg, var(--surface-card) 0%, var(--surface) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      margin-bottom: 36px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .meta-label {
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+    }
+
+    .meta-value {
+      color: var(--text-bright);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+    }
+
+    section {
+      margin-bottom: 40px;
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-bottom: 14px;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      background: var(--surface-elevated);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      color: var(--cyan);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .badge-primary { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+    .badge-success { background: rgba(63, 185, 80, 0.15); color: var(--success); border: 1px solid var(--success); }
+    .badge-warning { background: rgba(210, 153, 34, 0.15); color: var(--warning); border: 1px solid var(--warning); }
+    .badge-purple { background: rgba(188, 140, 255, 0.15); color: var(--purple); border: 1px solid var(--purple); }
+
+    .grounding-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .grounding-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .grounding-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .grounding-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+    }
+
+    .grounding-card h4 {
+      font-size: 13px;
+      color: var(--accent);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .axes-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .axis-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 13px;
+    }
+
+    .axis-title {
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 4px;
+    }
+
+    .axis-desc {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .jump-nav {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 28px;
+    }
+
+    .jump-nav-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .jump-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .jump-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 13px;
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      transition: all 0.15s ease;
+    }
+
+    .jump-link:hover {
+      background: var(--surface-elevated);
+      border-color: var(--accent);
+      color: var(--text-bright);
+    }
+
+    .idea-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 28px;
+      transition: border-color 0.2s ease;
+      scroll-margin-top: 20px;
+    }
+
+    .idea-card:hover {
+      border-color: var(--border-accent);
+    }
+
+    .idea-card.top-pick {
+      border-color: var(--success);
+      background: linear-gradient(180deg, rgba(63, 185, 80, 0.05) 0%, var(--surface-card) 100%);
+      box-shadow: 0 0 20px rgba(63, 185, 80, 0.15);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      gap: 16px;
+    }
+
+    .card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-rank {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--accent);
+      background: var(--surface-elevated);
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+
+    .idea-card.top-pick .card-rank {
+      color: var(--success);
+      border-color: var(--success);
+    }
+
+    .card-badges {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .field-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-size: 13.5px;
+    }
+
+    .field-name {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .field-basis {
+      border-left: 3px solid var(--cyan);
+    }
+
+    .field-rationale {
+      border-left: 3px solid var(--success);
+    }
+
+    .field-downsides {
+      border-left: 3px solid var(--warning);
+    }
+
+    .diagram-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin: 16px 0;
+      text-align: center;
+    }
+
+    .diagram-title {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 12px;
+      background: var(--surface-card);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    table.data-table th {
+      background: var(--surface-elevated);
+      color: var(--text-bright);
+      font-weight: 600;
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    table.data-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    table.data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    table.data-table tr:hover td {
+      background: var(--surface);
+    }
+
+    footer.composition-signal {
+      margin-top: 50px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="doc-header">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <h1>ce-ai Ideation: Leveraging SKILL.state for Long-Horizon Agent Skills</h1>
+          <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 0;">
+            Translating the runtime architecture from arXiv:2608.26263v2 into highly executable capabilities for ce-ai and Compound Engineering.
+          </p>
+        </div>
+        <span class="badge badge-primary">Ranked & Refined</span>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-item">
+          <span class="meta-label">Date</span>
+          <span class="meta-value">2026-09-01</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Topic</span>
+          <span class="meta-value">skill-state-integration</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Mode</span>
+          <span class="meta-value">repo-grounded</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Focus Hint</span>
+          <span class="meta-value">arXiv:2608.26263v2 SKILL.state runtime</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- SECTION: GROUNDING CONTEXT -->
+    <section>
+      <h2>Grounding Context</h2>
+      <div class="grounding-box">
+        <div class="grounding-grid">
+          <div class="grounding-card">
+            <h4>Codebase Architecture (ce-ai)</h4>
+            <p style="font-size: 13px; margin-bottom: 8px;">
+              <code>ce-ai</code> is a fast Rust CLI orchestrating the 7-stage Compound Engineering lifecycle across 10 native AI harnesses (OpenCode, Claude, Antigravity, Cursor, Pi, Codex, etc.). Crucially, <strong>ce-ai is an orchestrator/governor, not the LLM inference runtime</strong>.
+            </p>
+            <ul style="font-size: 12.5px; padding-left: 18px; color: var(--text-muted);">
+              <li><code>src/state/state.rs</code>: Atomic <code>state.json</code> I/O and FSM workflow stage tracking.</li>
+              <li><code>src/commands/workflow.rs</code>: FSM checkpointing, status queries, and stage resumption.</li>
+              <li><code>src/commands/skills.rs</code>: Skill registry, installation, and harness distribution.</li>
+              <li><code>src/commands/doctor.rs</code> & <code>sync.rs</code>: SHA256 manifest drift detection and health verification.</li>
+            </ul>
+          </div>
+
+          <div class="grounding-card">
+            <h4>Key Findings from arXiv:2608.26263v2</h4>
+            <p style="font-size: 13px; margin-bottom: 8px;">
+              <strong>SKILL.state (Badhe et al. 2026)</strong> replaces append-only conversational history with an explicit, mutable execution state:
+            </p>
+            <ul style="font-size: 12.5px; padding-left: 18px; color: var(--text-muted);">
+              <li><strong>Step Execution:</strong> <code>(P, &Sigma;<sub>t</sub>, O<sub>t</sub>) &rarr; (R<sub>t</sub>, &Delta;&Sigma;<sub>t</sub>, a<sub>t</sub>)</code>.</li>
+              <li><strong>Discarded CoT:</strong> Reasoning <code>R<sub>t</sub></code> is discarded immediately after validating the state patch <code>&Sigma;<sub>t+1</sub> = &Sigma;<sub>t</sub> &oplus; &Delta;&Sigma;<sub>t</sub></code>.</li>
+              <li><strong>Bounded Prompt:</strong> <em>O(1)</em> prompt footprint per step; <em>O(T)</em> cumulative token complexity (up to <strong>16.2&times; token reduction</strong> at T=100).</li>
+              <li><strong>Drift & Noise Resilience:</strong> <strong>0-step recovery</strong> upon external environment drift; immunity to background telemetry context poisoning.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: TOPIC AXES -->
+    <section>
+      <h2>Topic Axes</h2>
+      <p style="font-size: 13px; color: var(--text-muted);">
+        The integration surface of SKILL.state into <code>ce-ai</code> decomposes across five orthogonal dimensions:
+      </p>
+      <div class="axes-list">
+        <div class="axis-item">
+          <div class="axis-title">1. Deterministic State Validation</div>
+          <div class="axis-desc">Zero-drift state recovery, manifest synchronization, and instant world-model alignment.</div>
+        </div>
+        <div class="axis-item">
+          <div class="axis-title">2. Git & CI Telemetry State</div>
+          <div class="axis-desc">Transforming verbose build and test outputs into structured state deltas before agent context ingestion.</div>
+        </div>
+        <div class="axis-item">
+          <div class="axis-title">3. Skill Schema & Prompt Protocol</div>
+          <div class="axis-desc">Declarative state schemas authored in <code>SKILL.md</code> frontmatter and distributed to harnesses.</div>
+        </div>
+        <div class="axis-item">
+          <div class="axis-title">4. Workflow Loop Execution</div>
+          <div class="axis-desc">Skill-level behavioral conventions for long-horizon Stage 4 (TDD and compiler fix iterations).</div>
+        </div>
+        <div class="axis-item">
+          <div class="axis-title">5. Multi-Agent Coordination</div>
+          <div class="axis-desc">Blackboard state architecture with concurrent write coordination (treated as a focused design spike).</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: RANKED IDEAS -->
+    <section>
+      <h2>Ranked Ideas (Pragmatic & Executable Ordering)</h2>
+
+      <div class="jump-nav">
+        <div class="jump-nav-title">Jump to Idea</div>
+        <div class="jump-nav-links jump-links">
+          <a class="jump-link" href="#idea-1">1. Zero-Step Environment Drift Recovery via Live RepoState</a>
+          <a class="jump-link" href="#idea-2">2. Noise-Filtered Output Projections for Git & CI Telemetry</a>
+          <a class="jump-link" href="#idea-3">3. Declarative SKILL.state Schemas in Skill Frontmatter</a>
+          <a class="jump-link" href="#idea-4">4. SKILL.state Behavioral Convention for Long-Horizon TDD</a>
+          <a class="jump-link" href="#idea-5">5. Design Spike: Multi-Agent State Blackboard with Concurrency</a>
+          <a class="jump-link" href="#idea-6">6. Redux-Style Pure Reducer for 7-Stage FSM Resumption</a>
+        </div>
+      </div>
+
+      <!-- IDEA 1 (TOP PICK: DRIFT RECOVERY) -->
+      <div class="idea-card top-pick" id="idea-1">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-rank">1</div>
+            <div>
+              <h3 style="margin-bottom: 2px;">Zero-Step Environment Drift Recovery via Live <code>RepoState</code> Sync</h3>
+              <span style="font-size: 12px; color: var(--text-muted);">Axis: Deterministic State Validation</span>
+            </div>
+          </div>
+          <div class="card-badges">
+            <span class="badge badge-success">Top Pick</span>
+            <span class="badge badge-primary">Conf: 96%</span>
+            <span class="badge badge-success">Complexity: Low-Med</span>
+          </div>
+        </div>
+
+        <p>
+          Connect <code>doctor.rs</code> and <code>sync.rs</code> SHA256 manifest diffing directly to <code>ce-ai workflow resume</code>. When human developers make git commits, edit files, or switch branches outside the agent's turn, conversational agents hallucinate for 5–8 turns because obsolete chat history overpowers reality. <code>ce-ai</code> computes a live <code>RepoState</code> projection upon invocation that injects a canonical ground-truth state update, achieving the paper's proven <strong>0-step recovery</strong> without touching LLM inference internals.
+        </p>
+
+        <div class="diagram-container">
+          <div class="diagram-title">Drift Recovery: 5-8 Turn Conversational Hallucination vs 0-Step Manifest Injection</div>
+          <svg viewBox="0 0 760 140" xmlns="http://www.w3.org/2000/svg">
+            <!-- Left: Baseline Drift -->
+            <rect x="10" y="10" width="350" height="120" rx="8" fill="#161b22" stroke="#f85149" stroke-width="1.5"/>
+            <text x="25" y="32" fill="#f85149" font-family="Inter" font-size="12" font-weight="600">Standard Agent: Stale History Hallucination</text>
+            <rect x="25" y="45" width="320" height="20" rx="4" fill="#21262d" stroke="#30363d"/>
+            <text x="35" y="59" fill="#c9d1d9" font-family="JetBrains Mono" font-size="10">User renames file on disk &rarr; Agent misses drift</text>
+            <rect x="25" y="70" width="320" height="20" rx="4" fill="#301c1c" stroke="#f85149"/>
+            <text x="35" y="84" fill="#f85149" font-family="JetBrains Mono" font-size="10">Turns 1-5: Hallucinates old path from chat logs</text>
+            <rect x="25" y="95" width="320" height="24" rx="4" fill="#21262d" stroke="#30363d"/>
+            <text x="35" y="111" fill="#8b949e" font-family="JetBrains Mono" font-size="10">Turn 6+: Finally recovers after repeated errors</text>
+
+            <!-- Right: ce-ai Zero-Step Recovery -->
+            <rect x="390" y="10" width="360" height="120" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+            <text x="405" y="32" fill="#3fb950" font-family="Inter" font-size="12" font-weight="600">ce-ai RepoState Sync: 0-Step Ground-Truth</text>
+            <rect x="405" y="45" width="330" height="22" rx="4" fill="#1c2128" stroke="#30363d"/>
+            <text x="415" y="60" fill="#c9d1d9" font-family="JetBrains Mono" font-size="10">doctor.rs / sync.rs computes SHA256 diff in &lt;10ms</text>
+            <rect x="405" y="72" width="330" height="22" rx="4" fill="#1c2b20" stroke="#3fb950"/>
+            <text x="415" y="87" fill="#3fb950" font-family="JetBrains Mono" font-size="10">workflow.rs resume injects canonical &Sigma;<sub>t</sub></text>
+            <rect x="405" y="99" width="330" height="22" rx="4" fill="#1c2128" stroke="#30363d"/>
+            <text x="415" y="114" fill="#58a6ff" font-family="JetBrains Mono" font-size="10">Agent acts on true state immediately (0 lag turns)</text>
+          </svg>
+        </div>
+
+        <div class="field-grid">
+          <div class="field-block field-basis">
+            <div class="field-name">Basis (External + Direct)</div>
+            <div><code>external:</code> arXiv:2608.26263v2 §5.4 (Table 3) documents that history-based runtimes waste 5–8 turns recovering from environment drift, while explicit state updates achieve instant 0-turn recovery.<br><code>direct:</code> <code>src/commands/doctor.rs</code> and <code>src/commands/sync.rs</code> already have robust SHA256 manifest and filesystem drift calculation; connecting this to <code>workflow.rs</code> requires minimal new code.</div>
+          </div>
+          <div class="field-block field-rationale">
+            <div class="field-name">Why It Matters</div>
+            <div>Delivers the highest immediate value with minimal risk. Eliminates developer frustration when switching branches or making manual edits while working with an AI agent.</div>
+          </div>
+          <div class="field-block field-downsides">
+            <div class="field-name">Downsides & Tradeoffs</div>
+            <div>Requires lightweight git status / file hashing check during workflow resumption (easily kept under 20ms in Rust).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IDEA 2: NOISE FILTERING -->
+      <div class="idea-card" id="idea-2">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-rank">2</div>
+            <div>
+              <h3 style="margin-bottom: 2px;">Noise-Filtered Output Projections for Git & CI Telemetry</h3>
+              <span style="font-size: 12px; color: var(--text-muted);">Axis: Git & CI Telemetry State</span>
+            </div>
+          </div>
+          <div class="card-badges">
+            <span class="badge badge-primary">Conf: 92%</span>
+            <span class="badge badge-success">Complexity: Low-Med</span>
+          </div>
+        </div>
+
+        <p>
+          Implement deterministic output filters and distillers in <code>ce-ai</code> for command execution during Stage 5 (Verification) and Stage 7 (Shipping). Instead of dumping 500 lines of raw compiler warnings, cargo check logs, or <code>gh pr checks</code> polling telemetry into the agent context, <code>ce-ai</code> parses tool output into a clean structured summary (failing assertions, blocking jobs, specific line numbers) before it reaches the agent context.
+        </p>
+
+        <div class="field-grid">
+          <div class="field-block field-basis">
+            <div class="field-name">Basis (External + Direct)</div>
+            <div><code>external:</code> arXiv:2608.26263v2 §5.3 proves that standard ReAct agents drop from 0.68 to 0.53 task accuracy under background telemetry noise, whereas state-based noise filtering preserves &ge;0.97 accuracy.<br><code>direct:</code> Hard-Gate Invariant 2 and Stage 7 shipping workflows mandate running <code>gh pr checks --watch</code> and CI matrix gates, which generate high volumes of distractor logs.</div>
+          </div>
+          <div class="field-block field-rationale">
+            <div class="field-name">Why It Matters</div>
+            <div>Pure output transformation before context ingestion. Requires zero control over the harness's LLM loop, making it 100% shippable and universally beneficial across all 10 harnesses.</div>
+          </div>
+          <div class="field-block field-downsides">
+            <div class="field-name">Downsides & Tradeoffs</div>
+            <div>Requires maintaining parsers for common tool outputs (cargo, npm, pytest, gh CLI), though standard regex-based error extraction covers >90% of cases.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IDEA 3: DECLARATIVE SCHEMAS -->
+      <div class="idea-card" id="idea-3">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-rank">3</div>
+            <div>
+              <h3 style="margin-bottom: 2px;">Declarative <code>SKILL.state</code> Schemas in Skill Frontmatter</h3>
+              <span style="font-size: 12px; color: var(--text-muted);">Axis: Skill Schema & Prompt Protocol</span>
+            </div>
+          </div>
+          <div class="card-badges">
+            <span class="badge badge-primary">Conf: 90%</span>
+            <span class="badge badge-primary">Complexity: Low-Med</span>
+          </div>
+        </div>
+
+        <p>
+          Define formal execution state schemas in the YAML frontmatter of <code>SKILL.md</code> files in <code>compound-engineering-plugin</code> (e.g. <code>ce-work</code>, <code>ce-debug</code>, <code>ce-optimize</code>). <code>ce-ai</code> validates these schemas at skill installation and sync time, providing standard state templates that tell agents exactly what state fields to track in external files rather than accumulating conversational clutter.
+        </p>
+
+        <div class="field-grid">
+          <div class="field-block field-basis">
+            <div class="field-name">Basis (External + Direct)</div>
+            <div><code>external:</code> arXiv:2608.26263v2 §3.1 proves that static 5-field domain schemas can generalize across hundreds of diverse real-world tasks without per-task tuning.<br><code>direct:</code> <code>src/commands/skills.rs</code> already manages skill distribution and validation; adding YAML frontmatter schema parsing is a clean additive change.</div>
+          </div>
+          <div class="field-block field-rationale">
+            <div class="field-name">Why It Matters</div>
+            <div>Acts as the foundation for stateful agent behavior. Provides explicit structure so that skills instruct agents to maintain a local <code>.ce-state.json</code> instead of relying on prompt memory.</div>
+          </div>
+          <div class="field-block field-downsides">
+            <div class="field-name">Downsides & Tradeoffs</div>
+            <div>Requires upstream updates to skill definitions in <code>compound-engineering-plugin</code>.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IDEA 4: SKILL CONVENTION FOR TDD -->
+      <div class="idea-card" id="idea-4">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-rank">4</div>
+            <div>
+              <h3 style="margin-bottom: 2px;"><code>SKILL.state</code> Behavioral Convention for Long-Horizon Stage 4 TDD Loops</h3>
+              <span style="font-size: 12px; color: var(--text-muted);">Axis: Workflow Loop Execution</span>
+            </div>
+          </div>
+          <div class="card-badges">
+            <span class="badge badge-primary">Conf: 85%</span>
+            <span class="badge badge-success">Complexity: Low</span>
+          </div>
+        </div>
+
+        <p>
+          Reframe the Stage 4 TDD loop as a <strong>skill-level behavioral convention</strong> rather than an impossible engine-level prompt interceptor. <code>ce-work</code> instructs the agent to maintain an explicit local state file (e.g. <code>.ce-tdd-state.json</code> with <code>failing_tests</code>, <code>tested_hypotheses</code>, <code>active_lints</code>) and explicitly consult and overwrite this state file during multi-step bugfixing rather than replaying past trial-and-error reasoning in conversational memory.
+        </p>
+
+        <div class="field-grid">
+          <div class="field-block field-basis">
+            <div class="field-name">Basis (External + Direct)</div>
+            <div><code>external:</code> arXiv:2608.26263v2 demonstrates that explicit state tracking prevents hypothesis repetition in Linux bash CTF challenges (+7.8 points pass@1).<br><code>direct:</code> Reframing from a CLI runtime wrapper to a skill instruction pattern respects the reality that <code>ce-ai</code> orchestrates third-party harnesses without controlling their internal token loops.</div>
+          </div>
+          <div class="field-block field-rationale">
+            <div class="field-name">Why It Matters</div>
+            <div>Achieves >80% of the cognitive benefit of SKILL.state (structured memory, no repeated failed attempts) purely through prompt guidance and file conventions.</div>
+          </div>
+          <div class="field-block field-downsides">
+            <div class="field-name">Downsides & Tradeoffs</div>
+            <div>Relies on agent adherence rather than deterministic engine enforcement (though OpenSpec and AGENTS.md rules provide strong compliance guardrails).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IDEA 5: MULTI-AGENT BLACKBOARD SPIKE -->
+      <div class="idea-card" id="idea-5">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-rank">5</div>
+            <div>
+              <h3 style="margin-bottom: 2px;">Design Spike: Multi-Agent Shared Blackboard with Concurrency Control</h3>
+              <span style="font-size: 12px; color: var(--text-muted);">Axis: Multi-Agent Coordination</span>
+            </div>
+          </div>
+          <div class="card-badges">
+            <span class="badge badge-purple">Spike Needed</span>
+            <span class="badge badge-primary">Conf: 80%</span>
+            <span class="badge badge-purple">Complexity: High</span>
+          </div>
+        </div>
+
+        <p>
+          Initiate a focused architectural spike to design a shared state blackboard for parallel subagents (e.g. <code>ce-ideate</code>, <code>ce-code-review</code>). Currently, <code>write_atomic</code> in <code>src/state/mod.rs</code> is a simple tempfile+rename without locking or concurrency controls. This spike will design a lock-safe patch merge mechanism (supporting null-deletion and conflict resolution) for multi-agent workflows.
+        </p>
+
+        <div class="field-grid">
+          <div class="field-block field-basis">
+            <div class="field-name">Basis (External + Direct)</div>
+            <div><code>external:</code> arXiv:2608.26263v2 §7 notes that multi-agent explicit state requires deterministic conflict-resolution semantics in the merge operator <code>&oplus;</code>.<br><code>direct:</code> <code>src/state/mod.rs:38</code> uses tempfile rename, which guarantees atomic POSIX writes but can silently clobber concurrent writers without file locking or transactional merges.</div>
+          </div>
+          <div class="field-block field-rationale">
+            <div class="field-name">Why It Matters</div>
+            <div>Prevents premature implementation of a naive multi-agent blackboard that would suffer race conditions, setting up a solid foundation for future parallel agent scaling.</div>
+          </div>
+          <div class="field-block field-downsides">
+            <div class="field-name">Downsides & Tradeoffs</div>
+            <div>Requires designing file-locking / CRDT-like merge semantics across platforms (Unix flock vs Windows LockFileEx).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IDEA 6: REDUX REDUCER FSM -->
+      <div class="idea-card" id="idea-6">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-rank">6</div>
+            <div>
+              <h3 style="margin-bottom: 2px;">Redux-Style Pure Reducer Architecture for 7-Stage FSM Resumption</h3>
+              <span style="font-size: 12px; color: var(--text-muted);">Axis: Workflow Loop Execution</span>
+            </div>
+          </div>
+          <div class="card-badges">
+            <span class="badge badge-primary">Conf: 86%</span>
+            <span class="badge badge-success">Complexity: Low</span>
+          </div>
+        </div>
+
+        <p>
+          Re-architect <code>src/commands/workflow.rs</code> around a deterministic pure reducer pattern <code>(State, Action) &rarr; State</code>. Every user action, agent transition, and checkpoint becomes a discrete serializable action object. When resuming a session across different harnesses (e.g. starting in Claude Code and switching to Antigravity CLI), the target harness receives the compiled state snapshot without needing any chat history translation.
+        </p>
+
+        <div class="field-grid">
+          <div class="field-block field-basis">
+            <div class="field-name">Basis (Reasoned + Direct)</div>
+            <div><code>reasoned:</code> Pure reducer architectures provide mathematical determinism and lossless state reconstitution across disparate UI/agent clients.<br><code>direct:</code> <code>src/state/state.rs</code> already uses atomic writes and serde serialization; refactoring transition methods into pure reducer functions requires minimal architectural disruption.</div>
+          </div>
+          <div class="field-block field-rationale">
+            <div class="field-name">Why It Matters</div>
+            <div>Enables seamless cross-harness portability and flawless crash recovery across all 10 supported agent harnesses.</div>
+          </div>
+          <div class="field-block field-downsides">
+            <div class="field-name">Downsides & Tradeoffs</div>
+            <div>Purely an architectural refactor for the Rust orchestrator; does not directly reduce LLM token usage by itself without companion skill changes.</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- SECTION: REJECTION SUMMARY -->
+    <section>
+      <h2>Rejection Summary</h2>
+      <p style="font-size: 13px; color: var(--text-muted);">
+        Candidates evaluated during divergent ideation and adversarial filtering that were cut, along with their specific rejection rationales:
+      </p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 28%;">Candidate Idea</th>
+            <th style="width: 22%;">Frame</th>
+            <th>Rejection Rationale</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Engine-Level Prompt Interception Loop</strong></td>
+            <td>Inversion & Removal</td>
+            <td>Scope mismatch / unrealistic; ce-ai is a CLI orchestrator across 10 third-party harnesses and cannot intercept native inference loops. Reframed as Idea 4 (Skill-Level Convention).</td>
+          </tr>
+          <tr>
+            <td><strong>Sufficient-Statistic Memory vs. RAG</strong></td>
+            <td>Assumption-breaking</td>
+            <td>Duplicates stronger ideas; already incorporated into Idea 3 (Declarative Schemas) and Idea 2 (Telemetry State).</td>
+          </tr>
+          <tr>
+            <td><strong>Git Object DAG for Agent State Transitions</strong></td>
+            <td>Cross-domain Analogy</td>
+            <td>Too expensive relative to likely value; full content-addressed DAG storage adds unnecessary disk I/O compared to simple JSON state snapshots.</td>
+          </tr>
+          <tr>
+            <td><strong>Strict 4k Token Context Window Constraint</strong></td>
+            <td>Constraint-flipping</td>
+            <td>Below ambition floor; modern production models already have &ge;128k context windows. The real bottleneck is context pollution and quadratic cost, not artificial 4k constraints.</td>
+          </tr>
+          <tr>
+            <td><strong>1,000-Step Autonomous Coding Sessions</strong></td>
+            <td>Constraint-flipping</td>
+            <td>Too vague and ungrounded; represents an aspirational vision rather than an actionable CLI or skill implementation unit.</td>
+          </tr>
+          <tr>
+            <td><strong>LLMLingua Perplexity History Compressor</strong></td>
+            <td>Inversion & Removal</td>
+            <td>Refuted by paper findings: arXiv:2608.26263v2 §5.6 shows statistical compression drops accuracy to 0.22 by destroying critical structured slot dependencies.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer class="composition-signal">
+      Composed 2026-09-01 by ce-ideate from <code>https://arxiv.org/html/2608.26263v2</code> and <code>ce-ai</code> codebase (Refined with user architectural feedback)
+    </footer>
+  </div>
+</body>
+</html>

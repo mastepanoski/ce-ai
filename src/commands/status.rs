@@ -174,5 +174,16 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
         }
     }
 
+    // Git Environment State
+    let root = ctx.repo_root();
+    if let Some(branch) = crate::commands::workflow::probe_git_branch(&root) {
+        let (clean, dirty_files) = crate::commands::workflow::probe_git_dirty_files(&root);
+        if clean {
+            println!("git: {branch} (clean)");
+        } else {
+            println!("git: {branch} ({} modified files)", dirty_files.len());
+        }
+    }
+
     Ok(())
 }
