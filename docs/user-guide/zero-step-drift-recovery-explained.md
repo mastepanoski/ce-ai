@@ -103,11 +103,16 @@ How does `ce-ai workflow resume` actually reach the agent at session start witho
    ```
    Claude Code automatically executes this hook at session startup and streams its output directly into the agent's context window.
 
-2. **Universal Turn-0 Directive (Enforced — All Other Harnesses):**
-   For harnesses that do not provide native shell lifecycle hooks (Cursor, Codex, GitHub Copilot, Kimi, Grok, Pi), `ce-ai init-prj` injects a mandatory Turn-0 directive into the managed block of `AGENTS.md`:
+2. **Native Plugin Lifecycle Event & Compaction Hook (Automated — OpenCode):**
+   When `ce-ai install --harness opencode` or `ce-ai sync` runs, it installs the canonical plugin loader at `~/.config/opencode/compound-engineering/plugins/compound-engineering.js` and registers it in `opencode.json`. The plugin subscribes directly to OpenCode's internal lifecycle hooks:
+   - **`session.created`**: Upon initialization of every session, runs `ce-ai workflow resume` in the project directory and silently injects live `RepoState` into the session via `client.session.prompt` with `{ noReply: true }`.
+   - **`experimental.session.compacting`**: Injects live `RepoState` directly into `output.context`, ensuring canonical drift status survives context compaction.
+
+3. **Universal Turn-0 Directive (Enforced — Other Prompt-Driven Harnesses):**
+   For harnesses that do not provide native shell lifecycle hooks or plugin runtimes (Cursor, Codex, GitHub Copilot, Kimi, Grok, Pi), `ce-ai init-prj` injects a mandatory Turn-0 directive into the managed block of `AGENTS.md`:
    > *"At the start of EVERY new session or after context compaction, before running any task or reading historical chat assumptions, the AI agent MUST run `ce-ai workflow resume`."*
 
-3. **Checkpoint Verification Gate:**
+4. **Checkpoint Verification Gate:**
    When an agent records progress via `ce-ai workflow checkpoint`, `ce-ai` automatically probes `RepoState` and surfaces non-blocking warnings if drift or modified files are detected.
 
 ---

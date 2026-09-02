@@ -5,6 +5,20 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.0] - 2026-09-02
+
+### Added
+- **Guaranteed Turn-0 Drift Delivery for OpenCode via Native Plugin Lifecycle Hooks (`.opencode/plugins/compound-engineering.js`, `src/opencode/plugins.rs`):**
+  - Implemented canonical OpenCode plugin subscribing to the `session.created` event to automatically run `ce-ai workflow resume` and inject live `RepoState` via `client.session.prompt` with `{ noReply: true }`.
+  - Added `experimental.session.compacting` hook ensuring canonical `RepoState` persists across context compaction.
+  - Preserved full dynamic skill discovery and slash-command registration.
+  - Embedded canonical plugin loader directly into the `ce-ai` binary (`BUILTIN_LOADER`), ensuring offline installation safety and eliminating external tarball release dependencies.
+  - Implemented idempotent lifecycle helpers: `has_session_start_plugin`, `ensure_session_start_plugin`, and `remove_session_start_plugin`, guaranteeing atomic writes and non-destructive preservation of user plugins and settings in `opencode.json`.
+- **OpenCode Doctor Health Diagnostics (`src/commands/doctor.rs`):**
+  - Added diagnostic check alerting users when OpenCode is an installed harness but its `SessionStart` plugin is missing or outdated in `opencode.json`.
+- **Documentation Updates:**
+  - Updated `zero-step-drift-recovery-explained.md` and `harnesses-loops-and-context-masterclass.md` to document OpenCode's native plugin lifecycle event integration alongside Claude Code.
+
 ## [1.31.0] - 2026-09-02
 
 ### Added

@@ -109,7 +109,7 @@ flowchart TD
 1. **Atomic Workflow Checkpoints & Turn-0 Resumption (`ce-ai workflow checkpoint` / `resume`)**:
    - Saves current FSM stage index, active subtask string, and timestamp to disk (`state.json`).
    - On session start or context compaction, `ce-ai workflow resume` re-hydrates canonical Git branch, working tree state, manifest integrity, and OpenSpec progress.
-   - Delivered automatically in Claude Code via `.claude/settings.json` `SessionStart` hooks, and enforced via Turn-0 prompt directives in `AGENTS.md` across all other harnesses.
+   - Delivered automatically in Claude Code (via `.claude/settings.json` `SessionStart` hooks) and OpenCode (via native `session.created` and `experimental.session.compacting` plugin hooks), and enforced via Turn-0 prompt directives in `AGENTS.md` across other harnesses.
 
 2. **Engram Memory Persistence**:
    - Session summaries and technical findings are saved outside the LLM context in Engram's SQLite database.
