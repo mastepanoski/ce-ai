@@ -223,6 +223,8 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 for tool in &["codegraph", "engram", "context7", "rtk"] {
                     crate::harness::fx::unregister_fx_mcp_server(&target_config, tool)?;
                 }
+            } else if harness_kind == HarnessKind::Opencode {
+                crate::opencode::plugins::remove_session_start_plugin(&config_dir)?;
             } else if target_config.is_file() {
                 std::fs::remove_file(&target_config)?;
             }

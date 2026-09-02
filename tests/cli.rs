@@ -4764,3 +4764,43 @@ fn init_prj_full_tier_contains_turn_zero_directive() {
     assert!(agents_text.contains("### ⚡ Turn-0 Session Directives (Zero-Step Drift Recovery)"));
     assert!(agents_text.contains("ce-ai workflow resume"));
 }
+
+#[test]
+fn doctor_reports_and_sync_repairs_missing_opencode_plugin() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Verify doctor is initially ok
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains("opencode: SessionStart plugin missing").not());
+
+    // Tamper: remove plugin from opencode.json
+    let opencode_json = home.join(".config/opencode/opencode.json");
+    fs::write(&opencode_json, "{\"plugin\": []}").unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains(
+            "opencode: SessionStart plugin missing or outdated",
+        ));
+
+    // Sync repairs the missing plugin entry
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .arg("sync")
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains("opencode: SessionStart plugin missing").not());
+}

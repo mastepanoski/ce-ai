@@ -90,6 +90,13 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             .push("state-inconsistent: opencode state entry and install manifest disagree".into());
     }
 
+    if has_entry && !crate::opencode::plugins::has_session_start_plugin(&ctx.opencode_config_dir) {
+        findings.push(format!(
+            "opencode: SessionStart plugin missing or outdated in '{}' — run 'ce-ai sync' or 'ce-ai install --harness opencode' to update",
+            ctx.opencode_config_dir.display()
+        ));
+    }
+
     // Model assignment drift between state.json and opencode.json (#111).
     if let Ok(config) = read_config(&opencode_json) {
         findings.extend(crate::commands::models::model_drift_findings(
