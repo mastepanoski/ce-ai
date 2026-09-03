@@ -5,6 +5,19 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.35.0] - 2026-09-02
+
+### Added
+- **Guaranteed Turn-0 Drift Delivery for Pi Coding Agent via Native Extension (`src/harness/pi.rs`, `src/commands/init_prj.rs`):**
+  - Implemented `has_session_start_hook`, `ensure_session_start_hook`, and `remove_session_start_hook` managing `.pi/extensions/compound-engineering.ts`.
+  - Configures an in-process TypeScript lifecycle extension subscribing to `session_start` and `before_agent_start`, executing `ce-ai workflow resume` on Turn-0 and injecting live `RepoState` directly into `systemPrompt`.
+  - Employs Turn-0 execution caching with `session_start` cache reset (for `/resume`, `/new`, `/fork` transitions) and fail-open error handling with timeouts to prevent disrupting agent loops.
+  - Surgically deploys and removes extensions via `write_atomic`, preserving any user-defined extensions and pruning empty directories on project de-adoption.
+- **Pi Coding Agent Doctor Diagnostic Finding (`src/commands/doctor.rs`):**
+  - Added audit probe in `ce-ai doctor` flagging missing Pi `before_agent_start` extensions in adopted projects containing `.pi/`.
+- **Documentation Updates:**
+  - Updated `docs/user-guide/zero-step-drift-recovery-explained.md` promoting Pi coding agent to native automated extension delivery.
+
 ## [1.34.0] - 2026-09-02
 
 ### Added

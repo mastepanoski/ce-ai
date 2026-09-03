@@ -230,6 +230,20 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 ));
             }
         }
+
+        let pi_dir = p.path.join(".pi");
+        if pi_dir.exists() {
+            let extension_file = pi_dir
+                .join("extensions")
+                .join(crate::harness::pi::PI_EXTENSION_FILENAME);
+            if !crate::harness::pi::has_session_start_hook(&extension_file) {
+                findings.push(format!(
+                    "project-adoption: Pi before_agent_start extension missing at '{}' — re-run ce-ai init-prj --tier {} to configure",
+                    extension_file.display(),
+                    p.tier.as_str()
+                ));
+            }
+        }
     }
 
     // Git Hooks & Worktree Health Probes

@@ -368,11 +368,16 @@ pub fn run(
             }
         }
 
-        // Write Pi project rule .pi/AGENTS.md if .pi exists
+        // Write Pi project rule .pi/AGENTS.md and before_agent_start extension if .pi exists
         let pi_dir = target_dir.join(".pi");
         if pi_dir.exists() {
             let pi_agents = pi_dir.join("AGENTS.md");
             crate::harness::update_managed_rule_md(&pi_agents, inner_body)?;
+
+            let ext_path = pi_dir
+                .join("extensions")
+                .join(crate::harness::pi::PI_EXTENSION_FILENAME);
+            crate::harness::pi::ensure_session_start_hook(&ext_path)?;
         }
 
         // Write fx project rule .fx/AGENTS.md if .fx exists

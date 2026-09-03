@@ -4933,3 +4933,64 @@ fn init_prj_codex_injects_and_deinits_session_start_hook() {
     assert!(!after_deinit.contains("ce-ai workflow resume"));
     assert!(after_deinit.contains("model = \"o3-mini\""));
 }
+
+#[test]
+fn init_prj_pi_injects_and_deinits_session_start_hook() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("pi-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    // Create a mock git repository with .pi directory
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(&prj_dir)
+        .output()
+        .unwrap();
+
+    let pi_dir = prj_dir.join(".pi");
+    fs::create_dir_all(&pi_dir).unwrap();
+
+    // Adopt project
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let ext_file = pi_dir.join("extensions").join("compound-engineering.ts");
+    assert!(ext_file.exists());
+    let content = fs::read_to_string(&ext_file).unwrap();
+    assert!(content.contains("before_agent_start"));
+    assert!(content.contains("ce-ai workflow resume"));
+
+    // Doctor checks it and finds no issue
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains("Pi before_agent_start extension missing").not());
+
+    // Tamper by removing the hook: doctor must report finding
+    fs::remove_file(&ext_file).unwrap();
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains(
+            "project-adoption: Pi before_agent_start extension missing",
+        ));
+
+    // Re-run init-prj repairs the extension
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+    assert!(ext_file.exists());
+    let repaired = fs::read_to_string(&ext_file).unwrap();
+    assert!(repaired.contains("ce-ai workflow resume"));
+
+    // De-init cleans up the extension and prunes empty directories
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success();
+    assert!(!ext_file.exists());
+}
