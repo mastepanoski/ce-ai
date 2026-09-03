@@ -287,6 +287,10 @@ pub fn run(
             let rule_path = cursor_rules_dir.join("compound-engineering.mdc");
             let frontmatter = crate::harness::cursor::CursorRuleFrontmatter::default();
             crate::harness::cursor::update_cursor_rule_mdc(&rule_path, &frontmatter, inner_body)?;
+
+            // Ensure Cursor sessionStart hook is configured for Turn-0 drift delivery
+            let cursor_hooks = cursor_dir.join("hooks.json");
+            crate::harness::cursor::ensure_session_start_hook(&cursor_hooks)?;
         }
 
         // Write Claude project rule .claude/CLAUDE.md or CLAUDE.md if .claude or pre-existing CLAUDE.md exists

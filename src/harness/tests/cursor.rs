@@ -159,3 +159,92 @@ Keep types strict.
     assert!(content.contains("Keep types strict."));
     assert!(content.contains("Updated managed text"));
 }
+
+#[test]
+fn cursor_session_start_hook_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let hooks_path = tmp.path().join("hooks.json");
+
+    assert!(!has_session_start_hook(&hooks_path));
+
+    // First ensure -> creates file and returns Ok(true)
+    let created = ensure_session_start_hook(&hooks_path).unwrap();
+    assert!(created);
+    assert!(has_session_start_hook(&hooks_path));
+
+    let content = std::fs::read_to_string(&hooks_path).unwrap();
+    let val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(val["version"], 1);
+    let session_start = val["hooks"]["sessionStart"].as_array().unwrap();
+    assert_eq!(session_start.len(), 1);
+    assert_eq!(session_start[0]["command"], CURSOR_RESUME_COMMAND);
+
+    // Second ensure -> idempotent, returns Ok(false)
+    let re_ensure = ensure_session_start_hook(&hooks_path).unwrap();
+    assert!(!re_ensure);
+    assert!(has_session_start_hook(&hooks_path));
+
+    // Remove -> returns Ok(true) and prunes file
+    let removed = remove_session_start_hook(&hooks_path).unwrap();
+    assert!(removed);
+    assert!(!has_session_start_hook(&hooks_path));
+    assert!(!hooks_path.exists());
+
+    // Second remove -> returns Ok(false)
+    let re_remove = remove_session_start_hook(&hooks_path).unwrap();
+    assert!(!re_remove);
+}
+
+#[test]
+fn cursor_session_start_hook_preserves_user_hooks() {
+    let tmp = TempDir::new().unwrap();
+    let hooks_path = tmp.path().join("hooks.json");
+
+    let initial = serde_json::json!({
+        "version": 1,
+        "hooks": {
+            "preToolUse": [
+                {
+                    "command": "./validate.sh",
+                    "matcher": "Shell|Write"
+                }
+            ],
+            "sessionStart": [
+                {
+                    "command": "./custom-init.sh"
+                }
+            ]
+        },
+        "user_custom_setting": true
+    });
+    std::fs::write(&hooks_path, serde_json::to_string_pretty(&initial).unwrap()).unwrap();
+
+    let created = ensure_session_start_hook(&hooks_path).unwrap();
+    assert!(created);
+    assert!(has_session_start_hook(&hooks_path));
+
+    let content = std::fs::read_to_string(&hooks_path).unwrap();
+    let val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(val["user_custom_setting"], true);
+    assert_eq!(val["hooks"]["preToolUse"].as_array().unwrap().len(), 1);
+    let session_start = val["hooks"]["sessionStart"].as_array().unwrap();
+    assert_eq!(session_start.len(), 2);
+    assert_eq!(session_start[0]["command"], "./custom-init.sh");
+    assert_eq!(session_start[1]["command"], CURSOR_RESUME_COMMAND);
+
+    let removed = remove_session_start_hook(&hooks_path).unwrap();
+    assert!(removed);
+    assert!(!has_session_start_hook(&hooks_path));
+    assert!(hooks_path.exists());
+
+    let content_after = std::fs::read_to_string(&hooks_path).unwrap();
+    let val_after: serde_json::Value = serde_json::from_str(&content_after).unwrap();
+    assert_eq!(val_after["user_custom_setting"], true);
+    assert_eq!(
+        val_after["hooks"]["preToolUse"].as_array().unwrap().len(),
+        1
+    );
+    let session_start_after = val_after["hooks"]["sessionStart"].as_array().unwrap();
+    assert_eq!(session_start_after.len(), 1);
+    assert_eq!(session_start_after[0]["command"], "./custom-init.sh");
+}

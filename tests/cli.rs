@@ -4994,3 +4994,81 @@ fn init_prj_pi_injects_and_deinits_session_start_hook() {
         .success();
     assert!(!ext_file.exists());
 }
+
+#[test]
+fn init_prj_cursor_injects_and_deinits_session_start_hook() {
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let config_dir = home.join(".config").join("opencode");
+    let prj_dir = tmp.path().join("cursor_prj");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    // Initialize git repository
+    std::process::Command::new("git")
+        .args(["init", prj_dir.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    // Pre-create .cursor directory so init-prj triggers Cursor adoption
+    let cursor_dir = prj_dir.join(".cursor");
+    fs::create_dir_all(&cursor_dir).unwrap();
+
+    // Adopt project with full tier
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let hooks_file = cursor_dir.join("hooks.json");
+    let rule_file = cursor_dir.join("rules").join("compound-engineering.mdc");
+    assert!(hooks_file.exists(), ".cursor/hooks.json must be created");
+    assert!(
+        rule_file.exists(),
+        ".cursor/rules/compound-engineering.mdc must be created"
+    );
+
+    let hooks_content = fs::read_to_string(&hooks_file).unwrap();
+    let hooks_val: serde_json::Value = serde_json::from_str(&hooks_content).unwrap();
+    assert_eq!(hooks_val["version"], 1);
+    let session_start = hooks_val["hooks"]["sessionStart"].as_array().unwrap();
+    assert_eq!(session_start.len(), 1);
+    assert_eq!(session_start[0]["command"], "ce-ai workflow resume --json");
+
+    // Doctor check should pass cleanly without Cursor hook findings
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains("Cursor sessionStart hook missing").not());
+
+    // Tamper by removing the hook: doctor must report finding
+    fs::remove_file(&hooks_file).unwrap();
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains(
+            "project-adoption: Cursor sessionStart hook missing",
+        ));
+
+    // Re-run init-prj repairs the hook
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+    assert!(hooks_file.exists());
+    let repaired = fs::read_to_string(&hooks_file).unwrap();
+    assert!(repaired.contains("ce-ai workflow resume --json"));
+
+    // De-init cleans up the hooks and rules
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success();
+    assert!(
+        !hooks_file.exists(),
+        ".cursor/hooks.json must be removed on deinit"
+    );
+    assert!(
+        !rule_file.exists(),
+        "compound-engineering.mdc must be removed on deinit"
+    );
+}
