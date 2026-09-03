@@ -218,6 +218,18 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 ));
             }
         }
+
+        let codex_dir = p.path.join(".codex");
+        if codex_dir.exists() {
+            let config_file = codex_dir.join("config.toml");
+            if !crate::harness::codex::has_session_start_hook(&config_file) {
+                findings.push(format!(
+                    "project-adoption: Codex CLI SessionStart hook missing at '{}' — re-run ce-ai init-prj --tier {} to configure",
+                    config_file.display(),
+                    p.tier.as_str()
+                ));
+            }
+        }
     }
 
     // Git Hooks & Worktree Health Probes

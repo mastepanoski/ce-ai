@@ -4862,3 +4862,74 @@ fn init_prj_copilot_injects_and_deinits_session_start_hook() {
         .success();
     assert!(!hooks_file.exists());
 }
+
+#[test]
+fn init_prj_codex_injects_and_deinits_session_start_hook() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("codex-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    // Create a mock git repository with .codex directory
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(&prj_dir)
+        .output()
+        .unwrap();
+
+    let codex_dir = prj_dir.join(".codex");
+    fs::create_dir_all(&codex_dir).unwrap();
+
+    // Adopt project
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let config_file = codex_dir.join("config.toml");
+    assert!(config_file.exists());
+    let content = fs::read_to_string(&config_file).unwrap();
+    assert!(content.contains("[[hooks.SessionStart]]"));
+    assert!(content.contains("ce-ai workflow resume"));
+
+    // Doctor checks it and finds no issue
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains("Codex CLI SessionStart hook missing").not());
+
+    // Tamper by removing the hook: doctor must report finding
+    fs::write(&config_file, "model = \"o3-mini\"\n").unwrap();
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains(
+            "project-adoption: Codex CLI SessionStart hook missing",
+        ));
+
+    // Re-run init-prj repairs the hook
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+    let repaired = fs::read_to_string(&config_file).unwrap();
+    assert!(repaired.contains("ce-ai workflow resume"));
+    assert!(repaired.contains("model = \"o3-mini\""));
+
+    // Verify ce-ai workflow resume --json contains hookSpecificOutput
+    ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args(["workflow", "resume", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"hookSpecificOutput\""));
+
+    // De-init cleans up the hook, preserving other config settings
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success();
+    let after_deinit = fs::read_to_string(&config_file).unwrap();
+    assert!(!after_deinit.contains("ce-ai workflow resume"));
+    assert!(after_deinit.contains("model = \"o3-mini\""));
+}
