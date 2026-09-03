@@ -244,6 +244,18 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 ));
             }
         }
+
+        let cursor_dir = p.path.join(".cursor");
+        if cursor_dir.exists() {
+            let hooks_file = cursor_dir.join("hooks.json");
+            if !crate::harness::cursor::has_session_start_hook(&hooks_file) {
+                findings.push(format!(
+                    "project-adoption: Cursor sessionStart hook missing at '{}' — re-run ce-ai init-prj --tier {} to configure",
+                    hooks_file.display(),
+                    p.tier.as_str()
+                ));
+            }
+        }
     }
 
     // Git Hooks & Worktree Health Probes

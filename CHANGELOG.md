@@ -5,6 +5,21 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.36.0] - 2026-09-02
+
+### Added
+- **Guaranteed Turn-0 Drift Delivery for Cursor via Native `sessionStart` Hook (`src/harness/cursor.rs`, `src/commands/init_prj.rs`):**
+  - Implemented `has_session_start_hook`, `ensure_session_start_hook`, and `remove_session_start_hook` managing `<project>/.cursor/hooks.json`.
+  - Configures `sessionStart` command hook invoking `ce-ai workflow resume --json`, which executes on composer session creation across both Cursor desktop IDE and Cursor CLI (v0.45+).
+  - Surgically parses and writes `.cursor/hooks.json` via `write_atomic`, preserving all pre-existing user hooks (e.g. `preToolUse`, custom scripts) and top-level user configuration fields.
+  - Cleans up `.cursor/hooks.json` and `.cursor/rules/compound-engineering.mdc` on project de-adoption (`ce-ai deinit-prj`), safely removing empty parent directories while preserving user-defined rules.
+- **Snake-Case `additional_context` in `workflow resume --json` (`src/commands/workflow.rs`):**
+  - Added `additional_context` field to `workflow resume --json` output to natively satisfy Cursor's expected JSON stdout schema.
+- **Cursor Doctor Diagnostic Finding (`src/commands/doctor.rs`):**
+  - Added audit probe in `ce-ai doctor` flagging missing Cursor `sessionStart` hooks in adopted projects containing `.cursor/`.
+- **Documentation Updates:**
+  - Updated `docs/user-guide/zero-step-drift-recovery-explained.md` promoting Cursor to native automated lifecycle hook delivery.
+
 ## [1.35.0] - 2026-09-02
 
 ### Added

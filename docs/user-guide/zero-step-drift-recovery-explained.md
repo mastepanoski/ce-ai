@@ -175,11 +175,27 @@ How does `ce-ai workflow resume` actually reach the agent at session start witho
    ```
    Pi automatically discovers and executes this extension with its built-in `jiti` runtime, executing `ce-ai workflow resume` on Turn-0 and injecting live `RepoState` directly into `systemPrompt` before the agent starts processing.
 
-6. **Universal Turn-0 Directive (Enforced — Other Prompt-Driven Harnesses):**
-   For harnesses that do not yet provide native shell lifecycle hooks or plugin runtimes (Cursor, Kimi, Grok), `ce-ai init-prj` injects a mandatory Turn-0 directive into the managed block of `AGENTS.md`:
+6. **Native Lifecycle Hook & Context Injection (Automated — Cursor):**
+   When `ce-ai init-prj` adopts a project containing a `.cursor/` directory, it automatically injects a `sessionStart` hook into `.cursor/hooks.json`:
+   ```json
+   {
+     "version": 1,
+     "hooks": {
+       "sessionStart": [
+         {
+           "command": "ce-ai workflow resume --json"
+         }
+       ]
+     }
+   }
+   ```
+   Both the Cursor desktop editor and Cursor CLI (v0.45+) execute this hook upon session creation, parsing `additional_context` from `stdout` and appending the live `RepoState` directly into the conversation's initial context window.
+
+7. **Universal Turn-0 Directive (Enforced — Other Prompt-Driven Harnesses):**
+   For harnesses that do not yet provide native shell lifecycle hooks or plugin runtimes (Kimi, Grok), `ce-ai init-prj` injects a mandatory Turn-0 directive into the managed block of `AGENTS.md`:
    > *"At the start of EVERY new session or after context compaction, before running any task or reading historical chat assumptions, the AI agent MUST run `ce-ai workflow resume`."*
 
-7. **Checkpoint Verification Gate:**
+8. **Checkpoint Verification Gate:**
    When an agent records progress via `ce-ai workflow checkpoint`, `ce-ai` automatically probes `RepoState` and surfaces non-blocking warnings if drift or modified files are detected.
 
 ---

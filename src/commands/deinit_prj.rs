@@ -261,6 +261,40 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             let _ = crate::harness::pi::remove_session_start_hook(&pi_ext);
         }
 
+        // Clean up Cursor rule file (.cursor/rules/compound-engineering.mdc) and hooks (.cursor/hooks.json)
+        let cursor_dir = target_dir.join(".cursor");
+        let cursor_rule = cursor_dir.join("rules").join("compound-engineering.mdc");
+        if cursor_rule.exists() {
+            if let Ok(c_text) = fs::read_to_string(&cursor_rule) {
+                if c_text.contains(crate::harness::cursor::CE_MANAGED_BEGIN) {
+                    let stripped = crate::harness::cursor::strip_managed_block(&c_text);
+                    let only_frontmatter = {
+                        let trimmed = stripped.trim();
+                        if let Some(rest) = trimmed.strip_prefix("---") {
+                            rest.find("---")
+                                .map(|idx| rest[idx + 3..].trim().is_empty())
+                                .unwrap_or(false)
+                        } else {
+                            false
+                        }
+                    };
+                    if stripped.trim().is_empty() || only_frontmatter {
+                        report_best_effort_remove(&cursor_rule, fs::remove_file(&cursor_rule));
+                        let _ = fs::remove_dir(cursor_dir.join("rules"));
+                    } else {
+                        report_best_effort_write(
+                            &cursor_rule,
+                            crate::state::write_atomic(&cursor_rule, stripped.as_bytes()),
+                        );
+                    }
+                }
+            }
+        }
+        let cursor_hooks = cursor_dir.join("hooks.json");
+        if cursor_hooks.exists() {
+            let _ = crate::harness::cursor::remove_session_start_hook(&cursor_hooks);
+        }
+
         // Clean up fx rule file (.fx/AGENTS.md)
         let fx_agents = target_dir.join(".fx").join("AGENTS.md");
         if fx_agents.exists() {
