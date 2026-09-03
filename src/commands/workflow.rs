@@ -94,7 +94,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 let wf = state.current_workflow();
                 let repo_state = probe_repo_state(ctx, &wf);
                 let openspec_info = repo_state.openspec_context.clone();
+                let text_lines = resume_lines(ctx)?;
+                let additional_context = text_lines.join("\n");
                 let payload = json!({
+                    "additionalContext": additional_context,
                     "workflow": wf,
                     "repo_state": repo_state,
                     "openspec_context": openspec_info,

@@ -206,6 +206,18 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 ));
             }
         }
+
+        let github_dir = p.path.join(".github");
+        if github_dir.exists() {
+            let hooks_file = github_dir.join("hooks").join("hooks.json");
+            if !crate::harness::copilot::has_session_start_hook(&hooks_file) {
+                findings.push(format!(
+                    "project-adoption: Copilot CLI sessionStart hook missing at '{}' — re-run ce-ai init-prj --tier {} to configure",
+                    hooks_file.display(),
+                    p.tier.as_str()
+                ));
+            }
+        }
     }
 
     // Git Hooks & Worktree Health Probes

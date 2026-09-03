@@ -172,6 +172,12 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             }
         }
 
+        // Clean up Copilot hooks (.github/hooks/hooks.json)
+        let copilot_hooks = target_dir.join(".github").join("hooks").join("hooks.json");
+        if copilot_hooks.exists() {
+            let _ = crate::harness::copilot::remove_session_start_hook(&copilot_hooks);
+        }
+
         // Clean up Grok rule file (.grok/rules/compound-engineering.md)
         let grok_rule = target_dir
             .join(".grok")

@@ -231,6 +231,174 @@ pub fn strip_managed_block(content: &str) -> String {
     }
 }
 
+pub const COPILOT_RESUME_COMMAND: &str = "ce-ai workflow resume --json";
+
+/// Checks if `.github/hooks/hooks.json` contains a sessionStart hook executing `ce-ai workflow resume --json`.
+pub fn has_session_start_hook(hooks_path: &Path) -> bool {
+    if !hooks_path.exists() {
+        return false;
+    }
+    let Ok(content) = std::fs::read_to_string(hooks_path) else {
+        return false;
+    };
+    let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return false;
+    };
+    val.get("hooks")
+        .and_then(|h| h.get("sessionStart"))
+        .and_then(|s| s.as_array())
+        .map(|arr| {
+            arr.iter().any(|entry| {
+                entry.get("bash").and_then(|b| b.as_str()) == Some(COPILOT_RESUME_COMMAND)
+                    || entry.get("powershell").and_then(|p| p.as_str())
+                        == Some(COPILOT_RESUME_COMMAND)
+                    || entry.get("command").and_then(|c| c.as_str()) == Some(COPILOT_RESUME_COMMAND)
+            })
+        })
+        .unwrap_or(false)
+}
+
+/// Ensures `.github/hooks/hooks.json` contains the sessionStart hook for `ce-ai workflow resume --json`.
+/// Preserves any pre-existing user hooks or extra settings. Idempotent.
+pub fn ensure_session_start_hook(hooks_path: &Path) -> Result<bool, CeError> {
+    if has_session_start_hook(hooks_path) {
+        return Ok(false);
+    }
+
+    let mut root: serde_json::Value = if hooks_path.exists() {
+        let content = std::fs::read_to_string(hooks_path)?;
+        serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    if !root.is_object() {
+        root = serde_json::json!({});
+    }
+
+    let root_obj = root
+        .as_object_mut()
+        .ok_or_else(|| CeError::Runtime("hooks root is not an object".to_string()))?;
+
+    if !root_obj.contains_key("version") {
+        root_obj.insert("version".to_string(), serde_json::json!(1));
+    }
+
+    let hooks_val = root_obj
+        .entry("hooks")
+        .or_insert_with(|| serde_json::json!({}));
+    if !hooks_val.is_object() {
+        *hooks_val = serde_json::json!({});
+    }
+
+    let hooks_obj = hooks_val
+        .as_object_mut()
+        .ok_or_else(|| CeError::Runtime("hooks is not an object".to_string()))?;
+
+    let session_start_val = hooks_obj
+        .entry("sessionStart")
+        .or_insert_with(|| serde_json::json!([]));
+    if !session_start_val.is_array() {
+        *session_start_val = serde_json::json!([]);
+    }
+
+    let session_start_arr = session_start_val
+        .as_array_mut()
+        .ok_or_else(|| CeError::Runtime("sessionStart is not an array".to_string()))?;
+
+    let target_hook = serde_json::json!({
+        "type": "command",
+        "bash": COPILOT_RESUME_COMMAND,
+        "powershell": COPILOT_RESUME_COMMAND,
+        "timeoutSec": 15
+    });
+
+    if !session_start_arr.iter().any(|entry| {
+        entry.get("bash").and_then(|b| b.as_str()) == Some(COPILOT_RESUME_COMMAND)
+            || entry.get("powershell").and_then(|p| p.as_str()) == Some(COPILOT_RESUME_COMMAND)
+            || entry.get("command").and_then(|c| c.as_str()) == Some(COPILOT_RESUME_COMMAND)
+    }) {
+        session_start_arr.push(target_hook);
+    }
+
+    if let Some(parent) = hooks_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let serialized = serde_json::to_string_pretty(&root)
+        .map_err(|e| CeError::Runtime(format!("failed to serialize hooks.json: {e}")))?;
+    write_atomic(hooks_path, serialized.as_bytes())?;
+    Ok(true)
+}
+
+/// Surgically removes `ce-ai workflow resume --json` hook from `.github/hooks/hooks.json`.
+/// If the file becomes empty `{}` or only contains `{"version": 1}` as a result, removes the file cleanly.
+pub fn remove_session_start_hook(hooks_path: &Path) -> Result<bool, CeError> {
+    if !hooks_path.exists() {
+        return Ok(false);
+    }
+
+    let content = std::fs::read_to_string(hooks_path)?;
+    let Ok(mut root) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return Ok(false);
+    };
+
+    let mut changed = false;
+
+    if let Some(hooks_obj) = root.get_mut("hooks").and_then(|h| h.as_object_mut()) {
+        if let Some(session_start_arr) = hooks_obj
+            .get_mut("sessionStart")
+            .and_then(|s| s.as_array_mut())
+        {
+            let prev_len = session_start_arr.len();
+            session_start_arr.retain(|entry| {
+                entry.get("bash").and_then(|b| b.as_str()) != Some(COPILOT_RESUME_COMMAND)
+                    && entry.get("powershell").and_then(|p| p.as_str())
+                        != Some(COPILOT_RESUME_COMMAND)
+                    && entry.get("command").and_then(|c| c.as_str()) != Some(COPILOT_RESUME_COMMAND)
+            });
+            if session_start_arr.len() != prev_len {
+                changed = true;
+            }
+
+            if session_start_arr.is_empty() {
+                hooks_obj.remove("sessionStart");
+                changed = true;
+            }
+        }
+
+        if hooks_obj.is_empty() {
+            if let Some(root_obj) = root.as_object_mut() {
+                root_obj.remove("hooks");
+                changed = true;
+            }
+        }
+    }
+
+    if !changed {
+        return Ok(false);
+    }
+
+    let is_empty_or_only_version = if let Some(obj) = root.as_object() {
+        obj.is_empty() || (obj.len() == 1 && obj.contains_key("version"))
+    } else {
+        false
+    };
+
+    if is_empty_or_only_version {
+        let _ = std::fs::remove_file(hooks_path);
+        if let Some(parent) = hooks_path.parent() {
+            let _ = std::fs::remove_dir(parent);
+        }
+        return Ok(true);
+    }
+
+    let serialized = serde_json::to_string_pretty(&root)
+        .map_err(|e| CeError::Runtime(format!("failed to serialize hooks.json: {e}")))?;
+    write_atomic(hooks_path, serialized.as_bytes())?;
+    Ok(true)
+}
+
 #[cfg(test)]
 #[path = "tests/copilot.rs"]
 mod tests;
