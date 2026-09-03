@@ -252,6 +252,15 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             }
         }
 
+        // Clean up Pi extension (.pi/extensions/compound-engineering.ts)
+        let pi_ext = target_dir
+            .join(".pi")
+            .join("extensions")
+            .join(crate::harness::pi::PI_EXTENSION_FILENAME);
+        if pi_ext.exists() {
+            let _ = crate::harness::pi::remove_session_start_hook(&pi_ext);
+        }
+
         // Clean up fx rule file (.fx/AGENTS.md)
         let fx_agents = target_dir.join(".fx").join("AGENTS.md");
         if fx_agents.exists() {

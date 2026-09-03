@@ -140,11 +140,46 @@ How does `ce-ai workflow resume` actually reach the agent at session start witho
    ```
    OpenAI Codex CLI executes this hook on startup, resume, and immediately after mid-turn session compaction (`source: "compact"`), streaming `stdout` directly into the agent's developer context window.
 
-5. **Universal Turn-0 Directive (Enforced — Other Prompt-Driven Harnesses):**
-   For harnesses that do not yet provide native shell lifecycle hooks or plugin runtimes (Cursor, Kimi, Grok, Pi), `ce-ai init-prj` injects a mandatory Turn-0 directive into the managed block of `AGENTS.md`:
+5. **Native In-Process Extension & Prompt Injection (Automated — Pi Coding Agent):**
+   When `ce-ai init-prj` adopts a project containing a `.pi/` directory, it automatically deploys a TypeScript lifecycle extension at `.pi/extensions/compound-engineering.ts`:
+   ```typescript
+   import { execSync } from "node:child_process";
+
+   export default function (pi: any) {
+     let sessionInitialized = false;
+
+     pi.on("session_start", async () => {
+       sessionInitialized = false;
+     });
+
+     pi.on("before_agent_start", async (event: any, ctx: any) => {
+       if (!sessionInitialized) {
+         sessionInitialized = true;
+         try {
+           const stdout = execSync("ce-ai workflow resume", {
+             cwd: ctx?.cwd || process.cwd(),
+             encoding: "utf-8",
+             timeout: 5000,
+           });
+           if (stdout && stdout.trim()) {
+             return {
+               systemPrompt: `${event.systemPrompt}\n\n<!-- CE-AI MANAGED REPOSTATE -->\n${stdout.trim()}`,
+             };
+           }
+         } catch {
+           // Fail-open
+         }
+       }
+     });
+   }
+   ```
+   Pi automatically discovers and executes this extension with its built-in `jiti` runtime, executing `ce-ai workflow resume` on Turn-0 and injecting live `RepoState` directly into `systemPrompt` before the agent starts processing.
+
+6. **Universal Turn-0 Directive (Enforced — Other Prompt-Driven Harnesses):**
+   For harnesses that do not yet provide native shell lifecycle hooks or plugin runtimes (Cursor, Kimi, Grok), `ce-ai init-prj` injects a mandatory Turn-0 directive into the managed block of `AGENTS.md`:
    > *"At the start of EVERY new session or after context compaction, before running any task or reading historical chat assumptions, the AI agent MUST run `ce-ai workflow resume`."*
 
-6. **Checkpoint Verification Gate:**
+7. **Checkpoint Verification Gate:**
    When an agent records progress via `ce-ai workflow checkpoint`, `ce-ai` automatically probes `RepoState` and surfaces non-blocking warnings if drift or modified files are detected.
 
 ---
