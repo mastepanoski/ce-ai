@@ -142,3 +142,95 @@ fn replaces_env_map_cleanly_on_re_registration() {
     let engram_table = root_empty["mcp_servers"]["engram"].as_table().unwrap();
     assert!(!engram_table.contains_key("env"));
 }
+
+#[test]
+fn codex_session_start_hook_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let config_path = tmp.path().join(".codex/config.toml");
+
+    assert!(!has_session_start_hook(&config_path));
+
+    // Ensure hook in non-existent file
+    let changed = ensure_session_start_hook(&config_path).unwrap();
+    assert!(changed);
+    assert!(has_session_start_hook(&config_path));
+
+    // Verify content
+    let content = std::fs::read_to_string(&config_path).unwrap();
+    let root: toml::Table = content.parse().unwrap();
+    let session_start = root["hooks"]["SessionStart"].as_array().unwrap();
+    assert_eq!(session_start.len(), 1);
+    let matcher = session_start[0]["matcher"].as_str().unwrap();
+    assert_eq!(matcher, "startup|resume|compact");
+    let hooks = session_start[0]["hooks"].as_array().unwrap();
+    assert_eq!(hooks.len(), 1);
+    assert_eq!(hooks[0]["command"].as_str().unwrap(), CODEX_RESUME_COMMAND);
+
+    // Idempotent second call
+    let changed_second = ensure_session_start_hook(&config_path).unwrap();
+    assert!(!changed_second);
+    assert!(has_session_start_hook(&config_path));
+
+    // Remove hook
+    let removed = remove_session_start_hook(&config_path).unwrap();
+    assert!(removed);
+    assert!(!has_session_start_hook(&config_path));
+    assert!(!config_path.exists(), "File should be removed when empty");
+
+    let removed_second = remove_session_start_hook(&config_path).unwrap();
+    assert!(!removed_second);
+}
+
+#[test]
+fn codex_session_start_hook_preserves_user_settings() {
+    let tmp = TempDir::new().unwrap();
+    let config_path = tmp.path().join(".codex/config.toml");
+    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+
+    let initial = r#"model = "o3-mini"
+
+[[hooks.PreToolUse]]
+matcher = "Bash"
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "policy_check.sh"
+
+[[hooks.SessionStart]]
+matcher = "startup"
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "echo user-start"
+"#;
+    std::fs::write(&config_path, initial).unwrap();
+
+    let changed = ensure_session_start_hook(&config_path).unwrap();
+    assert!(changed);
+    assert!(has_session_start_hook(&config_path));
+
+    let content = std::fs::read_to_string(&config_path).unwrap();
+    let root: toml::Table = content.parse().unwrap();
+    assert_eq!(root["model"].as_str().unwrap(), "o3-mini");
+    assert!(root["hooks"]["PreToolUse"].as_array().is_some());
+
+    // Remove our hook
+    let removed = remove_session_start_hook(&config_path).unwrap();
+    assert!(removed);
+    assert!(!has_session_start_hook(&config_path));
+    assert!(
+        config_path.exists(),
+        "File should remain because user settings exist"
+    );
+
+    let content_after = std::fs::read_to_string(&config_path).unwrap();
+    let root_after: toml::Table = content_after.parse().unwrap();
+    assert_eq!(root_after["model"].as_str().unwrap(), "o3-mini");
+    assert!(root_after["hooks"]["PreToolUse"].as_array().is_some());
+    let session_start = root_after["hooks"]["SessionStart"].as_array().unwrap();
+    assert_eq!(session_start.len(), 1);
+    assert_eq!(
+        session_start[0]["hooks"].as_array().unwrap()[0]["command"]
+            .as_str()
+            .unwrap(),
+        "echo user-start"
+    );
+}

@@ -98,6 +98,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 let additional_context = text_lines.join("\n");
                 let payload = json!({
                     "additionalContext": additional_context,
+                    "hookSpecificOutput": {
+                        "hookEventName": "SessionStart",
+                        "additionalContext": additional_context,
+                    },
                     "workflow": wf,
                     "repo_state": repo_state,
                     "openspec_context": openspec_info,

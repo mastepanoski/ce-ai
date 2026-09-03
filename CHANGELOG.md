@@ -5,6 +5,20 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.34.0] - 2026-09-02
+
+### Added
+- **Guaranteed Turn-0 Drift Delivery for OpenAI Codex CLI via Native `SessionStart` Hook (`src/harness/codex.rs`, `src/commands/init_prj.rs`):**
+  - Implemented `has_session_start_hook`, `ensure_session_start_hook`, and `remove_session_start_hook` managing `.codex/config.toml`.
+  - Configures `[[hooks.SessionStart]]` command hook running `ce-ai workflow resume` matching `"startup|resume|compact"`, ensuring live `RepoState` injection at session start and mid-turn session compaction.
+  - Surgically merges and removes hooks via `toml::Table` manipulation with `write_atomic`, preserving all pre-existing user settings (MCP servers, env vars, other hooks) and cleaning up empty configuration files upon de-adoption.
+- **`hookSpecificOutput` in `workflow resume --json` (`src/commands/workflow.rs`):**
+  - Added `hookSpecificOutput` JSON structure with `hookEventName: "SessionStart"` and `additionalContext` for full compatibility with OpenAI Codex CLI's structured output schema.
+- **OpenAI Codex Doctor Diagnostic Finding (`src/commands/doctor.rs`):**
+  - Added audit probe in `ce-ai doctor` flagging missing Codex CLI `SessionStart` hooks in adopted projects containing `.codex/`.
+- **Documentation Updates:**
+  - Updated `docs/user-guide/zero-step-drift-recovery-explained.md` promoting OpenAI Codex CLI to native automated hook delivery with compaction resilience.
+
 ## [1.33.0] - 2026-09-02
 
 ### Added

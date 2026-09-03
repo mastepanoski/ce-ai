@@ -308,11 +308,14 @@ pub fn run(
             let _ = crate::harness::claude::ensure_session_start_hook(&settings_path);
         }
 
-        // Write Codex project rule .codex/AGENTS.md if .codex exists
+        // Write Codex project rule .codex/AGENTS.md and SessionStart hook if .codex exists
         let codex_dir = target_dir.join(".codex");
         if codex_dir.exists() {
             let codex_rule_path = codex_dir.join("AGENTS.md");
             crate::harness::codex::update_codex_agents_md(&codex_rule_path, inner_body)?;
+
+            let codex_config_path = codex_dir.join("config.toml");
+            crate::harness::codex::ensure_session_start_hook(&codex_config_path)?;
         }
 
         // Write Copilot project rule .github/copilot-instructions.md and sessionStart hook if .github or copilot-instructions.md exists

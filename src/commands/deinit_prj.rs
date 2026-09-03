@@ -154,6 +154,12 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
             }
         }
 
+        // Clean up Codex hooks (.codex/config.toml)
+        let codex_config = target_dir.join(".codex").join("config.toml");
+        if codex_config.exists() {
+            let _ = crate::harness::codex::remove_session_start_hook(&codex_config);
+        }
+
         // Clean up Copilot rule file (.github/copilot-instructions.md)
         let copilot_rule = target_dir.join(".github").join("copilot-instructions.md");
         if copilot_rule.exists() {
