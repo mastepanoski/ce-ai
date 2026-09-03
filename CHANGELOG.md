@@ -5,6 +5,20 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.33.0] - 2026-09-02
+
+### Added
+- **Guaranteed Turn-0 Drift Delivery for GitHub Copilot CLI via Native `sessionStart` Hook (`src/harness/copilot.rs`, `src/commands/init_prj.rs`):**
+  - Implemented `has_session_start_hook`, `ensure_session_start_hook`, and `remove_session_start_hook` managing `.github/hooks/hooks.json`.
+  - Configures `sessionStart` command hook running `ce-ai workflow resume --json` cross-platform with both `bash` and `powershell` definitions.
+  - Surgically merges and removes hooks via `write_atomic`, preserving all pre-existing user hooks (`preToolUse`, other `sessionStart` hooks) and cleaning up empty hook files upon de-adoption.
+- **`additionalContext` Output in `workflow resume --json` (`src/commands/workflow.rs`):**
+  - Enhanced `ce-ai workflow resume --json` payload with a top-level `additionalContext` string containing formatted status lines, satisfying GitHub Copilot CLI's context injection contract while preserving complete structured metadata for autonomous agents.
+- **GitHub Copilot Doctor Diagnostic Finding (`src/commands/doctor.rs`):**
+  - Added audit probe in `ce-ai doctor` flagging missing Copilot CLI `sessionStart` hooks in adopted projects containing `.github/`.
+- **Documentation Updates:**
+  - Updated `docs/user-guide/zero-step-drift-recovery-explained.md` promoting GitHub Copilot CLI to native automated hook delivery.
+
 ## [1.32.0] - 2026-09-02
 
 ### Added

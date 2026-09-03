@@ -108,11 +108,30 @@ How does `ce-ai workflow resume` actually reach the agent at session start witho
    - **`session.created`**: Upon initialization of every session, runs `ce-ai workflow resume` in the project directory and silently injects live `RepoState` into the session via `client.session.prompt` with `{ noReply: true }`.
    - **`experimental.session.compacting`**: Injects live `RepoState` directly into `output.context`, ensuring canonical drift status survives context compaction.
 
-3. **Universal Turn-0 Directive (Enforced — Other Prompt-Driven Harnesses):**
-   For harnesses that do not provide native shell lifecycle hooks or plugin runtimes (Cursor, Codex, GitHub Copilot, Kimi, Grok, Pi), `ce-ai init-prj` injects a mandatory Turn-0 directive into the managed block of `AGENTS.md`:
+3. **Native Repository-Level Hook & Context Injection (Automated — GitHub Copilot CLI):**
+   When `ce-ai init-prj` adopts a project containing a `.github/` directory, it automatically and non-destructively injects a `sessionStart` command hook into `.github/hooks/hooks.json`:
+   ```json
+   {
+     "version": 1,
+     "hooks": {
+       "sessionStart": [
+         {
+           "type": "command",
+           "bash": "ce-ai workflow resume --json",
+           "powershell": "ce-ai workflow resume --json",
+           "timeoutSec": 15
+         }
+       ]
+     }
+   }
+   ```
+   GitHub Copilot CLI executes this hook on startup. `ce-ai workflow resume --json` outputs an `additionalContext` string alongside structured state metadata, which Copilot CLI ingests and injects directly into the agent's prompt context before the first user response.
+
+4. **Universal Turn-0 Directive (Enforced — Other Prompt-Driven Harnesses):**
+   For harnesses that do not yet provide native shell lifecycle hooks or plugin runtimes (Cursor, Codex, Kimi, Grok, Pi), `ce-ai init-prj` injects a mandatory Turn-0 directive into the managed block of `AGENTS.md`:
    > *"At the start of EVERY new session or after context compaction, before running any task or reading historical chat assumptions, the AI agent MUST run `ce-ai workflow resume`."*
 
-4. **Checkpoint Verification Gate:**
+5. **Checkpoint Verification Gate:**
    When an agent records progress via `ce-ai workflow checkpoint`, `ce-ai` automatically probes `RepoState` and surfaces non-blocking warnings if drift or modified files are detected.
 
 ---

@@ -143,3 +143,99 @@ fn replaces_env_map_cleanly_on_re_registration() {
     assert_eq!(engram_server.command, "engram");
     assert_eq!(engram_server.args, vec!["serve"]);
 }
+
+#[test]
+fn copilot_session_start_hook_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let hooks_path = tmp.path().join(".github/hooks/hooks.json");
+
+    assert!(!has_session_start_hook(&hooks_path));
+
+    // Ensure hook in non-existent file
+    let changed = ensure_session_start_hook(&hooks_path).unwrap();
+    assert!(changed);
+    assert!(has_session_start_hook(&hooks_path));
+
+    // Content check
+    let content = std::fs::read_to_string(&hooks_path).unwrap();
+    let val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(val["version"], 1);
+    let session_start = val["hooks"]["sessionStart"].as_array().unwrap();
+    assert_eq!(session_start.len(), 1);
+    assert_eq!(session_start[0]["type"], "command");
+    assert_eq!(session_start[0]["bash"], COPILOT_RESUME_COMMAND);
+    assert_eq!(session_start[0]["powershell"], COPILOT_RESUME_COMMAND);
+
+    // Idempotent second call
+    let changed_second = ensure_session_start_hook(&hooks_path).unwrap();
+    assert!(!changed_second);
+    assert!(has_session_start_hook(&hooks_path));
+
+    // Remove hook
+    let removed = remove_session_start_hook(&hooks_path).unwrap();
+    assert!(removed);
+    assert!(!has_session_start_hook(&hooks_path));
+    assert!(!hooks_path.exists(), "File should be removed when empty");
+
+    let removed_second = remove_session_start_hook(&hooks_path).unwrap();
+    assert!(!removed_second);
+}
+
+#[test]
+fn copilot_session_start_hook_preserves_user_settings() {
+    let tmp = TempDir::new().unwrap();
+    let hooks_path = tmp.path().join(".github/hooks/hooks.json");
+    std::fs::create_dir_all(hooks_path.parent().unwrap()).unwrap();
+
+    let initial = serde_json::json!({
+        "version": 1,
+        "hooks": {
+            "preToolUse": [
+                {
+                    "type": "command",
+                    "bash": "echo 'pre-tool'"
+                }
+            ],
+            "sessionStart": [
+                {
+                    "type": "command",
+                    "bash": "echo 'user-start'"
+                }
+            ]
+        }
+    });
+    std::fs::write(&hooks_path, serde_json::to_string_pretty(&initial).unwrap()).unwrap();
+
+    let changed = ensure_session_start_hook(&hooks_path).unwrap();
+    assert!(changed);
+    assert!(has_session_start_hook(&hooks_path));
+
+    let content = std::fs::read_to_string(&hooks_path).unwrap();
+    let val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(val["hooks"]["sessionStart"].as_array().unwrap().len(), 2);
+    assert_eq!(val["hooks"]["preToolUse"].as_array().unwrap().len(), 1);
+
+    // Remove our hook
+    let removed = remove_session_start_hook(&hooks_path).unwrap();
+    assert!(removed);
+    assert!(!has_session_start_hook(&hooks_path));
+    assert!(
+        hooks_path.exists(),
+        "File should remain because user hooks exist"
+    );
+
+    let content_after = std::fs::read_to_string(&hooks_path).unwrap();
+    let val_after: serde_json::Value = serde_json::from_str(&content_after).unwrap();
+    assert_eq!(
+        val_after["hooks"]["sessionStart"].as_array().unwrap().len(),
+        1
+    );
+    assert_eq!(
+        val_after["hooks"]["sessionStart"][0]["bash"],
+        "echo 'user-start'"
+    );
+    assert_eq!(
+        val_after["hooks"]["preToolUse"].as_array().unwrap().len(),
+        1
+    );
+}

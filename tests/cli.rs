@@ -4804,3 +4804,61 @@ fn doctor_reports_and_sync_repairs_missing_opencode_plugin() {
         .assert()
         .stdout(predicate::str::contains("opencode: SessionStart plugin missing").not());
 }
+
+#[test]
+fn init_prj_copilot_injects_and_deinits_session_start_hook() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("copilot-project");
+    let github_dir = prj_dir.join(".github");
+    fs::create_dir_all(&github_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let hooks_file = github_dir.join("hooks/hooks.json");
+    assert!(hooks_file.exists());
+    let content = fs::read_to_string(&hooks_file).unwrap();
+    assert!(content.contains("\"sessionStart\""));
+    assert!(content.contains("ce-ai workflow resume --json"));
+
+    // Verify doctor is happy with the hook present
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains("Copilot CLI sessionStart hook missing").not());
+
+    // Tamper by removing the hook: doctor must report finding
+    fs::write(&hooks_file, "{\"version\": 1}").unwrap();
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains(
+            "project-adoption: Copilot CLI sessionStart hook missing",
+        ));
+
+    // Re-run init-prj repairs the hook
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+    let repaired = fs::read_to_string(&hooks_file).unwrap();
+    assert!(repaired.contains("ce-ai workflow resume --json"));
+
+    // Verify ce-ai workflow resume --json contains additionalContext
+    ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args(["workflow", "resume", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"additionalContext\""));
+
+    // De-init cleans up the hook and the empty hooks file
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success();
+    assert!(!hooks_file.exists());
+}

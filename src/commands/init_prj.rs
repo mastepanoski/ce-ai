@@ -315,12 +315,16 @@ pub fn run(
             crate::harness::codex::update_codex_agents_md(&codex_rule_path, inner_body)?;
         }
 
-        // Write Copilot project rule .github/copilot-instructions.md if .github or copilot-instructions.md exists
+        // Write Copilot project rule .github/copilot-instructions.md and sessionStart hook if .github or copilot-instructions.md exists
         let github_dir = target_dir.join(".github");
         let copilot_md_path = github_dir.join("copilot-instructions.md");
         if github_dir.exists() || copilot_md_path.exists() {
             fs::create_dir_all(&github_dir)?;
             crate::harness::copilot::update_copilot_instructions_md(&copilot_md_path, inner_body)?;
+
+            let copilot_hooks_dir = github_dir.join("hooks");
+            let copilot_hooks_file = copilot_hooks_dir.join("hooks.json");
+            crate::harness::copilot::ensure_session_start_hook(&copilot_hooks_file)?;
         }
 
         // Write Grok project rule .grok/rules/compound-engineering.md if .grok exists
