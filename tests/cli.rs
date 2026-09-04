@@ -5188,3 +5188,71 @@ fn workflow_resume_pre_invocation_cli_deduplication() {
     let trimmed2 = stdout2.trim();
     assert_eq!(trimmed2, "{}");
 }
+
+#[test]
+fn workflow_checkpoint_reset_to_stage_1_clears_feature_in_resume() {
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let config_dir = home.join(".config").join("opencode");
+    let repo_dir = tmp.path().join("my-repo");
+    fs::create_dir_all(&repo_dir).unwrap();
+
+    std::process::Command::new("git")
+        .args(["init", repo_dir.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    let feat_a_dir = repo_dir.join("openspec").join("changes").join("feature-a");
+    let feat_b_dir = repo_dir.join("openspec").join("changes").join("feature-b");
+    fs::create_dir_all(&feat_a_dir).unwrap();
+    fs::create_dir_all(&feat_b_dir).unwrap();
+    fs::write(feat_a_dir.join("proposal.md"), "# Feature A").unwrap();
+    fs::write(feat_b_dir.join("proposal.md"), "# Feature B").unwrap();
+
+    // 1. Checkpoint on Stage 2 with explicit feature-a
+    ceai(&config_dir, &home)
+        .current_dir(&repo_dir)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--stage",
+            "2",
+            "--task",
+            "spec feature-a",
+            "--feature",
+            "feature-a",
+        ])
+        .assert()
+        .success();
+
+    // 2. Reset to Stage 1 without --feature
+    ceai(&config_dir, &home)
+        .current_dir(&repo_dir)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--stage",
+            "1",
+            "--task",
+            "ideation for feature-b",
+        ])
+        .assert()
+        .success();
+
+    // 3. Resume must NOT retain feature-a; must fall back to discovery or not show feature-a
+    let assert_resume = ceai(&config_dir, &home)
+        .current_dir(&repo_dir)
+        .args(["workflow", "resume"])
+        .assert()
+        .success();
+
+    let stdout = String::from_utf8_lossy(&assert_resume.get_output().stdout);
+    assert!(
+        !stdout.contains("active feature: feature-a"),
+        "stdout must not retain active feature-a after reset to stage 1: {stdout}"
+    );
+    assert!(
+        !stdout.contains("Context Re-hydration: feature-a"),
+        "re-hydration must not bind to old feature-a after reset to stage 1: {stdout}"
+    );
+}

@@ -221,3 +221,123 @@ fn guardrail_state_round_trips_and_parses() {
     assert_eq!(guard.harness.as_deref(), Some("claude"));
     assert_eq!(guard.updated_at, "2026-08-28T00:00:00Z");
 }
+
+#[test]
+fn reset_to_stage_1_without_feature_clears_previous_feature() {
+    let mut state = State::new();
+    state
+        .validate_and_set_workflow(
+            crate::state::state::WorkflowStage::OpenSpec,
+            "specifying feature A",
+            Some("feature-a".into()),
+        )
+        .unwrap();
+    assert_eq!(
+        state.current_workflow().unwrap().feature_name.as_deref(),
+        Some("feature-a")
+    );
+
+    // Resetting to Stage 1 without --feature MUST clear the previous feature
+    state
+        .validate_and_set_workflow(
+            crate::state::state::WorkflowStage::Ideation,
+            "ideation for feature B",
+            None,
+        )
+        .unwrap();
+    assert_eq!(
+        state.current_workflow().unwrap().feature_name,
+        None,
+        "reset to Stage 1 without explicit feature must clear feature_name"
+    );
+}
+
+#[test]
+fn advance_stage_without_feature_inherits_previous_feature() {
+    let mut state = State::new();
+    state
+        .validate_and_set_workflow(
+            crate::state::state::WorkflowStage::OpenSpec,
+            "specifying feature A",
+            Some("feature-a".into()),
+        )
+        .unwrap();
+
+    // Advancing from Stage 2 to Stage 3 without --feature MUST inherit feature-a
+    state
+        .validate_and_set_workflow(
+            crate::state::state::WorkflowStage::ExecutionPlan,
+            "planning feature A",
+            None,
+        )
+        .unwrap();
+    assert_eq!(
+        state.current_workflow().unwrap().feature_name.as_deref(),
+        Some("feature-a")
+    );
+}
+
+#[test]
+fn reset_to_stage_1_with_explicit_feature_sets_new_feature() {
+    let mut state = State::new();
+    state
+        .validate_and_set_workflow(
+            crate::state::state::WorkflowStage::OpenSpec,
+            "specifying feature A",
+            Some("feature-a".into()),
+        )
+        .unwrap();
+
+    // Resetting to Stage 1 with explicit --feature sets the new feature
+    state
+        .validate_and_set_workflow(
+            crate::state::state::WorkflowStage::Ideation,
+            "ideation for feature B",
+            Some("feature-b".into()),
+        )
+        .unwrap();
+    assert_eq!(
+        state.current_workflow().unwrap().feature_name.as_deref(),
+        Some("feature-b")
+    );
+}
+
+#[test]
+fn explicit_empty_feature_clears_feature_name() {
+    let mut state = State::new();
+    state
+        .validate_and_set_workflow(
+            crate::state::state::WorkflowStage::OpenSpec,
+            "specifying feature A",
+            Some("feature-a".into()),
+        )
+        .unwrap();
+
+    // Passing empty string explicitly clears the feature
+    state
+        .validate_and_set_workflow(
+            crate::state::state::WorkflowStage::ExecutionPlan,
+            "planning tasks",
+            Some("".into()),
+        )
+        .unwrap();
+    assert_eq!(
+        state.current_workflow().unwrap().feature_name,
+        None,
+        "explicit empty feature must clear feature_name"
+    );
+
+    // Whitespace-only string also clears the feature
+    state
+        .validate_and_set_workflow(
+            crate::state::state::WorkflowStage::WorkTdd,
+            "working",
+            Some("   ".into()),
+        )
+        .unwrap();
+    assert_eq!(
+        state.current_workflow().unwrap().feature_name,
+        None,
+        "whitespace feature must clear feature_name"
+    );
+}

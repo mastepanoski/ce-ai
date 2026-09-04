@@ -152,7 +152,7 @@ If you need to stop working and continue hours or days later:
 
 1. **Before Stopping (Save Progress)**:
    ```bash
-   ce-ai workflow checkpoint --phase "Stage 4: Work/TDD" --task "4.2 Implementing Unit 2"
+   ce-ai workflow checkpoint --stage 4 --task "4.2 Implementing Unit 2"
    ```
 2. **When Resuming Later**:
    ```bash

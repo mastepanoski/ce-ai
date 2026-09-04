@@ -307,8 +307,27 @@ impl State {
                 current_stage.number() + 1
             )));
         }
-        let feature_name =
-            feature.or_else(|| self.current_workflow().and_then(|wf| wf.feature_name));
+        let is_reset_to_stage_1 =
+            target_stage == WorkflowStage::Ideation && current_stage != WorkflowStage::Ideation;
+
+        let feature_name = match feature {
+            Some(f) => {
+                let trimmed = f.trim().to_string();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed)
+                }
+            }
+            None => {
+                if is_reset_to_stage_1 {
+                    None
+                } else {
+                    self.current_workflow().and_then(|wf| wf.feature_name)
+                }
+            }
+        };
+
         self.workflow = Some(WorkflowState {
             stage: target_stage,
             task: task.to_string(),
