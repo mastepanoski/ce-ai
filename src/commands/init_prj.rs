@@ -398,6 +398,8 @@ pub fn run(
             fs::create_dir_all(&agents_rules_dir)?;
             let agy_rule_path = agents_rules_dir.join("compound-engineering.md");
             crate::harness::update_managed_rule_md(&agy_rule_path, inner_body)?;
+            let agy_hooks = agents_dir.join("hooks.json");
+            crate::harness::agy::ensure_pre_invocation_hook(&agy_hooks)?;
         }
         let gemini_md = target_dir.join("GEMINI.md");
         if gemini_md.exists() || (agents_dir.exists() && !gemini_md.exists()) {

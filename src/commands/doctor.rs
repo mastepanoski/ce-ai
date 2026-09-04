@@ -256,6 +256,18 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 ));
             }
         }
+
+        let agents_dir = p.path.join(".agents");
+        if agents_dir.exists() {
+            let hooks_file = agents_dir.join("hooks.json");
+            if !crate::harness::agy::has_pre_invocation_hook(&hooks_file) {
+                findings.push(format!(
+                    "project-adoption: Antigravity PreInvocation hook missing at '{}' — re-run ce-ai init-prj --tier {} to configure",
+                    hooks_file.display(),
+                    p.tier.as_str()
+                ));
+            }
+        }
     }
 
     // Git Hooks & Worktree Health Probes

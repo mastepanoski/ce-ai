@@ -5072,3 +5072,119 @@ fn init_prj_cursor_injects_and_deinits_session_start_hook() {
         "compound-engineering.mdc must be removed on deinit"
     );
 }
+
+#[test]
+fn init_prj_agy_injects_and_deinits_pre_invocation_hook() {
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let config_dir = home.join(".config").join("opencode");
+    let prj_dir = tmp.path().join("agy_prj");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    // Initialize git repository
+    std::process::Command::new("git")
+        .args(["init", prj_dir.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    // Pre-create .agents directory so init-prj triggers Antigravity adoption
+    let agents_dir = prj_dir.join(".agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+
+    // Adopt project with full tier
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let hooks_file = agents_dir.join("hooks.json");
+    let rule_file = agents_dir.join("rules").join("compound-engineering.md");
+    assert!(hooks_file.exists(), ".agents/hooks.json must be created");
+    assert!(
+        rule_file.exists(),
+        ".agents/rules/compound-engineering.md must be created"
+    );
+
+    let hooks_content = fs::read_to_string(&hooks_file).unwrap();
+    let hooks_val: serde_json::Value = serde_json::from_str(&hooks_content).unwrap();
+    let pre_inv = hooks_val["compound-engineering"]["PreInvocation"]
+        .as_array()
+        .unwrap();
+    assert_eq!(pre_inv.len(), 1);
+    assert_eq!(pre_inv[0]["type"], "command");
+    assert_eq!(
+        pre_inv[0]["command"],
+        "ce-ai workflow resume --pre-invocation"
+    );
+
+    // Doctor check should pass cleanly without Antigravity hook findings
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains("Antigravity PreInvocation hook missing").not());
+
+    // Tamper by removing the hook: doctor must report finding
+    fs::remove_file(&hooks_file).unwrap();
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains(
+            "project-adoption: Antigravity PreInvocation hook missing",
+        ));
+
+    // Re-run init-prj repairs the hook
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+    assert!(hooks_file.exists());
+    let repaired = fs::read_to_string(&hooks_file).unwrap();
+    assert!(repaired.contains("ce-ai workflow resume --pre-invocation"));
+
+    // De-init cleans up the hooks and rules
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success();
+    assert!(
+        !hooks_file.exists(),
+        ".agents/hooks.json must be removed on deinit"
+    );
+    assert!(
+        !rule_file.exists(),
+        "compound-engineering.md must be removed on deinit"
+    );
+}
+
+#[test]
+fn workflow_resume_pre_invocation_cli_deduplication() {
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let config_dir = home.join(".config").join("opencode");
+
+    // First invocation with conversationId returns injectSteps
+    let input1 = r#"{"conversationId": "test-agy-cli-conv-1", "invocationNum": 0}"#;
+    let assert1 = ceai(&config_dir, &home)
+        .env("CE_AI_AGY_MARKER_DIR", tmp.path())
+        .args(["workflow", "resume", "--pre-invocation"])
+        .write_stdin(input1)
+        .assert()
+        .success();
+
+    let stdout1 = String::from_utf8_lossy(&assert1.get_output().stdout);
+    assert!(stdout1.contains("injectSteps"));
+    assert!(stdout1.contains("ephemeralMessage"));
+
+    // Second invocation with same conversationId returns {}
+    let input2 = r#"{"conversationId": "test-agy-cli-conv-1", "invocationNum": 1}"#;
+    let assert2 = ceai(&config_dir, &home)
+        .env("CE_AI_AGY_MARKER_DIR", tmp.path())
+        .args(["workflow", "resume", "--pre-invocation"])
+        .write_stdin(input2)
+        .assert()
+        .success();
+
+    let stdout2 = String::from_utf8_lossy(&assert2.get_output().stdout);
+    let trimmed2 = stdout2.trim();
+    assert_eq!(trimmed2, "{}");
+}

@@ -169,3 +169,98 @@ fn register_agy_mcp_server_excludes_opencode_keys() {
     assert!(!content.contains("plugin"));
     assert!(!content.contains("skills"));
 }
+
+#[test]
+fn agy_pre_invocation_hook_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let agents_dir = tmp.path().join(".agents");
+    let hooks_path = agents_dir.join("hooks.json");
+
+    assert!(!has_pre_invocation_hook(&hooks_path));
+
+    // Ensure hook creates file and parent directory
+    let created = ensure_pre_invocation_hook(&hooks_path).unwrap();
+    assert!(created);
+    assert!(hooks_path.exists());
+    assert!(has_pre_invocation_hook(&hooks_path));
+
+    // Inspect content
+    let content = std::fs::read_to_string(&hooks_path).unwrap();
+    let val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let ce_hook = val
+        .get("compound-engineering")
+        .and_then(|c| c.get("PreInvocation"))
+        .and_then(|pi| pi.as_array())
+        .expect("compound-engineering.PreInvocation must be an array");
+    assert_eq!(ce_hook.len(), 1);
+    assert_eq!(
+        ce_hook[0].get("command").and_then(|c| c.as_str()),
+        Some(AGY_RESUME_COMMAND)
+    );
+
+    // Idempotent re-run
+    let re_ensure = ensure_pre_invocation_hook(&hooks_path).unwrap();
+    assert!(!re_ensure);
+
+    // Remove hook cleans up file and empty .agents parent
+    let removed = remove_pre_invocation_hook(&hooks_path).unwrap();
+    assert!(removed);
+    assert!(!hooks_path.exists());
+    assert!(!agents_dir.exists(), "empty parent dir should be pruned");
+
+    // Remove again returns false
+    let re_remove = remove_pre_invocation_hook(&hooks_path).unwrap();
+    assert!(!re_remove);
+}
+
+#[test]
+fn agy_pre_invocation_hook_preserves_user_hooks() {
+    let tmp = TempDir::new().unwrap();
+    let agents_dir = tmp.path().join(".agents");
+    let hooks_path = agents_dir.join("hooks.json");
+    std::fs::create_dir_all(&agents_dir).unwrap();
+
+    let initial_json = r#"{
+      "custom-security": {
+        "PreToolUse": [
+          {
+            "type": "command",
+            "command": "check-security"
+          }
+        ]
+      }
+    }"#;
+    std::fs::write(&hooks_path, initial_json).unwrap();
+
+    let created = ensure_pre_invocation_hook(&hooks_path).unwrap();
+    assert!(created);
+    assert!(has_pre_invocation_hook(&hooks_path));
+
+    // Verify user hooks preserved
+    let content = std::fs::read_to_string(&hooks_path).unwrap();
+    let val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert!(val.get("custom-security").is_some());
+    assert!(val.get("compound-engineering").is_some());
+
+    // Remove only removes compound-engineering hook, preserving custom-security
+    let removed = remove_pre_invocation_hook(&hooks_path).unwrap();
+    assert!(removed);
+    assert!(hooks_path.exists());
+
+    let content_after = std::fs::read_to_string(&hooks_path).unwrap();
+    let val_after: serde_json::Value = serde_json::from_str(&content_after).unwrap();
+    assert!(val_after.get("custom-security").is_some());
+    assert!(val_after.get("compound-engineering").is_none());
+}
+
+#[test]
+fn agy_hook_aliases_work_identically() {
+    let tmp = TempDir::new().unwrap();
+    let hooks_path = tmp.path().join("hooks.json");
+
+    assert!(!has_session_start_hook(&hooks_path));
+    assert!(ensure_session_start_hook(&hooks_path).unwrap());
+    assert!(has_session_start_hook(&hooks_path));
+    assert!(remove_session_start_hook(&hooks_path).unwrap());
+    assert!(!has_session_start_hook(&hooks_path));
+}

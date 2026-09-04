@@ -191,11 +191,42 @@ How does `ce-ai workflow resume` actually reach the agent at session start witho
    ```
    Both the Cursor desktop editor and Cursor CLI (v0.45+) execute this hook upon session creation, parsing `additional_context` from `stdout` and appending the live `RepoState` directly into the conversation's initial context window.
 
-7. **Universal Turn-0 Directive (Enforced — Other Prompt-Driven Harnesses):**
+7. **Native PreInvocation Hook & Session-Deduplicated Injection (Automated — Google Antigravity CLI):**
+   When `ce-ai init-prj` adopts a project containing a `.agents/` directory, it automatically and non-destructively injects a `PreInvocation` hook into `.agents/hooks.json`:
+   ```json
+   {
+     "compound-engineering": {
+       "PreInvocation": [
+         {
+           "type": "command",
+           "command": "ce-ai workflow resume --pre-invocation"
+         }
+       ]
+     }
+   }
+   ```
+   **The Per-Turn vs Session-Start Distinction:**
+   Google Antigravity CLI (`agy`) does not provide a dedicated single-shot session start event. Its official hooks engine (`https://antigravity.google/docs/hooks/`) defines `PreInvocation`, which fires before *every* model invocation.
+   To deliver true Turn-0 drift recovery without spamming subsequent conversational turns, `ce-ai workflow resume --pre-invocation` implements **session deduplication**:
+   - On the first turn of a session (Turn 0), `ce-ai` reads `conversationId` (or `sessionId`) from `stdin`, creates a temporary session marker, and emits:
+     ```json
+     {
+       "injectSteps": [
+         {
+           "ephemeralMessage": "<live RepoState>"
+         }
+       ]
+     }
+     ```
+     This injects live environment drift status directly as a transient system prompt before the model begins reasoning.
+   - On all subsequent conversational turns within the same session, `ce-ai` detects the existing session marker and emits an empty JSON object `{}` in sub-millisecond time.
+   This guarantees 0-step drift recovery on session wake-up with zero token overhead during active pair programming.
+
+8. **Universal Turn-0 Directive (Enforced — Other Prompt-Driven Harnesses):**
    For harnesses that do not yet provide native shell lifecycle hooks or plugin runtimes (Kimi, Grok), `ce-ai init-prj` injects a mandatory Turn-0 directive into the managed block of `AGENTS.md`:
    > *"At the start of EVERY new session or after context compaction, before running any task or reading historical chat assumptions, the AI agent MUST run `ce-ai workflow resume`."*
 
-8. **Checkpoint Verification Gate:**
+9. **Checkpoint Verification Gate:**
    When an agent records progress via `ce-ai workflow checkpoint`, `ce-ai` automatically probes `RepoState` and surfaces non-blocking warnings if drift or modified files are detected.
 
 ---
