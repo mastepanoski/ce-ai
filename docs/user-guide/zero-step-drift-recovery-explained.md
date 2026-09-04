@@ -223,7 +223,7 @@ How does `ce-ai workflow resume` actually reach the agent at session start witho
    This guarantees 0-step drift recovery on session wake-up with zero token overhead during active pair programming.
 
 8. **Universal Turn-0 Directive (Enforced — Other Prompt-Driven Harnesses):**
-   For harnesses that do not yet provide native shell lifecycle hooks or plugin runtimes (Kimi, Grok), `ce-ai init-prj` injects a mandatory Turn-0 directive into the managed block of `AGENTS.md`:
+   For harnesses that do not provide a native, deterministic context-injection mechanism (Kimi, Grok, DeepSeek, Fx — see their evaluation docs under `docs/solutions/architecture/`), `ce-ai init-prj` injects a mandatory Turn-0 directive into the managed block of `AGENTS.md`:
    > *"At the start of EVERY new session or after context compaction, before running any task or reading historical chat assumptions, the AI agent MUST run `ce-ai workflow resume`."*
 
 9. **Checkpoint Verification Gate:**
@@ -288,7 +288,7 @@ Autonomous harnesses run `ce-ai workflow resume --json` to receive structured da
 
 ---
 
-## 5. Non-Blocking Guidance on Drift
+## 6. Non-Blocking Guidance on Drift
 
 What happens if managed files (like skills or plugin scripts) were edited outside `ce-ai`?
 
@@ -305,7 +305,7 @@ If you see this warning:
 
 ---
 
-## 6. Summary Checklist for Newcomers
+## 7. Summary Checklist for Newcomers
 
 | Concept | What it Means |
 | :--- | :--- |

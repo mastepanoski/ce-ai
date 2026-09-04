@@ -109,7 +109,7 @@ flowchart TD
 1. **Atomic Workflow Checkpoints & Turn-0 Resumption (`ce-ai workflow checkpoint` / `resume`)**:
    - Saves current FSM stage index, active subtask string, and timestamp to disk (`state.json`).
    - On session start or context compaction, `ce-ai workflow resume` re-hydrates canonical Git branch, working tree state, manifest integrity, and OpenSpec progress.
-   - Delivered automatically in Claude Code (via `.claude/settings.json` `SessionStart` hooks) and OpenCode (via native `session.created` and `experimental.session.compacting` plugin hooks), and enforced via Turn-0 prompt directives in `AGENTS.md` across other harnesses.
+   - Delivered automatically via native lifecycle hooks in Claude Code (`.claude/settings.json` `SessionStart`), OpenCode (`session.created` / `experimental.session.compacting` plugin hooks), GitHub Copilot CLI (`.github/hooks/hooks.json` `sessionStart`), OpenAI Codex CLI (`.codex/config.toml` `SessionStart`), Pi (`.pi/extensions/compound-engineering.ts` `before_agent_start`), Cursor (`.cursor/hooks.json` `sessionStart`), and Google Antigravity CLI (`.agents/hooks.json` `PreInvocation`, deduplicated per session). Kimi, Grok, DeepSeek, and Fx have no native context-injection hook (see [Zero-Step Drift Recovery Explained](zero-step-drift-recovery-explained.md#4-delivery-architecture-automated-hooks-vs-prompt-directives)) and remain governed by the Turn-0 prompt directive in `AGENTS.md`.
 
 2. **Engram Memory Persistence**:
    - Session summaries and technical findings are saved outside the LLM context in Engram's SQLite database.
