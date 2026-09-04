@@ -35,7 +35,12 @@ pub struct Args {
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
-    let manifest = InstallManifest::load(&ctx.opencode_config_dir)
+    let state_path = ctx.config_dir.join("state.json");
+    let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
+        .unwrap_or_default();
+    let opencode_dir = ctx.resolve_opencode_dir(&state);
+
+    let manifest = InstallManifest::load(&opencode_dir)
         .map_err(|_| CeError::Runtime("no install-manifest.json — run install first".into()))?;
     let source_root = resolve_source_root(&manifest.source)?;
     if args.watch {
@@ -76,8 +81,12 @@ pub(crate) fn sync_with(
     version: &str,
     source_json: serde_json::Value,
 ) -> Result<(), CeError> {
-    let manifest = InstallManifest::load(&ctx.opencode_config_dir)?;
-    let managed_dir = ctx.opencode_config_dir.join(MANAGED_DIR);
+    let state_path = ctx.config_dir.join("state.json");
+    let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())?;
+    let opencode_dir = ctx.resolve_opencode_dir(&state);
+
+    let manifest = InstallManifest::load(&opencode_dir)?;
+    let managed_dir = opencode_dir.join(MANAGED_DIR);
 
     // Desired: managed-rel path -> sha256, plus the source-rel path to copy from.
     let mut desired: BTreeMap<String, String> = BTreeMap::new();
@@ -155,10 +164,7 @@ pub(crate) fn sync_with(
             sha256: sha256.clone(),
         })
         .collect();
-    arm!(&ctx
-        .opencode_config_dir
-        .join(MANAGED_DIR)
-        .join("install-manifest.json"));
+    arm!(&opencode_dir.join(MANAGED_DIR).join("install-manifest.json"));
     InstallManifest {
         version: version.to_string(),
         plugin_name: manifest.plugin_name.clone(),
@@ -167,7 +173,7 @@ pub(crate) fn sync_with(
         files,
         config_mutations: manifest.config_mutations.clone(),
     }
-    .write(&ctx.opencode_config_dir)?;
+    .write(&opencode_dir)?;
 
     // Refresh and sync across all active host-detected and registered harness entries in state.json (SU-2, SU-5).
     let state_path = ctx.config_dir.join("state.json");
@@ -218,11 +224,17 @@ pub(crate) fn sync_with(
         })
         .collect();
 
+    let prior_entries: BTreeMap<String, serde_json::Value> = state
+        .installed_harnesses
+        .iter()
+        .filter_map(|h| h["name"].as_str().map(|n| (n.to_string(), h.clone())))
+        .collect();
+
     state.installed_harnesses.clear();
     for name in &active_harnesses {
         if let Ok(h_kind) = name.parse::<HarnessKind>() {
             let config_dir = if h_kind == HarnessKind::Opencode {
-                ctx.opencode_config_dir.clone()
+                opencode_dir.clone()
             } else {
                 h_kind.harness_dir(&home_dir)
             };
@@ -297,6 +309,20 @@ pub(crate) fn sync_with(
             "source": source_json.clone(),
             "last_synced_at": Utc::now().to_rfc3339(),
         });
+        if let Some(prior) = prior_entries.get(name) {
+            if let Some(scope) = prior.get("scope") {
+                entry["scope"] = scope.clone();
+            }
+            if let Some(target_dir) = prior.get("target_dir") {
+                entry["target_dir"] = target_dir.clone();
+            }
+            if let Some(installed_at) = prior.get("installed_at") {
+                entry["installed_at"] = installed_at.clone();
+            }
+        } else if name == "opencode" && opencode_dir != ctx.opencode_config_dir {
+            entry["scope"] = serde_json::json!("workspace");
+            entry["target_dir"] = serde_json::json!(opencode_dir.display().to_string());
+        }
         if let Some(custom) = prior_custom.get(name) {
             entry["custom"] = custom.clone();
         }
@@ -305,7 +331,7 @@ pub(crate) fn sync_with(
     // Repair model-assignment desync: import effective opencode.json
     // assignments into state.json (config→state; #111). Config is the live
     // truth — state is never pushed back over user-edited config here.
-    let opencode_json = ctx.opencode_config_dir.join("opencode.json");
+    let opencode_json = opencode_dir.join("opencode.json");
     let config = crate::opencode::config::read_config(&opencode_json)?;
     for (slot, model) in crate::commands::models::import_config_assignments(&mut state, &config) {
         if !ctx.quiet {
@@ -825,7 +851,9 @@ fn check_and_repair_drift(
     source_root: &Path,
     manifest: &InstallManifest,
 ) -> Result<bool, CeError> {
-    let managed_dir = ctx.opencode_config_dir.join(MANAGED_DIR);
+    let state = State::load(&ctx.config_dir.join("state.json")).unwrap_or_default();
+    let opencode_dir = ctx.resolve_opencode_dir(&state);
+    let managed_dir = opencode_dir.join(MANAGED_DIR);
     let mut desired: BTreeMap<String, String> = managed_tree(source_root)?
         .into_iter()
         .map(|(managed_rel, (_, hash))| (managed_rel, hash))

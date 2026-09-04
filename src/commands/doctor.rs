@@ -49,23 +49,28 @@ fn github_slug_from_remote(repo_root: &std::path::Path) -> Option<String> {
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
+    let state = State::load_with_workspace_overrides(
+        &ctx.config_dir.join("state.json"),
+        ctx.workspace_root.as_deref(),
+    )?;
+    let opencode_dir = ctx.resolve_opencode_dir(&state);
     let mut findings: Vec<String> = Vec::new();
 
     // Config validity: opencode.json must parse (D4).
-    let opencode_json = ctx.opencode_config_dir.join("opencode.json");
+    let opencode_json = opencode_dir.join("opencode.json");
     if let Err(err) = read_config(&opencode_json) {
         findings.push(format!("config-invalid: {err}"));
     }
 
     // Diff: managed files vs the install manifest (SU-3).
-    let manifest = InstallManifest::load(&ctx.opencode_config_dir);
+    let manifest = InstallManifest::load(&opencode_dir);
     if let Ok(manifest) = &manifest {
         let desired: BTreeMap<String, String> = manifest
             .files
             .iter()
             .map(|f| (f.path.clone(), f.sha256.clone()))
             .collect();
-        let managed = ctx.opencode_config_dir.join(MANAGED_DIR);
+        let managed = opencode_dir.join(MANAGED_DIR);
         for action in diff::diff(&desired, &desired, &managed).actions {
             let (kind, path) = match action {
                 Action::Copy { path } => ("missing", path),
@@ -77,23 +82,29 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 
     // State consistency: the opencode state entry and the manifest must agree.
-    let state = State::load_with_workspace_overrides(
-        &ctx.config_dir.join("state.json"),
-        ctx.workspace_root.as_deref(),
-    )?;
-    let has_entry = state
-        .installed_harnesses
-        .iter()
-        .any(|h| h["name"].as_str() == Some("opencode"));
+    let repo_root = ctx.repo_root();
+    let has_entry = state.installed_harnesses.iter().any(|h| {
+        if h["name"].as_str() != Some("opencode") {
+            return false;
+        }
+        match h["scope"].as_str() {
+            Some("workspace") => h["target_dir"]
+                .as_str()
+                .map(|d| std::path::Path::new(d) == repo_root.as_path())
+                .unwrap_or(true),
+            Some("global") | None => true,
+            _ => false,
+        }
+    });
     if has_entry != manifest.is_ok() {
         findings
             .push("state-inconsistent: opencode state entry and install manifest disagree".into());
     }
 
-    if has_entry && !crate::opencode::plugins::has_session_start_plugin(&ctx.opencode_config_dir) {
+    if has_entry && !crate::opencode::plugins::has_session_start_plugin(&opencode_dir) {
         findings.push(format!(
             "opencode: SessionStart plugin missing or outdated in '{}' — run 'ce-ai sync' or 'ce-ai install --harness opencode' to update",
-            ctx.opencode_config_dir.display()
+            opencode_dir.display()
         ));
     }
 

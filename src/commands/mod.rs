@@ -97,6 +97,36 @@ impl Context {
         self.config_dir.join("state.json")
     }
 
+    /// Resolves the effective OpenCode configuration directory.
+    ///
+    /// If executed within a workspace where `state.installed_harnesses` contains a
+    /// workspace-scoped "opencode" entry for this workspace, or if the current
+    /// workspace contains `<workspace>/compound-engineering/install-manifest.json`,
+    /// returns the workspace directory. Otherwise returns `self.opencode_config_dir`.
+    pub fn resolve_opencode_dir(&self, state: &crate::state::state::State) -> PathBuf {
+        let repo_root = self.repo_root();
+        let has_ws_entry = state.installed_harnesses.iter().any(|h| {
+            h["name"].as_str() == Some("opencode")
+                && h["scope"].as_str() == Some("workspace")
+                && h["target_dir"]
+                    .as_str()
+                    .map(|d| std::path::Path::new(d) == repo_root.as_path())
+                    .unwrap_or(false)
+        });
+        if has_ws_entry {
+            return repo_root;
+        }
+
+        let ws_manifest = repo_root
+            .join(crate::opencode::plugins::MANAGED_DIR)
+            .join("install-manifest.json");
+        if ws_manifest.exists() {
+            return repo_root;
+        }
+
+        self.opencode_config_dir.clone()
+    }
+
     /// Returns the canonical path to `opencode.json`.
     pub fn opencode_config_path(&self) -> PathBuf {
         self.opencode_config_dir.join("opencode.json")

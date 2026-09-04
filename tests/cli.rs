@@ -5263,3 +5263,80 @@ fn workflow_checkpoint_reset_to_stage_1_clears_feature_in_resume() {
         "re-hydration should discover feature-b fallback: {stdout}"
     );
 }
+
+#[test]
+fn doctor_workspace_scope_opencode_install_has_no_false_positive_findings() {
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let config_dir = home.join(".ce-ai");
+    let repo_dir = tmp.path().join("repo");
+    let source = ce_source(tmp.path());
+
+    fs::create_dir_all(&repo_dir).unwrap();
+    std::process::Command::new("git")
+        .args(["init", "-q", repo_dir.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    // Install with --scope workspace
+    ceai(&config_dir, &home)
+        .current_dir(&repo_dir)
+        .args([
+            "install",
+            "--harness",
+            "opencode",
+            "--scope",
+            "workspace",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // ce-ai doctor inside the workspace must NOT report state-inconsistent or missing SessionStart plugin
+    let assert_doctor = ceai(&config_dir, &home)
+        .current_dir(&repo_dir)
+        .args(["doctor"])
+        .assert();
+
+    let output = assert_doctor.get_output();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        !stdout.contains("state-inconsistent"),
+        "doctor stdout must not report state-inconsistent for workspace scope: {stdout}"
+    );
+    assert!(
+        !stdout.contains("SessionStart plugin missing"),
+        "doctor stdout must not report missing SessionStart plugin for workspace scope: {stdout}"
+    );
+    assert!(
+        !stderr.contains("state-inconsistent"),
+        "doctor stderr must not report state-inconsistent: {stderr}"
+    );
+
+    // ce-ai status inside workspace must report drift: none, not "unknown (no install manifest)"
+    let assert_status = ceai(&config_dir, &home)
+        .current_dir(&repo_dir)
+        .args(["status"])
+        .assert()
+        .success();
+
+    let status_out = String::from_utf8_lossy(&assert_status.get_output().stdout);
+    assert!(
+        status_out.contains("drift: none"),
+        "status stdout must report drift: none: {status_out}"
+    );
+    assert!(
+        !status_out.contains("drift: unknown"),
+        "status stdout must not report unknown drift: {status_out}"
+    );
+
+    // ce-ai sync inside workspace must succeed without error
+    ceai(&config_dir, &home)
+        .current_dir(&repo_dir)
+        .args(["sync"])
+        .assert()
+        .success();
+}
