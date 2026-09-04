@@ -92,8 +92,9 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
     }
 
     // Drift: compare managed files on disk against the install manifest (SU-3).
-    let managed = ctx.opencode_config_dir.join(MANAGED_DIR);
-    match InstallManifest::load(&ctx.opencode_config_dir) {
+    let opencode_dir = ctx.resolve_opencode_dir(&state);
+    let managed = opencode_dir.join(MANAGED_DIR);
+    match InstallManifest::load(&opencode_dir) {
         Ok(manifest) => {
             let desired: BTreeMap<String, String> = manifest
                 .files

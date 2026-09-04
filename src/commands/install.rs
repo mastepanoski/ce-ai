@@ -332,11 +332,21 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             );
         }
 
-        // Update state.json; replace any prior entry for this harness (idempotent).
+        // Update state.json; replace any prior entry for this harness and scope (idempotent).
         let harness_name = harness_kind.to_string();
-        state
-            .installed_harnesses
-            .retain(|h| h["name"].as_str() != Some(harness_name.as_str()));
+        if scope_arg == "workspace" {
+            let target_str = config_dir.display().to_string();
+            state.installed_harnesses.retain(|h| {
+                !(h["name"].as_str() == Some(harness_name.as_str())
+                    && h["scope"].as_str() == Some("workspace")
+                    && h["target_dir"].as_str() == Some(&target_str))
+            });
+        } else {
+            state.installed_harnesses.retain(|h| {
+                !(h["name"].as_str() == Some(harness_name.as_str())
+                    && (h["scope"].as_str() == Some("global") || h["scope"].is_null()))
+            });
+        }
         let mut entry = serde_json::json!({
             "name": harness_name,
             "version": version,
@@ -344,6 +354,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             "installed_at": Utc::now().to_rfc3339(),
             "last_synced_at": Utc::now().to_rfc3339(),
         });
+        if scope_arg == "workspace" {
+            entry["scope"] = serde_json::json!("workspace");
+            entry["target_dir"] = serde_json::json!(config_dir.display().to_string());
+        } else {
+            entry["scope"] = serde_json::json!("global");
+        }
         if let Some(cfg) = &custom_cfg {
             entry["custom"] = cfg.to_state_json();
         }

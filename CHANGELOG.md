@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.2] - 2026-09-04
+
+### Fixed
+- **Workspace-Scoped OpenCode Manifest Resolution in Doctor, Status, and Sync (`src/commands/mod.rs`, `src/commands/install.rs`, `src/commands/doctor.rs`, `src/commands/status.rs`, `src/commands/sync.rs`):**
+  - Stored `scope` and `target_dir` metadata in `state.installed_harnesses` when running `ce-ai install --harness opencode --scope workspace`, enabling downstream commands to resolve the workspace-level install location.
+  - Implemented `Context::resolve_opencode_dir(&self, state: &State) -> PathBuf` to contextually resolve OpenCode manifest and config roots: checks matching `installed_harnesses` workspace records, falls back to probe `<workspace_root>/compound-engineering/install-manifest.json` on disk, and defaults to `ctx.opencode_config_dir` (`~/.config/opencode`).
+  - Updated `ce-ai doctor` to resolve OpenCode paths using `resolve_opencode_dir`, eliminating false-positive `state-inconsistent` and missing plugin findings in worktrees and workspace-scoped setups.
+  - Updated `ce-ai status` and `ce-ai sync` to evaluate manifests and drift against `resolve_opencode_dir`, preserving workspace-level tracking and metadata across sync operations.
+  - Added CLI integration and unit tests covering workspace-scoped manifest verification, drift resolution, and state consistency.
+
 ## [1.37.1] - 2026-09-04
 
 ### Fixed
