@@ -26,10 +26,10 @@ cargo install --path .
 Every release publishes `SHA256SUMS.txt` alongside its binaries — verify any
 download before running it (ISO/IEC 27002 integrity control).
 
-**2. Preview the plugin installation** (modifies nothing):
+**2. Install the plugin into your detected AI harness(es)** (add `--dry-run` first if you want to preview it with no writes):
 
 ```bash
-ce-ai install --all --dry-run
+ce-ai install --harness all
 ```
 
 **3. Verify system health:**
@@ -38,7 +38,7 @@ ce-ai install --all --dry-run
 ce-ai doctor
 ```
 
-That's it — your harnesses are ready for Compound Engineering. Run your first 7-stage cycle with the [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md).
+**4. Adopt your project and take your first step** — new here? The [Getting Started guide](docs/user-guide/getting-started.md) walks through `ce-ai init-prj` and your very first slash command (typed inside your AI chat, not the terminal) end to end. Already comfortable? Jump to the [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) for the full 7-stage cycle.
 
 > **First install hitting `403 Forbidden`?** GitHub allows 60 unauth requests/hour per IP. `ce-ai install/upgrade` queries `api.github.com` — without a token you can hit the limit. Set `CE_AI_GITHUB_TOKEN=ghp_xxx` (or `GITHUB_TOKEN` / `gh auth login`) or pin a release: `ce-ai upgrade --to v1.26.0` / `ce-ai install --source <path>`.
 
@@ -53,12 +53,13 @@ That's it — your harnesses are ready for Compound Engineering. Run your first 
 | `ce-ai upgrade --to <tag>` | Upgrade the plugin to a release tag | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
 | `ce-ai models set/list/profile …` | Assign models per agent slot, snapshot profiles | [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) |
 | `ce-ai uninstall --harness <name>` | Restore pre-install configuration cleanly | [Backup & Uninstall](docs/user-guide/backup-and-uninstall.md) |
-| `ce-ai install --all --dry-run` | Preview any mutation before it touches disk | [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) |
+| `ce-ai install --harness all --dry-run` | Preview any mutation before it touches disk | [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) |
 
 ## Documentation Map
 
 | Document | Audience | Intent |
 | :--- | :--- | :--- |
+| 🌱 [Getting Started](docs/user-guide/getting-started.md) | **Absolute beginner** | Tutorial — zero to your first slash command, no assumed knowledge |
 | 🚀 [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) | **Beginner** | Tutorial — greenfield setup, first feature, bug fix, resumption |
 | 🎓 [Compound Workflow Explained](docs/user-guide/compound-engineering-workflow-explained.md) | **Beginner** | Explanation — strategy to code, 6-level hierarchy, OpenSpec vs Brainstorm |
 | 📁 [Project Adoption Guide](docs/user-guide/project-adoption-guide.md) | Both | How-to — non-destructive AGENTS.md adoption, de-init, tiers |

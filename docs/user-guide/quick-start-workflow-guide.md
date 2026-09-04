@@ -2,6 +2,8 @@
 
 Welcome to the beginner's Quick Start guide! Whether you are building a new feature, fixing a production bug, or simply researching a codebase, this guide explains step-by-step how to use **Compound Engineering** skills alongside **`ce-ai`**.
 
+> 🌱 **Haven't installed `ce-ai` or run a slash command yet?** This guide assumes both are already done. Start with [Getting Started](getting-started.md) first, then come back here.
+
 ---
 
 ## 💡 The Core Philosophy: Orchestrator + Methodology

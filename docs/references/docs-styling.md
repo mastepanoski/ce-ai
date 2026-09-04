@@ -32,7 +32,7 @@ Never blend quadrants inside one document section. A reference table does not be
 Required structure, in order:
 
 1. **Title + what & why** (max 3 lines): what `ce-ai` is, who it helps, why it matters.
-2. **Quick Path**: the shortest verified route to value — install binary → first command → verification command (e.g., `install` → `ce-ai install --all --dry-run` → `ce-ai doctor`). Nothing else before this.
+2. **Quick Path**: the shortest verified route to value — install binary → first command → verification command (e.g., `install` → `ce-ai install --harness all` → `ce-ai doctor`). Nothing else before this.
 3. **Documentation map**: a table linking into `docs/`, each row labeled with audience (`Beginner` / `Senior`) or quadrant.
 4. **Minimal pointers**: security/compliance links one line each; no duplicated internals.
 
