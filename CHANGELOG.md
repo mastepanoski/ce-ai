@@ -5,6 +5,21 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.0] - 2026-09-04
+
+### Added
+- **Guaranteed Turn-0 Drift Delivery for Google Antigravity CLI via Native `PreInvocation` Hook (`src/harness/agy.rs`, `src/commands/init_prj.rs`):**
+  - Implemented `has_pre_invocation_hook`, `ensure_pre_invocation_hook`, and `remove_pre_invocation_hook` (with backward-compatible `*_session_start_hook` aliases) managing `<project>/.agents/hooks.json`.
+  - Configures `PreInvocation` command hook invoking `ce-ai workflow resume --pre-invocation`, which executes before model invocations in Google Antigravity CLI (`agy`).
+  - Implemented session deduplication in `ce-ai workflow resume --pre-invocation` using `conversationId` (and `sessionId` fallback) to deliver live `RepoState` via `injectSteps` containing `ephemeralMessage` on Turn-0, and returning empty `{}` in sub-millisecond time on subsequent turns.
+  - Surgically parses and writes `.agents/hooks.json` via `write_atomic`, preserving existing user hook groups (e.g. `custom-security`, `PreToolUse`) and non-destructive JSON merges.
+  - Cleans up `.agents/hooks.json` and rules on project de-adoption (`ce-ai deinit-prj`), safely removing empty parent directories while preserving user configurations.
+- **Antigravity CLI Doctor Diagnostic Finding (`src/commands/doctor.rs`):**
+  - Added audit probe in `ce-ai doctor` flagging missing Antigravity `PreInvocation` hooks in adopted projects containing `.agents/`.
+- **Documentation & Solution Architecture:**
+  - Updated `docs/user-guide/zero-step-drift-recovery-explained.md` explaining the per-turn vs session-start distinction and session deduplication.
+  - Created solution architecture record in `docs/solutions/architecture/2026-09-02-antigravity-pre-invocation-drift-delivery.md`.
+
 ## [1.36.0] - 2026-09-02
 
 ### Added

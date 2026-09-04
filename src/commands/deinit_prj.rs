@@ -324,6 +324,7 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                     let stripped = crate::harness::strip_managed_rule_block(&c_text);
                     if stripped.trim().is_empty() {
                         report_best_effort_remove(&agy_rule, fs::remove_file(&agy_rule));
+                        let _ = fs::remove_dir(target_dir.join(".agents").join("rules"));
                     } else {
                         report_best_effort_write(
                             &agy_rule,
@@ -333,6 +334,11 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
                 }
             }
         }
+        let agy_hooks = target_dir.join(".agents").join("hooks.json");
+        if agy_hooks.exists() {
+            let _ = crate::harness::agy::remove_pre_invocation_hook(&agy_hooks);
+        }
+        let _ = fs::remove_dir(target_dir.join(".agents"));
         let gemini_rule = target_dir.join("GEMINI.md");
         if gemini_rule.exists() {
             if let Ok(c_text) = fs::read_to_string(&gemini_rule) {

@@ -100,3 +100,41 @@ fn repo_state_serialization_and_resume_lines() {
     let deserialized: RepoState = serde_json::from_str(&serialized).unwrap();
     assert_eq!(repo_state, deserialized);
 }
+
+#[test]
+fn pre_invocation_deduplicates_by_conversation_id() {
+    let tmp = TempDir::new().unwrap();
+    let marker_dir = tmp.path();
+
+    let input1 = r#"{"conversationId": "session-abc-123", "invocationNum": 0}"#;
+    assert!(should_inject_pre_invocation(input1, marker_dir));
+
+    // Second turn in same session must be deduplicated
+    let input2 = r#"{"conversationId": "session-abc-123", "invocationNum": 1}"#;
+    assert!(!should_inject_pre_invocation(input2, marker_dir));
+
+    // Different session ID must inject
+    let input3 = r#"{"conversationId": "session-xyz-789", "invocationNum": 0}"#;
+    assert!(should_inject_pre_invocation(input3, marker_dir));
+}
+
+#[test]
+fn pre_invocation_supports_session_id_fallback_and_invocation_num() {
+    let tmp = TempDir::new().unwrap();
+    let marker_dir = tmp.path();
+
+    // Uses sessionId if conversationId not present
+    let input1 = r#"{"sessionId": "sess-456", "invocationNum": 0}"#;
+    assert!(should_inject_pre_invocation(input1, marker_dir));
+    assert!(!should_inject_pre_invocation(input1, marker_dir));
+
+    // When no ID is present, relies on invocationNum
+    assert!(should_inject_pre_invocation(
+        r#"{"invocationNum": 0}"#,
+        marker_dir
+    ));
+    assert!(!should_inject_pre_invocation(
+        r#"{"invocationNum": 1}"#,
+        marker_dir
+    ));
+}

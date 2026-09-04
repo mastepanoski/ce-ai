@@ -166,6 +166,170 @@ pub fn unregister_agy_mcp_server(config_path: &Path, name: &str) -> Result<(), C
     write_atomic(config_path, updated_json.as_bytes())
 }
 
+pub const AGY_RESUME_COMMAND: &str = "ce-ai workflow resume --pre-invocation";
+
+/// Checks if `.agents/hooks.json` (or any hooks configuration) contains the PreInvocation hook for `ce-ai workflow resume --pre-invocation`.
+pub fn has_pre_invocation_hook(hooks_path: &Path) -> bool {
+    if !hooks_path.exists() {
+        return false;
+    }
+    let Ok(content) = std::fs::read_to_string(hooks_path) else {
+        return false;
+    };
+    let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return false;
+    };
+    let Some(obj) = val.as_object() else {
+        return false;
+    };
+    obj.values().any(|group| {
+        group
+            .get("PreInvocation")
+            .and_then(|pi| pi.as_array())
+            .map(|arr| {
+                arr.iter().any(|entry| {
+                    entry.get("command").and_then(|c| c.as_str()) == Some(AGY_RESUME_COMMAND)
+                })
+            })
+            .unwrap_or(false)
+    })
+}
+
+/// Ensures `.agents/hooks.json` contains the PreInvocation hook for `ce-ai workflow resume --pre-invocation`.
+/// Preserves any pre-existing user hooks or extra hook groups. Idempotent.
+pub fn ensure_pre_invocation_hook(hooks_path: &Path) -> Result<bool, CeError> {
+    if has_pre_invocation_hook(hooks_path) {
+        return Ok(false);
+    }
+
+    let mut root: serde_json::Value = if hooks_path.exists() {
+        let content = std::fs::read_to_string(hooks_path)?;
+        serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    if !root.is_object() {
+        root = serde_json::json!({});
+    }
+
+    let root_obj = root
+        .as_object_mut()
+        .ok_or_else(|| CeError::Runtime("hooks root is not an object".to_string()))?;
+
+    let ce_val = root_obj
+        .entry("compound-engineering")
+        .or_insert_with(|| serde_json::json!({}));
+    if !ce_val.is_object() {
+        *ce_val = serde_json::json!({});
+    }
+
+    let ce_obj = ce_val.as_object_mut().ok_or_else(|| {
+        CeError::Runtime("compound-engineering hook group is not an object".to_string())
+    })?;
+
+    let pre_inv_val = ce_obj
+        .entry("PreInvocation")
+        .or_insert_with(|| serde_json::json!([]));
+    if !pre_inv_val.is_array() {
+        *pre_inv_val = serde_json::json!([]);
+    }
+
+    let pre_inv_arr = pre_inv_val
+        .as_array_mut()
+        .ok_or_else(|| CeError::Runtime("PreInvocation is not an array".to_string()))?;
+
+    let target_hook = serde_json::json!({
+        "type": "command",
+        "command": AGY_RESUME_COMMAND,
+    });
+
+    if !pre_inv_arr
+        .iter()
+        .any(|entry| entry.get("command").and_then(|c| c.as_str()) == Some(AGY_RESUME_COMMAND))
+    {
+        pre_inv_arr.push(target_hook);
+    }
+
+    if let Some(parent) = hooks_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let serialized = serde_json::to_string_pretty(&root)
+        .map_err(|e| CeError::Runtime(format!("failed to serialize hooks.json: {e}")))?;
+    write_atomic(hooks_path, serialized.as_bytes())?;
+    Ok(true)
+}
+
+/// Surgically removes `ce-ai workflow resume --pre-invocation` hook from `.agents/hooks.json`.
+/// If the file becomes effectively empty as a result, removes the file cleanly and prunes the parent directory if empty.
+pub fn remove_pre_invocation_hook(hooks_path: &Path) -> Result<bool, CeError> {
+    if !hooks_path.exists() {
+        return Ok(false);
+    }
+
+    let content = std::fs::read_to_string(hooks_path)?;
+    let Ok(mut root) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return Ok(false);
+    };
+
+    let Some(root_obj) = root.as_object_mut() else {
+        return Ok(false);
+    };
+
+    let mut changed = false;
+    let mut empty_groups = Vec::new();
+
+    for (group_name, group_val) in root_obj.iter_mut() {
+        if let Some(group_obj) = group_val.as_object_mut() {
+            if let Some(pre_inv_arr) = group_obj
+                .get_mut("PreInvocation")
+                .and_then(|pi| pi.as_array_mut())
+            {
+                let orig_len = pre_inv_arr.len();
+                pre_inv_arr.retain(|entry| {
+                    entry.get("command").and_then(|c| c.as_str()) != Some(AGY_RESUME_COMMAND)
+                });
+                if pre_inv_arr.len() != orig_len {
+                    changed = true;
+                }
+                if pre_inv_arr.is_empty() {
+                    group_obj.remove("PreInvocation");
+                }
+            }
+            if group_obj.is_empty() {
+                empty_groups.push(group_name.clone());
+            }
+        }
+    }
+
+    for group in empty_groups {
+        root_obj.remove(&group);
+    }
+
+    if !changed {
+        return Ok(false);
+    }
+
+    if root_obj.is_empty() {
+        let _ = std::fs::remove_file(hooks_path);
+        if let Some(parent) = hooks_path.parent() {
+            let _ = std::fs::remove_dir(parent);
+        }
+        return Ok(true);
+    }
+
+    let serialized = serde_json::to_string_pretty(&root)
+        .map_err(|e| CeError::Runtime(format!("failed to serialize hooks.json: {e}")))?;
+    write_atomic(hooks_path, serialized.as_bytes())?;
+    Ok(true)
+}
+
+// Backward-compatible alias helpers
+pub use ensure_pre_invocation_hook as ensure_session_start_hook;
+pub use has_pre_invocation_hook as has_session_start_hook;
+pub use remove_pre_invocation_hook as remove_session_start_hook;
+
 #[cfg(test)]
 #[path = "tests/agy.rs"]
 mod tests;

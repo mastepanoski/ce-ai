@@ -2,6 +2,7 @@
 //! the 7 development stages (Ideation -> OpenSpec -> Plan -> Work -> Verify -> Compound -> Ship).
 
 use std::collections::BTreeMap;
+use std::io::{IsTerminal, Read};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -49,6 +50,9 @@ pub enum Action {
         /// Output machine-readable JSON format.
         #[arg(long)]
         json: bool,
+        /// Antigravity PreInvocation hook mode (reads stdin, dedupes per conversationId, injects ephemeralMessage).
+        #[arg(long)]
+        pre_invocation: bool,
     },
 }
 
@@ -87,8 +91,13 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 }
             }
         }
-        Action::Resume { json } => {
-            if *json {
+        Action::Resume {
+            json,
+            pre_invocation,
+        } => {
+            if *pre_invocation {
+                handle_pre_invocation(ctx)?;
+            } else if *json {
                 let state_path = ctx.config_dir.join("state.json");
                 let state = State::load(&state_path)?;
                 let wf = state.current_workflow();
@@ -496,6 +505,88 @@ pub fn probe_openspec_context_in(
         completed_tasks,
         total_tasks,
     })
+}
+
+#[derive(Deserialize, Default, Debug)]
+struct PreInvocationPayload {
+    #[serde(rename = "conversationId")]
+    conversation_id: Option<String>,
+    #[serde(rename = "sessionId")]
+    session_id: Option<String>,
+    #[serde(rename = "invocationNum")]
+    invocation_num: Option<u64>,
+}
+
+pub(crate) fn should_inject_pre_invocation(stdin_content: &str, marker_dir: &Path) -> bool {
+    let payload =
+        serde_json::from_str::<PreInvocationPayload>(stdin_content.trim()).unwrap_or_default();
+    let conv_id = payload
+        .conversation_id
+        .as_deref()
+        .or(payload.session_id.as_deref());
+
+    if let Some(id) = conv_id {
+        let safe_id: String = id
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        let marker = marker_dir.join(format!("ce-ai-agy-session-{safe_id}.marker"));
+        if marker.exists() {
+            let is_stale = marker
+                .metadata()
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.elapsed().ok())
+                .map(|dur| dur.as_secs() > 86400)
+                .unwrap_or(false);
+            if !is_stale {
+                return false;
+            }
+        }
+        let _ = std::fs::write(&marker, b"1");
+        true
+    } else {
+        payload.invocation_num.unwrap_or(0) == 0
+    }
+}
+
+fn agy_marker_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("CE_AI_AGY_MARKER_DIR") {
+        if !dir.trim().is_empty() {
+            return PathBuf::from(dir);
+        }
+    }
+    std::env::temp_dir()
+}
+
+fn handle_pre_invocation(ctx: &Context) -> Result<(), CeError> {
+    let mut stdin_content = String::new();
+    if !std::io::stdin().is_terminal() {
+        let _ = std::io::stdin().read_to_string(&mut stdin_content);
+    }
+
+    if !should_inject_pre_invocation(&stdin_content, &agy_marker_dir()) {
+        println!("{{}}");
+        return Ok(());
+    }
+
+    let lines = resume_lines(ctx)?;
+    let msg = lines.join("\n");
+    let resp = json!({
+        "injectSteps": [
+            {
+                "ephemeralMessage": msg
+            }
+        ]
+    });
+    println!("{}", serde_json::to_string(&resp)?);
+    Ok(())
 }
 
 fn stage_display_name(stage: WorkflowStage) -> &'static str {
