@@ -46,6 +46,7 @@ If you are familiar with Agile software development, each level in Compound Engi
 ### 💡 Level 1: `ce-ideate` (Opportunity Discovery)
 - **Role**: Divergent thinking. Generates and compares multiple potential solutions (1 to N options) before committing to one.
 - **Why it matters**: Avoids jumping to the first obvious solution. Explores tradeoffs, performance implications, and alternatives early.
+- **Related, not the same tool — `ce-pov`**: `ce-ideate` is divergent (many candidate directions, none named yet). `ce-pov` is convergent: you already have one specific external candidate in mind — a library, framework, or architectural pattern — and want a decisive, project-grounded yes/no on it, not a list of alternatives. It's also the right tool mid-session when an external event (a CVE, a deprecation, an ecosystem shift) lands and you need to know whether it actually affects *this* project. A "yes" verdict from `ce-pov` feeds into `ce-brainstorm` exactly like a chosen idea from `ce-ideate` would.
 
 ### 🔍 Level 2: `ce-brainstorm` (Epic & Problem Definition)
 - **Role**: Convergent thinking. Takes the chosen idea and frames the problem in depth.

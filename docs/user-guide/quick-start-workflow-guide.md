@@ -119,10 +119,12 @@ flowchart TD
 ```mermaid
 flowchart TD
     TASK[Task Type] -->|Research / Codebase Survey| RESEARCH[Use ce-ideate or Research Subagents]
+    TASK -->|Adopt / Switch / Revisit a Tech Decision| POV[Use ce-pov]
     TASK -->|Updating Documentation / Solutions| DOCS[Use ce-compound / ce-compound-refresh]
     TASK -->|Trivial Typos / Single-Line Chores| CHORE[Use ce-commit Directly]
 
     RESEARCH -->|No Specs / PR Needed| DONE_1[Deliver Research Output]
+    POV -->|Project-Grounded Verdict| DONE_4[Decision Recorded, No Mutation Required]
     DOCS -->|Direct Write| DONE_2[Update docs/solutions/]
     CHORE -->|Direct Commit| DONE_3[Commit & Push]
 ```
@@ -134,11 +136,16 @@ flowchart TD
   - **Use A — Standalone research (this scenario)**: you want ideas or a survey as the *final deliverable*. Nothing feeds forward; full bypass.
   - **Use B — Upstream of a feature**: you run ideation because the approach is uncertain, then continue into `ce-brainstorm` → Stage 2. In that case it is NOT a bypass: the chosen idea and rejected alternatives distill into `exploration.md` (see Section 7, FAQ 1b).
 
-### 2. Documentation Generation & Knowledge Audits
+### 2. Technology & Architecture Decisions
+- **Use**: `/ce-pov`.
+- **Workflow**: Bypasses OpenSpec entirely for a single, decisive question — "should this project adopt/switch to/revisit X?" — judged against the current codebase, not in the abstract. Also fits a CVE, deprecation, or ecosystem shift landing mid-session: is it actually load-bearing for *this* project?
+- ⚠️ **`/ce-ideate` vs `/ce-pov` — do not confuse them**: `/ce-ideate` is *divergent* — it generates and ranks several candidate directions when you don't yet know what to build. `/ce-pov` is *convergent* — it takes one specific external candidate you already have in mind (a library, a pattern, a platform) and returns a single decisive verdict grounded in this project. If you need options, use `/ce-ideate`; if you need a yes/no on one already-named option, use `/ce-pov`. If the verdict is "adopt," continue into `/ce-brainstorm` → Stage 2 like any other upstream idea.
+
+### 3. Documentation Generation & Knowledge Audits
 - **Use**: `/ce-compound` or `/ce-compound-refresh`.
 - **Workflow**: Bypasses feature planning and TDD. Reads recent solutions or codebase state and writes directly to `docs/solutions/` or `CONCEPTS.md`.
 
-### 3. Trivial Chores & Typo Fixes
+### 4. Trivial Chores & Typo Fixes
 - **Use**: Direct `/ce-commit` or `/ce-commit-push-pr`.
 - **Workflow**: Bypasses Stages 1–3. Makes the minor edit, runs the project's relevant checks, and commits immediately.
 
@@ -404,6 +411,7 @@ flowchart TD
 | **Doc / Plan Quality Audit** | `/ce-doc-review` | Gate after Stages 1 & 3 | Review findings (no rewrites) |
 | **Approach Uncertain (pre-feature)** | `/ce-ideate` | Stage 0/1 Sub-Loop ➔ Stage 2 | Idea dossier in `docs/ideation/` → distills into `exploration.md` |
 | **Standalone Research / Survey** | `/ce-ideate` / Subagents | Targeted Pass (bypass) | Research report for the user only |
+| **Adopt / Switch / Revisit a Technology** | `/ce-pov` | Targeted Pass (bypass) | Decisive, project-grounded verdict — no options list |
 | **Bug Fix / Crash Repair** | `/ce-debug` | Direct Entry: Stage 4 ➔ 7 | Reproducer Test + Fix + Solution + PR |
 | **Refactoring Clean Code** | `/ce-simplify-code` | Stage 4 (Sub-Loop) | Non-behavioral code tidying |
 | **Documentation Update** | `/ce-compound` | Targeted Pass (Stage 6) | Solution doc in `docs/solutions/` |

@@ -278,6 +278,7 @@ flowchart TD
         V5["5. Multi-Harness Handoff"] -->|"Harness Agnostic Disk State"| HANDOFF["Claude ➔ Cursor ➔ Antigravity"]
         V6["6. Worktree Isolation"] -->|"--scope workspace"| WORKTREE["Parallel Git Worktrees"]
         V7["7. Targeted Fast-Track"] -->|"Stage 6 ce-compound"| DOCS["Docs / Research Only"]
+        V8["8. Project-Grounded Verdict"] -->|"Any Stage ce-pov"| POV["Adopt/Switch/Revisit Decision"]
     end
 ```
 
@@ -292,6 +293,7 @@ flowchart TD
 | **Multi-Harness Handoff** | Any Stage | Harness-Agnostic State Traversal | Shared disk state allows Claude Code to ideate, Cursor to edit, and AGY to ship |
 | **Git Worktree Isolation** | Worktree Root | Workspace-Scoped Traversal | `install --scope workspace` isolates state and CodeGraph per worktree |
 | **Docs / Research Fast-Track** | Stage 1 or Stage 6 | Targeted Pass | Bypasses code implementation; mutates `docs/solutions/` or research summary directly |
+| **Project-Grounded Verdict** | Any Stage (`ce-pov`) | Targeted Pass | Decisive adopt/switch/revisit judgment against the current codebase; no disk mutation of its own — a positive verdict feeds into `ce-brainstorm`/`exploration.md` like any other idea |
 
 ---
 
