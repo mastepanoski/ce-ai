@@ -5205,9 +5205,7 @@ fn workflow_checkpoint_reset_to_stage_1_clears_feature_in_resume() {
     let feat_a_dir = repo_dir.join("openspec").join("changes").join("feature-a");
     let feat_b_dir = repo_dir.join("openspec").join("changes").join("feature-b");
     fs::create_dir_all(&feat_a_dir).unwrap();
-    fs::create_dir_all(&feat_b_dir).unwrap();
     fs::write(feat_a_dir.join("proposal.md"), "# Feature A").unwrap();
-    fs::write(feat_b_dir.join("proposal.md"), "# Feature B").unwrap();
 
     // 1. Checkpoint on Stage 2 with explicit feature-a
     ceai(&config_dir, &home)
@@ -5225,6 +5223,11 @@ fn workflow_checkpoint_reset_to_stage_1_clears_feature_in_resume() {
         .assert()
         .success();
 
+    // Ensure filesystem timestamp ticks forward before creating feature-b
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    fs::create_dir_all(&feat_b_dir).unwrap();
+    fs::write(feat_b_dir.join("proposal.md"), "# Feature B").unwrap();
+
     // 2. Reset to Stage 1 without --feature
     ceai(&config_dir, &home)
         .current_dir(&repo_dir)
@@ -5239,7 +5242,7 @@ fn workflow_checkpoint_reset_to_stage_1_clears_feature_in_resume() {
         .assert()
         .success();
 
-    // 3. Resume must NOT retain feature-a; must fall back to discovery or not show feature-a
+    // 3. Resume must NOT retain feature-a; must fall back to discovery of feature-b
     let assert_resume = ceai(&config_dir, &home)
         .current_dir(&repo_dir)
         .args(["workflow", "resume"])
@@ -5254,5 +5257,9 @@ fn workflow_checkpoint_reset_to_stage_1_clears_feature_in_resume() {
     assert!(
         !stdout.contains("Context Re-hydration: feature-a"),
         "re-hydration must not bind to old feature-a after reset to stage 1: {stdout}"
+    );
+    assert!(
+        stdout.contains("Context Re-hydration: feature-b"),
+        "re-hydration should discover feature-b fallback: {stdout}"
     );
 }

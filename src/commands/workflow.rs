@@ -469,7 +469,7 @@ pub fn probe_openspec_context_in(
                 }
             }
         }
-        entries.sort_by_key(|(_, mtime)| *mtime);
+        entries.sort_by_key(|(path, mtime)| (*mtime, path.clone()));
         let (path, _) = entries.pop()?;
         path.file_name()?.to_string_lossy().to_string()
     };
