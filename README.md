@@ -73,6 +73,7 @@ ce-ai doctor
 | 🗂️ [Harness Matrix](docs/user-guide/harness-matrix.md) | Reference | Reference — all supported harnesses (10 native + custom), config paths, merge strategies |
 | 🏛️ [Architectural & Conceptual Guide](docs/user-guide/architectural-and-conceptual-guide.md) | **Senior** | Explanation — adapter traits, scope hierarchy, atomic writes |
 | 🎮 [FSM & Checkpoints Masterclass](docs/user-guide/fsm-and-checkpoints-explained.md) | **Senior** | Explanation — 7-stage cycle, savegames, sub-loops |
+| ⚖️ [Checkpoints vs. Memory & Planning Files](docs/user-guide/checkpoints-vs-memory-explained.md) | **Beginner** | Explanation — why checkpoints are a validated CLI write, not an Engram/handoff note or a `task_progress.md` |
 | 🧭 [Workflow Panel: Native vs Agent Skills](docs/user-guide/workflow-panel-native-vs-agent-skills.md) | **Beginner** | Explanation — why the TUI dashboard runs some actions and only points to others |
 | 📐 [OpenSpec specifications](openspec/changes/archive/ce-ai/) | **Senior** | Reference — archived SSOT package: proposal, exploration, design, spec, tasks |
 | 🧠 [Solutions Library](docs/solutions/) · [Plans & Audits](docs/plans/) | Contributor | Reference — solved problems, architecture decisions, delivery history |

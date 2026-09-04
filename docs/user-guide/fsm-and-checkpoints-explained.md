@@ -302,3 +302,10 @@ flowchart TD
 | `ce-ai workflow status` | Checking the Map | Queries current FSM stage, active subtask, and variant capability status. |
 | `ce-ai workflow checkpoint` | Saving Your Game | Persists stage name, task string, and timestamp atomically to disk. |
 | `ce-ai workflow resume` | Reloading Your Save | Re-hydrates state and Engram memory across sessions, handoffs, or compactions. |
+
+---
+
+## Related
+
+- [Checkpoints vs. Memory & Planning Files Explained](checkpoints-vs-memory-explained.md) — why this isn't the same job as an Engram handoff note or a `task_progress.md` file
+- [Determinism & ce-ai Explained](determinism-explained.md) — what the FSM validation gate does and does not guarantee
