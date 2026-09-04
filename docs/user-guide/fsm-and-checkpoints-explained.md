@@ -225,13 +225,13 @@ The AI agent executes Stage 4 (TDD & Work):
 Before performing a heavy task, switching models, or ending a session, the agent calls:
 
 ```bash
-ce-ai workflow checkpoint --phase "Stage 4: TDD & Work" --task "4.2 Companion Tools Manager Implemented"
+ce-ai workflow checkpoint --stage 4 --task "4.2 Companion Tools Manager Implemented"
 ```
 
 **Output**:
 ```text
 workflow: checkpoint saved successfully!
-  phase: Stage 4: TDD & Work
+  phase: Stage 4: TDD & Work (ce-work)
   task: 4.2 Companion Tools Manager Implemented
 ```
 

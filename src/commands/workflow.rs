@@ -35,7 +35,7 @@ pub enum Action {
         /// Active subtask (e.g. "Implementing TDD module").
         #[arg(long, short = 't')]
         task: String,
-        /// Current 7-stage phase (e.g. "4" or "work" or "Stage 4: TDD & Work").
+        /// Current 7-stage phase (e.g. "4", "work", "tdd").
         #[arg(long, short = 's', alias = "phase")]
         stage: String,
         /// Optional feature or change package name.
@@ -449,7 +449,11 @@ pub fn probe_openspec_context_in(
         return None;
     }
 
-    let target_feature = if let Some(feat) = wf.as_ref().and_then(|w| w.feature_name.clone()) {
+    let target_feature = if let Some(feat) = wf
+        .as_ref()
+        .and_then(|w| w.feature_name.clone())
+        .filter(|f| !f.trim().is_empty())
+    {
         feat
     } else {
         // Fallback: find most recently modified directory in openspec/changes/
@@ -465,7 +469,7 @@ pub fn probe_openspec_context_in(
                 }
             }
         }
-        entries.sort_by_key(|(_, mtime)| *mtime);
+        entries.sort_by_key(|(path, mtime)| (*mtime, path.clone()));
         let (path, _) = entries.pop()?;
         path.file_name()?.to_string_lossy().to_string()
     };

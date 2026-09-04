@@ -5,6 +5,19 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.1] - 2026-09-04
+
+### Fixed
+- **Workflow Feature Name Clearing on Reset to Stage 1 (`src/state/state.rs`):**
+  - Updated `validate_and_set_workflow` so that transitioning to Stage 1 (`WorkflowStage::Ideation`) from any advanced stage clears the previous `feature_name` by default if `--feature` is omitted.
+  - Advancing or staying on the current stage without `--feature` continues to seamlessly inherit the active feature.
+  - Passing an explicit empty or whitespace-only feature string (`--feature ""`) is now treated as an intentional clear (`None`), preventing invalid empty path resolutions in `probe_openspec_context_in`.
+- **OpenSpec Context Probing Defense-in-Depth (`src/commands/workflow.rs`):**
+  - Added filter in `probe_openspec_context_in` ensuring empty or whitespace-only feature strings trigger fallback directory discovery under `openspec/changes/`.
+  - Corrected `--stage` / `--phase` CLI flag documentation in `Action::Checkpoint` to show valid token examples (`4`, `work`, `tdd`).
+- **User Guide Checkpoint Command Fixes (`docs/user-guide/`):**
+  - Corrected copy-pasteable checkpoint examples in `quick-start-workflow-guide.md` and `fsm-and-checkpoints-explained.md` from invalid display strings (`"Stage 4: Work/TDD"`) to valid stage tokens (`--stage 4`).
+
 ## [1.37.0] - 2026-09-04
 
 ### Added
