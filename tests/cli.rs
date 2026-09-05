@@ -33,6 +33,17 @@ fn ceai(config_dir: &Path, home: &Path) -> Command {
     cmd
 }
 
+/// Hermetic git command helper: removes outer git environment variables (GIT_DIR,
+/// GIT_WORK_TREE, GIT_INDEX_FILE, GIT_PREFIX) so temporary repository fixtures
+/// behave correctly even when cargo test runs inside a git hook (e.g., .githooks/pre-commit).
+fn git_cmd() -> std::process::Command {
+    let mut cmd = std::process::Command::new("git");
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
+        cmd.env_remove(var);
+    }
+    cmd
+}
+
 /// Local CE source-tree fixture: loader + one skill.
 fn ce_source(dir: &Path) -> PathBuf {
     let loader = dir.join("ce-tree/.opencode/plugins/compound-engineering.js");
@@ -1211,12 +1222,8 @@ fn doctor_reports_git_hooks_misconfigured_finding() {
     let repo = tmp.path().join("repo");
     fs::create_dir_all(&repo).unwrap();
     let isolated_git = || {
-        let mut cmd = std::process::Command::new("git");
-        cmd.current_dir(&repo)
-            .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
-            .env_remove("GIT_INDEX_FILE")
-            .env_remove("GIT_PREFIX");
+        let mut cmd = git_cmd();
+        cmd.current_dir(&repo);
         cmd
     };
     let _ = isolated_git().args(["init"]).output();
@@ -1253,12 +1260,8 @@ fn doctor_ignores_non_githooks_hooks_path_when_not_adopted() {
     let repo = tmp.path().join("repo");
     fs::create_dir_all(&repo).unwrap();
     let isolated_git = || {
-        let mut cmd = std::process::Command::new("git");
-        cmd.current_dir(&repo)
-            .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
-            .env_remove("GIT_INDEX_FILE")
-            .env_remove("GIT_PREFIX");
+        let mut cmd = git_cmd();
+        cmd.current_dir(&repo);
         cmd
     };
     let _ = isolated_git().args(["init"]).output();
@@ -1339,12 +1342,8 @@ fn doctor_reports_sibling_worktree_info() {
     fs::create_dir_all(&wt_dir).unwrap();
 
     let clean_git = |cwd: &Path| {
-        let mut cmd = std::process::Command::new("git");
-        cmd.current_dir(cwd)
-            .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
-            .env_remove("GIT_INDEX_FILE")
-            .env_remove("GIT_PREFIX");
+        let mut cmd = git_cmd();
+        cmd.current_dir(cwd);
         cmd
     };
 
@@ -4310,22 +4309,12 @@ fn doctor_flags_unprotected_github_main() {
     let repo = tmp.path().join("repo");
     fs::create_dir_all(&repo).unwrap();
 
-    let mut git = std::process::Command::new("git");
-    git.current_dir(&repo)
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .env_remove("GIT_INDEX_FILE")
-        .env_remove("GIT_PREFIX");
     let isolated = || {
-        let mut c = std::process::Command::new("git");
-        c.current_dir(&repo)
-            .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
-            .env_remove("GIT_INDEX_FILE")
-            .env_remove("GIT_PREFIX");
+        let mut c = git_cmd();
+        c.current_dir(&repo);
         c
     };
-    git.args(["init"]).output().unwrap();
+    isolated().args(["init"]).output().unwrap();
     isolated()
         .args([
             "remote",
@@ -4353,22 +4342,12 @@ fn doctor_stays_quiet_when_main_is_protected() {
     let repo = tmp.path().join("repo");
     fs::create_dir_all(&repo).unwrap();
 
-    let mut git = std::process::Command::new("git");
-    git.current_dir(&repo)
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .env_remove("GIT_INDEX_FILE")
-        .env_remove("GIT_PREFIX");
     let isolated = || {
-        let mut c = std::process::Command::new("git");
-        c.current_dir(&repo)
-            .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
-            .env_remove("GIT_INDEX_FILE")
-            .env_remove("GIT_PREFIX");
+        let mut c = git_cmd();
+        c.current_dir(&repo);
         c
     };
-    git.args(["init"]).output().unwrap();
+    isolated().args(["init"]).output().unwrap();
     isolated()
         .args([
             "remote",
@@ -4989,7 +4968,7 @@ fn init_prj_codex_injects_and_deinits_session_start_hook() {
     fs::create_dir_all(&prj_dir).unwrap();
 
     // Create a mock git repository with .codex directory
-    std::process::Command::new("git")
+    git_cmd()
         .args(["init"])
         .current_dir(&prj_dir)
         .output()
@@ -5060,7 +5039,7 @@ fn init_prj_pi_injects_and_deinits_session_start_hook() {
     fs::create_dir_all(&prj_dir).unwrap();
 
     // Create a mock git repository with .pi directory
-    std::process::Command::new("git")
+    git_cmd()
         .args(["init"])
         .current_dir(&prj_dir)
         .output()
@@ -5122,7 +5101,7 @@ fn init_prj_cursor_injects_and_deinits_session_start_hook() {
     fs::create_dir_all(&prj_dir).unwrap();
 
     // Initialize git repository
-    std::process::Command::new("git")
+    git_cmd()
         .args(["init", prj_dir.to_str().unwrap()])
         .output()
         .unwrap();
@@ -5200,7 +5179,7 @@ fn init_prj_agy_injects_and_deinits_pre_invocation_hook() {
     fs::create_dir_all(&prj_dir).unwrap();
 
     // Initialize git repository
-    std::process::Command::new("git")
+    git_cmd()
         .args(["init", prj_dir.to_str().unwrap()])
         .output()
         .unwrap();
@@ -5315,7 +5294,7 @@ fn workflow_checkpoint_reset_to_stage_1_clears_feature_in_resume() {
     let repo_dir = tmp.path().join("my-repo");
     fs::create_dir_all(&repo_dir).unwrap();
 
-    std::process::Command::new("git")
+    git_cmd()
         .args(["init", repo_dir.to_str().unwrap()])
         .output()
         .unwrap();
@@ -5391,7 +5370,7 @@ fn doctor_workspace_scope_opencode_install_has_no_false_positive_findings() {
     let source = ce_source(tmp.path());
 
     fs::create_dir_all(&repo_dir).unwrap();
-    std::process::Command::new("git")
+    git_cmd()
         .args(["init", "-q", repo_dir.to_str().unwrap()])
         .output()
         .unwrap();
@@ -5584,12 +5563,12 @@ fn workflow_checkpoints_isolated_across_different_workspaces() {
     fs::create_dir_all(&proj_a).unwrap();
     fs::create_dir_all(&proj_b).unwrap();
 
-    std::process::Command::new("git")
+    git_cmd()
         .args(["init", "-q"])
         .current_dir(&proj_a)
         .output()
         .unwrap();
-    std::process::Command::new("git")
+    git_cmd()
         .args(["init", "-q"])
         .current_dir(&proj_b)
         .output()
@@ -5691,7 +5670,7 @@ fn init_prj_and_deinit_prj_gitignore_lifecycle() {
     let ws = tmp.path().join("workspace");
     fs::create_dir_all(&ws).unwrap();
 
-    std::process::Command::new("git")
+    git_cmd()
         .args(["init", "-q"])
         .current_dir(&ws)
         .output()
@@ -5733,7 +5712,7 @@ fn install_workspace_scope_ensures_compound_engineering_in_gitignore() {
     let ws = tmp.path().join("workspace");
     fs::create_dir_all(&ws).unwrap();
 
-    std::process::Command::new("git")
+    git_cmd()
         .args(["init", "-q"])
         .current_dir(&ws)
         .output()
@@ -5822,7 +5801,7 @@ fn audit_suggests_codegraph_init_without_gentle_ai() {
     let project_dir = tmp.path().join("project");
     fs::create_dir_all(&project_dir).unwrap();
 
-    std::process::Command::new("git")
+    git_cmd()
         .args(["init", "-q"])
         .current_dir(&project_dir)
         .output()
@@ -5894,7 +5873,7 @@ fn init_prj_auto_initializes_codegraph_when_present() {
     let project_dir = tmp.path().join("project");
     fs::create_dir_all(&project_dir).unwrap();
 
-    std::process::Command::new("git")
+    git_cmd()
         .args(["init", "-q"])
         .current_dir(&project_dir)
         .output()
