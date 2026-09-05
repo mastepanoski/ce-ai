@@ -19,6 +19,7 @@ fn state_with(slot: &str) -> State {
         )]),
         last_update_check: None,
         workflow: None,
+        workflows: BTreeMap::new(),
         latest_release_tag: None,
         projects: vec![],
         skill_surfaces: vec![],
@@ -340,4 +341,99 @@ fn explicit_empty_feature_clears_feature_name() {
         None,
         "whitespace feature must clear feature_name"
     );
+}
+
+#[test]
+fn workspace_scoped_workflow_isolation() {
+    use crate::state::state::WorkflowStage;
+    let dir = tempdir().unwrap();
+    let ws_a = dir.path().join("project_a");
+    let ws_b = dir.path().join("project_b");
+    std::fs::create_dir_all(&ws_a).unwrap();
+    std::fs::create_dir_all(&ws_b).unwrap();
+
+    let mut state = State::new();
+
+    // Advance workspace A to Stage 4
+    state
+        .validate_and_set_workflow_for(
+            &ws_a,
+            WorkflowStage::Ideation,
+            "Ideation A",
+            Some("feat-a".into()),
+        )
+        .unwrap();
+    state
+        .validate_and_set_workflow_for(&ws_a, WorkflowStage::OpenSpec, "Spec A", None)
+        .unwrap();
+    state
+        .validate_and_set_workflow_for(&ws_a, WorkflowStage::ExecutionPlan, "Plan A", None)
+        .unwrap();
+    state
+        .validate_and_set_workflow_for(
+            &ws_a,
+            WorkflowStage::WorkTdd,
+            "Deep in TDD A, unit 7/12",
+            None,
+        )
+        .unwrap();
+
+    // Verify workspace A is at Stage 4
+    let wf_a = state.current_workflow_for(&ws_a).unwrap();
+    assert_eq!(wf_a.stage, WorkflowStage::WorkTdd);
+    assert_eq!(wf_a.task, "Deep in TDD A, unit 7/12");
+    assert_eq!(wf_a.feature_name.as_deref(), Some("feat-a"));
+
+    // Workspace B is still at default/legacy
+    assert_eq!(state.workflows.len(), 1);
+
+    // Set workspace B to Stage 1
+    state
+        .validate_and_set_workflow_for(
+            &ws_b,
+            WorkflowStage::Ideation,
+            "Ideation B",
+            Some("feat-b".into()),
+        )
+        .unwrap();
+
+    // Verify workspace B is at Stage 1
+    let wf_b = state.current_workflow_for(&ws_b).unwrap();
+    assert_eq!(wf_b.stage, WorkflowStage::Ideation);
+    assert_eq!(wf_b.task, "Ideation B");
+    assert_eq!(wf_b.feature_name.as_deref(), Some("feat-b"));
+
+    // CRITICAL: Verify workspace A is STILL at Stage 4 with feat-a
+    let wf_a_after = state.current_workflow_for(&ws_a).unwrap();
+    assert_eq!(wf_a_after.stage, WorkflowStage::WorkTdd);
+    assert_eq!(wf_a_after.task, "Deep in TDD A, unit 7/12");
+    assert_eq!(wf_a_after.feature_name.as_deref(), Some("feat-a"));
+}
+
+#[test]
+fn legacy_workflow_fallback_and_deserialization() {
+    use crate::state::state::WorkflowStage;
+    let json_legacy = r#"{
+        "version": 1,
+        "workflow": {
+            "stage": "executionplan",
+            "task": "Planning v1",
+            "feature_name": "legacy-feat",
+            "updated_at": "2026-08-20T00:00:00Z"
+        }
+    }"#;
+
+    let state: State = serde_json::from_str(json_legacy).unwrap();
+    assert!(state.workflows.is_empty());
+    assert!(state.workflow.is_some());
+
+    let dir = tempdir().unwrap();
+    let ws = dir.path().join("some_repo");
+    std::fs::create_dir_all(&ws).unwrap();
+
+    // current_workflow_for falls back to legacy workflow when not in workflows map
+    let wf = state.current_workflow_for(&ws).unwrap();
+    assert_eq!(wf.stage, WorkflowStage::ExecutionPlan);
+    assert_eq!(wf.task, "Planning v1");
+    assert_eq!(wf.feature_name.as_deref(), Some("legacy-feat"));
 }

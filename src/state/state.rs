@@ -211,6 +211,8 @@ pub struct State {
     pub last_update_check: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workflow: Option<WorkflowState>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub workflows: BTreeMap<String, WorkflowState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_release_tag: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -260,8 +262,32 @@ impl State {
         self.projects.iter().find(|p| p.path == target_path)
     }
 
+    /// Normalizes a workspace root path into a stable canonical string key.
+    pub fn normalize_workspace_key(root: &Path) -> String {
+        match std::fs::canonicalize(root) {
+            Ok(canonical) => canonical.to_string_lossy().to_string(),
+            Err(_) => root.to_string_lossy().to_string(),
+        }
+    }
+
+    /// Returns active `WorkflowState` for a specific workspace root,
+    /// falling back to the legacy global `workflow` field or `last_update_check`.
+    pub fn current_workflow_for(&self, root: &Path) -> Option<WorkflowState> {
+        let key = Self::normalize_workspace_key(root);
+        if let Some(wf) = self.workflows.get(&key) {
+            return Some(wf.clone());
+        }
+        self.current_workflow()
+    }
+
     /// Returns active `WorkflowState`, falling back to legacy `last_update_check` parsing if present.
     pub fn current_workflow(&self) -> Option<WorkflowState> {
+        if let Ok(cwd) = std::env::current_dir() {
+            let key = Self::normalize_workspace_key(&cwd);
+            if let Some(wf) = self.workflows.get(&key) {
+                return Some(wf.clone());
+            }
+        }
         if let Some(wf) = &self.workflow {
             return Some(wf.clone());
         }
@@ -286,15 +312,16 @@ impl State {
         None
     }
 
-    /// Validates stage transition and updates state.workflow.
-    pub fn validate_and_set_workflow(
+    /// Validates stage transition and updates state.workflows for the specified workspace.
+    pub fn validate_and_set_workflow_for(
         &mut self,
+        root: &Path,
         target_stage: WorkflowStage,
         task: &str,
         feature: Option<String>,
     ) -> Result<(), CeError> {
         let current_stage = self
-            .current_workflow()
+            .current_workflow_for(root)
             .map(|wf| wf.stage)
             .unwrap_or(WorkflowStage::Ideation);
         if !current_stage.can_transition_to(target_stage) {
@@ -323,18 +350,34 @@ impl State {
                 if is_reset_to_stage_1 {
                     None
                 } else {
-                    self.current_workflow().and_then(|wf| wf.feature_name)
+                    self.current_workflow_for(root)
+                        .and_then(|wf| wf.feature_name)
                 }
             }
         };
 
-        self.workflow = Some(WorkflowState {
+        let new_wf = WorkflowState {
             stage: target_stage,
             task: task.to_string(),
             feature_name,
             updated_at: chrono::Utc::now().to_rfc3339(),
-        });
+        };
+
+        let key = Self::normalize_workspace_key(root);
+        self.workflows.insert(key, new_wf.clone());
+        self.workflow = Some(new_wf);
         Ok(())
+    }
+
+    /// Validates stage transition and updates state for the current working directory.
+    pub fn validate_and_set_workflow(
+        &mut self,
+        target_stage: WorkflowStage,
+        task: &str,
+        feature: Option<String>,
+    ) -> Result<(), CeError> {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        self.validate_and_set_workflow_for(&cwd, target_stage, task, feature)
     }
 
     pub fn set_model_assignment(&mut self, slot: &str, provider_id: &str, model_id: &str) {

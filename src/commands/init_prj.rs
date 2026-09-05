@@ -1,7 +1,7 @@
 //! Project adoption init subcommand: `ce-ai init-prj`.
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
@@ -260,24 +260,7 @@ pub fn run(
             }
         }
         // Inject sentinel-bounded .gitignore block (DEC-06)
-        let gitignore_file = target_dir.join(".gitignore");
-        let gitignore_block = format!(
-            "{}\n.ce-ai/skills-registry.json\n{}\n",
-            GITIGNORE_BEGIN_MARKER, GITIGNORE_END_MARKER
-        );
-        let gitignore_text = if gitignore_file.exists() {
-            fs::read_to_string(&gitignore_file)?
-        } else {
-            String::new()
-        };
-        if !gitignore_text.contains(GITIGNORE_BEGIN_MARKER) {
-            let mut updated_gi = gitignore_text;
-            if !updated_gi.is_empty() && !updated_gi.ends_with('\n') {
-                updated_gi.push('\n');
-            }
-            updated_gi.push_str(&gitignore_block);
-            crate::state::write_atomic(&gitignore_file, updated_gi.as_bytes())?;
-        }
+        ensure_gitignore_block(&target_dir)?;
 
         // Write Cursor project rule .cursor/rules/compound-engineering.mdc if .cursor exists
         let cursor_dir = target_dir.join(".cursor");
@@ -435,6 +418,41 @@ pub fn run(
         );
     }
 
+    Ok(())
+}
+
+/// Ensures the sentinel-bounded .gitignore block exists and contains both
+/// `.ce-ai/skills-registry.json` and `compound-engineering/`.
+pub fn ensure_gitignore_block(target_dir: &Path) -> Result<(), CeError> {
+    let gitignore_file = target_dir.join(".gitignore");
+    let gitignore_block = format!(
+        "{}\n.ce-ai/skills-registry.json\ncompound-engineering/\n{}\n",
+        GITIGNORE_BEGIN_MARKER, GITIGNORE_END_MARKER
+    );
+    let gitignore_text = if gitignore_file.exists() {
+        fs::read_to_string(&gitignore_file)?
+    } else {
+        String::new()
+    };
+    if !gitignore_text.contains(GITIGNORE_BEGIN_MARKER) {
+        let mut updated_gi = gitignore_text;
+        if !updated_gi.is_empty() && !updated_gi.ends_with('\n') {
+            updated_gi.push('\n');
+        }
+        updated_gi.push_str(&gitignore_block);
+        crate::state::write_atomic(&gitignore_file, updated_gi.as_bytes())?;
+    } else if !gitignore_text.contains("compound-engineering/") {
+        if let Some(start_idx) = gitignore_text.find(GITIGNORE_BEGIN_MARKER) {
+            if let Some(end_rel) = gitignore_text[start_idx..].find(GITIGNORE_END_MARKER) {
+                let end_idx = start_idx + end_rel + GITIGNORE_END_MARKER.len();
+                let mut updated_gi = String::new();
+                updated_gi.push_str(&gitignore_text[..start_idx]);
+                updated_gi.push_str(gitignore_block.trim_end());
+                updated_gi.push_str(&gitignore_text[end_idx..]);
+                crate::state::write_atomic(&gitignore_file, updated_gi.as_bytes())?;
+            }
+        }
+    }
     Ok(())
 }
 

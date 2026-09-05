@@ -5456,3 +5456,194 @@ fn sync_standalone_custom_harness_without_opencode_succeeds() {
         .stdout(predicates::str::contains("0 failed"))
         .stdout(predicates::str::contains("opencode").not());
 }
+
+#[test]
+fn workflow_checkpoints_isolated_across_different_workspaces() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let proj_a = tmp.path().join("proj_a");
+    let proj_b = tmp.path().join("proj_b");
+    fs::create_dir_all(&proj_a).unwrap();
+    fs::create_dir_all(&proj_b).unwrap();
+
+    std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&proj_a)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&proj_b)
+        .output()
+        .unwrap();
+
+    // Advance project A from Stage 1 -> 2 -> 3 -> 4
+    ceai(&config_dir, &home)
+        .current_dir(&proj_a)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--stage",
+            "1",
+            "--task",
+            "Brainstorm A",
+            "--feature",
+            "feat-a",
+        ])
+        .assert()
+        .success();
+    ceai(&config_dir, &home)
+        .current_dir(&proj_a)
+        .args(["workflow", "checkpoint", "--stage", "2", "--task", "Spec A"])
+        .assert()
+        .success();
+    ceai(&config_dir, &home)
+        .current_dir(&proj_a)
+        .args(["workflow", "checkpoint", "--stage", "3", "--task", "Plan A"])
+        .assert()
+        .success();
+    ceai(&config_dir, &home)
+        .current_dir(&proj_a)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--stage",
+            "4",
+            "--task",
+            "Deep in TDD A, unit 7/12",
+        ])
+        .assert()
+        .success();
+
+    // Verify project A is at Stage 4
+    ceai(&config_dir, &home)
+        .current_dir(&proj_a)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Stage 4: TDD & Work"))
+        .stdout(predicates::str::contains(
+            "active subtask: Deep in TDD A, unit 7/12",
+        ))
+        .stdout(predicates::str::contains("active feature: feat-a"));
+
+    // Checkpoint project B at Stage 1
+    ceai(&config_dir, &home)
+        .current_dir(&proj_b)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--stage",
+            "1",
+            "--task",
+            "Ideation for B",
+            "--feature",
+            "feat-b",
+        ])
+        .assert()
+        .success();
+
+    // Resume in project A MUST still show Stage 4 and feat-a (NOT wiped by B)
+    ceai(&config_dir, &home)
+        .current_dir(&proj_a)
+        .args(["workflow", "resume"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Stage 4: TDD & Work"))
+        .stdout(predicates::str::contains(
+            "active subtask: Deep in TDD A, unit 7/12",
+        ))
+        .stdout(predicates::str::contains("active feature: feat-a"));
+
+    // Resume in project B MUST show Stage 1 and feat-b
+    ceai(&config_dir, &home)
+        .current_dir(&proj_b)
+        .args(["workflow", "resume"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Stage 1: Ideation"))
+        .stdout(predicates::str::contains("active subtask: Ideation for B"))
+        .stdout(predicates::str::contains("active feature: feat-b"));
+}
+
+#[test]
+fn init_prj_and_deinit_prj_gitignore_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let ws = tmp.path().join("workspace");
+    fs::create_dir_all(&ws).unwrap();
+
+    std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&ws)
+        .output()
+        .unwrap();
+
+    // Adopt project
+    ceai(&config_dir, &home)
+        .current_dir(&ws)
+        .args(["init-prj", ws.to_str().unwrap()])
+        .assert()
+        .success();
+
+    let gitignore = ws.join(".gitignore");
+    assert!(gitignore.exists(), ".gitignore must be created by init-prj");
+    let content = fs::read_to_string(&gitignore).unwrap();
+    assert!(content.contains("# BEGIN CE-AI MANAGED BLOCK"));
+    assert!(content.contains(".ce-ai/skills-registry.json"));
+    assert!(content.contains("compound-engineering/"));
+    assert!(content.contains("# END CE-AI MANAGED BLOCK"));
+
+    // De-adopt project
+    ceai(&config_dir, &home)
+        .current_dir(&ws)
+        .args(["deinit-prj", ws.to_str().unwrap()])
+        .assert()
+        .success();
+
+    assert!(
+        !gitignore.exists(),
+        "empty .gitignore must be cleaned up on deinit-prj"
+    );
+}
+
+#[test]
+fn install_workspace_scope_ensures_compound_engineering_in_gitignore() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source_top_level_skills(tmp.path());
+    let ws = tmp.path().join("workspace");
+    fs::create_dir_all(&ws).unwrap();
+
+    std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&ws)
+        .output()
+        .unwrap();
+
+    // Install with --scope workspace without running init-prj first
+    ceai(&config_dir, &home)
+        .current_dir(&ws)
+        .args([
+            "install",
+            "--harness",
+            "opencode",
+            "--scope",
+            "workspace",
+            "--source",
+        ])
+        .arg(&source)
+        .assert()
+        .success();
+
+    let gitignore = ws.join(".gitignore");
+    assert!(
+        gitignore.exists(),
+        ".gitignore must be ensured by workspace-scoped install"
+    );
+    let content = fs::read_to_string(&gitignore).unwrap();
+    assert!(
+        content.contains("compound-engineering/"),
+        "compound-engineering/ must be in .gitignore"
+    );
+}
