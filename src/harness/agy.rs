@@ -167,8 +167,9 @@ pub fn unregister_agy_mcp_server(config_path: &Path, name: &str) -> Result<(), C
 }
 
 pub const AGY_RESUME_COMMAND: &str = "ce-ai workflow resume --pre-invocation";
+pub const AGY_STOP_COMMAND: &str = "ce-ai workflow resume";
 
-/// Checks if `.agents/hooks.json` (or any hooks configuration) contains the PreInvocation hook for `ce-ai workflow resume --pre-invocation`.
+/// Checks if `.agents/hooks.json` (or any hooks configuration) contains PreInvocation and Stop hooks for `ce-ai workflow resume`.
 pub fn has_pre_invocation_hook(hooks_path: &Path) -> bool {
     if !hooks_path.exists() {
         return false;
@@ -182,7 +183,8 @@ pub fn has_pre_invocation_hook(hooks_path: &Path) -> bool {
     let Some(obj) = val.as_object() else {
         return false;
     };
-    obj.values().any(|group| {
+
+    let has_pi = obj.values().any(|group| {
         group
             .get("PreInvocation")
             .and_then(|pi| pi.as_array())
@@ -192,10 +194,56 @@ pub fn has_pre_invocation_hook(hooks_path: &Path) -> bool {
                 })
             })
             .unwrap_or(false)
-    })
+    });
+
+    let has_stop = obj.values().any(|group| {
+        group
+            .get("Stop")
+            .and_then(|st| st.as_array())
+            .map(|arr| {
+                arr.iter().any(|entry| {
+                    entry.get("command").and_then(|c| c.as_str()) == Some(AGY_STOP_COMMAND)
+                })
+            })
+            .unwrap_or(false)
+    });
+
+    has_pi && has_stop
 }
 
-/// Ensures `.agents/hooks.json` contains the PreInvocation hook for `ce-ai workflow resume --pre-invocation`.
+fn ensure_agy_group_hook(
+    group_obj: &mut serde_json::Map<String, serde_json::Value>,
+    event_name: &str,
+    command: &str,
+) -> Result<bool, CeError> {
+    let event_val = group_obj
+        .entry(event_name)
+        .or_insert_with(|| serde_json::json!([]));
+    if !event_val.is_array() {
+        *event_val = serde_json::json!([]);
+    }
+
+    let event_arr = event_val
+        .as_array_mut()
+        .ok_or_else(|| CeError::Runtime(format!("{event_name} is not an array")))?;
+
+    let target_hook = serde_json::json!({
+        "type": "command",
+        "command": command,
+    });
+
+    if !event_arr
+        .iter()
+        .any(|entry| entry.get("command").and_then(|c| c.as_str()) == Some(command))
+    {
+        event_arr.push(target_hook);
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+/// Ensures `.agents/hooks.json` contains PreInvocation and Stop hooks for `ce-ai workflow resume`.
 /// Preserves any pre-existing user hooks or extra hook groups. Idempotent.
 pub fn ensure_pre_invocation_hook(hooks_path: &Path) -> Result<bool, CeError> {
     if has_pre_invocation_hook(hooks_path) {
@@ -228,27 +276,16 @@ pub fn ensure_pre_invocation_hook(hooks_path: &Path) -> Result<bool, CeError> {
         CeError::Runtime("compound-engineering hook group is not an object".to_string())
     })?;
 
-    let pre_inv_val = ce_obj
-        .entry("PreInvocation")
-        .or_insert_with(|| serde_json::json!([]));
-    if !pre_inv_val.is_array() {
-        *pre_inv_val = serde_json::json!([]);
+    let mut changed = false;
+    if ensure_agy_group_hook(ce_obj, "PreInvocation", AGY_RESUME_COMMAND)? {
+        changed = true;
+    }
+    if ensure_agy_group_hook(ce_obj, "Stop", AGY_STOP_COMMAND)? {
+        changed = true;
     }
 
-    let pre_inv_arr = pre_inv_val
-        .as_array_mut()
-        .ok_or_else(|| CeError::Runtime("PreInvocation is not an array".to_string()))?;
-
-    let target_hook = serde_json::json!({
-        "type": "command",
-        "command": AGY_RESUME_COMMAND,
-    });
-
-    if !pre_inv_arr
-        .iter()
-        .any(|entry| entry.get("command").and_then(|c| c.as_str()) == Some(AGY_RESUME_COMMAND))
-    {
-        pre_inv_arr.push(target_hook);
+    if !changed {
+        return Ok(false);
     }
 
     if let Some(parent) = hooks_path.parent() {
@@ -261,7 +298,7 @@ pub fn ensure_pre_invocation_hook(hooks_path: &Path) -> Result<bool, CeError> {
     Ok(true)
 }
 
-/// Surgically removes `ce-ai workflow resume --pre-invocation` hook from `.agents/hooks.json`.
+/// Surgically removes `ce-ai workflow resume` hooks (PreInvocation, Stop) from `.agents/hooks.json`.
 /// If the file becomes effectively empty as a result, removes the file cleanly and prunes the parent directory if empty.
 pub fn remove_pre_invocation_hook(hooks_path: &Path) -> Result<bool, CeError> {
     if !hooks_path.exists() {
@@ -282,6 +319,7 @@ pub fn remove_pre_invocation_hook(hooks_path: &Path) -> Result<bool, CeError> {
 
     for (group_name, group_val) in root_obj.iter_mut() {
         if let Some(group_obj) = group_val.as_object_mut() {
+            // 1. Clean PreInvocation
             if let Some(pre_inv_arr) = group_obj
                 .get_mut("PreInvocation")
                 .and_then(|pi| pi.as_array_mut())
@@ -297,6 +335,21 @@ pub fn remove_pre_invocation_hook(hooks_path: &Path) -> Result<bool, CeError> {
                     group_obj.remove("PreInvocation");
                 }
             }
+
+            // 2. Clean Stop
+            if let Some(stop_arr) = group_obj.get_mut("Stop").and_then(|st| st.as_array_mut()) {
+                let orig_len = stop_arr.len();
+                stop_arr.retain(|entry| {
+                    entry.get("command").and_then(|c| c.as_str()) != Some(AGY_STOP_COMMAND)
+                });
+                if stop_arr.len() != orig_len {
+                    changed = true;
+                }
+                if stop_arr.is_empty() {
+                    group_obj.remove("Stop");
+                }
+            }
+
             if group_obj.is_empty() {
                 empty_groups.push(group_name.clone());
             }

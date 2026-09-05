@@ -115,6 +115,14 @@ fn ensures_and_removes_session_start_hook_lifecycle() {
         val["hooks"]["SessionStart"][0]["hooks"][0]["command"],
         "ce-ai workflow resume"
     );
+    assert_eq!(
+        val["hooks"]["Stop"][0]["hooks"][0]["command"],
+        "ce-ai workflow resume"
+    );
+    assert_eq!(
+        val["hooks"]["PreCompact"][0]["hooks"][0]["command"],
+        "ce-ai workflow resume"
+    );
 
     // Surgical removal cleans up empty file
     let removed = remove_session_start_hook(&settings_path).unwrap();

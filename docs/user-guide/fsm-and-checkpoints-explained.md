@@ -264,6 +264,34 @@ The new agent immediately knows **where it is**, **what was already built**, and
 
 ---
 
+### 📍 Step 5: Automated Stage Inference & Turn-End Checkpointing
+
+In adopted projects (`ce-ai init-prj`), `ce-ai` configures native lifecycle hooks across 7 AI agent harnesses:
+- **Claude Code**: `SessionStart`, `Stop`, `PreCompact` in `.claude/settings.json`
+- **Codex CLI**: `SessionStart`, `Stop`, `PreCompact` in `.codex/config.toml`
+- **Cursor**: `sessionStart`, `stop` in `.cursor/hooks.json`
+- **GitHub Copilot**: `sessionStart`, `postToolUse` in `.github/hooks/hooks.json`
+- **Antigravity**: `PreInvocation`, `Stop` in `.agents/hooks.json`
+- **Pi**: `before_agent_start`, `agent_end`, `session_before_compact` in `.pi/extensions/compound-engineering.ts` (`v=2`)
+- **OpenCode**: `session.created`, `session.idle`, `compacting` plugin hooks in `.opencode/plugins/compound-engineering.js`
+
+These hooks execute at turn boundaries and before context compaction, evaluating repository state through `infer_stage_from_repo`:
+- **Stage 1 (Ideation)**: `docs/brainstorms/*.md` or `docs/ideation/*.md` present without OpenSpec changes.
+- **Stage 2 (OpenSpec)**: `proposal.md` and `spec.md` present under `openspec/changes/<feature>/` without tasks.
+- **Stage 3 (Execution Plan)**: `tasks.md` present with zero completed tasks.
+- **Stage 4 (TDD & Work)**: `tasks.md` with in-progress tasks, OR **Direct Entry** (`fix/*` or `feat/*` branch with uncommitted changes, bypassing ideation for fast bug repair via `ce-debug`).
+- **Stage 5 (Verification)**: All tasks in `tasks.md` marked completed (`[x]`).
+- **Stage 6 (Knowledge Capture)**: New or modified solutions in `docs/solutions/*.md`.
+- **Stage 7 (Git Shipping)**: Active PR created on GitHub or branch merged.
+
+#### 🛡️ Monotonic Provenance & Opt-Out
+- **Manual Provenance Guard**: Checkpoints saved manually via `ce-ai workflow checkpoint` have `source: "manual"` and can NEVER be regressed by automated inference.
+- **Monotonic Progression**: Automated checkpoints only advance forward (`source: "inferred"`).
+- **Adoption Opt-In**: Repositories must be adopted via `ce-ai init-prj` for hooks and automated checkpointing to activate.
+- **Configurable Opt-Out**: Users can disable automated checkpointing by setting `"auto_checkpoint": false` in `state.json`.
+
+---
+
 ## 5. FSM Capability Matrix: Supported Workflow Variants & Transitions
 
 The `ce-ai` FSM engine was specifically designed to support **all real-world engineering variants**:

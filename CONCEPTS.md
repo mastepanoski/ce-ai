@@ -49,3 +49,12 @@ A sub-15ms Turn-0 state synchronization mechanism (`ce-ai workflow resume`) insp
 ### RepoState
 A structured, serializable data snapshot capturing real-time workspace disk reality (Git status, manifest drift count, adoption marker validity, OpenSpec task progress) emitted on workflow resumption for human review and autonomous agent consumption.
 
+### Workflow FSM Auto-Checkpointing
+An automated lifecycle progression engine that infers the current 7-stage workflow phase from observable disk artifacts (ideation notes, OpenSpec specs, git branch semantics, unit tests, solution docs, git log PR traces) triggered exclusively on Turn-End (`Stop`, `session.idle`, `agent_end`, `postToolUse`) and Pre-Compaction (`PreCompact`, `session_before_compact`) events across all 7 supported harnesses.
+
+### Monotonic Provenance Guard
+A non-regression invariant guaranteeing that inferred workflow transitions (`WorkflowSource::Inferred`) never overwrite or revert a manually recorded checkpoint (`WorkflowSource::Manual`) at an equal or higher workflow stage, preventing speculative automation from clobbering explicit operator intent.
+
+### Branch-Scoped Workflow Isolation
+A multi-branch state partition scheme that indexes workflow progression by canonical workspace root and sanitized Git branch name (`<canonical_root>::<branch>`), preventing feature branches and bugfix work from clobbering one another's active workflow stage in multi-branch or worktree setups.
+

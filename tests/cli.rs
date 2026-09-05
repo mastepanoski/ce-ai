@@ -5894,3 +5894,429 @@ fn init_prj_auto_initializes_codegraph_when_present() {
 
     assert!(project_dir.join(".codegraph").exists());
 }
+
+#[test]
+fn workflow_auto_checkpoint_infers_stage_on_resume_and_status() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let project_dir = tmp.path().join("project");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    git_cmd()
+        .args(["init", "-q"])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+
+    // Adopt project
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .arg("init-prj")
+        .assert()
+        .success();
+
+    // Stage 1 default
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stage 1: Ideation"));
+
+    // Create Stage 2 artifacts: proposal.md + spec.md
+    let change_dir = project_dir
+        .join("openspec")
+        .join("changes")
+        .join("feat-infer");
+    fs::create_dir_all(&change_dir).unwrap();
+    fs::write(change_dir.join("proposal.md"), "# Proposal").unwrap();
+    fs::write(change_dir.join("spec.md"), "# Spec").unwrap();
+
+    // Status infers Stage 2
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stage 2: OpenSpec Definition"));
+
+    // Add tasks.md with 0 completed (Stage 3)
+    fs::write(change_dir.join("tasks.md"), "- [ ] Task 1\n- [ ] Task 2\n").unwrap();
+
+    // Resume infers Stage 3
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .args(["workflow", "resume"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stage 3: Execution Plan"));
+
+    // Verify source is recorded as "inferred" in state.json
+    let state_file = config_dir.join("state.json");
+    let loaded = ce_ai::state::state::State::load(&state_file).unwrap();
+    let current = loaded
+        .current_workflow_for_branch(&project_dir, None)
+        .unwrap();
+    assert_eq!(
+        current.source,
+        ce_ai::state::state::WorkflowSource::Inferred
+    );
+}
+
+#[test]
+fn workflow_branch_scoping_prevents_cross_branch_clobbering() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let project_dir = tmp.path().join("project");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    git_cmd()
+        .args(["init", "-q"])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+
+    git_cmd()
+        .args(["config", "user.email", "test@example.com"])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+    git_cmd()
+        .args(["config", "user.name", "Test"])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+
+    // Create initial commit so branch switching works cleanly
+    fs::write(project_dir.join("README.md"), "# Initial").unwrap();
+    git_cmd()
+        .args(["add", "."])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+    git_cmd()
+        .args(["commit", "-m", "init"])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+
+    // Adopt project
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .arg("init-prj")
+        .assert()
+        .success();
+
+    // Create and switch to feat/alpha
+    git_cmd()
+        .args(["checkout", "-b", "feat/alpha"])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+
+    let alpha_dir = project_dir.join("openspec").join("changes").join("alpha");
+    fs::create_dir_all(&alpha_dir).unwrap();
+    fs::write(alpha_dir.join("proposal.md"), "# Alpha Proposal").unwrap();
+    fs::write(alpha_dir.join("spec.md"), "# Alpha Spec").unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stage 2: OpenSpec Definition"));
+
+    // Switch to feat/beta
+    git_cmd()
+        .args(["checkout", "-b", "feat/beta"])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+
+    let beta_dir = project_dir.join("openspec").join("changes").join("beta");
+    fs::create_dir_all(&beta_dir).unwrap();
+    fs::write(beta_dir.join("proposal.md"), "# Beta Proposal").unwrap();
+    fs::write(beta_dir.join("spec.md"), "# Beta Spec").unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stage 2: OpenSpec Definition"));
+
+    fs::write(beta_dir.join("tasks.md"), "- [ ] Task 1\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stage 3: Execution Plan"));
+
+    // Switch back to feat/alpha
+    git_cmd()
+        .args(["checkout", "feat/alpha"])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+
+    // Alpha workflow is still Stage 2
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stage 2: OpenSpec Definition"));
+}
+
+#[test]
+fn workflow_transitory_git_state_suppresses_auto_checkpoint() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let project_dir = tmp.path().join("project");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    git_cmd()
+        .args(["init", "-q"])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .arg("init-prj")
+        .assert()
+        .success();
+
+    // Create Stage 2 files
+    let change_dir = project_dir.join("openspec").join("changes").join("gamma");
+    fs::create_dir_all(&change_dir).unwrap();
+    fs::write(change_dir.join("proposal.md"), "# Proposal").unwrap();
+    fs::write(change_dir.join("spec.md"), "# Spec").unwrap();
+
+    // Inject transitory git state: rebase-merge
+    let rebase_merge = project_dir.join(".git").join("rebase-merge");
+    fs::create_dir_all(&rebase_merge).unwrap();
+
+    // Status suppresses auto-checkpoint during rebase
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stage 1: Ideation"));
+
+    // Remove transitory state
+    fs::remove_dir_all(&rebase_merge).unwrap();
+
+    // Status now proceeds to auto-checkpoint to Stage 2
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stage 2: OpenSpec Definition"));
+}
+
+#[test]
+fn workflow_inferred_stage_never_regresses_manual_checkpoint() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let project_dir = tmp.path().join("project");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    git_cmd()
+        .args(["init", "-q"])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .arg("init-prj")
+        .assert()
+        .success();
+
+    // Manually advance legally from Stage 1 to Stage 4
+    for (stg, tsk) in [(2, "Spec"), (3, "Plan"), (4, "Manual Work")] {
+        ceai(&config_dir, &home)
+            .current_dir(&project_dir)
+            .args([
+                "workflow",
+                "checkpoint",
+                "--stage",
+                &stg.to_string(),
+                "--task",
+                tsk,
+            ])
+            .assert()
+            .success();
+    }
+
+    // Now repo files only reflect Stage 2
+    let change_dir = project_dir.join("openspec").join("changes").join("delta");
+    fs::create_dir_all(&change_dir).unwrap();
+    fs::write(change_dir.join("proposal.md"), "# Proposal").unwrap();
+    fs::write(change_dir.join("spec.md"), "# Spec").unwrap();
+
+    // Resume runs: Stage 4 must NOT regress to Stage 2
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .args(["workflow", "resume"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stage 4: TDD & Work (ce-work)"));
+}
+
+#[test]
+fn init_prj_and_deinit_prj_roundtrip_all_harness_hooks() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let project_dir = tmp.path().join("project");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    // Pre-create directories for all file-based harnesses
+    let claude_dir = project_dir.join(".claude");
+    fs::create_dir_all(&claude_dir).unwrap();
+    let codex_dir = project_dir.join(".codex");
+    fs::create_dir_all(&codex_dir).unwrap();
+    let cursor_dir = project_dir.join(".cursor");
+    fs::create_dir_all(&cursor_dir).unwrap();
+    let github_dir = project_dir.join(".github");
+    fs::create_dir_all(&github_dir).unwrap();
+    let agents_dir = project_dir.join(".agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+    let pi_dir = project_dir.join(".pi");
+    fs::create_dir_all(&pi_dir).unwrap();
+
+    // 1. Run init-prj
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .arg("init-prj")
+        .assert()
+        .success();
+
+    // 2. Verify all hooks are registered
+    // Claude: SessionStart, Stop, PreCompact
+    let claude_settings = claude_dir.join("settings.json");
+    assert!(claude_settings.exists());
+    let claude_val: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&claude_settings).unwrap()).unwrap();
+    assert!(claude_val["hooks"]["SessionStart"].is_array());
+    assert!(claude_val["hooks"]["Stop"].is_array());
+    assert!(claude_val["hooks"]["PreCompact"].is_array());
+
+    // Codex: SessionStart, Stop, PreCompact in config.toml
+    let codex_config = codex_dir.join("config.toml");
+    assert!(codex_config.exists());
+    let codex_text = fs::read_to_string(&codex_config).unwrap();
+    assert!(codex_text.contains("SessionStart"));
+    assert!(codex_text.contains("Stop"));
+    assert!(codex_text.contains("PreCompact"));
+
+    // Cursor: sessionStart, stop in hooks.json
+    let cursor_hooks = cursor_dir.join("hooks.json");
+    assert!(cursor_hooks.exists());
+    let cursor_val: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&cursor_hooks).unwrap()).unwrap();
+    assert!(cursor_val["hooks"]["sessionStart"].is_array());
+    assert!(cursor_val["hooks"]["stop"].is_array());
+
+    // Copilot: sessionStart, postToolUse in .github/hooks/hooks.json
+    let copilot_hooks = github_dir.join("hooks").join("hooks.json");
+    assert!(copilot_hooks.exists());
+    let copilot_val: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&copilot_hooks).unwrap()).unwrap();
+    assert!(copilot_val["hooks"]["sessionStart"].is_array());
+    assert!(copilot_val["hooks"]["postToolUse"].is_array());
+
+    // Antigravity: PreInvocation, Stop in .agents/hooks.json
+    let agy_hooks = agents_dir.join("hooks.json");
+    assert!(agy_hooks.exists());
+    let agy_val: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&agy_hooks).unwrap()).unwrap();
+    assert!(agy_val["compound-engineering"]["PreInvocation"].is_array());
+    assert!(agy_val["compound-engineering"]["Stop"].is_array());
+
+    // Pi: compound-engineering.ts with v=2
+    let pi_ext = pi_dir.join("extensions").join("compound-engineering.ts");
+    assert!(pi_ext.exists());
+    let pi_text = fs::read_to_string(&pi_ext).unwrap();
+    assert!(pi_text.contains("// ce-ai:hook v=2"));
+    assert!(pi_text.contains("agent_end"));
+    assert!(pi_text.contains("session_before_compact"));
+
+    // 3. Run deinit-prj
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .arg("deinit-prj")
+        .assert()
+        .success();
+
+    // 4. Symmetrical clean up verification (no orphaned hooks)
+    // Claude
+    if claude_settings.exists() {
+        let claude_val_after: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&claude_settings).unwrap()).unwrap();
+        assert!(claude_val_after["hooks"]["SessionStart"]
+            .as_array()
+            .map(|a| a.is_empty())
+            .unwrap_or(true));
+        assert!(claude_val_after["hooks"]["Stop"]
+            .as_array()
+            .map(|a| a.is_empty())
+            .unwrap_or(true));
+        assert!(claude_val_after["hooks"]["PreCompact"]
+            .as_array()
+            .map(|a| a.is_empty())
+            .unwrap_or(true));
+    }
+
+    // Codex
+    if codex_config.exists() {
+        let codex_text_after = fs::read_to_string(&codex_config).unwrap();
+        assert!(!codex_text_after.contains("ce-ai workflow resume"));
+    }
+
+    // Cursor
+    if cursor_hooks.exists() {
+        let cursor_val_after: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&cursor_hooks).unwrap()).unwrap();
+        assert!(cursor_val_after["hooks"]["sessionStart"]
+            .as_array()
+            .map(|a| a.is_empty())
+            .unwrap_or(true));
+        assert!(cursor_val_after["hooks"]["stop"]
+            .as_array()
+            .map(|a| a.is_empty())
+            .unwrap_or(true));
+    }
+
+    // Copilot
+    if copilot_hooks.exists() {
+        let copilot_val_after: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&copilot_hooks).unwrap()).unwrap();
+        assert!(copilot_val_after["hooks"]["sessionStart"]
+            .as_array()
+            .map(|a| a.is_empty())
+            .unwrap_or(true));
+        assert!(copilot_val_after["hooks"]["postToolUse"]
+            .as_array()
+            .map(|a| a.is_empty())
+            .unwrap_or(true));
+    }
+
+    // Antigravity
+    if agy_hooks.exists() {
+        let agy_val_after: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&agy_hooks).unwrap()).unwrap();
+        assert!(agy_val_after.get("compound-engineering").is_none());
+    }
+
+    // Pi
+    assert!(
+        !pi_ext.exists(),
+        "Pi extension file must be removed symmetrically"
+    );
+}

@@ -166,6 +166,20 @@ fn codex_session_start_hook_lifecycle() {
     assert_eq!(hooks.len(), 1);
     assert_eq!(hooks[0]["command"].as_str().unwrap(), CODEX_RESUME_COMMAND);
 
+    let stop = root["hooks"]["Stop"].as_array().unwrap();
+    assert_eq!(stop.len(), 1);
+    assert_eq!(
+        stop[0]["hooks"][0]["command"].as_str().unwrap(),
+        CODEX_RESUME_COMMAND
+    );
+
+    let pre_compact = root["hooks"]["PreCompact"].as_array().unwrap();
+    assert_eq!(pre_compact.len(), 1);
+    assert_eq!(
+        pre_compact[0]["hooks"][0]["command"].as_str().unwrap(),
+        CODEX_RESUME_COMMAND
+    );
+
     // Idempotent second call
     let changed_second = ensure_session_start_hook(&config_path).unwrap();
     assert!(!changed_second);

@@ -116,6 +116,9 @@ export const CompoundEngineeringPlugin = async ({ project, client, $, directory,
             // Non-blocking: continue normal session execution if prompt injection fails
           }
         }
+      } else if (event && event.type === "session.idle") {
+        // Turn-end auto-checkpoint: invoke ce-ai workflow resume to evaluate stage progression
+        getRepoState(cwd);
       }
     },
 
