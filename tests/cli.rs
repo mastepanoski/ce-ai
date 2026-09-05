@@ -2554,6 +2554,40 @@ fn skills_resolve_emits_markdown_prompt_and_json() {
 }
 
 #[test]
+fn skills_resolve_accepts_positional_query_and_validates_missing() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Positional query mode (as suggested by ce-ai doctor / tools status)
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .args(["skills", "resolve", "sequential-thinking"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("## Skills to load before work:"));
+
+    // Positional query with --json
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .args(["skills", "resolve", "sequential-thinking", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"query\": \"sequential-thinking\"",
+        ));
+
+    // Missing query fails with usage error exit code 2
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .args(["skills", "resolve"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("missing search query"));
+}
+
+#[test]
 fn audit_subcommand_runs_advisory_and_json_mode() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
