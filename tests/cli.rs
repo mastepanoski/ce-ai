@@ -1223,6 +1223,11 @@ fn doctor_reports_git_hooks_misconfigured_finding() {
     let _ = isolated_git()
         .args(["config", "core.hooksPath", "invalid_hooks"])
         .output();
+    // The .githooks convention only applies once a project has adopted it
+    // (i.e. the directory exists) — otherwise a differing hooksPath just
+    // means the project uses a different hooks manager (Husky, lefthook,
+    // etc.) and is not a finding.
+    fs::create_dir_all(repo.join(".githooks")).unwrap();
 
     let mut cmd = ceai(&config_dir, &home);
     cmd.current_dir(&repo)
@@ -1233,6 +1238,39 @@ fn doctor_reports_git_hooks_misconfigured_finding() {
         .stdout(predicate::str::contains(
             "git-hooks: core.hooksPath set to 'invalid_hooks'",
         ));
+}
+
+#[test]
+fn doctor_ignores_non_githooks_hooks_path_when_not_adopted() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Simulate a project that legitimately uses a different hooks manager
+    // (e.g. Husky sets core.hooksPath to '.husky/_') and never opted into
+    // ce-ai's own .githooks convention. This must not be flagged.
+    let repo = tmp.path().join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    let isolated_git = || {
+        let mut cmd = std::process::Command::new("git");
+        cmd.current_dir(&repo)
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
+            .env_remove("GIT_PREFIX");
+        cmd
+    };
+    let _ = isolated_git().args(["init"]).output();
+    let _ = isolated_git()
+        .args(["config", "core.hooksPath", ".husky/_"])
+        .output();
+
+    let mut cmd = ceai(&config_dir, &home);
+    cmd.current_dir(&repo)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains("git-hooks: core.hooksPath set to").not());
 }
 
 #[test]

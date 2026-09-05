@@ -297,6 +297,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 println!("doctor-info: codegraph index (.codegraph/) not initialized");
             }
 
+            let githooks_dir = root_path.join(".githooks");
+            let uses_githooks_convention = githooks_dir.exists();
+
             if let Ok(hooks_output) = std::process::Command::new("git")
                 .args(["config", "--get", "core.hooksPath"])
                 .current_dir(root_path)
@@ -306,18 +309,26 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                     let raw_val = String::from_utf8_lossy(&hooks_output.stdout);
                     let hooks_val = raw_val.trim().trim_end_matches('/').trim_end_matches('\\');
                     let hooks_path = std::path::Path::new(hooks_val);
-                    if !hooks_val.ends_with(".githooks")
-                        && hooks_path.file_name() != Some(std::ffi::OsStr::new(".githooks"))
-                    {
+                    let points_to_githooks = hooks_val.ends_with(".githooks")
+                        || hooks_path.file_name() == Some(std::ffi::OsStr::new(".githooks"));
+                    if points_to_githooks {
+                        let pre_commit = root_path.join(".githooks").join("pre-commit");
+                        if !pre_commit.exists() {
+                            findings.push("git-hooks: .githooks/pre-commit missing".into());
+                        }
+                    } else if uses_githooks_convention {
+                        // Project has already adopted the .githooks convention (the
+                        // directory exists), so a hooksPath pointing elsewhere is drift,
+                        // not an unrelated hooks manager.
                         findings.push(format!(
                             "git-hooks: core.hooksPath set to '{}', expected '.githooks'",
                             hooks_val
                         ));
                     } else {
-                        let pre_commit = root_path.join(".githooks").join("pre-commit");
-                        if !pre_commit.exists() {
-                            findings.push("git-hooks: .githooks/pre-commit missing".into());
-                        }
+                        println!(
+                            "doctor-info: git-hooks core.hooksPath set to '{}' (not the .githooks convention; skipping)",
+                            hooks_val
+                        );
                     }
                 } else {
                     println!("doctor-info: git-hooks core.hooksPath not set");
