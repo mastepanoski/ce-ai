@@ -365,6 +365,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
         state.installed_harnesses.push(entry);
 
+        if scope_arg == "workspace" && !ctx.dry_run {
+            let _ = crate::commands::init_prj::ensure_gitignore_block(&config_dir);
+        }
+
         if !ctx.quiet && !ctx.dry_run {
             let source_disp = if args.source.is_some() {
                 source_path.display().to_string()

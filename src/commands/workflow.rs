@@ -57,12 +57,13 @@ pub enum Action {
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
+    let repo_root = ctx.repo_root();
     match &args.action {
         Action::Status { json } => {
             if *json {
                 let state_path = ctx.config_dir.join("state.json");
                 let state = State::load(&state_path)?;
-                let wf = state.current_workflow();
+                let wf = state.current_workflow_for(&repo_root);
                 println!("{}", serde_json::to_string_pretty(&wf)?);
             } else {
                 for line in status_lines(ctx)? {
@@ -83,7 +84,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 let state = State::load(&state_path)?;
                 println!(
                     "{}",
-                    serde_json::to_string_pretty(&state.current_workflow())?
+                    serde_json::to_string_pretty(&state.current_workflow_for(&repo_root))?
                 );
             } else {
                 for line in &lines {
@@ -100,7 +101,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             } else if *json {
                 let state_path = ctx.config_dir.join("state.json");
                 let state = State::load(&state_path)?;
-                let wf = state.current_workflow();
+                let wf = state.current_workflow_for(&repo_root);
                 let repo_state = probe_repo_state(ctx, &wf);
                 let openspec_info = repo_state.openspec_context.clone();
                 let text_lines = resume_lines(ctx)?;
@@ -130,6 +131,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 /// Real status content as renderable lines; the CLI prints them and the TUI
 /// renders them verbatim in its result modal.
 pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
+    let repo_root = ctx.repo_root();
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load(&state_path)?;
 
@@ -150,7 +152,7 @@ pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
         lines.push(format!("latest release: {cp}"));
     }
 
-    match state.current_workflow() {
+    match state.current_workflow_for(&repo_root) {
         Some(wf) => {
             lines.push(format!(
                 "current phase: Stage {}: {} ({})",
@@ -182,10 +184,11 @@ pub fn checkpoint_lines(
     task: &str,
     feature: Option<&str>,
 ) -> Result<Vec<String>, CeError> {
+    let repo_root = ctx.repo_root();
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
 
-    state.validate_and_set_workflow(stage, task, feature.map(String::from))?;
+    state.validate_and_set_workflow_for(&repo_root, stage, task, feature.map(String::from))?;
 
     if !ctx.dry_run {
         state.save(&state_path)?;
@@ -201,7 +204,7 @@ pub fn checkpoint_lines(
         format!("  task: {task}"),
     ];
 
-    let repo_state = probe_repo_state(ctx, &state.current_workflow());
+    let repo_state = probe_repo_state(ctx, &state.current_workflow_for(&repo_root));
     if repo_state.manifest_drift_count > 0 {
         lines.push(format!(
             "! Warning: Drift detected in {} managed files. Run 'ce-ai sync' to reconcile.",
@@ -214,12 +217,13 @@ pub fn checkpoint_lines(
 
 /// Resume surfaces the checkpoint-derived status plus hand-off framing lines.
 pub fn resume_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
+    let repo_root = ctx.repo_root();
     let mut lines = vec!["workflow: resuming execution from latest checkpoint...".to_string()];
     lines.extend(status_lines(ctx)?);
 
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load(&state_path)?;
-    let wf = state.current_workflow();
+    let wf = state.current_workflow_for(&repo_root);
     let repo_state = probe_repo_state(ctx, &wf);
 
     lines.push(String::new());

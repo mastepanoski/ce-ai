@@ -112,6 +112,14 @@ flowchart TD
 - **Coexistence Behavior**:
   - Preserves existing key-value structures in each harness's respective native configuration files (`~/.pi/agent/skills/`, `~/.gemini/config/mcp_config.json`, `~/.kimi-code/mcp.json`, `~/.codex/config.toml`, `~/.grok/config.toml`, `~/.fx/mcp.json`).
 
+### 📁 6. Workspace Scoping & Gitignore Isolation (`--scope workspace`)
+- **Strategy**: Sentinel-Bounded `.gitignore` Protection.
+- **Artifact Boundary**:
+  - `compound-engineering/`: Contains machine-local installation files and manifests (`install-manifest.json`) recording absolute local paths. `ce-ai` automatically ensures this directory is ignored inside the sentinel block in `.gitignore`.
+  - `.ce-ai/skills-registry.json`: Machine-local skills cache, automatically ignored.
+  - `AGENTS.md` / `CLAUDE.md` / `.cursor/rules/`: Shared team governance and directives; these **should be committed** to Git.
+  - `opencode.json` / `.claude.json`: Native harness configs; can optionally be committed if sharing team-wide settings and MCP servers.
+
 ---
 
 ## 🛡️ Summary of Safety Guarantees
@@ -119,3 +127,4 @@ flowchart TD
 1. **Zero Destructive Overwrites**: No official application plugin or custom user configuration is ever deleted.
 2. **Clean Uninstallation (`ce-ai uninstall`)**: Uninstallation removes only `ce-ai` managed assets or restores the original pre-install backup created in Step 2.
 3. **Auditability**: Every change is tracked in `install-manifest.json` with per-file SHA256 hashes.
+4. **Git Repository Cleanliness**: Machine-local workspace installations are automatically excluded via `.gitignore` sentinels.

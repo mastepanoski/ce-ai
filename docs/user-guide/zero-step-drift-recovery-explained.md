@@ -313,6 +313,7 @@ If you see this warning:
 | **Turn-0 Recovery** | Syncing disk state *before* the AI plans its next move. |
 | **`RepoState`** | The structured snapshot of Git, Manifest, and OpenSpec progress. |
 | **Deterministic SHA256** | File integrity is proven by exact hashes, never guessed by timestamps. |
+| **Workspace & Worktree Isolation** | Checkpoint and FSM state are scoped per workspace root in `~/.ce-ai/state.json`; parallel worktrees never collide. |
 | **Non-Blocking** | Drift warnings alert you without breaking or crashing your workflow. |
 
 ---

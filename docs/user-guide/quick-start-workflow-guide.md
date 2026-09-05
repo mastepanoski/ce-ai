@@ -197,7 +197,10 @@ When working on multiple features or PRs concurrently, use isolated Git worktree
   ```bash
   ce-ai install --scope workspace
   ```
-  Installing with `--scope workspace` inside a worktree places skills and configs (`./.opencode/`, `./.claude/`) strictly inside that worktree without polluting `main` or other parallel worktrees.
+- **Workflow FSM Checkpoint Isolation**:
+  `ce-ai workflow checkpoint`, `status`, and `resume` are automatically isolated per repository and worktree root in `~/.ce-ai/state.json`. Saving a checkpoint in one worktree will never overwrite or interfere with the active FSM stage or tasks in parallel worktrees on the same machine.
+- **Gitignore Cleanliness**:
+  Workspace installations place plugin assets in `compound-engineering/`, which is automatically covered by the sentinel block in `.gitignore` so local workstation paths never leak into Git.
 - **CodeGraph & Engram Isolation**:
   - *CodeGraph*: Each worktree maintains its own independent index. Run `gentle-ai codegraph init --cwd <worktree-root>` inside the new worktree.
   - *Engram*: Memory observations are tagged with the worktree path so findings remain cleanly isolated per workspace.

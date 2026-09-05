@@ -5,6 +5,21 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.0] - 2026-09-04
+
+### Added
+- **Workspace-Scoped Workflow FSM Isolation (`src/state/state.rs`, `src/commands/workflow.rs`, `tests/cli.rs`):**
+  - Scoped 7-stage workflow FSM checkpoints (`ce-ai workflow checkpoint`, `status`, and `resume`) per workspace root path in `~/.ce-ai/state.json` via a new `workflows: BTreeMap<String, WorkflowState>` dictionary, eliminating cross-workspace and cross-worktree state collisions.
+  - Implemented `current_workflow_for` and `validate_and_set_workflow_for` in `State`, normalizing repository roots with `std::fs::canonicalize`.
+  - Maintained 100% backwards compatibility with legacy `state.json` files by falling back to the scalar `workflow: Option<WorkflowState>` field when a workspace entry is not yet present.
+  - Updated CLI commands and JSON output schema to query and persist checkpoints using `ctx.repo_root()`.
+- **Automatic `.gitignore` Coverage for `--scope workspace` Installations (`src/commands/init_prj.rs`, `src/commands/install.rs`, `src/commands/deinit_prj.rs`, `tests/cli.rs`):**
+  - Updated the sentinel-bounded `.gitignore` block in `init_prj.rs` to include `compound-engineering/`, preventing machine-local installation manifests with local absolute paths from being tracked in Git.
+  - Added `ensure_gitignore_block` helper invoked by `init-prj` and automatically executed by `install --scope workspace` even if project adoption was not performed beforehand.
+  - Preserved surgical de-adoption in `deinit-prj` to cleanly strip the managed sentinel block.
+- **Documentation Updates (`docs/user-guide/`):**
+  - Updated `quick-start-workflow-guide.md`, `zero-step-drift-recovery-explained.md`, and `installation-and-coexistence-mechanisms.md` documenting workspace isolation, worktree safety, and `.gitignore` boundaries.
+
 ## [1.37.3] - 2026-09-04
 
 ### Fixed
