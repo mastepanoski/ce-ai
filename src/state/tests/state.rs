@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use tempfile::tempdir;
 
 use crate::state::state::{
@@ -722,4 +723,97 @@ fn legacy_workflow_source_deserialization_defaults_to_manual() {
     let state: State = serde_json::from_str(json).unwrap();
     let wf = state.workflow.unwrap();
     assert_eq!(wf.source, WorkflowSource::Manual);
+}
+
+#[test]
+fn inferred_checkpoint_cannot_regress_previous_inferred_checkpoint() {
+    let mut state = State::new();
+    let ws = PathBuf::from("/tmp/test-repo-monotonic");
+
+    // 1. Advance legally: Stage 1 -> Stage 2 -> Stage 3 with Inferred
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feature-1"),
+            WorkflowStage::OpenSpec,
+            "Specifying task",
+            Some("feature-1".into()),
+            WorkflowSource::Inferred,
+        )
+        .unwrap();
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feature-1"),
+            WorkflowStage::ExecutionPlan,
+            "Planning task",
+            Some("feature-1".into()),
+            WorkflowSource::Inferred,
+        )
+        .unwrap();
+
+    let wf = state
+        .current_workflow_for_branch(&ws, Some("feature-1"))
+        .unwrap();
+    assert_eq!(wf.stage, WorkflowStage::ExecutionPlan);
+    assert_eq!(wf.source, WorkflowSource::Inferred);
+
+    // 2. Attempt to regress from Stage 3 to Stage 2 (OpenSpec) with Inferred
+    // Although can_transition_to allows 3 -> 2 as a rewind, Inferred monotonicity MUST block it as a no-op
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feature-1"),
+            WorkflowStage::OpenSpec,
+            "Regressed task",
+            Some("feature-1".into()),
+            WorkflowSource::Inferred,
+        )
+        .unwrap();
+
+    let wf_after_regress = state
+        .current_workflow_for_branch(&ws, Some("feature-1"))
+        .unwrap();
+    assert_eq!(
+        wf_after_regress.stage,
+        WorkflowStage::ExecutionPlan,
+        "Inferred transition must not regress an existing Inferred stage"
+    );
+    assert_eq!(wf_after_regress.task, "Planning task");
+
+    // 3. Advancing from Stage 3 to Stage 4 (WorkTdd) with Inferred succeeds
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feature-1"),
+            WorkflowStage::WorkTdd,
+            "Working task",
+            Some("feature-1".into()),
+            WorkflowSource::Inferred,
+        )
+        .unwrap();
+
+    let wf_after_advance = state
+        .current_workflow_for_branch(&ws, Some("feature-1"))
+        .unwrap();
+    assert_eq!(wf_after_advance.stage, WorkflowStage::WorkTdd);
+    assert_eq!(wf_after_advance.task, "Working task");
+
+    // 4. Manual transition CAN rewind from Stage 4 to Stage 3
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feature-1"),
+            WorkflowStage::ExecutionPlan,
+            "Manual rewind task",
+            Some("feature-1".into()),
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+
+    let wf_after_manual = state
+        .current_workflow_for_branch(&ws, Some("feature-1"))
+        .unwrap();
+    assert_eq!(wf_after_manual.stage, WorkflowStage::ExecutionPlan);
+    assert_eq!(wf_after_manual.source, WorkflowSource::Manual);
 }

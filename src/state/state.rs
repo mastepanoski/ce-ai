@@ -396,13 +396,19 @@ impl State {
             .map(|wf| wf.stage)
             .unwrap_or(WorkflowStage::Ideation);
 
-        // Monotonic provenance guard: Inferred checkpoints can NEVER regress or clobber a Manual checkpoint at equal or higher stage
+        // Monotonic provenance guard:
+        // 1. Inferred checkpoints can NEVER equal or regress an existing Manual checkpoint.
+        // 2. Inferred checkpoints can NEVER regress any existing checkpoint (Manual or Inferred).
         if let Some(ref wf) = current_wf {
-            if wf.source == WorkflowSource::Manual
-                && source == WorkflowSource::Inferred
-                && target_stage.number() <= current_stage.number()
-            {
-                return Ok(());
+            if source == WorkflowSource::Inferred {
+                if wf.source == WorkflowSource::Manual
+                    && target_stage.number() <= current_stage.number()
+                {
+                    return Ok(());
+                }
+                if target_stage.number() < current_stage.number() {
+                    return Ok(());
+                }
             }
         }
 
