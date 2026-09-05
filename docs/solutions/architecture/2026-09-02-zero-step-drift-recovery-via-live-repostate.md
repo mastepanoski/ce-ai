@@ -1,7 +1,8 @@
 ---
 module: workflow
-tags: [workflow, repo-state, drift-recovery, skill-state, arxiv-2608-26263v2, sha256, openspec]
+tags: [workflow, repo-state, drift-recovery, skill-state, arxiv-2608-26263v2, arxiv-2603-29919, sha256, openspec, evaluation-framework]
 problem_type: architecture
+last_updated: 2026-09-05
 ---
 
 # Zero-Step Environment Drift Recovery via Live `RepoState` Sync
@@ -28,3 +29,4 @@ Implemented Turn-0 canonical environment synchronization via live `RepoState` pr
 1. **Turn-0 Ground-Truth Injection Eliminates Agent Lag:** Providing structured disk truth at the exact moment of context resume prevents agents from generating multi-turn hallucinated plans on top of stale working tree assumptions.
 2. **SSOT Diagnostic Reuse:** Reusing `check_adoption_block_status()` across `doctor`, `status`, and `workflow resume` ensures all subsystems report identical adoption block diagnostics without diverging.
 3. **`diff::diff` Scope in `probe_manifest_drift_count`:** Passing `diff::diff(&desired, &desired, &managed_dir)` compares `desired` exclusively against disk, accurately reporting modified (`Restore`) and missing (`Copy`) files without requiring a separate tracking state. Note: because `desired` is passed for both map parameters, this probe does not detect orphaned/stale files (files present on disk but absent from the manifest, e.g. after a version downgrade). Full orphan detection is owned by `ce-ai doctor` and `ce-ai sync`.
+4. **Evaluating future "agent efficiency" research against this design:** arXiv:2608.26263v2 was pre-published research at the time this feature shipped; it has since been formally published as "SKILL.state: Scalable Long-Horizon Agent Skills" (EMNLP 2026), independently confirming the explicit-mutable-state-over-transcript-replay approach taken here. When a *new* paper is proposed against `ce-ai`, the load-bearing question is whether it touches orchestration code (`state.rs`, `workflow.rs`, `adopt.rs`, `sync.rs`) or targets inference/model-serving internals `ce-ai` — a CLI orchestrator with no inference loop of its own — cannot act on. A concrete example of the former: SkillReducer (arXiv:2603.29919) proposes compressing skill routing-descriptions and bodies for token efficiency, but `ce-ai`'s skill adoption/sync (`classify_found`, `canonical_skills` in `adopt.rs`; `managed_tree` in `sync.rs`) marks a skill "adoptable" only on byte-exact SHA256 match against the canonical source. Compression applied at sync time would change the hash and break adoption detection — the same deterministic-integrity invariant behind Key Learning #3 above. Any such compression would have to happen upstream, at the canonical-source authoring stage, before hashes are computed.
