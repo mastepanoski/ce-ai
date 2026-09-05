@@ -5340,3 +5340,119 @@ fn doctor_workspace_scope_opencode_install_has_no_false_positive_findings() {
         .assert()
         .success();
 }
+
+#[test]
+fn sync_standalone_claude_harness_without_opencode_succeeds() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source_top_level_skills(tmp.path());
+
+    // Create marker only for claude — opencode is NOT present
+    fs::create_dir_all(home.join(".claude")).unwrap();
+    fs::write(home.join(".claude/settings.json"), "{}").unwrap();
+
+    // Install only claude
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "claude", "--source"])
+        .arg(&source)
+        .assert()
+        .success();
+
+    // ce-ai sync must succeed without requiring opencode manifest
+    ceai(&config_dir, &home)
+        .args(["sync"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "○ claude: registered — ce-ai manages no skill files here (MCP companions only; nothing to hash-verify)",
+        ))
+        .stdout(predicates::str::contains("0 failed"))
+        .stdout(predicates::str::contains("opencode").not());
+}
+
+#[test]
+fn upgrade_standalone_claude_harness_without_opencode_succeeds() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source1 = ce_source_top_level_skills(tmp.path());
+
+    fs::create_dir_all(home.join(".claude")).unwrap();
+    fs::write(home.join(".claude/settings.json"), "{}").unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "claude", "--source"])
+        .arg(&source1)
+        .assert()
+        .success();
+
+    let source2 = tmp.path().join("source2");
+    fs::create_dir_all(source2.join("skills/ce-brainstorm")).unwrap();
+    fs::write(source2.join("skills/ce-brainstorm/SKILL.md"), "# v2\n").unwrap();
+    fs::create_dir_all(source2.join(".opencode/plugins")).unwrap();
+    fs::write(
+        source2.join(".opencode/plugins/compound-engineering.js"),
+        "// v2\n",
+    )
+    .unwrap();
+
+    // ce-ai upgrade --source must succeed without requiring opencode manifest
+    ceai(&config_dir, &home)
+        .args(["upgrade", "--source"])
+        .arg(&source2)
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "○ claude: registered — ce-ai manages no skill files here (MCP companions only; nothing to hash-verify)",
+        ));
+}
+
+#[test]
+fn sync_with_no_harnesses_installed_fails_with_clear_error() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    ceai(&config_dir, &home)
+        .args(["sync"])
+        .assert()
+        .failure()
+        .code(1)
+        .stderr(predicates::str::contains(
+            "no harnesses installed — run ce-ai install first",
+        ));
+}
+
+#[test]
+fn sync_standalone_custom_harness_without_opencode_succeeds() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let (plugins, skills, rules) = (
+        home.join("harness/plugins"),
+        home.join("harness/skills"),
+        home.join("harness/rules.md"),
+    );
+    fs::create_dir_all(rules.parent().unwrap()).unwrap();
+    fs::write(&rules, "# my harness rules\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["install", "--harness", "custom", "--plugins-dir"])
+        .arg(&plugins)
+        .arg("--skills-dir")
+        .arg(&skills)
+        .arg("--rules-file")
+        .arg(&rules)
+        .arg("--source")
+        .arg(&source)
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args(["sync"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "✓ custom: verified — 2/2 managed files match SHA256",
+        ))
+        .stdout(predicates::str::contains("0 failed"))
+        .stdout(predicates::str::contains("opencode").not());
+}

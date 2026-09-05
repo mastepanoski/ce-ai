@@ -46,8 +46,10 @@ flowchart TD
 ```
 
 #### Step 1: Read Manifest & Target Source Tree
-- `ce-ai` reads `install-manifest.json` (described above) located in `~/.config/opencode/compound-engineering/` to determine the registered source tree (a GitHub release tarball cached in `~/.ce-ai/cache/` or a local source directory).
-- Scans skill files (`skills/`) and loaders (`plugins/compound-engineering.js`) in the source.
+- **OpenCode harness is optional**: OpenCode does not need to be installed or active to use `ce-ai sync` or `ce-ai upgrade`. When only non-OpenCode harnesses (e.g. Claude Code, Copilot, Cursor, or custom plugins) are installed, `sync` reads their manifests and configuration directly and skips OpenCode mutations.
+- **Standalone harness support**: Harnesses with standalone plugin directories are updated and drift-checked during `sync`.
+- **Adopted and custom surface synchronization**: Any directories adopted via `ce-ai skills adopt` or configured as custom harnesses are also drift-checked and updated during sync.
+- Scans skill files (`skills/`) and loaders (`plugins/compound-engineering.js`) in the resolved source.
 
 #### Step 2: Compare SHA256 Hashes (Drift Detection)
 - Computes the **SHA256** hash for each managed asset on disk and compares it against the desired source recorded in `install-manifest.json`:
@@ -83,6 +85,7 @@ flowchart TD
         (or --harness all). Skill files are managed per harness only when the
         installed source ships a managed skills tree.
   ```
+  *(Note: when OpenCode is not installed, only the active installed harnesses—such as `claude`, `cursor`, or `custom`—appear in the matrix without an OpenCode entry).*
 
 ##### Verification States
 

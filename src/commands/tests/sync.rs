@@ -248,3 +248,67 @@ fn tree_drift_tracks_mismatches_and_missing_counts() {
         _ => panic!("expected CheckStatus::Failed"),
     }
 }
+
+#[test]
+fn resolve_sync_source_and_version_fails_fast_with_empty_state() {
+    use crate::commands::sync::resolve_sync_source_and_version;
+    use crate::commands::Context;
+    use crate::state::state::State;
+
+    let tmp = tempdir().unwrap();
+    let ctx = Context {
+        config_dir: tmp.path().join("config"),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    let state = State::new();
+    let home_dir = tmp.path().join("home");
+    let opencode_dir = ctx.opencode_config_dir.clone();
+
+    let res = resolve_sync_source_and_version(&ctx, &state, &home_dir, &opencode_dir);
+    assert!(res.is_err());
+    if let Err(crate::error::CeError::Runtime(msg)) = res {
+        assert!(msg.contains("no harnesses installed — run ce-ai install first"));
+    } else {
+        panic!("expected CeError::Runtime with no harnesses installed message");
+    }
+}
+
+#[test]
+fn resolve_sync_source_and_version_resolves_from_non_opencode_entry() {
+    use crate::commands::sync::resolve_sync_source_and_version;
+    use crate::commands::Context;
+    use crate::state::state::State;
+
+    let tmp = tempdir().unwrap();
+    let source_dir = tmp.path().join("source");
+    std::fs::create_dir_all(&source_dir).unwrap();
+
+    let ctx = Context {
+        config_dir: tmp.path().join("config"),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    let mut state = State::new();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "claude",
+        "version": "1.6.3",
+        "source": { "kind": "local", "path": source_dir.display().to_string() },
+        "installed_at": "2026-08-22T00:00:00Z"
+    }));
+
+    let home_dir = tmp.path().join("home");
+    let opencode_dir = ctx.opencode_config_dir.clone();
+
+    let (root, ver, src) =
+        resolve_sync_source_and_version(&ctx, &state, &home_dir, &opencode_dir).unwrap();
+    assert_eq!(root, source_dir);
+    assert_eq!(ver, "1.6.3");
+    assert_eq!(src["kind"], "local");
+}
