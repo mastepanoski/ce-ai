@@ -62,24 +62,33 @@
 
 ---
 
-## 5. Optimistic Concurrency Control (CAS)
+## 5. Concurrency Control & Limitations
 
-- **WHEN** persisting an inferred or manual checkpoint,
-- **THEN** the process SHALL reload `state.json` immediately prior to writing, verify that the transition from the freshly reloaded state is legal (`can_transition_to`), and write via atomic file replacement.
+- **WHEN** persisting an inferred or manual checkpoint via `atomic_update_workflow`,
+- **THEN** the process SHALL reload `state.json` immediately prior to writing, verify that the transition from the freshly reloaded state is legal (`can_transition_to`), and write via atomic file replacement (`write_atomic`).
+- **NOTE (Known Limitation)**: This reload-before-save pattern reduces the race window to sub-millisecond IO duration, but does not provide distributed multi-process locking. Concurrent writes within that sub-millisecond window remain last-writer-wins.
 
 ---
 
-## 6. Hook Lifecycle, Versioning & Upgrade
+## 6. Comprehensive Hook Lifecycle & Upgrades across 7 Harnesses
 
+- **WHEN** `ce-ai init-prj` runs on a project:
+  - Claude Code: SHALL configure `SessionStart`, `Stop`, and `PreCompact` in `.claude/settings.json`.
+  - Codex CLI: SHALL configure `SessionStart`, `Stop`, and `PreCompact` in `.codex/config.toml`.
+  - Cursor: SHALL configure `sessionStart` and `stop` in `.cursor/hooks.json`.
+  - GitHub Copilot: SHALL configure `sessionStart` and `postToolUse` in `.github/hooks/hooks.json`.
+  - Antigravity: SHALL configure `PreInvocation` and `Stop` in `.agents/hooks.json`.
+  - Pi: SHALL configure `before_agent_start`, `agent_end`, and `session_before_compact` in `.pi/extensions/compound-engineering.ts` (`v=2`).
+  - OpenCode: SHALL configure `session.created`, `session.idle`, and `compacting` in `compound-engineering.js`.
 - **WHEN** `ce-ai init-prj --force`, `ce-ai sync`, or `ce-ai upgrade` runs on an adopted project,
-- **THEN** it SHALL verify that harness hooks in `.agents/hooks.json`, `.pi/extensions/compound-engineering.ts`, and `.opencode/plugins/compound-engineering.js` match the latest hook version (`v=2`), and rewrite them if missing or stale.
+- **THEN** it SHALL verify that harness hooks across all 7 harnesses contain the latest hooks and version tag (`v=2`), rewriting them if missing or stale.
 
 ---
 
 ## 7. De-init Hook Symmetry
 
 - **WHEN** `ce-ai deinit-prj` executes,
-- **THEN** it SHALL remove all registered hook keys (`PreInvocation`, `Stop`, `SessionStart`, etc.) across all harness configurations, leaving no orphaned commands.
+- **THEN** it SHALL surgically remove all registered hook keys (`SessionStart`, `Stop`, `PreCompact`, `sessionStart`, `stop`, `postToolUse`, `PreInvocation`, etc.) across all harness configurations, leaving no orphaned commands.
 
 ---
 
@@ -92,7 +101,9 @@
 
 ## 9. Product Contract & Opt-Out
 
-- **WHEN** `auto_checkpoint` is set to `false` in configuration or `--no-auto-checkpoint` is passed,
+- **WHEN** a repository is not adopted via `ce-ai init-prj`,
+- **THEN** no hooks SHALL be installed and no automated recording SHALL occur (adoption-level opt-in).
+- **WHEN** an adopted repository has `auto_checkpoint` configured to `false` (or `--no-auto-checkpoint` is passed),
 - **THEN** automated stage inference SHALL NOT persist state changes to `state.json`.
 
 ---

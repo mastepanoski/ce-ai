@@ -8,16 +8,26 @@ A detailed investigation of the supported harnesses reveals hook events suitable
 
 | Harness | Events Beyond Session-Start | Characteristics & Injection Capabilities | Applicable Workflow Trigger |
 |---|---|---|---|
-| **Claude Code** | `PostToolUse`, `Stop`, `PreCompact` | `Stop` can return exit code 2 to block termination (MUST NOT be used). `PreCompact` is the critical boundary to persist state before memory compaction. | Turn-end: `Stop`. Compaction: `PreCompact`. |
-| **Codex CLI** | `PostToolUse`, `PreCompact`, `Stop`, `SessionEnd` | Schema mirrors Claude Code hooks in `.codex/config.toml` (`[hooks]`). | Turn-end: `Stop`. Compaction: `PreCompact`. |
-| **GitHub Copilot CLI** | `postToolUse` | Supports returning an object with `additionalContext` back to the active agent prompt. | Turn-end / Post-tool: `postToolUse`. |
-| **Cursor** | `afterFileEdit`, `afterShellExecution`, `postToolUse`, `stop`, `subagentStop` | Used in production by GitButler for auto-commits. | Turn-end: `stop`. File events: `afterFileEdit`. |
+| **Claude Code** | `Stop`, `PreCompact` (and `PostToolUse`) | `.claude/settings.json`. `Stop` runs at end of loop/turn. `PreCompact` fires before context compaction. Exit code 2 can block (MUST NOT be used; fail-open only). | Turn-end: `Stop`. Compaction: `PreCompact`. |
+| **Codex CLI** | `Stop`, `PreCompact`, `PostToolUse`, `SessionEnd` | `.codex/config.toml` (`[hooks]`). Schema mirrors Claude Code hooks. | Turn-end: `Stop`. Compaction: `PreCompact`. |
+| **GitHub Copilot CLI** | `postToolUse` | `.github/hooks/hooks.json`. Supports returning an object with `additionalContext` back to the active agent prompt. | Turn-end / Post-tool: `postToolUse`. |
+| **Cursor** | `afterFileEdit`, `afterShellExecution`, `postToolUse`, `stop`, `subagentStop` | `.cursor/hooks.json`. Used in production by GitButler for auto-commits. | Turn-end: `stop`. |
 | **Google Antigravity (`agy`)** | `PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation`, `Stop` | Defined in `.agents/hooks.json` under custom hook groups (e.g. `"compound-engineering"`). Flat array per hook type. `Stop` runs at loop termination. | Turn-0: `PreInvocation`. Turn-end: `Stop`. |
 | **Pi** | `tool_result`, `agent_end`, `session_before_compact` | Registered via `pi.on(event, handler)` in `.pi/extensions/compound-engineering.ts`. `session_before_compact` fires before compaction; `agent_end` fires when agent finishes turn. | Turn-end: `agent_end`. Compaction: `session_before_compact`. |
-| **OpenCode** | `tool.execute.after`, `file.edited`, `session.idle`, `experimental.session.compacting` | In-process JS plugin (`BUILTIN_LOADER`). `session.idle` fires when agent becomes idle. | Turn-end: `session.idle`. Compaction: `compacting`. |
+| **OpenCode** | `session.idle`, `experimental.session.compacting` | In-process JS plugin (`BUILTIN_LOADER`). `session.idle` fires when agent becomes idle. | Turn-end: `session.idle`. Compaction: `compacting`. |
 
 ### Precedent: `rtk` (rtk-ai.app)
 `rtk` uses `PreToolUse` in Claude Code / Cursor to transparently rewrite shell commands (`git status` -> `rtk git status`). This proves harness hooks can execute frequently and safely when kept lightweight and fail-open.
+
+### Decision on Hook Trigger Granularity
+Rather than spawning CLI processes on every tool call (`PostToolUse`, `afterFileEdit`), which introduces noticeable latency in turns with 20–50 tool calls, we hook into:
+1. **Turn-end / Inactivity** (`Stop` in Claude Code, Codex, Cursor, Agy; `agent_end` in Pi; `session.idle` in OpenCode; `postToolUse` in Copilot).
+2. **Pre-compaction** (`PreCompact` in Claude Code, Codex; `session_before_compact` in Pi; `experimental.session.compacting` in OpenCode).
+
+This guarantees that:
+- Stage inference updates during active multi-hour sessions (e.g. `/ce-debug` fixing a bug and running tests).
+- Stage checkpoints are persisted before context exhaustion compaction occurs.
+- Spawning overhead is kept to 1 invocation per agent turn rather than dozens per turn.
 
 ---
 
@@ -61,9 +71,9 @@ In `src/commands/init_prj.rs`:
 
 ### Evaluated Options
 - **Option A: Re-write files unconditionally**: Risks clobbering user customizations.
-- **Option B: Embedded Version Header + Stale Detection (Recommended)**:
-  - Embed a version identifier (e.g. `// ce-ai:hook v=2` for TS/JS, or hook group inspection for JSON).
-  - In `init-prj --force`, `sync`, and `upgrade`: inspect installed hooks. If version is stale or required hooks (`Stop`, `session_before_compact`) are missing, refresh the hook while preserving non-managed blocks.
+- **Option B: Embedded Version Header + Hook Completeness Check (Recommended)**:
+  - Embed a version identifier (e.g. `// ce-ai:hook v=2` for TS/JS, or check that all expected hook keys exist in JSON/TOML).
+  - In `init-prj --force`, `sync`, and `upgrade`: inspect installed hooks. If version is stale or required hooks (`Stop`, `PreCompact`, `session_before_compact`, `session.idle`) are missing, refresh the hook while preserving non-managed blocks.
 
 ---
 
@@ -73,18 +83,18 @@ In `src/commands/init_prj.rs`:
 `remove_*_hook` functions in `src/harness/{claude,codex,copilot,cursor,agy}.rs` were written to strip only the single hook key that existed at creation time:
 - `agy.rs::remove_pre_invocation_hook`: only strips `group_obj.get_mut("PreInvocation")`.
 - `claude.rs::remove_session_start_hook`: only strips `hooks_obj.get_mut("SessionStart")`.
+- `codex.rs::remove_session_start_hook`: only strips `hooks.SessionStart`.
 - `cursor.rs::remove_session_start_hook`: only strips `hooks_obj.get_mut("sessionStart")`.
 - `copilot.rs::remove_session_start_hook`: only strips `hooks_obj.get_mut("sessionStart")`.
-- `codex.rs::remove_session_start_hook`: only strips `SessionStart` from TOML.
 
-Adding `Stop` or `PostToolUse` without updating `remove_*_hook` would leave orphaned commands in user config upon `ce-ai deinit-prj`.
+Adding `Stop` or `PreCompact` across these files without updating `remove_*_hook` would leave orphaned commands in user configs upon `ce-ai deinit-prj`.
 
 ### Evaluated Options
-- **Symmetric Key Removal (Recommended)**: Every harness adapter file must maintain parity between `ensure_*_hook` and `remove_*_hook`. Every hook key added must be explicitly cleared in removal. Verified by CLI integration roundtrip tests.
+- **Symmetric Key Removal (Recommended)**: Every harness adapter file must maintain strict parity between `ensure_*_hook` and `remove_*_hook`. Every hook key added must be explicitly cleared in removal. Verified by CLI integration roundtrip tests across all harnesses.
 
 ---
 
-## 5. Concurrency & Race Condition Analysis
+## 5. Concurrency, Race Conditions & CAS Tradeoffs
 
 ### Root Cause
 In `src/state/mod.rs:38` (`write_atomic`) and `src/state/state.rs:251` (`State::save`):
@@ -94,17 +104,18 @@ load(path) -> mutate in memory -> save(path) [tempfile + atomic rename]
 ```
 `write_atomic` guarantees single-write file integrity, but does not provide multi-process transaction isolation. If two hooks (or two parallel subagents) read `state.json` simultaneously, both mutate their copy, and the last writer clobbers the first writer's updates.
 
-### Evaluated Options
+### Evaluated Options & Known Tradeoff
 - **Option A: Heavyweight OS File Locks (`fs2` / `flock`)**:
-  Can cause deadlock or timeouts across OS platforms and containers.
-- **Option B: Optimistic Compare-and-Swap (CAS) with Monotonic Stage Gating (Recommended)**:
+  Can cause deadlock or timeouts across OS platforms and container environments.
+- **Option B: Reload-Immediately-Before-Save with Monotonic Stage Gating (Recommended)**:
   Immediately before writing to `state.json`, reload the state from disk.
   Verify that the pending transition is still valid against the freshly read state (`current_stage.can_transition_to(target_stage)`).
   For automated inference: only apply monotonic stage advances (`target_stage > disk_stage`). Never overwrite a manual checkpoint or a higher inferred stage.
+  *Known Limitation*: This drastically narrows the race window from seconds (spanning an agent turn) down to the sub-millisecond IO duration of reload+save, but does not constitute an ACID distributed lock. Concurrent writes within that exact sub-millisecond window remain last-writer-wins. This is a deliberate, pragmatic tradeoff for workstation CLI execution without external lock daemons.
 
 ---
 
-## 6. Security, Blast Radius, Performance & Safety Analysis
+## 6. Security, Blast Radius, Performance & Product Contract
 
 1. **Security (Path Traversal via Git Branch)**:
    `git branch --show-current` can be controlled by external actors in PRs or forks (e.g. `../../etc/passwd` or hostile branch names).
@@ -114,10 +125,9 @@ load(path) -> mutate in memory -> save(path) [tempfile + atomic rename]
    `state.json` stores all adopted projects on the workstation.
    *Mitigation*: Validate JSON serialization before atomic rename; ensure failure in one project never mutates or invalidates other project entries.
 3. **Performance (Process Spawn Overhead)**:
-   Spawning a CLI binary on every tool call adds 20-50 subprocess executions per agent turn, introducing noticeable lag.
-   *Mitigation*: Primary automated checkpoints must trigger on **turn-end** (`Stop`, `agent_end`, `session.idle`) and **pre-compaction** (`PreCompact`, `session_before_compact`, `compacting`). In OpenCode (in-process JS), tool execution hooks use in-memory debouncing.
-4. **Product Contract (Opt-In / Opt-Out)**:
-   The README advertises workflow checkpoints as opt-in.
-   *Mitigation*: Support `auto_checkpoint = false` in configuration (and `--no-auto-checkpoint` flag). When disabled, only explicit `ce-ai workflow checkpoint` calls advance the FSM.
+   Avoid subprocess execution per tool call. Primary automated checkpoints trigger on **turn-end** (`Stop`, `agent_end`, `session.idle`) and **pre-compaction** (`PreCompact`, `session_before_compact`, `compacting`).
+4. **Product Contract (Adoption Opt-In & Configurable Opt-Out)**:
+   The README states: *"recording is opt-in"*.
+   *Resolution*: Project adoption (`ce-ai init-prj`) is the explicit opt-in boundary. Unadopted repositories receive no hooks and zero automated recording. Within adopted projects, auto-checkpointing is active by default, and can be opted out at any time via `ce-ai config set auto-checkpoint false` (or flag `--no-auto-checkpoint`). The README and user guide will be updated to reflect this adoption-level opt-in model.
 5. **Execution Safety (Zero Blocking)**:
    Harness hooks (`Stop`, `PreCompact`) must NEVER return non-zero or blocking exit codes (e.g. Claude Code exit code 2). All hooks must be strictly observational and 100% fail-open.
