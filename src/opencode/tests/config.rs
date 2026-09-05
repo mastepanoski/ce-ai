@@ -178,3 +178,22 @@ fn in_memory_config_store_works_with_ensure_and_register() {
         serde_json::json!({ "command": "codegraph" })
     );
 }
+
+#[test]
+fn register_companions_writes_codegraph_and_engram() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("opencode.json");
+    write_json(&path, serde_json::json!({}));
+
+    register_companions(&path).unwrap();
+
+    let val = read_json(&path);
+    assert_eq!(
+        val["mcpServers"]["codegraph"],
+        serde_json::json!({ "command": "codegraph", "args": ["mcp"] })
+    );
+    assert_eq!(
+        val["mcpServers"]["engram"],
+        serde_json::json!({ "command": "engram", "args": ["serve"] })
+    );
+}

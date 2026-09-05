@@ -267,6 +267,19 @@ pub fn find_mcp_config_paths(ctx: &Context) -> Vec<PathBuf> {
                 HarnessKind::Fx => {
                     paths.push(crate::harness::fx::FxAdapter.default_config_path(&home_dir));
                 }
+                HarnessKind::Opencode => {
+                    paths.push(ctx.opencode_config_dir.join("opencode.json"));
+                }
+                HarnessKind::Custom => {
+                    if let Some(cfg) = entry
+                        .get("custom")
+                        .and_then(crate::harness::custom::CustomHarnessConfig::from_state_json)
+                    {
+                        if let Some(mcp) = cfg.mcp_file {
+                            paths.push(mcp);
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -275,6 +288,7 @@ pub fn find_mcp_config_paths(ctx: &Context) -> Vec<PathBuf> {
     // Always check common user home configs even if state is fresh/partial
     paths.push(crate::harness::claude::ClaudeAdapter.default_config_path(&home_dir));
     paths.push(home_dir.join(".cursor").join("mcp.json"));
+    paths.push(ctx.opencode_config_dir.join("opencode.json"));
 
     let mut seen = HashSet::new();
     paths.retain(|p| seen.insert(p.clone()));

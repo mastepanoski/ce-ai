@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.0] - 2026-09-05
+
+### Added
+- **Close engram/codegraph Registration Parity Gap for Opencode, Custom, Deepseek, and Pi (`#307`):**
+  - **OpenCode Companion Auto-Registration**: Automated companion MCP servers registration (`codegraph` with `["mcp"]`, `engram` with `["serve"]`) into `opencode.json` during `ce-ai install --harness opencode` and `ce-ai sync`, with symmetric unregistration during `uninstall`.
+  - **Custom Harness MCP Support**: Added `--mcp-file` CLI flag and `mcp_file` option to `CustomHarnessConfig` and `CustomConfigFlags`, persisting to `state.json` and auto-registering companion servers in `install` and `sync`, with symmetric unregistration on `uninstall`.
+  - **MCP Path Discovery Integration**: Updated `find_mcp_config_paths` in `src/source/tools_registry.rs` to detect both `opencode.json` and custom `mcp_file`, enabling seamless status reporting in `ce-ai doctor` and `ce-ai tools status`.
+  - **Tools CLI Parity**: Extended `ce-ai tools install` to register tools into custom `mcp_file` when configured.
+  - **Formalized Pi Delivery Contract**: Documented and verified Pi's strict No-MCP architectural contract (Objective 8: skills tree only); companion capabilities are delivered via PATH binaries and the skills tree without generating false missing-MCP diagnostics.
+  - **Documented Deepseek Preview Rationale**: Clarified de-scoped status in `registration_spec` during developer preview due to `dsh`'s YAML patch layers under `~/.dsh`.
+
 ## [1.40.1] - 2026-09-05
 
 ### Fixed

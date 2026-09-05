@@ -74,6 +74,7 @@ fn resolve_preserves_rooted_paths_without_cwd_joining() {
             plugins_dir: Some(PathBuf::from("/rooted/plugins")),
             skills_dir: Some(PathBuf::from("/rooted/skills")),
             rules_file: None,
+            mcp_file: None,
         },
     )
     .unwrap();
@@ -111,6 +112,7 @@ fn state_json_round_trips_resolved_config() {
         plugins_dir: PathBuf::from("/p"),
         skills_dir: PathBuf::from("/s"),
         rules_file: Some(PathBuf::from("/r.md")),
+        mcp_file: Some(PathBuf::from("/mcp.json")),
     };
     let parsed = CustomHarnessConfig::from_state_json(&cfg.to_state_json()).unwrap();
     assert_eq!(parsed, cfg);
@@ -199,4 +201,92 @@ fn prune_empty_dirs_stops_at_boundaries() {
     prune_empty_dirs(&deep, &[&root]);
     assert!(root.exists());
     assert!(!root.join("a").exists());
+}
+
+#[test]
+fn resolve_supports_mcp_file_via_flag_and_config() {
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path();
+    let cfg_path = CustomHarnessConfig::config_path(home);
+    std::fs::create_dir_all(cfg_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &cfg_path,
+        r#"{"plugins_dir": "~/p", "skills_dir": "~/s", "mcp_file": "~/config.json"}"#,
+    )
+    .unwrap();
+
+    let cfg = CustomHarnessConfig::resolve(home, &CustomConfigFlags::default()).unwrap();
+    assert_eq!(cfg.mcp_file, Some(home.join("config.json")));
+
+    let cfg_override = CustomHarnessConfig::resolve(
+        home,
+        &CustomConfigFlags {
+            plugins_dir: Some(home.join("p")),
+            skills_dir: Some(home.join("s")),
+            mcp_file: Some(PathBuf::from("/custom/mcp.json")),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        cfg_override.mcp_file,
+        Some(PathBuf::from("/custom/mcp.json"))
+    );
+}
+
+#[test]
+fn register_and_unregister_custom_mcp_server() {
+    let tmp = TempDir::new().unwrap();
+    let mcp_path = tmp.path().join("mcp.json");
+
+    let env = std::collections::BTreeMap::new();
+    register_custom_mcp_server(&mcp_path, "tool1", "tool1-cmd", &["arg1"], &env).unwrap();
+
+    let content = std::fs::read_to_string(&mcp_path).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(
+        json["mcpServers"]["tool1"],
+        serde_json::json!({
+            "command": "tool1-cmd",
+            "args": ["arg1"],
+            "env": {}
+        })
+    );
+
+    register_companions(&mcp_path).unwrap();
+    let content2 = std::fs::read_to_string(&mcp_path).unwrap();
+    let json2: serde_json::Value = serde_json::from_str(&content2).unwrap();
+    assert_eq!(
+        json2["mcpServers"]["codegraph"],
+        serde_json::json!({
+            "command": "codegraph",
+            "args": ["mcp"],
+            "env": {}
+        })
+    );
+    assert_eq!(
+        json2["mcpServers"]["engram"],
+        serde_json::json!({
+            "command": "engram",
+            "args": ["serve"],
+            "env": {}
+        })
+    );
+    assert_eq!(
+        json2["mcpServers"]["tool1"],
+        serde_json::json!({
+            "command": "tool1-cmd",
+            "args": ["arg1"],
+            "env": {}
+        })
+    );
+
+    assert!(unregister_custom_mcp_server(&mcp_path, "codegraph").unwrap());
+    let content3 = std::fs::read_to_string(&mcp_path).unwrap();
+    let json3: serde_json::Value = serde_json::from_str(&content3).unwrap();
+    assert!(json3["mcpServers"].get("codegraph").is_none());
+    assert!(json3["mcpServers"].get("engram").is_some());
+    assert!(json3["mcpServers"].get("tool1").is_some());
+
+    assert!(!unregister_custom_mcp_server(&mcp_path, "codegraph").unwrap());
 }

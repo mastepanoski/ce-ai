@@ -398,6 +398,11 @@ pub(crate) fn sync_with(
                     config_mutations: prior_mutations,
                 }
                 .write(&cfg.plugins_dir)?;
+
+                if let Some(mcp) = &cfg.mcp_file {
+                    arm!(mcp);
+                    crate::harness::custom::register_companions(mcp)?;
+                }
             } else if let Some(spec) = registration_spec(h_kind) {
                 // Strategy table: one exhaustive entry per table-driven kind
                 // (see harness::registration). Skills are never copied into
@@ -424,6 +429,7 @@ pub(crate) fn sync_with(
                     &crate::opencode::plugins::plugin_entry(&config_dir).to_string_lossy(),
                     &crate::opencode::plugins::skills_path(&config_dir).to_string_lossy(),
                 )?;
+                crate::opencode::config::register_companions(&target_config)?;
             } else {
                 // Every supported kind has an explicit arm above; reaching
                 // this point means state.json references an unsupported

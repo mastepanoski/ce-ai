@@ -25,6 +25,8 @@ pub struct CustomHarnessConfig {
     pub skills_dir: PathBuf,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rules_file: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mcp_file: Option<PathBuf>,
 }
 
 /// Explicit CLI flag overrides for custom-mode configuration resolution.
@@ -33,6 +35,7 @@ pub struct CustomConfigFlags {
     pub plugins_dir: Option<PathBuf>,
     pub skills_dir: Option<PathBuf>,
     pub rules_file: Option<PathBuf>,
+    pub mcp_file: Option<PathBuf>,
 }
 
 impl CustomHarnessConfig {
@@ -74,6 +77,10 @@ impl CustomHarnessConfig {
             .rules_file
             .clone()
             .or_else(|| from_file.as_ref().and_then(|c| c.rules_file.clone()));
+        let mcp_file = flags
+            .mcp_file
+            .clone()
+            .or_else(|| from_file.as_ref().and_then(|c| c.mcp_file.clone()));
 
         if plugins_dir.is_none() || skills_dir.is_none() {
             return Err(CeError::Usage(format!(
@@ -88,6 +95,7 @@ impl CustomHarnessConfig {
             plugins_dir: absolutize(expand_tilde(plugins_dir.unwrap_or_default(), home)),
             skills_dir: absolutize(expand_tilde(skills_dir.unwrap_or_default(), home)),
             rules_file: rules_file.map(|p| absolutize(expand_tilde(p, home))),
+            mcp_file: mcp_file.map(|p| absolutize(expand_tilde(p, home))),
         })
     }
 
@@ -103,6 +111,7 @@ impl CustomHarnessConfig {
             plugins_dir: dir("plugins_dir")?,
             skills_dir: dir("skills_dir")?,
             rules_file: dir("rules_file"),
+            mcp_file: dir("mcp_file"),
         })
     }
 
@@ -112,6 +121,7 @@ impl CustomHarnessConfig {
             "plugins_dir": self.plugins_dir.display().to_string(),
             "skills_dir": self.skills_dir.display().to_string(),
             "rules_file": self.rules_file.as_ref().map(|p| p.display().to_string()),
+            "mcp_file": self.mcp_file.as_ref().map(|p| p.display().to_string()),
         })
     }
 }
@@ -287,8 +297,113 @@ impl HarnessAdapter for CustomAdapter {
     }
 
     fn default_config_path(&self, home: &Path) -> PathBuf {
+        if let Some(cfg) = &self.config {
+            if let Some(mcp) = &cfg.mcp_file {
+                return mcp.clone();
+            }
+        }
         CustomHarnessConfig::config_path(home)
     }
+}
+
+/// Merge and register an MCP server into the custom harness's MCP file using standard `mcpServers` schema.
+pub fn register_custom_mcp_server(
+    config_path: &Path,
+    name: &str,
+    command: &str,
+    args: &[&str],
+    env: &std::collections::BTreeMap<String, String>,
+) -> Result<(), CeError> {
+    let mut config: serde_json::Value = if config_path.exists() {
+        let content = std::fs::read_to_string(config_path)?;
+        if content.trim().is_empty() {
+            serde_json::json!({ "mcpServers": {} })
+        } else {
+            serde_json::from_str(&content).map_err(|e| {
+                CeError::Runtime(format!(
+                    "Failed to parse custom MCP config at {}: {e}",
+                    config_path.display()
+                ))
+            })?
+        }
+    } else {
+        serde_json::json!({ "mcpServers": {} })
+    };
+
+    if !config.is_object() {
+        return Err(CeError::Runtime(format!(
+            "Custom MCP config at {} must be a JSON object",
+            config_path.display()
+        )));
+    }
+
+    let server_def = serde_json::json!({
+        "command": command,
+        "args": args,
+        "env": env,
+    });
+
+    match config.get_mut("mcpServers") {
+        None => {
+            config["mcpServers"] = serde_json::json!({ name: server_def });
+        }
+        Some(serde_json::Value::Object(map)) => {
+            map.insert(name.to_string(), server_def);
+        }
+        Some(_) => {
+            return Err(CeError::Runtime(format!(
+                "`mcpServers` in {} must be an object",
+                config_path.display()
+            )));
+        }
+    }
+
+    let bytes = serde_json::to_vec_pretty(&config).map_err(|e| {
+        CeError::Runtime(format!(
+            "Failed to serialize custom MCP config at {}: {e}",
+            config_path.display()
+        ))
+    })?;
+
+    if let Some(parent) = config_path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    crate::state::write_atomic(config_path, &bytes)
+}
+
+/// Registers companion MCP servers (`codegraph`, `engram`) into the custom MCP file.
+pub fn register_companions(mcp_file: &Path) -> Result<(), CeError> {
+    let env = std::collections::BTreeMap::new();
+    register_custom_mcp_server(mcp_file, "codegraph", "codegraph", &["mcp"], &env)?;
+    register_custom_mcp_server(mcp_file, "engram", "engram", &["serve"], &env)?;
+    Ok(())
+}
+
+/// Removes an MCP server definition from the custom harness's MCP file.
+pub fn unregister_custom_mcp_server(config_path: &Path, name: &str) -> Result<bool, CeError> {
+    if !config_path.exists() {
+        return Ok(false);
+    }
+    let content = std::fs::read_to_string(config_path)?;
+    let mut config: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return Ok(false),
+    };
+    if let Some(mcp_servers) = config.get_mut("mcpServers").and_then(|v| v.as_object_mut()) {
+        if mcp_servers.remove(name).is_some() {
+            let bytes = serde_json::to_vec_pretty(&config).map_err(|e| {
+                CeError::Runtime(format!(
+                    "Failed to serialize custom MCP config at {}: {e}",
+                    config_path.display()
+                ))
+            })?;
+            crate::state::write_atomic(config_path, &bytes)?;
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 #[cfg(test)]

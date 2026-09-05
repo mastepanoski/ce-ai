@@ -6320,3 +6320,124 @@ fn init_prj_and_deinit_prj_roundtrip_all_harness_hooks() {
         "Pi extension file must be removed symmetrically"
     );
 }
+
+#[test]
+fn install_registers_codegraph_and_engram_for_opencode_and_custom() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    // 1. OpenCode install auto-registers companions
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "opencode",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let opencode_json = home.join(".config/opencode/opencode.json");
+    let opencode_cfg = read_json(&opencode_json);
+    assert_eq!(
+        opencode_cfg["mcpServers"]["codegraph"],
+        serde_json::json!({ "command": "codegraph", "args": ["mcp"] })
+    );
+    assert_eq!(
+        opencode_cfg["mcpServers"]["engram"],
+        serde_json::json!({ "command": "engram", "args": ["serve"] })
+    );
+
+    // 2. Custom install with --mcp-file auto-registers companions
+    let plugins = home.join("custom/plugins");
+    let skills = home.join("custom/skills");
+    let mcp_file = home.join("custom/mcp.json");
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_file.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let custom_cfg = read_json(&mcp_file);
+    assert_eq!(
+        custom_cfg["mcpServers"]["codegraph"],
+        serde_json::json!({ "command": "codegraph", "args": ["mcp"], "env": {} })
+    );
+    assert_eq!(
+        custom_cfg["mcpServers"]["engram"],
+        serde_json::json!({ "command": "engram", "args": ["serve"], "env": {} })
+    );
+
+    // Simulate drift: remove companion entries
+    let mut modified_opencode = opencode_cfg.clone();
+    modified_opencode["mcpServers"]
+        .as_object_mut()
+        .unwrap()
+        .remove("codegraph");
+    fs::write(
+        &opencode_json,
+        serde_json::to_string_pretty(&modified_opencode).unwrap(),
+    )
+    .unwrap();
+
+    let mut modified_custom = custom_cfg.clone();
+    modified_custom["mcpServers"]
+        .as_object_mut()
+        .unwrap()
+        .remove("engram");
+    fs::write(
+        &mcp_file,
+        serde_json::to_string_pretty(&modified_custom).unwrap(),
+    )
+    .unwrap();
+
+    // Run sync
+    ceai(&config_dir, &home).arg("sync").assert().success();
+
+    // Verify sync restored companions
+    let synced_opencode = read_json(&opencode_json);
+    assert!(synced_opencode["mcpServers"].get("codegraph").is_some());
+    let synced_custom = read_json(&mcp_file);
+    assert!(synced_custom["mcpServers"].get("engram").is_some());
+
+    // Uninstall custom harness cleans up custom mcp registrations
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "custom", "--yes"])
+        .assert()
+        .success();
+
+    let custom_cfg_after = read_json(&mcp_file);
+    assert!(custom_cfg_after["mcpServers"].get("codegraph").is_none());
+    assert!(custom_cfg_after["mcpServers"].get("engram").is_none());
+
+    // 3. Pi install is No-MCP: succeeds without writing MCP config
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "pi",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(home
+        .join(".pi/agent/compound-engineering/install-manifest.json")
+        .exists());
+    assert!(!home.join(".pi/agent/mcp.json").exists());
+}
