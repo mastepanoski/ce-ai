@@ -10,7 +10,7 @@ use crate::opencode::config::read_config;
 use crate::opencode::manifest::InstallManifest;
 use crate::opencode::plugins::MANAGED_DIR;
 use crate::source::tools_registry::{
-    evaluate_freshness, extract_tool_version, FreshnessStatus, ToolsRegistryCache,
+    detect_tool_freshness, is_skill_configured, FreshnessStatus, ToolsRegistryCache,
 };
 use crate::state::diff::{self, Action};
 use crate::state::state::State;
@@ -120,11 +120,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         findings.extend(skill_findings);
     }
 
-    // Companion Tools Readiness & Version Freshness Probe (#112)
+    // Companion Tools Readiness & Version Freshness Probe (#112, #293)
     let registry = ToolsRegistryCache::load_or_default(ctx);
     for (name, info) in &registry.tools {
-        let installed = extract_tool_version(name);
-        let freshness = evaluate_freshness(installed.as_deref(), &info.latest_version);
+        let freshness = detect_tool_freshness(ctx, name, info);
 
         match freshness {
             FreshnessStatus::Ok { version } => {
@@ -158,12 +157,14 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
     }
 
-    // Skill Suggestions Probe (#112)
+    // Skill Suggestions Probe (#112, #293)
     for (name, skill) in &registry.skills {
-        println!(
-            "doctor-info: skill-suggestion: {} (run '{}')",
-            name, skill.resolve_cmd
-        );
+        if !is_skill_configured(ctx, name) {
+            println!(
+                "doctor-info: skill-suggestion: {} (run '{}')",
+                name, skill.resolve_cmd
+            );
+        }
     }
 
     // GitHub token info for install/upgrade
