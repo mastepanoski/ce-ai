@@ -395,6 +395,8 @@ pub fn run(
             }
         }
 
+        init_codegraph_if_available(&target_dir, ctx.quiet);
+
         state.save(&global_state_path)?;
     }
 
@@ -454,6 +456,52 @@ pub fn ensure_gitignore_block(target_dir: &Path) -> Result<(), CeError> {
         }
     }
     Ok(())
+}
+
+fn init_codegraph_if_available(target_dir: &Path, quiet: bool) {
+    let codegraph_dir = target_dir.join(".codegraph");
+    if codegraph_dir.exists() {
+        return;
+    }
+
+    let is_codegraph_available = std::process::Command::new("codegraph")
+        .arg("--version")
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false);
+
+    if !is_codegraph_available {
+        return;
+    }
+
+    if !quiet {
+        println!(
+            "init-prj: initializing CodeGraph index in '{}'...",
+            target_dir.display()
+        );
+    }
+
+    match std::process::Command::new("codegraph")
+        .arg("init")
+        .arg(target_dir)
+        .status()
+    {
+        Ok(status) if status.success() => {
+            if !quiet {
+                println!("✓ Initialized CodeGraph index (.codegraph/)");
+            }
+        }
+        Ok(status) => {
+            if !quiet {
+                eprintln!("warning: 'codegraph init' exited with status {status}");
+            }
+        }
+        Err(e) => {
+            if !quiet {
+                eprintln!("warning: failed to run 'codegraph init': {e}");
+            }
+        }
+    }
 }
 
 #[cfg(test)]

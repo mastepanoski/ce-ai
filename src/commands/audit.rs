@@ -140,7 +140,7 @@ impl Detector for CodeIntelDetector {
                     category: "repo".into(),
                     status: AuditStatus::Warn,
                     satisfied_by: None,
-                    detail: ".codegraph/ index not initialized (run 'gentle-ai codegraph init')"
+                    detail: ".codegraph/ index not initialized (run 'codegraph init' or 'ce-ai tools init codegraph')"
                         .into(),
                 });
             }

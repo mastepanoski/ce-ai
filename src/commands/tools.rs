@@ -8,6 +8,8 @@ use crate::source::tools_registry::{
     ToolsRegistryCache,
 };
 
+use std::path::{Path, PathBuf};
+
 #[derive(clap::Args)]
 pub struct Args {
     #[command(subcommand)]
@@ -23,12 +25,21 @@ pub enum Action {
         /// Name of tool (engram, codegraph, context7, rtk).
         tool: String,
     },
+    /// Initialize workspace index or configuration for a companion tool (e.g. codegraph).
+    Init {
+        /// Name of tool (codegraph).
+        tool: String,
+        /// Target project path (defaults to current directory).
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+    },
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     match &args.action {
         Action::Status => status(ctx),
         Action::Install { tool } => install_tool(ctx, tool),
+        Action::Init { tool, path } => init_tool(ctx, tool, path.as_deref()),
     }
 }
 
@@ -162,10 +173,90 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
     Ok(())
 }
 
+pub fn init_tool(ctx: &Context, tool: &str, path: Option<&Path>) -> Result<(), CeError> {
+    let tool_lower = tool.to_lowercase();
+    match tool_lower.as_str() {
+        "codegraph" => init_codegraph(ctx, path),
+        _ => Err(CeError::Usage(format!(
+            "tool '{tool}' does not support init. Supported tools for init: codegraph"
+        ))),
+    }
+}
+
+fn init_codegraph(ctx: &Context, path: Option<&Path>) -> Result<(), CeError> {
+    let target_path = match path {
+        Some(p) => p.to_path_buf(),
+        None => std::env::current_dir().map_err(CeError::Io)?,
+    };
+
+    let codegraph_dir = target_path.join(".codegraph");
+    if codegraph_dir.exists() {
+        if !ctx.quiet {
+            println!(
+                "tools: codegraph index (.codegraph/) is already initialized at '{}'",
+                target_path.display()
+            );
+        }
+        return Ok(());
+    }
+
+    if ctx.dry_run {
+        if !ctx.quiet {
+            println!(
+                "tools: [dry-run] would run 'codegraph init' in '{}'",
+                target_path.display()
+            );
+        }
+        return Ok(());
+    }
+
+    let check = std::process::Command::new("codegraph")
+        .arg("--version")
+        .output();
+
+    match check {
+        Ok(_) => {
+            if !ctx.quiet {
+                println!(
+                    "tools: initializing CodeGraph index in '{}'...",
+                    target_path.display()
+                );
+            }
+            let status = std::process::Command::new("codegraph")
+                .arg("init")
+                .arg(&target_path)
+                .status()
+                .map_err(|e| {
+                    CeError::Runtime(format!("failed to execute 'codegraph init': {e}"))
+                })?;
+
+            if status.success() {
+                if !ctx.quiet {
+                    println!(
+                        "✓ Initialized CodeGraph index (.codegraph/) at '{}'",
+                        target_path.display()
+                    );
+                }
+                Ok(())
+            } else {
+                Err(CeError::Runtime(format!(
+                    "'codegraph init' exited with status {status}"
+                )))
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(CeError::Usage(
+            "codegraph binary not found on PATH. Install it first (e.g. npm install -g @colbymchenry/codegraph or check https://github.com/colbymchenry/codegraph)".into(),
+        )),
+        Err(e) => Err(CeError::Runtime(format!(
+            "failed to probe 'codegraph --version': {e}"
+        ))),
+    }
+}
+
 fn is_in_path(name: &str) -> bool {
     if let Ok(path_var) = std::env::var("PATH") {
         for dir in std::env::split_paths(&path_var) {
-            if dir.join(name).is_file() {
+            if dir.join(name).is_file() || dir.join(format!("{name}.exe")).is_file() {
                 return true;
             }
         }

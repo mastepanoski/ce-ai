@@ -5731,3 +5731,75 @@ fn install_workspace_scope_ensures_compound_engineering_in_gitignore() {
         "compound-engineering/ must be in .gitignore"
     );
 }
+
+#[test]
+fn tools_init_unsupported_tool_fails_usage() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("ce-ai");
+    let home = tmp.path().join("home");
+
+    ceai(&config_dir, &home)
+        .args(["tools", "init", "invalid-tool"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("does not support init"));
+}
+
+#[test]
+fn tools_init_codegraph_dry_run() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("ce-ai");
+    let home = tmp.path().join("home");
+    let project_dir = tmp.path().join("project");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .args(["tools", "init", "codegraph", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "[dry-run] would run 'codegraph init'",
+        ));
+}
+
+#[test]
+fn tools_init_codegraph_when_already_initialized() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("ce-ai");
+    let home = tmp.path().join("home");
+    let project_dir = tmp.path().join("project");
+    let codegraph_dir = project_dir.join(".codegraph");
+    fs::create_dir_all(&codegraph_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .args(["tools", "init", "codegraph"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("is already initialized"));
+}
+
+#[test]
+fn audit_suggests_codegraph_init_without_gentle_ai() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("ce-ai");
+    let home = tmp.path().join("home");
+    let project_dir = tmp.path().join("project");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&project_dir)
+        .arg("audit")
+        .assert()
+        .stdout(predicate::str::contains(
+            "run 'codegraph init' or 'ce-ai tools init codegraph'",
+        ))
+        .stdout(predicate::str::contains("gentle-ai").not());
+}
