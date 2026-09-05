@@ -266,7 +266,21 @@ pub fn strip_managed_block(content: &str) -> String {
 
 pub const CURSOR_RESUME_COMMAND: &str = "ce-ai workflow resume --json";
 
-/// Checks if `.cursor/hooks.json` contains a sessionStart hook executing `ce-ai workflow resume --json`.
+const CURSOR_HOOK_EVENTS: [&str; 2] = ["sessionStart", "stop"];
+
+fn has_cursor_event_hook(hooks_obj: &serde_json::Value, event_name: &str) -> bool {
+    hooks_obj
+        .get(event_name)
+        .and_then(|s| s.as_array())
+        .map(|arr| {
+            arr.iter().any(|entry| {
+                entry.get("command").and_then(|c| c.as_str()) == Some(CURSOR_RESUME_COMMAND)
+            })
+        })
+        .unwrap_or(false)
+}
+
+/// Checks if `.cursor/hooks.json` contains sessionStart and stop hooks executing `ce-ai workflow resume --json`.
 pub fn has_session_start_hook(hooks_path: &Path) -> bool {
     if !hooks_path.exists() {
         return false;
@@ -277,18 +291,45 @@ pub fn has_session_start_hook(hooks_path: &Path) -> bool {
     let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) else {
         return false;
     };
-    val.get("hooks")
-        .and_then(|h| h.get("sessionStart"))
-        .and_then(|s| s.as_array())
-        .map(|arr| {
-            arr.iter().any(|entry| {
-                entry.get("command").and_then(|c| c.as_str()) == Some(CURSOR_RESUME_COMMAND)
-            })
-        })
-        .unwrap_or(false)
+    let Some(hooks) = val.get("hooks") else {
+        return false;
+    };
+    CURSOR_HOOK_EVENTS
+        .iter()
+        .all(|ev| has_cursor_event_hook(hooks, ev))
 }
 
-/// Ensures `.cursor/hooks.json` contains the sessionStart hook for `ce-ai workflow resume --json`.
+fn ensure_cursor_event_hook(
+    hooks_obj: &mut serde_json::Map<String, serde_json::Value>,
+    event_name: &str,
+) -> Result<bool, CeError> {
+    let event_val = hooks_obj
+        .entry(event_name)
+        .or_insert_with(|| serde_json::json!([]));
+    if !event_val.is_array() {
+        *event_val = serde_json::json!([]);
+    }
+
+    let event_arr = event_val
+        .as_array_mut()
+        .ok_or_else(|| CeError::Runtime(format!("{event_name} is not an array")))?;
+
+    let target_hook = serde_json::json!({
+        "command": CURSOR_RESUME_COMMAND,
+    });
+
+    if !event_arr
+        .iter()
+        .any(|entry| entry.get("command").and_then(|c| c.as_str()) == Some(CURSOR_RESUME_COMMAND))
+    {
+        event_arr.push(target_hook);
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+/// Ensures `.cursor/hooks.json` contains sessionStart and stop hooks for `ce-ai workflow resume --json`.
 /// Preserves any pre-existing user hooks or extra settings. Idempotent.
 pub fn ensure_session_start_hook(hooks_path: &Path) -> Result<bool, CeError> {
     if has_session_start_hook(hooks_path) {
@@ -325,26 +366,15 @@ pub fn ensure_session_start_hook(hooks_path: &Path) -> Result<bool, CeError> {
         .as_object_mut()
         .ok_or_else(|| CeError::Runtime("hooks is not an object".to_string()))?;
 
-    let session_start_val = hooks_obj
-        .entry("sessionStart")
-        .or_insert_with(|| serde_json::json!([]));
-    if !session_start_val.is_array() {
-        *session_start_val = serde_json::json!([]);
+    let mut changed = false;
+    for ev in CURSOR_HOOK_EVENTS {
+        if ensure_cursor_event_hook(hooks_obj, ev)? {
+            changed = true;
+        }
     }
 
-    let session_start_arr = session_start_val
-        .as_array_mut()
-        .ok_or_else(|| CeError::Runtime("sessionStart is not an array".to_string()))?;
-
-    let target_hook = serde_json::json!({
-        "command": CURSOR_RESUME_COMMAND,
-    });
-
-    if !session_start_arr
-        .iter()
-        .any(|entry| entry.get("command").and_then(|c| c.as_str()) == Some(CURSOR_RESUME_COMMAND))
-    {
-        session_start_arr.push(target_hook);
+    if !changed {
+        return Ok(false);
     }
 
     if let Some(parent) = hooks_path.parent() {
@@ -357,7 +387,7 @@ pub fn ensure_session_start_hook(hooks_path: &Path) -> Result<bool, CeError> {
     Ok(true)
 }
 
-/// Surgically removes `ce-ai workflow resume --json` hook from `.cursor/hooks.json`.
+/// Surgically removes `ce-ai workflow resume --json` hooks (sessionStart, stop) from `.cursor/hooks.json`.
 /// If the file becomes effectively empty or only contains an empty hooks object, cleans up the file.
 pub fn remove_session_start_hook(hooks_path: &Path) -> Result<bool, CeError> {
     if !hooks_path.exists() {
@@ -376,23 +406,24 @@ pub fn remove_session_start_hook(hooks_path: &Path) -> Result<bool, CeError> {
     let mut changed = false;
 
     if let Some(hooks_obj) = root_obj.get_mut("hooks").and_then(|h| h.as_object_mut()) {
-        if let Some(session_start_arr) = hooks_obj
-            .get_mut("sessionStart")
-            .and_then(|s| s.as_array_mut())
-        {
-            let orig_len = session_start_arr.len();
-            session_start_arr.retain(|entry| {
-                entry.get("command").and_then(|c| c.as_str()) != Some(CURSOR_RESUME_COMMAND)
-            });
-            if session_start_arr.len() != orig_len {
-                changed = true;
-            }
-            if session_start_arr.is_empty() {
-                hooks_obj.remove("sessionStart");
+        for ev in CURSOR_HOOK_EVENTS {
+            if let Some(event_arr) = hooks_obj.get_mut(ev).and_then(|s| s.as_array_mut()) {
+                let orig_len = event_arr.len();
+                event_arr.retain(|entry| {
+                    entry.get("command").and_then(|c| c.as_str()) != Some(CURSOR_RESUME_COMMAND)
+                });
+                if event_arr.len() != orig_len {
+                    changed = true;
+                }
+                if event_arr.is_empty() {
+                    hooks_obj.remove(ev);
+                    changed = true;
+                }
             }
         }
         if hooks_obj.is_empty() {
             root_obj.remove("hooks");
+            changed = true;
         }
     }
 

@@ -14,7 +14,7 @@ use crate::error::CeError;
 use crate::opencode::manifest::InstallManifest;
 use crate::opencode::plugins::MANAGED_DIR;
 use crate::state::diff;
-use crate::state::state::{State, WorkflowStage, WorkflowState};
+use crate::state::state::{State, WorkflowSource, WorkflowStage, WorkflowState};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -58,12 +58,15 @@ pub enum Action {
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let repo_root = ctx.repo_root();
+    let branch = probe_git_branch(&repo_root);
+    let state_path = ctx.config_dir.join("state.json");
+
     match &args.action {
         Action::Status { json } => {
+            let _ = maybe_auto_checkpoint(ctx, &repo_root, &state_path);
             if *json {
-                let state_path = ctx.config_dir.join("state.json");
                 let state = State::load(&state_path)?;
-                let wf = state.current_workflow_for(&repo_root);
+                let wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
                 println!("{}", serde_json::to_string_pretty(&wf)?);
             } else {
                 for line in status_lines(ctx)? {
@@ -80,11 +83,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             let target_stage = WorkflowStage::parse(stage)?;
             let lines = checkpoint_lines(ctx, target_stage, task, feature.as_deref())?;
             if *json {
-                let state_path = ctx.config_dir.join("state.json");
                 let state = State::load(&state_path)?;
                 println!(
                     "{}",
-                    serde_json::to_string_pretty(&state.current_workflow_for(&repo_root))?
+                    serde_json::to_string_pretty(
+                        &state.current_workflow_for_branch(&repo_root, branch.as_deref())
+                    )?
                 );
             } else {
                 for line in &lines {
@@ -96,12 +100,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             json,
             pre_invocation,
         } => {
+            let _ = maybe_auto_checkpoint(ctx, &repo_root, &state_path);
             if *pre_invocation {
                 handle_pre_invocation(ctx)?;
             } else if *json {
-                let state_path = ctx.config_dir.join("state.json");
                 let state = State::load(&state_path)?;
-                let wf = state.current_workflow_for(&repo_root);
+                let wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
                 let repo_state = probe_repo_state(ctx, &wf);
                 let openspec_info = repo_state.openspec_context.clone();
                 let text_lines = resume_lines(ctx)?;
@@ -132,6 +136,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 /// renders them verbatim in its result modal.
 pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
     let repo_root = ctx.repo_root();
+    let branch = probe_git_branch(&repo_root);
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load(&state_path)?;
 
@@ -152,7 +157,7 @@ pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
         lines.push(format!("latest release: {cp}"));
     }
 
-    match state.current_workflow_for(&repo_root) {
+    match state.current_workflow_for_branch(&repo_root, branch.as_deref()) {
         Some(wf) => {
             lines.push(format!(
                 "current phase: Stage {}: {} ({})",
@@ -185,10 +190,18 @@ pub fn checkpoint_lines(
     feature: Option<&str>,
 ) -> Result<Vec<String>, CeError> {
     let repo_root = ctx.repo_root();
+    let branch = probe_git_branch(&repo_root);
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
 
-    state.validate_and_set_workflow_for(&repo_root, stage, task, feature.map(String::from))?;
+    state.validate_and_set_workflow_for_branch(
+        &repo_root,
+        branch.as_deref(),
+        stage,
+        task,
+        feature.map(String::from),
+        WorkflowSource::Manual,
+    )?;
 
     if !ctx.dry_run {
         state.save(&state_path)?;
@@ -204,7 +217,10 @@ pub fn checkpoint_lines(
         format!("  task: {task}"),
     ];
 
-    let repo_state = probe_repo_state(ctx, &state.current_workflow_for(&repo_root));
+    let repo_state = probe_repo_state(
+        ctx,
+        &state.current_workflow_for_branch(&repo_root, branch.as_deref()),
+    );
     if repo_state.manifest_drift_count > 0 {
         lines.push(format!(
             "! Warning: Drift detected in {} managed files. Run 'ce-ai sync' to reconcile.",
@@ -218,12 +234,13 @@ pub fn checkpoint_lines(
 /// Resume surfaces the checkpoint-derived status plus hand-off framing lines.
 pub fn resume_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
     let repo_root = ctx.repo_root();
+    let branch = probe_git_branch(&repo_root);
     let mut lines = vec!["workflow: resuming execution from latest checkpoint...".to_string()];
     lines.extend(status_lines(ctx)?);
 
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load(&state_path)?;
-    let wf = state.current_workflow_for(&repo_root);
+    let wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
     let repo_state = probe_repo_state(ctx, &wf);
 
     lines.push(String::new());
@@ -326,6 +343,18 @@ pub struct RepoState {
 }
 
 pub fn probe_git_branch(repo_root: &Path) -> Option<String> {
+    if let Ok(out) = std::process::Command::new("git")
+        .args(["symbolic-ref", "--short", "HEAD"])
+        .current_dir(repo_root)
+        .output()
+    {
+        if out.status.success() {
+            let branch = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !branch.is_empty() {
+                return Some(branch);
+            }
+        }
+    }
     let out = std::process::Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(repo_root)
@@ -459,6 +488,11 @@ pub fn probe_openspec_context_in(
         .filter(|f| !f.trim().is_empty())
     {
         feat
+    } else if let Some(branch_feat) = probe_git_branch(repo_root)
+        .map(|b| sanitize_feature_name(&b))
+        .filter(|f| openspec_dir.join(f).is_dir())
+    {
+        branch_feat
     } else {
         // Fallback: find most recently modified directory in openspec/changes/
         let mut entries: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
@@ -607,6 +641,290 @@ fn stage_display_name(stage: WorkflowStage) -> &'static str {
         WorkflowStage::KnowledgeCapture => "Knowledge Capture (ce-compound)",
         WorkflowStage::GitShipping => "Git Shipping (ce-commit-push-pr)",
     }
+}
+
+pub fn is_transitory_git_state(repo_root: &Path) -> bool {
+    let git_dir = repo_root.join(".git");
+    let actual_git_dir = if git_dir.is_file() {
+        // In worktrees or submodules, .git is a file containing `gitdir: <path>`
+        std::fs::read_to_string(&git_dir)
+            .ok()
+            .and_then(|content| {
+                content.lines().next().and_then(|line| {
+                    line.strip_prefix("gitdir: ").map(|p| {
+                        let trimmed = p.trim();
+                        let path = PathBuf::from(trimmed);
+                        if path.is_absolute() {
+                            path
+                        } else {
+                            repo_root.join(path)
+                        }
+                    })
+                })
+            })
+            .unwrap_or(git_dir)
+    } else {
+        git_dir
+    };
+
+    actual_git_dir.join("rebase-merge").exists()
+        || actual_git_dir.join("rebase-apply").exists()
+        || actual_git_dir.join("CHERRY_PICK_HEAD").exists()
+        || actual_git_dir.join("MERGE_HEAD").exists()
+}
+
+pub fn sanitize_feature_name(branch: &str) -> String {
+    let stripped = branch
+        .trim_start_matches("refs/heads/")
+        .trim_start_matches("feature/")
+        .trim_start_matches("feat/")
+        .trim_start_matches("fix/");
+    let sanitized: String = stripped
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let trimmed = sanitized.trim_matches('-');
+    if trimmed.is_empty() {
+        "default".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+pub fn check_gh_pr_shipping(repo_root: &Path) -> bool {
+    let out = match std::process::Command::new("gh")
+        .args(["pr", "view", "--json", "state", "-q", ".state"])
+        .current_dir(repo_root)
+        .output()
+    {
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_uppercase(),
+        _ => return false,
+    };
+    out == "OPEN" || out == "MERGED"
+}
+
+pub fn has_committed_solutions_on_branch(repo_root: &Path) -> bool {
+    let out = match std::process::Command::new("git")
+        .args(["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"])
+        .current_dir(repo_root)
+        .output()
+    {
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
+        _ => return false,
+    };
+    out.lines()
+        .any(|f| f.starts_with("docs/solutions/") && f.ends_with(".md"))
+}
+
+pub fn infer_stage_from_repo(
+    repo_root: &Path,
+    branch: Option<&str>,
+) -> Option<(WorkflowStage, String, Option<String>)> {
+    if is_transitory_git_state(repo_root) {
+        return None;
+    }
+
+    let openspec_dir = repo_root.join("openspec").join("changes");
+
+    // 1. Resolve feature candidate from branch or probe
+    let candidate = branch.map(sanitize_feature_name);
+    let resolved_feature = candidate
+        .filter(|f| openspec_dir.join(f).is_dir())
+        .or_else(|| probe_openspec_context_in(repo_root, &None).map(|info| info.feature));
+
+    // 2. OpenSpec deduction (Stages 2, 3, 4, 5, 6, 7)
+    if let Some(ref feat) = resolved_feature {
+        let change_dir = openspec_dir.join(feat);
+        let has_proposal = change_dir.join("proposal.md").exists();
+        let has_spec = change_dir.join("spec.md").exists();
+        let tasks_path = change_dir.join("tasks.md");
+
+        if tasks_path.exists() {
+            let mut completed_tasks = 0;
+            let mut total_tasks = 0;
+            if let Ok(content) = std::fs::read_to_string(&tasks_path) {
+                for line in content.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]") {
+                        completed_tasks += 1;
+                        total_tasks += 1;
+                    } else if trimmed.starts_with("- [ ]") {
+                        total_tasks += 1;
+                    }
+                }
+            }
+
+            if total_tasks > 0 && completed_tasks == 0 {
+                return Some((
+                    WorkflowStage::ExecutionPlan,
+                    format!("Execution plan authored for {feat}"),
+                    Some(feat.clone()),
+                ));
+            } else if completed_tasks > 0 && completed_tasks < total_tasks {
+                return Some((
+                    WorkflowStage::WorkTdd,
+                    format!(
+                        "Implementing tasks ({completed_tasks}/{total_tasks} completed) for {feat}"
+                    ),
+                    Some(feat.clone()),
+                ));
+            } else if total_tasks > 0 && completed_tasks == total_tasks {
+                // All tasks completed: check Stage 7 (Ship), Stage 6 (Compound), or Stage 5 (Verify)
+                if check_gh_pr_shipping(repo_root) {
+                    return Some((
+                        WorkflowStage::GitShipping,
+                        format!("Shipping changes / pull request for {feat}"),
+                        Some(feat.clone()),
+                    ));
+                }
+
+                let (_, modified_files) = probe_git_dirty_files(repo_root);
+                let has_solutions_dirty = modified_files
+                    .iter()
+                    .any(|f| f.starts_with("docs/solutions/") && f.ends_with(".md"));
+                let has_solutions_committed = has_committed_solutions_on_branch(repo_root);
+
+                if has_solutions_dirty || has_solutions_committed {
+                    return Some((
+                        WorkflowStage::KnowledgeCapture,
+                        format!("Capturing solution in docs/solutions/ for {feat}"),
+                        Some(feat.clone()),
+                    ));
+                }
+
+                return Some((
+                    WorkflowStage::Verification,
+                    format!("Verifying test gates for {feat}"),
+                    Some(feat.clone()),
+                ));
+            }
+        }
+
+        if has_proposal && has_spec {
+            return Some((
+                WorkflowStage::OpenSpec,
+                format!("Authoring OpenSpec contract for {feat}"),
+                Some(feat.clone()),
+            ));
+        }
+    }
+
+    // 3. Direct Entry Bypass for Stage 4 (Work/TDD):
+    // If no OpenSpec, but on fix/* or feat/* branch with dirty files
+    if let Some(b) = branch {
+        let is_work_branch = b.starts_with("fix/")
+            || b.starts_with("feat/")
+            || b.starts_with("fix-")
+            || b.starts_with("feat-");
+        if is_work_branch {
+            let (is_clean, _) = probe_git_dirty_files(repo_root);
+            if !is_clean {
+                let feat_name = sanitize_feature_name(b);
+                return Some((
+                    WorkflowStage::WorkTdd,
+                    format!("Direct entry bugfix / work on {b}"),
+                    Some(feat_name),
+                ));
+            }
+        }
+    }
+
+    // 4. Ideation (Stage 1):
+    // docs/ideation/ or docs/brainstorms/*.md exists and no openspec change dir
+    let ideation_dir = repo_root.join("docs").join("ideation");
+    let brainstorms_dir = repo_root.join("docs").join("brainstorms");
+    let has_brainstorms = brainstorms_dir.is_dir()
+        && std::fs::read_dir(&brainstorms_dir)
+            .ok()
+            .map(|r| {
+                r.flatten()
+                    .any(|entry| entry.path().extension().is_some_and(|ext| ext == "md"))
+            })
+            .unwrap_or(false);
+
+    if ideation_dir.is_dir() || has_brainstorms {
+        return Some((
+            WorkflowStage::Ideation,
+            "Ideation & brainstorming in progress".to_string(),
+            None,
+        ));
+    }
+
+    None
+}
+
+pub fn maybe_auto_checkpoint(
+    ctx: &Context,
+    repo_root: &Path,
+    state_path: &Path,
+) -> Result<Option<WorkflowState>, CeError> {
+    if ctx.dry_run {
+        return Ok(None);
+    }
+    let state = if state_path.exists() {
+        State::load(state_path)?
+    } else {
+        return Ok(None);
+    };
+
+    if !state.is_project_adopted(repo_root) {
+        return Ok(None);
+    }
+
+    if !state.is_auto_checkpoint_enabled() {
+        return Ok(None);
+    }
+
+    if is_transitory_git_state(repo_root) {
+        return Ok(None);
+    }
+
+    let branch = probe_git_branch(repo_root);
+    let (inferred_stage, inferred_task, inferred_feature) =
+        match infer_stage_from_repo(repo_root, branch.as_deref()) {
+            Some(inf) => inf,
+            None => return Ok(None),
+        };
+
+    let current_wf = state.current_workflow_for_branch(repo_root, branch.as_deref());
+    let current_stage = current_wf
+        .as_ref()
+        .map(|wf| wf.stage)
+        .unwrap_or(WorkflowStage::Ideation);
+
+    // Monotonic provenance guard: Inferred checkpoints can NEVER regress or clobber a Manual checkpoint at equal or higher stage
+    if let Some(ref wf) = current_wf {
+        if wf.source == WorkflowSource::Manual && inferred_stage.number() <= current_stage.number()
+        {
+            return Ok(None);
+        }
+        if inferred_stage.number() < current_stage.number() {
+            return Ok(None);
+        }
+    }
+
+    if !current_stage.can_transition_to(inferred_stage) {
+        return Ok(None);
+    }
+
+    let updated = State::atomic_update_workflow(state_path, repo_root, branch.as_deref(), |s| {
+        s.validate_and_set_workflow_for_branch(
+            repo_root,
+            branch.as_deref(),
+            inferred_stage,
+            &inferred_task,
+            inferred_feature,
+            WorkflowSource::Inferred,
+        )?;
+        Ok(s.current_workflow_for_branch(repo_root, branch.as_deref()))
+    })?;
+    Ok(Some(updated))
 }
 
 #[cfg(test)]

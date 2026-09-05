@@ -262,132 +262,8 @@ pub fn run(
         // Inject sentinel-bounded .gitignore block (DEC-06)
         ensure_gitignore_block(&target_dir)?;
 
-        // Write Cursor project rule .cursor/rules/compound-engineering.mdc if .cursor exists
-        let cursor_dir = target_dir.join(".cursor");
-        if cursor_dir.exists() {
-            let cursor_rules_dir = cursor_dir.join("rules");
-            fs::create_dir_all(&cursor_rules_dir)?;
-            let rule_path = cursor_rules_dir.join("compound-engineering.mdc");
-            let frontmatter = crate::harness::cursor::CursorRuleFrontmatter::default();
-            crate::harness::cursor::update_cursor_rule_mdc(&rule_path, &frontmatter, inner_body)?;
-
-            // Ensure Cursor sessionStart hook is configured for Turn-0 drift delivery
-            let cursor_hooks = cursor_dir.join("hooks.json");
-            crate::harness::cursor::ensure_session_start_hook(&cursor_hooks)?;
-        }
-
-        // Write Claude project rule .claude/CLAUDE.md or CLAUDE.md if .claude or pre-existing CLAUDE.md exists
-        let claude_dir = target_dir.join(".claude");
-        let claude_md_root = target_dir.join("CLAUDE.md");
-        let has_user_claude_md = claude_md_root.exists() && {
-            let text = fs::read_to_string(&claude_md_root).unwrap_or_default();
-            text.trim() != "@AGENTS.md"
-        };
-        if claude_dir.exists() || has_user_claude_md {
-            let claude_rule_path = if claude_md_root.exists() {
-                claude_md_root
-            } else {
-                claude_dir.join("CLAUDE.md")
-            };
-            crate::harness::claude::update_claude_md(&claude_rule_path, inner_body)?;
-
-            let settings_path = target_dir.join(".claude").join("settings.json");
-            let _ = crate::harness::claude::ensure_session_start_hook(&settings_path);
-        }
-
-        // Write Codex project rule .codex/AGENTS.md and SessionStart hook if .codex exists
-        let codex_dir = target_dir.join(".codex");
-        if codex_dir.exists() {
-            let codex_rule_path = codex_dir.join("AGENTS.md");
-            crate::harness::codex::update_codex_agents_md(&codex_rule_path, inner_body)?;
-
-            let codex_config_path = codex_dir.join("config.toml");
-            crate::harness::codex::ensure_session_start_hook(&codex_config_path)?;
-        }
-
-        // Write Copilot project rule .github/copilot-instructions.md and sessionStart hook if .github or copilot-instructions.md exists
-        let github_dir = target_dir.join(".github");
-        let copilot_md_path = github_dir.join("copilot-instructions.md");
-        if github_dir.exists() || copilot_md_path.exists() {
-            fs::create_dir_all(&github_dir)?;
-            crate::harness::copilot::update_copilot_instructions_md(&copilot_md_path, inner_body)?;
-
-            let copilot_hooks_dir = github_dir.join("hooks");
-            let copilot_hooks_file = copilot_hooks_dir.join("hooks.json");
-            crate::harness::copilot::ensure_session_start_hook(&copilot_hooks_file)?;
-        }
-
-        // Write Grok project rule .grok/rules/compound-engineering.md if .grok exists
-        let grok_dir = target_dir.join(".grok");
-        if grok_dir.exists() {
-            let grok_rules_dir = grok_dir.join("rules");
-            fs::create_dir_all(&grok_rules_dir)?;
-            let grok_rule_path = grok_rules_dir.join("compound-engineering.md");
-            crate::harness::update_managed_rule_md(&grok_rule_path, inner_body)?;
-        }
-
-        // Write Kimi project rule .kimi-code/AGENTS.md if .kimi-code exists
-        let kimi_dir = target_dir.join(".kimi-code");
-        if kimi_dir.exists() {
-            let kimi_agents = kimi_dir.join("AGENTS.md");
-            crate::harness::update_managed_rule_md(&kimi_agents, inner_body)?;
-
-            // Clean up legacy .kimi-code/rules/compound-engineering.md if present
-            let legacy_rule = kimi_dir.join("rules").join("compound-engineering.md");
-            if legacy_rule.exists() {
-                if let Ok(text) = fs::read_to_string(&legacy_rule) {
-                    if text.contains(crate::harness::CE_MANAGED_BEGIN) {
-                        let stripped = crate::harness::strip_managed_rule_block(&text);
-                        if stripped.trim().is_empty() {
-                            report_best_effort_remove(&legacy_rule, fs::remove_file(&legacy_rule));
-                            report_best_effort_remove(
-                                kimi_dir.join("rules"),
-                                fs::remove_dir(kimi_dir.join("rules")),
-                            );
-                        } else {
-                            report_best_effort_write(
-                                &legacy_rule,
-                                crate::state::write_atomic(&legacy_rule, stripped.as_bytes()),
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
-        // Write Pi project rule .pi/AGENTS.md and before_agent_start extension if .pi exists
-        let pi_dir = target_dir.join(".pi");
-        if pi_dir.exists() {
-            let pi_agents = pi_dir.join("AGENTS.md");
-            crate::harness::update_managed_rule_md(&pi_agents, inner_body)?;
-
-            let ext_path = pi_dir
-                .join("extensions")
-                .join(crate::harness::pi::PI_EXTENSION_FILENAME);
-            crate::harness::pi::ensure_session_start_hook(&ext_path)?;
-        }
-
-        // Write fx project rule .fx/AGENTS.md if .fx exists
-        let fx_dir = target_dir.join(".fx");
-        if fx_dir.exists() {
-            let fx_agents = fx_dir.join("AGENTS.md");
-            crate::harness::update_managed_rule_md(&fx_agents, inner_body)?;
-        }
-
-        // Write Antigravity project rules if .agents or GEMINI.md exists
-        let agents_dir = target_dir.join(".agents");
-        if agents_dir.exists() {
-            let agents_rules_dir = agents_dir.join("rules");
-            fs::create_dir_all(&agents_rules_dir)?;
-            let agy_rule_path = agents_rules_dir.join("compound-engineering.md");
-            crate::harness::update_managed_rule_md(&agy_rule_path, inner_body)?;
-            let agy_hooks = agents_dir.join("hooks.json");
-            crate::harness::agy::ensure_pre_invocation_hook(&agy_hooks)?;
-        }
-        let gemini_md = target_dir.join("GEMINI.md");
-        if gemini_md.exists() || (agents_dir.exists() && !gemini_md.exists()) {
-            crate::harness::update_managed_rule_md(&gemini_md, inner_body)?;
-        }
+        // Reconcile harness project rules and hooks across all supported harnesses
+        reconcile_project_harness_hooks(&target_dir, inner_body)?;
 
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
             if !ctx.quiet {
@@ -502,6 +378,138 @@ fn init_codegraph_if_available(target_dir: &Path, quiet: bool) {
             }
         }
     }
+}
+
+/// Reconciles harness project rules and hooks across all supported harnesses for an adopted project.
+pub fn reconcile_project_harness_hooks(target_dir: &Path, inner_body: &str) -> Result<(), CeError> {
+    // 1. Cursor
+    let cursor_dir = target_dir.join(".cursor");
+    if cursor_dir.exists() {
+        let cursor_rules_dir = cursor_dir.join("rules");
+        fs::create_dir_all(&cursor_rules_dir)?;
+        let rule_path = cursor_rules_dir.join("compound-engineering.mdc");
+        let frontmatter = crate::harness::cursor::CursorRuleFrontmatter::default();
+        crate::harness::cursor::update_cursor_rule_mdc(&rule_path, &frontmatter, inner_body)?;
+
+        // Ensure Cursor hooks (sessionStart, stop)
+        let cursor_hooks = cursor_dir.join("hooks.json");
+        crate::harness::cursor::ensure_session_start_hook(&cursor_hooks)?;
+    }
+
+    // 2. Claude
+    let claude_dir = target_dir.join(".claude");
+    let claude_md_root = target_dir.join("CLAUDE.md");
+    let has_user_claude_md = claude_md_root.exists() && {
+        let text = fs::read_to_string(&claude_md_root).unwrap_or_default();
+        text.trim() != "@AGENTS.md"
+    };
+    if claude_dir.exists() || has_user_claude_md {
+        let claude_rule_path = if claude_md_root.exists() {
+            claude_md_root
+        } else {
+            claude_dir.join("CLAUDE.md")
+        };
+        crate::harness::claude::update_claude_md(&claude_rule_path, inner_body)?;
+
+        let settings_path = target_dir.join(".claude").join("settings.json");
+        let _ = crate::harness::claude::ensure_session_start_hook(&settings_path);
+    }
+
+    // 3. Codex
+    let codex_dir = target_dir.join(".codex");
+    if codex_dir.exists() {
+        let codex_rule_path = codex_dir.join("AGENTS.md");
+        crate::harness::codex::update_codex_agents_md(&codex_rule_path, inner_body)?;
+
+        let codex_config_path = codex_dir.join("config.toml");
+        crate::harness::codex::ensure_session_start_hook(&codex_config_path)?;
+    }
+
+    // 4. Copilot
+    let github_dir = target_dir.join(".github");
+    let copilot_md_path = github_dir.join("copilot-instructions.md");
+    if github_dir.exists() || copilot_md_path.exists() {
+        fs::create_dir_all(&github_dir)?;
+        crate::harness::copilot::update_copilot_instructions_md(&copilot_md_path, inner_body)?;
+
+        let copilot_hooks_dir = github_dir.join("hooks");
+        let copilot_hooks_file = copilot_hooks_dir.join("hooks.json");
+        crate::harness::copilot::ensure_session_start_hook(&copilot_hooks_file)?;
+    }
+
+    // 5. Grok
+    let grok_dir = target_dir.join(".grok");
+    if grok_dir.exists() {
+        let grok_rules_dir = grok_dir.join("rules");
+        fs::create_dir_all(&grok_rules_dir)?;
+        let grok_rule_path = grok_rules_dir.join("compound-engineering.md");
+        crate::harness::update_managed_rule_md(&grok_rule_path, inner_body)?;
+    }
+
+    // 6. Kimi
+    let kimi_dir = target_dir.join(".kimi-code");
+    if kimi_dir.exists() {
+        let kimi_agents = kimi_dir.join("AGENTS.md");
+        crate::harness::update_managed_rule_md(&kimi_agents, inner_body)?;
+
+        // Clean up legacy .kimi-code/rules/compound-engineering.md if present
+        let legacy_rule = kimi_dir.join("rules").join("compound-engineering.md");
+        if legacy_rule.exists() {
+            if let Ok(text) = fs::read_to_string(&legacy_rule) {
+                if text.contains(crate::harness::CE_MANAGED_BEGIN) {
+                    let stripped = crate::harness::strip_managed_rule_block(&text);
+                    if stripped.trim().is_empty() {
+                        report_best_effort_remove(&legacy_rule, fs::remove_file(&legacy_rule));
+                        report_best_effort_remove(
+                            kimi_dir.join("rules"),
+                            fs::remove_dir(kimi_dir.join("rules")),
+                        );
+                    } else {
+                        report_best_effort_write(
+                            &legacy_rule,
+                            crate::state::write_atomic(&legacy_rule, stripped.as_bytes()),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    // 7. Pi
+    let pi_dir = target_dir.join(".pi");
+    if pi_dir.exists() {
+        let pi_agents = pi_dir.join("AGENTS.md");
+        crate::harness::update_managed_rule_md(&pi_agents, inner_body)?;
+
+        let ext_path = pi_dir
+            .join("extensions")
+            .join(crate::harness::pi::PI_EXTENSION_FILENAME);
+        crate::harness::pi::ensure_session_start_hook(&ext_path)?;
+    }
+
+    // 8. fx
+    let fx_dir = target_dir.join(".fx");
+    if fx_dir.exists() {
+        let fx_agents = fx_dir.join("AGENTS.md");
+        crate::harness::update_managed_rule_md(&fx_agents, inner_body)?;
+    }
+
+    // 9. Antigravity & GEMINI.md
+    let agents_dir = target_dir.join(".agents");
+    if agents_dir.exists() {
+        let agents_rules_dir = agents_dir.join("rules");
+        fs::create_dir_all(&agents_rules_dir)?;
+        let agy_rule_path = agents_rules_dir.join("compound-engineering.md");
+        crate::harness::update_managed_rule_md(&agy_rule_path, inner_body)?;
+        let agy_hooks = agents_dir.join("hooks.json");
+        crate::harness::agy::ensure_pre_invocation_hook(&agy_hooks)?;
+    }
+    let gemini_md = target_dir.join("GEMINI.md");
+    if gemini_md.exists() || (agents_dir.exists() && !gemini_md.exists()) {
+        crate::harness::update_managed_rule_md(&gemini_md, inner_body)?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

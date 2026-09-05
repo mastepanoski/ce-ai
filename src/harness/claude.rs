@@ -266,19 +266,11 @@ pub fn strip_managed_block(content: &str) -> String {
 
 pub const RESUME_COMMAND: &str = "ce-ai workflow resume";
 
-/// Checks if `.claude/settings.json` contains a SessionStart hook executing `ce-ai workflow resume`.
-pub fn has_session_start_hook(settings_path: &Path) -> bool {
-    if !settings_path.exists() {
-        return false;
-    }
-    let Ok(content) = std::fs::read_to_string(settings_path) else {
-        return false;
-    };
-    let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) else {
-        return false;
-    };
-    val.get("hooks")
-        .and_then(|h| h.get("SessionStart"))
+const CLAUDE_HOOK_EVENTS: [&str; 3] = ["SessionStart", "Stop", "PreCompact"];
+
+fn has_event_hook(hooks_obj: &serde_json::Value, event_name: &str) -> bool {
+    hooks_obj
+        .get(event_name)
         .and_then(|s| s.as_array())
         .map(|arr| {
             arr.iter().any(|entry| {
@@ -296,7 +288,75 @@ pub fn has_session_start_hook(settings_path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Ensures `.claude/settings.json` contains the SessionStart hook for `ce-ai workflow resume`.
+/// Checks if `.claude/settings.json` contains SessionStart, Stop, and PreCompact hooks executing `ce-ai workflow resume`.
+pub fn has_session_start_hook(settings_path: &Path) -> bool {
+    if !settings_path.exists() {
+        return false;
+    }
+    let Ok(content) = std::fs::read_to_string(settings_path) else {
+        return false;
+    };
+    let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return false;
+    };
+    let Some(hooks) = val.get("hooks") else {
+        return false;
+    };
+    CLAUDE_HOOK_EVENTS
+        .iter()
+        .all(|ev| has_event_hook(hooks, ev))
+}
+
+fn ensure_event_hook(
+    hooks_obj: &mut serde_json::Map<String, serde_json::Value>,
+    event_name: &str,
+) -> Result<bool, CeError> {
+    let event_val = hooks_obj
+        .entry(event_name)
+        .or_insert_with(|| serde_json::json!([]));
+    if !event_val.is_array() {
+        *event_val = serde_json::json!([]);
+    }
+
+    let event_arr = event_val
+        .as_array_mut()
+        .ok_or_else(|| CeError::Runtime(format!("{event_name} is not an array")))?;
+
+    let target_hook = serde_json::json!({
+        "type": "command",
+        "command": RESUME_COMMAND
+    });
+
+    let wildcard_entry = event_arr.iter_mut().find(|entry| {
+        entry.get("matcher").and_then(|m| m.as_str()) == Some(".*")
+            && entry.get("hooks").and_then(|h| h.as_array()).is_some()
+    });
+
+    let mut changed = false;
+    match wildcard_entry {
+        Some(entry) => {
+            if let Some(hooks_list) = entry.get_mut("hooks").and_then(|h| h.as_array_mut()) {
+                if !hooks_list
+                    .iter()
+                    .any(|c| c.get("command").and_then(|s| s.as_str()) == Some(RESUME_COMMAND))
+                {
+                    hooks_list.push(target_hook);
+                    changed = true;
+                }
+            }
+        }
+        None => {
+            event_arr.push(serde_json::json!({
+                "matcher": ".*",
+                "hooks": [target_hook]
+            }));
+            changed = true;
+        }
+    }
+    Ok(changed)
+}
+
+/// Ensures `.claude/settings.json` contains SessionStart, Stop, and PreCompact hooks for `ce-ai workflow resume`.
 /// Preserves any pre-existing user hooks or extra settings. Idempotent.
 pub fn ensure_session_start_hook(settings_path: &Path) -> Result<bool, CeError> {
     if has_session_start_hook(settings_path) {
@@ -323,44 +383,16 @@ pub fn ensure_session_start_hook(settings_path: &Path) -> Result<bool, CeError> 
     let hooks_obj = hooks_val
         .as_object_mut()
         .ok_or_else(|| CeError::Runtime("hooks is not an object".to_string()))?;
-    let session_start_val = hooks_obj
-        .entry("SessionStart")
-        .or_insert_with(|| serde_json::json!([]));
-    if !session_start_val.is_array() {
-        *session_start_val = serde_json::json!([]);
+
+    let mut changed = false;
+    for ev in CLAUDE_HOOK_EVENTS {
+        if ensure_event_hook(hooks_obj, ev)? {
+            changed = true;
+        }
     }
 
-    let session_start_arr = session_start_val
-        .as_array_mut()
-        .ok_or_else(|| CeError::Runtime("SessionStart is not an array".to_string()))?;
-
-    let target_hook = serde_json::json!({
-        "type": "command",
-        "command": RESUME_COMMAND
-    });
-
-    let wildcard_entry = session_start_arr.iter_mut().find(|entry| {
-        entry.get("matcher").and_then(|m| m.as_str()) == Some(".*")
-            && entry.get("hooks").and_then(|h| h.as_array()).is_some()
-    });
-
-    match wildcard_entry {
-        Some(entry) => {
-            if let Some(hooks_list) = entry.get_mut("hooks").and_then(|h| h.as_array_mut()) {
-                if !hooks_list
-                    .iter()
-                    .any(|c| c.get("command").and_then(|s| s.as_str()) == Some(RESUME_COMMAND))
-                {
-                    hooks_list.push(target_hook);
-                }
-            }
-        }
-        None => {
-            session_start_arr.push(serde_json::json!({
-                "matcher": ".*",
-                "hooks": [target_hook]
-            }));
-        }
+    if !changed {
+        return Ok(false);
     }
 
     if let Some(parent) = settings_path.parent() {
@@ -373,7 +405,7 @@ pub fn ensure_session_start_hook(settings_path: &Path) -> Result<bool, CeError> 
     Ok(true)
 }
 
-/// Surgically removes `ce-ai workflow resume` hook from `.claude/settings.json`.
+/// Surgically removes `ce-ai workflow resume` hooks (SessionStart, Stop, PreCompact) from `.claude/settings.json`.
 /// If the file becomes empty `{}` as a result, removes the file cleanly.
 pub fn remove_session_start_hook(settings_path: &Path) -> Result<bool, CeError> {
     if !settings_path.exists() {
@@ -388,37 +420,37 @@ pub fn remove_session_start_hook(settings_path: &Path) -> Result<bool, CeError> 
     let mut changed = false;
 
     if let Some(hooks_obj) = root.get_mut("hooks").and_then(|h| h.as_object_mut()) {
-        if let Some(session_start_arr) = hooks_obj
-            .get_mut("SessionStart")
-            .and_then(|s| s.as_array_mut())
-        {
-            for entry in session_start_arr.iter_mut() {
-                if let Some(hooks_list) = entry.get_mut("hooks").and_then(|h| h.as_array_mut()) {
-                    let prev_len = hooks_list.len();
-                    hooks_list.retain(|cmd| {
-                        cmd.get("command").and_then(|c| c.as_str()) != Some(RESUME_COMMAND)
-                    });
-                    if hooks_list.len() != prev_len {
-                        changed = true;
+        for ev in CLAUDE_HOOK_EVENTS {
+            if let Some(arr) = hooks_obj.get_mut(ev).and_then(|s| s.as_array_mut()) {
+                for entry in arr.iter_mut() {
+                    if let Some(hooks_list) = entry.get_mut("hooks").and_then(|h| h.as_array_mut())
+                    {
+                        let prev_len = hooks_list.len();
+                        hooks_list.retain(|cmd| {
+                            cmd.get("command").and_then(|c| c.as_str()) != Some(RESUME_COMMAND)
+                        });
+                        if hooks_list.len() != prev_len {
+                            changed = true;
+                        }
                     }
                 }
-            }
 
-            let prev_len = session_start_arr.len();
-            session_start_arr.retain(|entry| {
-                entry
-                    .get("hooks")
-                    .and_then(|h| h.as_array())
-                    .map(|h| !h.is_empty())
-                    .unwrap_or(false)
-            });
-            if session_start_arr.len() != prev_len {
-                changed = true;
-            }
+                let prev_len = arr.len();
+                arr.retain(|entry| {
+                    entry
+                        .get("hooks")
+                        .and_then(|h| h.as_array())
+                        .map(|h| !h.is_empty())
+                        .unwrap_or(false)
+                });
+                if arr.len() != prev_len {
+                    changed = true;
+                }
 
-            if session_start_arr.is_empty() {
-                hooks_obj.remove("SessionStart");
-                changed = true;
+                if arr.is_empty() {
+                    hooks_obj.remove(ev);
+                    changed = true;
+                }
             }
         }
 

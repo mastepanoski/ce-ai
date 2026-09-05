@@ -241,21 +241,11 @@ pub fn strip_managed_block(content: &str) -> String {
 
 pub const CODEX_RESUME_COMMAND: &str = "ce-ai workflow resume";
 
-/// Checks if `.codex/config.toml` contains a SessionStart hook executing `ce-ai workflow resume`.
-pub fn has_session_start_hook(config_path: &Path) -> bool {
-    if !config_path.exists() {
-        return false;
-    }
-    let Ok(content) = std::fs::read_to_string(config_path) else {
-        return false;
-    };
-    let Ok(root_table) = content.parse::<toml::Table>() else {
-        return false;
-    };
-    root_table
-        .get("hooks")
-        .and_then(|h| h.as_table())
-        .and_then(|t| t.get("SessionStart"))
+const CODEX_HOOK_EVENTS: [&str; 3] = ["SessionStart", "Stop", "PreCompact"];
+
+fn has_codex_event_hook(hooks_table: &toml::Table, event_name: &str) -> bool {
+    hooks_table
+        .get(event_name)
         .and_then(|s| s.as_array())
         .map(|arr| {
             arr.iter().any(|entry| {
@@ -277,7 +267,107 @@ pub fn has_session_start_hook(config_path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Ensures `.codex/config.toml` contains the SessionStart hook for `ce-ai workflow resume`.
+/// Checks if `.codex/config.toml` contains SessionStart, Stop, and PreCompact hooks executing `ce-ai workflow resume`.
+pub fn has_session_start_hook(config_path: &Path) -> bool {
+    if !config_path.exists() {
+        return false;
+    }
+    let Ok(content) = std::fs::read_to_string(config_path) else {
+        return false;
+    };
+    let Ok(root_table) = content.parse::<toml::Table>() else {
+        return false;
+    };
+    let Some(hooks_table) = root_table.get("hooks").and_then(|h| h.as_table()) else {
+        return false;
+    };
+    CODEX_HOOK_EVENTS
+        .iter()
+        .all(|ev| has_codex_event_hook(hooks_table, ev))
+}
+
+fn ensure_codex_event_hook(
+    hooks_table: &mut toml::Table,
+    event_name: &str,
+    config_path: &Path,
+) -> Result<bool, CeError> {
+    let event_val = hooks_table
+        .entry(event_name.to_string())
+        .or_insert_with(|| toml::Value::Array(Vec::new()));
+    if !event_val.is_array() {
+        *event_val = toml::Value::Array(Vec::new());
+    }
+    let event_arr = event_val.as_array_mut().ok_or_else(|| {
+        CeError::Runtime(format!(
+            "Key `hooks.{event_name}` in Codex config at {} is not an array",
+            config_path.display()
+        ))
+    })?;
+
+    let mut target_hook = toml::Table::new();
+    target_hook.insert(
+        "type".to_string(),
+        toml::Value::String("command".to_string()),
+    );
+    target_hook.insert(
+        "command".to_string(),
+        toml::Value::String(CODEX_RESUME_COMMAND.to_string()),
+    );
+    target_hook.insert(
+        "statusMessage".to_string(),
+        toml::Value::String("Updating ce-ai workflow state".to_string()),
+    );
+
+    let existing_entry = event_arr.iter_mut().find(|entry| {
+        if let Some(t) = entry.as_table() {
+            t.get("matcher").is_some() && t.get("hooks").and_then(|h| h.as_array()).is_some()
+        } else {
+            false
+        }
+    });
+
+    let mut changed = false;
+    match existing_entry {
+        Some(entry) => {
+            if let Some(hooks_arr) = entry
+                .as_table_mut()
+                .and_then(|t| t.get_mut("hooks"))
+                .and_then(|h| h.as_array_mut())
+            {
+                if !hooks_arr.iter().any(|h| {
+                    h.as_table()
+                        .and_then(|t| t.get("command"))
+                        .and_then(|c| c.as_str())
+                        == Some(CODEX_RESUME_COMMAND)
+                }) {
+                    hooks_arr.push(toml::Value::Table(target_hook));
+                    changed = true;
+                }
+            }
+        }
+        None => {
+            let matcher_str = if event_name == "SessionStart" {
+                "startup|resume|compact"
+            } else {
+                ".*"
+            };
+            let mut entry = toml::Table::new();
+            entry.insert(
+                "matcher".to_string(),
+                toml::Value::String(matcher_str.to_string()),
+            );
+            entry.insert(
+                "hooks".to_string(),
+                toml::Value::Array(vec![toml::Value::Table(target_hook)]),
+            );
+            event_arr.push(toml::Value::Table(entry));
+            changed = true;
+        }
+    }
+    Ok(changed)
+}
+
+/// Ensures `.codex/config.toml` contains SessionStart, Stop, and PreCompact hooks for `ce-ai workflow resume`.
 /// Preserves any pre-existing user hooks or extra settings. Idempotent.
 pub fn ensure_session_start_hook(config_path: &Path) -> Result<bool, CeError> {
     if has_session_start_hook(config_path) {
@@ -313,79 +403,15 @@ pub fn ensure_session_start_hook(config_path: &Path) -> Result<bool, CeError> {
         ))
     })?;
 
-    let session_start_val = hooks_table
-        .entry("SessionStart".to_string())
-        .or_insert_with(|| toml::Value::Array(Vec::new()));
-    if !session_start_val.is_array() {
-        *session_start_val = toml::Value::Array(Vec::new());
+    let mut changed = false;
+    for ev in CODEX_HOOK_EVENTS {
+        if ensure_codex_event_hook(hooks_table, ev, config_path)? {
+            changed = true;
+        }
     }
-    let session_start_arr = session_start_val.as_array_mut().ok_or_else(|| {
-        CeError::Runtime(format!(
-            "Key `hooks.SessionStart` in Codex config at {} is not an array",
-            config_path.display()
-        ))
-    })?;
 
-    let mut target_hook = toml::Table::new();
-    target_hook.insert(
-        "type".to_string(),
-        toml::Value::String("command".to_string()),
-    );
-    target_hook.insert(
-        "command".to_string(),
-        toml::Value::String(CODEX_RESUME_COMMAND.to_string()),
-    );
-    target_hook.insert(
-        "statusMessage".to_string(),
-        toml::Value::String("Loading ce-ai workflow state".to_string()),
-    );
-
-    let existing_entry = session_start_arr.iter_mut().find(|entry| {
-        if let Some(t) = entry.as_table() {
-            t.get("matcher")
-                .and_then(|m| m.as_str())
-                .map(|m| {
-                    m.contains("startup")
-                        || m.contains("resume")
-                        || m.contains("compact")
-                        || m == ".*"
-                })
-                .unwrap_or(false)
-                && t.get("hooks").and_then(|h| h.as_array()).is_some()
-        } else {
-            false
-        }
-    });
-
-    match existing_entry {
-        Some(entry) => {
-            if let Some(hooks_arr) = entry
-                .as_table_mut()
-                .and_then(|t| t.get_mut("hooks"))
-                .and_then(|h| h.as_array_mut())
-            {
-                if !hooks_arr.iter().any(|h| {
-                    h.as_table()
-                        .and_then(|t| t.get("command"))
-                        .and_then(|c| c.as_str())
-                        == Some(CODEX_RESUME_COMMAND)
-                }) {
-                    hooks_arr.push(toml::Value::Table(target_hook));
-                }
-            }
-        }
-        None => {
-            let mut entry = toml::Table::new();
-            entry.insert(
-                "matcher".to_string(),
-                toml::Value::String("startup|resume|compact".to_string()),
-            );
-            entry.insert(
-                "hooks".to_string(),
-                toml::Value::Array(vec![toml::Value::Table(target_hook)]),
-            );
-            session_start_arr.push(toml::Value::Table(entry));
-        }
+    if !changed {
+        return Ok(false);
     }
 
     if let Some(parent) = config_path.parent() {
@@ -403,7 +429,7 @@ pub fn ensure_session_start_hook(config_path: &Path) -> Result<bool, CeError> {
     Ok(true)
 }
 
-/// Surgically removes `ce-ai workflow resume` hook from `.codex/config.toml`.
+/// Surgically removes `ce-ai workflow resume` hooks (SessionStart, Stop, PreCompact) from `.codex/config.toml`.
 /// If the file becomes empty `{}` as a result, removes the file cleanly.
 pub fn remove_session_start_hook(config_path: &Path) -> Result<bool, CeError> {
     if !config_path.exists() {
@@ -422,45 +448,44 @@ pub fn remove_session_start_hook(config_path: &Path) -> Result<bool, CeError> {
     let mut changed = false;
 
     if let Some(hooks_table) = root_table.get_mut("hooks").and_then(|h| h.as_table_mut()) {
-        if let Some(session_start_arr) = hooks_table
-            .get_mut("SessionStart")
-            .and_then(|s| s.as_array_mut())
-        {
-            for entry in session_start_arr.iter_mut() {
-                if let Some(hooks_arr) = entry
-                    .as_table_mut()
-                    .and_then(|t| t.get_mut("hooks"))
-                    .and_then(|h| h.as_array_mut())
-                {
-                    let prev_len = hooks_arr.len();
-                    hooks_arr.retain(|h| {
-                        h.as_table()
-                            .and_then(|t| t.get("command"))
-                            .and_then(|c| c.as_str())
-                            != Some(CODEX_RESUME_COMMAND)
-                    });
-                    if hooks_arr.len() != prev_len {
-                        changed = true;
+        for ev in CODEX_HOOK_EVENTS {
+            if let Some(event_arr) = hooks_table.get_mut(ev).and_then(|s| s.as_array_mut()) {
+                for entry in event_arr.iter_mut() {
+                    if let Some(hooks_arr) = entry
+                        .as_table_mut()
+                        .and_then(|t| t.get_mut("hooks"))
+                        .and_then(|h| h.as_array_mut())
+                    {
+                        let prev_len = hooks_arr.len();
+                        hooks_arr.retain(|h| {
+                            h.as_table()
+                                .and_then(|t| t.get("command"))
+                                .and_then(|c| c.as_str())
+                                != Some(CODEX_RESUME_COMMAND)
+                        });
+                        if hooks_arr.len() != prev_len {
+                            changed = true;
+                        }
                     }
                 }
-            }
 
-            let prev_len = session_start_arr.len();
-            session_start_arr.retain(|entry| {
-                entry
-                    .as_table()
-                    .and_then(|t| t.get("hooks"))
-                    .and_then(|h| h.as_array())
-                    .map(|h| !h.is_empty())
-                    .unwrap_or(false)
-            });
-            if session_start_arr.len() != prev_len {
-                changed = true;
-            }
+                let prev_len = event_arr.len();
+                event_arr.retain(|entry| {
+                    entry
+                        .as_table()
+                        .and_then(|t| t.get("hooks"))
+                        .and_then(|h| h.as_array())
+                        .map(|h| !h.is_empty())
+                        .unwrap_or(false)
+                });
+                if event_arr.len() != prev_len {
+                    changed = true;
+                }
 
-            if session_start_arr.is_empty() {
-                hooks_table.remove("SessionStart");
-                changed = true;
+                if event_arr.is_empty() {
+                    hooks_table.remove(ev);
+                    changed = true;
+                }
             }
         }
 

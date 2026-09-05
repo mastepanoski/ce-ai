@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
 use tempfile::tempdir;
 
-use crate::state::state::{GuardLevel, GuardrailState, ModelAssignment, ReleaseProvenance, State};
+use crate::state::state::{
+    GuardLevel, GuardrailState, ModelAssignment, ReleaseProvenance, State, WorkflowSource,
+    WorkflowStage,
+};
 
 fn state_with(slot: &str) -> State {
     State {
@@ -24,6 +27,7 @@ fn state_with(slot: &str) -> State {
         projects: vec![],
         skill_surfaces: vec![],
         guardrail: None,
+        auto_checkpoint: None,
     }
 }
 
@@ -436,4 +440,286 @@ fn legacy_workflow_fallback_and_deserialization() {
     assert_eq!(wf.stage, WorkflowStage::ExecutionPlan);
     assert_eq!(wf.task, "Planning v1");
     assert_eq!(wf.feature_name.as_deref(), Some("legacy-feat"));
+}
+
+#[test]
+fn branch_scoped_workflow_isolation_and_fallback() {
+    let dir = tempdir().unwrap();
+    let ws = dir.path().join("repo_branch");
+    std::fs::create_dir_all(&ws).unwrap();
+
+    let mut state = State::new();
+
+    // Advance branch feat-a: Stage 1 -> Stage 2
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-a"),
+            WorkflowStage::Ideation,
+            "Ideation A",
+            Some("feat-a".into()),
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-a"),
+            WorkflowStage::OpenSpec,
+            "Specifying A",
+            None,
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+
+    // Advance branch feat-b: Stage 1 -> Stage 2 -> Stage 3 -> Stage 4
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-b"),
+            WorkflowStage::Ideation,
+            "Ideation B",
+            Some("feat-b".into()),
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-b"),
+            WorkflowStage::OpenSpec,
+            "Spec B",
+            None,
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-b"),
+            WorkflowStage::ExecutionPlan,
+            "Plan B",
+            None,
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-b"),
+            WorkflowStage::WorkTdd,
+            "Coding B",
+            None,
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+
+    // Verify branch isolation
+    let wf_a = state
+        .current_workflow_for_branch(&ws, Some("feat-a"))
+        .unwrap();
+    assert_eq!(wf_a.stage, WorkflowStage::OpenSpec);
+    assert_eq!(wf_a.task, "Specifying A");
+    assert_eq!(wf_a.feature_name.as_deref(), Some("feat-a"));
+
+    let wf_b = state
+        .current_workflow_for_branch(&ws, Some("feat-b"))
+        .unwrap();
+    assert_eq!(wf_b.stage, WorkflowStage::WorkTdd);
+    assert_eq!(wf_b.task, "Coding B");
+    assert_eq!(wf_b.feature_name.as_deref(), Some("feat-b"));
+
+    // Querying without branch returns the most recently updated branch entry for that workspace
+    let wf_latest = state.current_workflow_for_branch(&ws, None).unwrap();
+    assert_eq!(wf_latest.stage, WorkflowStage::WorkTdd);
+    assert_eq!(wf_latest.feature_name.as_deref(), Some("feat-b"));
+
+    // Querying an unknown branch returns None because that branch has no recorded workflow
+    assert!(state
+        .current_workflow_for_branch(&ws, Some("feat-unknown"))
+        .is_none());
+}
+
+#[test]
+fn monotonic_provenance_guard_protects_manual_checkpoints() {
+    let dir = tempdir().unwrap();
+    let ws = dir.path().join("repo_guard");
+    std::fs::create_dir_all(&ws).unwrap();
+
+    let mut state = State::new();
+
+    // 1. Advance to manual checkpoint at Stage 4 legally
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-guard"),
+            WorkflowStage::Ideation,
+            "Manual task unit 1",
+            Some("feat-guard".into()),
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-guard"),
+            WorkflowStage::OpenSpec,
+            "Manual task unit 2",
+            None,
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-guard"),
+            WorkflowStage::ExecutionPlan,
+            "Manual task unit 3",
+            None,
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-guard"),
+            WorkflowStage::WorkTdd,
+            "Manual task unit 4",
+            None,
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+
+    let initial = state
+        .current_workflow_for_branch(&ws, Some("feat-guard"))
+        .unwrap();
+    assert_eq!(initial.stage, WorkflowStage::WorkTdd);
+    assert_eq!(initial.source, WorkflowSource::Manual);
+    assert_eq!(initial.task, "Manual task unit 4");
+
+    // 2. Inferred transition to Stage 3 (regress) must be safely ignored
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-guard"),
+            WorkflowStage::ExecutionPlan,
+            "Inferred plan task",
+            Some("feat-guard".into()),
+            WorkflowSource::Inferred,
+        )
+        .unwrap();
+
+    let after_regress = state
+        .current_workflow_for_branch(&ws, Some("feat-guard"))
+        .unwrap();
+    assert_eq!(after_regress.stage, WorkflowStage::WorkTdd);
+    assert_eq!(after_regress.task, "Manual task unit 4");
+    assert_eq!(after_regress.source, WorkflowSource::Manual);
+
+    // 3. Inferred transition at same Stage 4 must NOT overwrite manual task/source
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-guard"),
+            WorkflowStage::WorkTdd,
+            "Inferred same-stage task",
+            Some("feat-guard".into()),
+            WorkflowSource::Inferred,
+        )
+        .unwrap();
+
+    let after_same = state
+        .current_workflow_for_branch(&ws, Some("feat-guard"))
+        .unwrap();
+    assert_eq!(after_same.stage, WorkflowStage::WorkTdd);
+    assert_eq!(after_same.task, "Manual task unit 4");
+    assert_eq!(after_same.source, WorkflowSource::Manual);
+
+    // 4. Inferred transition advancing to Stage 5 (valid transition) is allowed
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("feat-guard"),
+            WorkflowStage::Verification,
+            "Inferred verification task",
+            Some("feat-guard".into()),
+            WorkflowSource::Inferred,
+        )
+        .unwrap();
+
+    let after_advance = state
+        .current_workflow_for_branch(&ws, Some("feat-guard"))
+        .unwrap();
+    assert_eq!(after_advance.stage, WorkflowStage::Verification);
+    assert_eq!(after_advance.source, WorkflowSource::Inferred);
+
+    // 5. Inferred invalid jump (e.g. from Stage 1 directly to Stage 5 on fresh branch) is ignored cleanly without error
+    state
+        .validate_and_set_workflow_for_branch(
+            &ws,
+            Some("fresh-branch"),
+            WorkflowStage::Verification,
+            "Invalid jump task",
+            Some("fresh-branch".into()),
+            WorkflowSource::Inferred,
+        )
+        .unwrap();
+    // Since current stage was Ideation (1), and 1 -> 5 is illegal, inferred transition did not apply
+    assert!(state
+        .current_workflow_for_branch(&ws, Some("fresh-branch"))
+        .is_none());
+}
+
+#[test]
+fn atomic_update_workflow_persists_and_reloads() {
+    let dir = tempdir().unwrap();
+    let state_path = dir.path().join("state.json");
+    let ws = dir.path().join("repo_atomic");
+    std::fs::create_dir_all(&ws).unwrap();
+
+    // Initial state saved to disk
+    let initial_state = State::new();
+    initial_state.save(&state_path).unwrap();
+
+    // Update using atomic_update_workflow
+    let updated = State::atomic_update_workflow(&state_path, &ws, Some("main"), |state| {
+        state.validate_and_set_workflow_for_branch(
+            &ws,
+            Some("main"),
+            WorkflowStage::OpenSpec,
+            "Atomic update task",
+            Some("spec-feat".into()),
+            WorkflowSource::Manual,
+        )?;
+        Ok(state.current_workflow_for_branch(&ws, Some("main")))
+    })
+    .unwrap();
+
+    assert_eq!(updated.stage, WorkflowStage::OpenSpec);
+    assert_eq!(updated.task, "Atomic update task");
+
+    // Reload from disk independently and verify persistence
+    let reloaded = State::load(&state_path).unwrap();
+    let wf = reloaded
+        .current_workflow_for_branch(&ws, Some("main"))
+        .unwrap();
+    assert_eq!(wf.stage, WorkflowStage::OpenSpec);
+    assert_eq!(wf.task, "Atomic update task");
+    assert_eq!(wf.feature_name.as_deref(), Some("spec-feat"));
+}
+
+#[test]
+fn legacy_workflow_source_deserialization_defaults_to_manual() {
+    let json = r#"{
+        "version": 1,
+        "workflow": {
+            "stage": "ideation",
+            "task": "Brainstorming idea",
+            "feature_name": null,
+            "updated_at": "2026-09-01T00:00:00Z"
+        }
+    }"#;
+    let state: State = serde_json::from_str(json).unwrap();
+    let wf = state.workflow.unwrap();
+    assert_eq!(wf.source, WorkflowSource::Manual);
 }

@@ -166,6 +166,12 @@ fn copilot_session_start_hook_lifecycle() {
     assert_eq!(session_start[0]["bash"], COPILOT_RESUME_COMMAND);
     assert_eq!(session_start[0]["powershell"], COPILOT_RESUME_COMMAND);
 
+    let post_tool_use = val["hooks"]["postToolUse"].as_array().unwrap();
+    assert_eq!(post_tool_use.len(), 1);
+    assert_eq!(post_tool_use[0]["type"], "command");
+    assert_eq!(post_tool_use[0]["bash"], COPILOT_RESUME_COMMAND);
+    assert_eq!(post_tool_use[0]["powershell"], COPILOT_RESUME_COMMAND);
+
     // Idempotent second call
     let changed_second = ensure_session_start_hook(&hooks_path).unwrap();
     assert!(!changed_second);

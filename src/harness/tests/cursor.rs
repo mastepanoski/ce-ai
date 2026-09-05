@@ -178,6 +178,9 @@ fn cursor_session_start_hook_lifecycle() {
     let session_start = val["hooks"]["sessionStart"].as_array().unwrap();
     assert_eq!(session_start.len(), 1);
     assert_eq!(session_start[0]["command"], CURSOR_RESUME_COMMAND);
+    let stop = val["hooks"]["stop"].as_array().unwrap();
+    assert_eq!(stop.len(), 1);
+    assert_eq!(stop[0]["command"], CURSOR_RESUME_COMMAND);
 
     // Second ensure -> idempotent, returns Ok(false)
     let re_ensure = ensure_session_start_hook(&hooks_path).unwrap();

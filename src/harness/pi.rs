@@ -31,8 +31,10 @@ use crate::error::CeError;
 use crate::state::write_atomic;
 
 pub const PI_EXTENSION_FILENAME: &str = "compound-engineering.ts";
+pub const PI_HOOK_VERSION_MARKER: &str = "// ce-ai:hook v=2";
 
-pub const PI_EXTENSION_CONTENT: &str = r#"import { execSync } from "node:child_process";
+pub const PI_EXTENSION_CONTENT: &str = r#"// ce-ai:hook v=2
+import { execSync } from "node:child_process";
 
 export default function (pi: any) {
   let sessionInitialized = false;
@@ -60,10 +62,34 @@ export default function (pi: any) {
       }
     }
   });
+
+  pi.on("agent_end", async (_event: any, ctx: any) => {
+    try {
+      execSync("ce-ai workflow resume", {
+        cwd: ctx?.cwd || process.cwd(),
+        encoding: "utf-8",
+        timeout: 5000,
+      });
+    } catch {
+      // Fail-open
+    }
+  });
+
+  pi.on("session_before_compact", async (_event: any, ctx: any) => {
+    try {
+      execSync("ce-ai workflow resume", {
+        cwd: ctx?.cwd || process.cwd(),
+        encoding: "utf-8",
+        timeout: 5000,
+      });
+    } catch {
+      // Fail-open
+    }
+  });
 }
 "#;
 
-/// Checks if `.pi/extensions/compound-engineering.ts` exists and contains the managed `ce-ai workflow resume` hook.
+/// Checks if `.pi/extensions/compound-engineering.ts` exists, contains the managed `ce-ai workflow resume` hook, and matches the latest version marker.
 pub fn has_session_start_hook(extension_path: &Path) -> bool {
     if !extension_path.exists() {
         return false;
@@ -71,7 +97,7 @@ pub fn has_session_start_hook(extension_path: &Path) -> bool {
     let Ok(content) = std::fs::read_to_string(extension_path) else {
         return false;
     };
-    content.contains("ce-ai workflow resume")
+    content.contains("ce-ai workflow resume") && content.contains(PI_HOOK_VERSION_MARKER)
 }
 
 /// Ensures `.pi/extensions/compound-engineering.ts` exists with the canonical extension content.

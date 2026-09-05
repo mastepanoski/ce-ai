@@ -54,6 +54,9 @@ fn pi_session_start_hook_lifecycle() {
     let content = std::fs::read_to_string(&ext_path).unwrap();
     assert!(content.contains("before_agent_start"));
     assert!(content.contains("session_start"));
+    assert!(content.contains("agent_end"));
+    assert!(content.contains("session_before_compact"));
+    assert!(content.contains(PI_HOOK_VERSION_MARKER));
     assert!(content.contains("ce-ai workflow resume"));
 
     // Idempotent second call

@@ -526,6 +526,16 @@ pub(crate) fn sync_with(
     }
 
     if !ctx.dry_run {
+        for project in &state.projects {
+            if project.path.exists() {
+                let inner_body = crate::commands::init_prj::render_block_content(project.tier);
+                let _ = crate::commands::init_prj::reconcile_project_harness_hooks(
+                    &project.path,
+                    inner_body,
+                );
+            }
+        }
+
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
             if !ctx.quiet {
                 eprintln!("warning: skill registry sync failed: {e}");

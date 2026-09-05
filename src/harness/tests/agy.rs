@@ -198,6 +198,17 @@ fn agy_pre_invocation_hook_lifecycle() {
         Some(AGY_RESUME_COMMAND)
     );
 
+    let stop_hook = val
+        .get("compound-engineering")
+        .and_then(|c| c.get("Stop"))
+        .and_then(|st| st.as_array())
+        .expect("compound-engineering.Stop must be an array");
+    assert_eq!(stop_hook.len(), 1);
+    assert_eq!(
+        stop_hook[0].get("command").and_then(|c| c.as_str()),
+        Some(AGY_STOP_COMMAND)
+    );
+
     // Idempotent re-run
     let re_ensure = ensure_pre_invocation_hook(&hooks_path).unwrap();
     assert!(!re_ensure);

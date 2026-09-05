@@ -119,6 +119,14 @@ impl WorkflowStage {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkflowSource {
+    #[default]
+    Manual,
+    Inferred,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct WorkflowState {
     pub stage: WorkflowStage,
@@ -126,6 +134,8 @@ pub struct WorkflowState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feature_name: Option<String>,
     pub updated_at: String,
+    #[serde(default)]
+    pub source: WorkflowSource,
 }
 
 /// One tracked file of an adopted skills surface (path relative to the
@@ -221,6 +231,8 @@ pub struct State {
     pub skill_surfaces: Vec<SkillSurface>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub guardrail: Option<GuardrailState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_checkpoint: Option<bool>,
 }
 fn default_version() -> u32 {
     1
@@ -259,7 +271,19 @@ impl State {
 
     /// Finds a registered project adoption entry matching the given path.
     pub fn project_for_path(&self, target_path: &Path) -> Option<&ProjectAdoptionEntry> {
-        self.projects.iter().find(|p| p.path == target_path)
+        let canonical = Self::normalize_workspace_key(target_path);
+        self.projects
+            .iter()
+            .find(|p| p.path == target_path || Self::normalize_workspace_key(&p.path) == canonical)
+    }
+
+    /// Checks whether the given workspace/repo root has been adopted.
+    pub fn is_project_adopted(&self, repo_root: &Path) -> bool {
+        self.project_for_path(repo_root).is_some()
+    }
+
+    pub fn is_auto_checkpoint_enabled(&self) -> bool {
+        self.auto_checkpoint.unwrap_or(true)
     }
 
     /// Normalizes a workspace root path into a stable canonical string key.
@@ -270,14 +294,57 @@ impl State {
         }
     }
 
+    /// Constructs a composite key combining canonical root and git branch.
+    /// Falls back to canonical root if branch is None or empty.
+    pub fn workspace_branch_key(root: &Path, branch: Option<&str>) -> String {
+        let canonical_root = Self::normalize_workspace_key(root);
+        match branch.filter(|b| !b.trim().is_empty()) {
+            Some(b) => format!("{canonical_root}::{b}"),
+            None => canonical_root,
+        }
+    }
+
+    /// Returns active `WorkflowState` for a specific workspace root and optional branch,
+    /// falling back to the canonical root key, legacy global `workflow` field, or `last_update_check`.
+    pub fn current_workflow_for_branch(
+        &self,
+        root: &Path,
+        branch: Option<&str>,
+    ) -> Option<WorkflowState> {
+        let canonical_root = Self::normalize_workspace_key(root);
+        if let Some(b) = branch.filter(|b| !b.trim().is_empty()) {
+            let branch_key = format!("{canonical_root}::{b}");
+            if let Some(wf) = self.workflows.get(&branch_key) {
+                return Some(wf.clone());
+            }
+        }
+        if let Some(wf) = self.workflows.get(&canonical_root) {
+            return Some(wf.clone());
+        }
+        // If branch was not specified, search for the most recently updated branch entry for this workspace
+        if branch.is_none() {
+            let prefix = format!("{canonical_root}::");
+            let mut matches: Vec<&WorkflowState> = self
+                .workflows
+                .iter()
+                .filter(|(k, _)| k.starts_with(&prefix))
+                .map(|(_, v)| v)
+                .collect();
+            if !matches.is_empty() {
+                matches.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+                return Some(matches[0].clone());
+            }
+        }
+        if self.workflows.is_empty() {
+            return self.current_workflow();
+        }
+        None
+    }
+
     /// Returns active `WorkflowState` for a specific workspace root,
     /// falling back to the legacy global `workflow` field or `last_update_check`.
     pub fn current_workflow_for(&self, root: &Path) -> Option<WorkflowState> {
-        let key = Self::normalize_workspace_key(root);
-        if let Some(wf) = self.workflows.get(&key) {
-            return Some(wf.clone());
-        }
-        self.current_workflow()
+        self.current_workflow_for_branch(root, None)
     }
 
     /// Returns active `WorkflowState`, falling back to legacy `last_update_check` parsing if present.
@@ -306,25 +373,43 @@ impl State {
                     } else {
                         ts
                     },
+                    source: WorkflowSource::Manual,
                 });
             }
         }
         None
     }
 
-    /// Validates stage transition and updates state.workflows for the specified workspace.
-    pub fn validate_and_set_workflow_for(
+    /// Validates stage transition and updates state.workflows for the specified workspace and branch.
+    pub fn validate_and_set_workflow_for_branch(
         &mut self,
         root: &Path,
+        branch: Option<&str>,
         target_stage: WorkflowStage,
         task: &str,
         feature: Option<String>,
+        source: WorkflowSource,
     ) -> Result<(), CeError> {
-        let current_stage = self
-            .current_workflow_for(root)
+        let current_wf = self.current_workflow_for_branch(root, branch);
+        let current_stage = current_wf
+            .as_ref()
             .map(|wf| wf.stage)
             .unwrap_or(WorkflowStage::Ideation);
+
+        // Monotonic provenance guard: Inferred checkpoints can NEVER regress or clobber a Manual checkpoint at equal or higher stage
+        if let Some(ref wf) = current_wf {
+            if wf.source == WorkflowSource::Manual
+                && source == WorkflowSource::Inferred
+                && target_stage.number() <= current_stage.number()
+            {
+                return Ok(());
+            }
+        }
+
         if !current_stage.can_transition_to(target_stage) {
+            if source == WorkflowSource::Inferred {
+                return Ok(());
+            }
             return Err(CeError::Usage(format!(
                 "invalid workflow transition: cannot jump from Stage {} ({}) directly to Stage {} ({}). Legal transitions: rewind, reset to Stage 1, stay on current stage, or advance to Stage {}.",
                 current_stage.number(),
@@ -350,7 +435,7 @@ impl State {
                 if is_reset_to_stage_1 {
                     None
                 } else {
-                    self.current_workflow_for(root)
+                    self.current_workflow_for_branch(root, branch)
                         .and_then(|wf| wf.feature_name)
                 }
             }
@@ -361,12 +446,67 @@ impl State {
             task: task.to_string(),
             feature_name,
             updated_at: chrono::Utc::now().to_rfc3339(),
+            source,
         };
 
-        let key = Self::normalize_workspace_key(root);
+        let key = Self::workspace_branch_key(root, branch);
         self.workflows.insert(key, new_wf.clone());
         self.workflow = Some(new_wf);
         Ok(())
+    }
+
+    /// Validates stage transition and updates state.workflows for the specified workspace.
+    pub fn validate_and_set_workflow_for(
+        &mut self,
+        root: &Path,
+        target_stage: WorkflowStage,
+        task: &str,
+        feature: Option<String>,
+    ) -> Result<(), CeError> {
+        self.validate_and_set_workflow_for_branch(
+            root,
+            None,
+            target_stage,
+            task,
+            feature,
+            WorkflowSource::Manual,
+        )
+    }
+
+    /// Mutates workflow state using a reload-before-save check to prevent multi-turn read-modify-write clobbering.
+    pub fn atomic_update_workflow<F>(
+        state_path: &Path,
+        root: &Path,
+        branch: Option<&str>,
+        mutator: F,
+    ) -> Result<WorkflowState, CeError>
+    where
+        F: FnOnce(&mut State) -> Result<Option<WorkflowState>, CeError>,
+    {
+        let mut state = if state_path.exists() {
+            State::load(state_path)?
+        } else {
+            State::default()
+        };
+
+        let updated_opt = mutator(&mut state)?;
+        if let Some(new_wf) = updated_opt {
+            let key = Self::workspace_branch_key(root, branch);
+            state.workflows.insert(key, new_wf.clone());
+            state.workflow = Some(new_wf.clone());
+            state.save(state_path)?;
+            Ok(new_wf)
+        } else {
+            Ok(state
+                .current_workflow_for_branch(root, branch)
+                .unwrap_or_else(|| WorkflowState {
+                    stage: WorkflowStage::Ideation,
+                    task: "No active task recorded".to_string(),
+                    feature_name: None,
+                    updated_at: chrono::Utc::now().to_rfc3339(),
+                    source: WorkflowSource::Manual,
+                }))
+        }
     }
 
     /// Validates stage transition and updates state for the current working directory.

@@ -5,6 +5,19 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.40.0] - 2026-09-05
+
+### Added
+- **Workflow FSM Autonomous Checkpointing Across All 7 Harnesses (`#296`):**
+  - Implemented automated Workflow FSM stage progression inferred from observable filesystem artifacts (ideation brainstorms, OpenSpec specifications, git branch semantics, unit test suites, solution documentation, and PR state) without requiring manual `ce-ai workflow checkpoint` calls.
+  - Wired Turn-End (`Stop`, `session.idle`, `agent_end`, `postToolUse`) and Pre-Compaction (`PreCompact`, `session_before_compact`) lifecycle hooks across Claude Code, Codex CLI, Cursor, GitHub Copilot, Google Antigravity, Pi, and OpenCode.
+  - Integrated `reconcile_project_harness_hooks` into `ce-ai init-prj` and `ce-ai sync` (and transitively `ce-ai upgrade`) with symmetric uninstallation in `ce-ai deinit-prj`.
+  - Added `WorkflowSource` provenance tracking (`Manual` vs `Inferred`) with Monotonic Provenance Guard guaranteeing inferred transitions never overwrite or regress manual operator checkpoints.
+  - Added branch-scoped workflow state partitioning (`<canonical_root>::<branch>`) with path traversal sanitization and hierarchical fallback.
+  - Added direct entry bypass for `fix/*` and `feat/*` branches directly into Stage 4 (`WorkTdd` / `ce-work`).
+  - Added suppression during transitory git states (`.git/rebase-merge`, `MERGE_HEAD`, `CHERRY_PICK_HEAD`).
+  - Enforced project adoption gate (`ce-ai init-prj`) with configurable opt-out (`auto_checkpoint: false` in `state.json`).
+
 ## [1.39.3] - 2026-09-05
 
 ### Fixed

@@ -69,6 +69,7 @@ fn probe_openspec_context_detects_features_and_counts_tasks() {
         task: "Building feature".to_string(),
         feature_name: Some("my-feature".to_string()),
         updated_at: "2026-09-02T00:00:00Z".to_string(),
+        source: WorkflowSource::Manual,
     });
 
     let info = probe_openspec_context_in(repo_root, &wf).expect("must detect feature");
@@ -137,4 +138,203 @@ fn pre_invocation_supports_session_id_fallback_and_invocation_num() {
         r#"{"invocationNum": 1}"#,
         marker_dir
     ));
+}
+
+#[test]
+fn test_sanitize_feature_name_strips_traversal_and_prefixes() {
+    assert_eq!(
+        sanitize_feature_name("feature/my-cool-feature"),
+        "my-cool-feature"
+    );
+    assert_eq!(sanitize_feature_name("feat/issue-296"), "issue-296");
+    assert_eq!(sanitize_feature_name("fix/bug-fix"), "bug-fix");
+    assert_eq!(
+        sanitize_feature_name("refs/heads/feature/nested/name"),
+        "nested-name"
+    );
+    // Directory traversal sequences must be neutralized
+    assert_eq!(sanitize_feature_name("../../etc/passwd"), "etc-passwd");
+    assert_eq!(
+        sanitize_feature_name("..\\..\\windows\\system32"),
+        "windows-system32"
+    );
+    // Empty / whitespace / non-alphanumeric fallback
+    assert_eq!(sanitize_feature_name("///...///"), "default");
+}
+
+#[test]
+fn test_is_transitory_git_state_detects_rebase_and_merge() {
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path();
+    let git_dir = repo_root.join(".git");
+    std::fs::create_dir_all(&git_dir).unwrap();
+
+    // Clean state
+    assert!(!is_transitory_git_state(repo_root));
+
+    // Rebase merge
+    let rebase_merge = git_dir.join("rebase-merge");
+    std::fs::create_dir_all(&rebase_merge).unwrap();
+    assert!(is_transitory_git_state(repo_root));
+    std::fs::remove_dir_all(&rebase_merge).unwrap();
+
+    // Rebase apply
+    let rebase_apply = git_dir.join("rebase-apply");
+    std::fs::create_dir_all(&rebase_apply).unwrap();
+    assert!(is_transitory_git_state(repo_root));
+    std::fs::remove_dir_all(&rebase_apply).unwrap();
+
+    // CHERRY_PICK_HEAD
+    let cherry_pick = git_dir.join("CHERRY_PICK_HEAD");
+    std::fs::write(&cherry_pick, "deadbeef").unwrap();
+    assert!(is_transitory_git_state(repo_root));
+    std::fs::remove_file(&cherry_pick).unwrap();
+
+    // MERGE_HEAD
+    let merge_head = git_dir.join("MERGE_HEAD");
+    std::fs::write(&merge_head, "deadbeef").unwrap();
+    assert!(is_transitory_git_state(repo_root));
+}
+
+#[test]
+fn test_stage_inference_stages_1_to_5() {
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path();
+
+    // 1. Stage 1: Ideation (docs/brainstorms exists, no openspec)
+    let brainstorms = repo_root.join("docs").join("brainstorms");
+    std::fs::create_dir_all(&brainstorms).unwrap();
+    std::fs::write(brainstorms.join("idea.md"), "# Big Idea").unwrap();
+
+    let (stage1, _, feat1) =
+        infer_stage_from_repo(repo_root, Some("main")).expect("must infer stage 1");
+    assert_eq!(stage1, WorkflowStage::Ideation);
+    assert_eq!(feat1, None);
+
+    // 2. Stage 2: OpenSpec (proposal.md + spec.md, no tasks.md)
+    let change_dir = repo_root.join("openspec").join("changes").join("test-feat");
+    std::fs::create_dir_all(&change_dir).unwrap();
+    std::fs::write(change_dir.join("proposal.md"), "# Proposal").unwrap();
+    std::fs::write(change_dir.join("spec.md"), "# Spec").unwrap();
+
+    let (stage2, _, feat2) =
+        infer_stage_from_repo(repo_root, Some("feat/test-feat")).expect("must infer stage 2");
+    assert_eq!(stage2, WorkflowStage::OpenSpec);
+    assert_eq!(feat2.as_deref(), Some("test-feat"));
+
+    // 3. Stage 3: Execution Plan (tasks.md with 0 completed)
+    let tasks_file = change_dir.join("tasks.md");
+    std::fs::write(&tasks_file, "- [ ] Task 1\n- [ ] Task 2\n").unwrap();
+
+    let (stage3, _, feat3) =
+        infer_stage_from_repo(repo_root, Some("feat/test-feat")).expect("must infer stage 3");
+    assert_eq!(stage3, WorkflowStage::ExecutionPlan);
+    assert_eq!(feat3.as_deref(), Some("test-feat"));
+
+    // 4. Stage 4: Work/TDD (1/2 tasks completed)
+    std::fs::write(&tasks_file, "- [x] Task 1\n- [ ] Task 2\n").unwrap();
+
+    let (stage4, _, feat4) =
+        infer_stage_from_repo(repo_root, Some("feat/test-feat")).expect("must infer stage 4");
+    assert_eq!(stage4, WorkflowStage::WorkTdd);
+    assert_eq!(feat4.as_deref(), Some("test-feat"));
+
+    // 5. Stage 5: Verification (all tasks completed)
+    std::fs::write(&tasks_file, "- [x] Task 1\n- [x] Task 2\n").unwrap();
+
+    let (stage5, _, feat5) =
+        infer_stage_from_repo(repo_root, Some("feat/test-feat")).expect("must infer stage 5");
+    assert_eq!(stage5, WorkflowStage::Verification);
+    assert_eq!(feat5.as_deref(), Some("test-feat"));
+}
+
+#[test]
+fn test_maybe_auto_checkpoint_respects_opt_out_and_monotonic_guard() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    std::fs::create_dir_all(&config_dir).unwrap();
+    let state_path = config_dir.join("state.json");
+
+    let repo_root = tmp.path().join("repo");
+    let change_dir = repo_root.join("openspec").join("changes").join("feat-auto");
+    std::fs::create_dir_all(&change_dir).unwrap();
+    std::fs::write(change_dir.join("proposal.md"), "# Proposal").unwrap();
+    std::fs::write(change_dir.join("spec.md"), "# Spec").unwrap();
+
+    let ctx = Context::resolve(Some(config_dir), false, false, true).unwrap();
+
+    let adoption_entry = crate::state::state::ProjectAdoptionEntry {
+        path: repo_root.clone(),
+        file: "AGENTS.md".into(),
+        tier: crate::state::state::AdoptionTier::Full,
+        block_version: 4,
+        block_sha256: "fake-sha".into(),
+        created_file: true,
+        adopted_at: "2026-09-05T00:00:00Z".into(),
+    };
+
+    // 0. Non-adopted project skips auto-checkpoint
+    let unadopted_state = State::new();
+    unadopted_state.save(&state_path).unwrap();
+    let unadopted_res = maybe_auto_checkpoint(&ctx, &repo_root, &state_path).unwrap();
+    assert!(
+        unadopted_res.is_none(),
+        "non-adopted project must skip auto-checkpoint"
+    );
+
+    // 1. When auto_checkpoint is disabled in state.json, auto-checkpoint does not run
+    let mut state = State::new();
+    state.projects.push(adoption_entry.clone());
+    state.auto_checkpoint = Some(false);
+    state.save(&state_path).unwrap();
+
+    let result = maybe_auto_checkpoint(&ctx, &repo_root, &state_path).unwrap();
+    assert!(result.is_none());
+
+    // 2. When auto_checkpoint is enabled (default), advancing from Ideation -> OpenSpec works
+    let mut state2 = State::new();
+    state2.projects.push(adoption_entry);
+    state2.save(&state_path).unwrap();
+
+    let res2 = maybe_auto_checkpoint(&ctx, &repo_root, &state_path).unwrap();
+    assert!(res2.is_some());
+    let saved_wf = res2.unwrap();
+    assert_eq!(saved_wf.stage, WorkflowStage::OpenSpec);
+    assert_eq!(saved_wf.source, WorkflowSource::Inferred);
+
+    // 3. Monotonic provenance: If a manual checkpoint is saved at Stage 4, auto-checkpoint cannot regress to Stage 2
+    let mut state3 = State::load(&state_path).unwrap();
+    // Advance legally to Stage 4 manually
+    state3
+        .validate_and_set_workflow_for_branch(
+            &repo_root,
+            None,
+            WorkflowStage::ExecutionPlan,
+            "Manual plan",
+            Some("feat-auto".into()),
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+    state3
+        .validate_and_set_workflow_for_branch(
+            &repo_root,
+            None,
+            WorkflowStage::WorkTdd,
+            "Manual work",
+            Some("feat-auto".into()),
+            WorkflowSource::Manual,
+        )
+        .unwrap();
+    state3.save(&state_path).unwrap();
+
+    // Even though repo files are at Stage 2 (no tasks.md), inferred stage cannot regress manual stage 4
+    let res3 = maybe_auto_checkpoint(&ctx, &repo_root, &state_path).unwrap();
+    assert!(res3.is_none());
+
+    let state_after = State::load(&state_path).unwrap();
+    let current = state_after
+        .current_workflow_for_branch(&repo_root, None)
+        .unwrap();
+    assert_eq!(current.stage, WorkflowStage::WorkTdd);
+    assert_eq!(current.source, WorkflowSource::Manual);
 }
