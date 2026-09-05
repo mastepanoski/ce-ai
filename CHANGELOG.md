@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.39.2] - 2026-09-05
+
+### Fixed
+- **Support Positional Query in `ce-ai skills resolve` (`src/commands/skills.rs`, `tests/cli.rs`):**
+  - Updated `Action::Resolve` to accept an optional positional query argument (`ce-ai skills resolve <QUERY>`) in addition to the existing named `--query` flag (#298).
+  - Fixed Clap unexpected argument parsing error (exit code 2) when running suggested diagnostic commands from `ce-ai doctor` and `ce-ai tools status` (e.g. `ce-ai skills resolve sequential-thinking`).
+  - Enforced clear usage error with exit code 2 when no query is provided via either positional argument or `--query` flag.
+  - Maintained full backward compatibility for existing `--query` flag invocations.
+  - Added CLI integration tests verifying positional resolution, flag resolution, JSON output, and missing query validation.
+
 ## [1.39.1] - 2026-09-05
 
 ### Fixed

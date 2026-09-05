@@ -33,9 +33,13 @@ pub enum Action {
         #[arg(long, default_value = "opencode")]
         harness: String,
 
-        /// Search query or task keyword.
-        #[arg(long, default_value = "")]
-        query: String,
+        /// Search query or task keyword (positional).
+        #[arg(value_name = "QUERY")]
+        query_pos: Option<String>,
+
+        /// Search query or task keyword (flag).
+        #[arg(long)]
+        query: Option<String>,
 
         /// Output resolution result in machine-readable JSON format.
         #[arg(long, default_value_t = false)]
@@ -111,23 +115,35 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
         Action::Resolve {
             harness,
+            query_pos,
             query,
             json,
         } => {
+            let effective_query = query_pos
+                .as_deref()
+                .or(query.as_deref())
+                .unwrap_or("")
+                .trim();
+            if effective_query.is_empty() {
+                return Err(CeError::Usage(
+                    "missing search query: provide a positional query or --query <QUERY>".into(),
+                ));
+            }
+
             let harness_kind = harness.parse::<HarnessKind>()?;
-            let (status, skills, markdown) = registry.resolve(harness_kind, query);
+            let (status, skills, markdown) = registry.resolve(harness_kind, effective_query);
 
             if status == "fallback-fuzzy" {
                 eprintln!(
                     "⚠️ Warning: Skill resolution degraded to fallback-fuzzy for query '{}'",
-                    query
+                    effective_query
                 );
             }
 
             if *json {
                 let output = serde_json::json!({
                     "resolution_status": status,
-                    "query": query,
+                    "query": effective_query,
                     "harness": harness_kind.as_str(),
                     "skills": skills,
                 });
