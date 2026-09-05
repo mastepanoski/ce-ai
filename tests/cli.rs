@@ -1274,6 +1274,52 @@ fn doctor_ignores_non_githooks_hooks_path_when_not_adopted() {
 }
 
 #[test]
+fn doctor_detects_mcp_configured_context7_and_sequential_thinking() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Register context7 and sequential-thinking in opencode.json mcpServers
+    let opencode_json_path = home.join(".config/opencode/opencode.json");
+    let mut config: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&opencode_json_path).unwrap()).unwrap();
+    config["mcpServers"] = serde_json::json!({
+        "context7": {
+            "command": "npx",
+            "args": ["-y", "@upstash/context7-mcp@latest"]
+        },
+        "sequential-thinking": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+        }
+    });
+    fs::write(
+        &opencode_json_path,
+        serde_json::to_string_pretty(&config).unwrap(),
+    )
+    .unwrap();
+
+    let mut cmd = ceai(&config_dir, &home);
+    cmd.arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("companion tool 'context7' not found").not())
+        .stdout(predicate::str::contains("skill-suggestion: sequential-thinking").not())
+        .stdout(predicate::str::contains("context7 v1.0.0 (ok)"));
+
+    // Also verify tools status reports context7 as OK
+    let mut cmd_tools = ceai(&config_dir, &home);
+    cmd_tools
+        .args(["tools", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("context7").and(predicate::str::contains("v1.0.0 (ok)")))
+        .stdout(predicate::str::contains("❌ context7").not())
+        .stdout(predicate::str::contains("sequential-thinking").not());
+}
+
+#[test]
 fn doctor_reports_sibling_worktree_info() {
     let tmp = TempDir::new().unwrap();
     let tmp_path = if cfg!(windows) {

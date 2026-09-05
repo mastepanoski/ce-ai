@@ -5,6 +5,15 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.2] - 2026-09-05
+
+### Fixed
+- **Detect MCP-Configured Companion Tools and Skills in `doctor` and `tools status` (`src/source/tools_registry.rs`, `src/commands/doctor.rs`, `src/commands/tools.rs`, `tests/cli.rs`):**
+  - Resolved `context7` being reported as `not found` (and `tool-missing` under `--strict`) in `ce-ai doctor` and `ce-ai tools status` when already configured as an MCP server in `opencode.json` or active harness configurations (#293).
+  - Resolved `sequential-thinking` being unconditionally suggested in `ce-ai doctor` and `ce-ai tools status` even when registered as an MCP server or present in the skill registry (#293).
+  - Implemented `is_mcp_server_configured`, `is_skill_configured`, and `detect_tool_freshness` in `src/source/tools_registry.rs` to serve as the unified source of truth across CLI commands for probing both binary PATH executables and wrapper MCP servers.
+  - Added unit tests in `src/source/tests/tools_registry.rs` and CLI integration tests in `tests/cli.rs`.
+
 ## [1.38.1] - 2026-09-05
 
 ### Fixed

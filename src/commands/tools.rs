@@ -4,7 +4,8 @@
 use crate::commands::Context;
 use crate::error::CeError;
 use crate::source::tools_registry::{
-    evaluate_freshness, extract_tool_version, FreshnessStatus, ToolsRegistryCache,
+    detect_tool_freshness, extract_tool_version, is_skill_configured, FreshnessStatus,
+    ToolsRegistryCache,
 };
 
 #[derive(clap::Args)]
@@ -36,8 +37,7 @@ pub fn status(ctx: &Context) -> Result<(), CeError> {
 
     println!("== [Companion Tools, Memory Sidecars & Token Reducers Status] ==");
     for (name, info) in &registry.tools {
-        let installed = extract_tool_version(name);
-        let freshness = evaluate_freshness(installed.as_deref(), &info.latest_version);
+        let freshness = detect_tool_freshness(ctx, name, info);
 
         let icon = match &freshness {
             FreshnessStatus::Ok { .. } => "✅",
@@ -64,12 +64,19 @@ pub fn status(ctx: &Context) -> Result<(), CeError> {
         );
     }
 
-    println!("\n== [Skill Registry Suggestions] ==");
-    for (name, skill) in &registry.skills {
-        println!(
-            "  ⚠️ {:<20} {} (suggested: '{}')",
-            name, skill.description, skill.resolve_cmd
-        );
+    let unconfigured_skills: Vec<_> = registry
+        .skills
+        .iter()
+        .filter(|(name, _)| !is_skill_configured(ctx, name))
+        .collect();
+    if !unconfigured_skills.is_empty() {
+        println!("\n== [Skill Registry Suggestions] ==");
+        for (name, skill) in unconfigured_skills {
+            println!(
+                "  ⚠️ {:<20} {} (suggested: '{}')",
+                name, skill.description, skill.resolve_cmd
+            );
+        }
     }
 
     println!("\n== [Orchestrator Readiness] ==");
