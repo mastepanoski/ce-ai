@@ -31,10 +31,10 @@
 - Its `install-manifest.json` contains absolute workstation paths (`source.path`).
 - `init_prj.rs` manages a sentinel block:
   ```gitignore
-  <!-- gentle-ai:ce-ai-ignore:start -->
+  # BEGIN CE-AI MANAGED BLOCK
   .ce-ai/skills-registry.json
   compound-engineering/
-  <!-- gentle-ai:ce-ai-ignore:end -->
+  # END CE-AI MANAGED BLOCK
   ```
 - Adding `compound-engineering/` to this sentinel block ensures that any adopted project ignores workspace-scoped installs.
 - Additionally, `install.rs` will proactively ensure `compound-engineering/` is present in `.gitignore` when `--scope workspace` is executed, even if `init-prj` was never called.

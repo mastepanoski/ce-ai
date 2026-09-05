@@ -202,7 +202,7 @@ When working on multiple features or PRs concurrently, use isolated Git worktree
 - **Gitignore Cleanliness**:
   Workspace installations place plugin assets in `compound-engineering/`, which is automatically covered by the sentinel block in `.gitignore` so local workstation paths never leak into Git.
 - **CodeGraph & Engram Isolation**:
-  - *CodeGraph*: Each worktree maintains its own independent index. Run `gentle-ai codegraph init --cwd <worktree-root>` inside the new worktree.
+  - *CodeGraph*: Each worktree maintains its own independent index. Run `codegraph init <worktree-root>` (or `ce-ai tools init codegraph`) inside the new worktree.
   - *Engram*: Memory observations are tagged with the worktree path so findings remain cleanly isolated per workspace.
 
 ### 4. Scenario 4: Starting a Project from Scratch (Greenfield Setup)

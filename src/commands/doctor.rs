@@ -295,7 +295,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
             let codegraph_dir = root_path.join(".codegraph");
             if !codegraph_dir.exists() {
-                println!("doctor-info: codegraph index (.codegraph/) not initialized");
+                println!("doctor-info: codegraph index (.codegraph/) not initialized (suggested: 'ce-ai tools init codegraph')");
             }
 
             let githooks_dir = root_path.join(".githooks");

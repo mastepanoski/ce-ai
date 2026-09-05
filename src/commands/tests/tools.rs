@@ -87,3 +87,55 @@ fn test_tools_install_dry_run_makes_no_changes() {
     assert!(result.is_ok());
     assert!(!opencode_dir.join("opencode.json").exists());
 }
+
+#[test]
+fn test_tools_init_unsupported_tool_fails_usage() {
+    let tmp = TempDir::new().unwrap();
+    let ctx = Context {
+        config_dir: tmp.path().to_path_buf(),
+        opencode_config_dir: tmp.path().to_path_buf(),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let err = init_tool(&ctx, "unsupported-tool", Some(tmp.path())).unwrap_err();
+    assert!(matches!(err, CeError::Usage(_)));
+}
+
+#[test]
+fn test_tools_init_codegraph_when_already_initialized() {
+    let tmp = TempDir::new().unwrap();
+    let codegraph_dir = tmp.path().join(".codegraph");
+    std::fs::create_dir_all(&codegraph_dir).unwrap();
+
+    let ctx = Context {
+        config_dir: tmp.path().to_path_buf(),
+        opencode_config_dir: tmp.path().to_path_buf(),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let result = init_tool(&ctx, "codegraph", Some(tmp.path()));
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_tools_init_codegraph_dry_run_does_not_create_index() {
+    let tmp = TempDir::new().unwrap();
+    let ctx = Context {
+        config_dir: tmp.path().to_path_buf(),
+        opencode_config_dir: tmp.path().to_path_buf(),
+        workspace_root: None,
+        dry_run: true,
+        verbose: false,
+        quiet: true,
+    };
+
+    let result = init_tool(&ctx, "codegraph", Some(tmp.path()));
+    assert!(result.is_ok());
+    assert!(!tmp.path().join(".codegraph").exists());
+}
