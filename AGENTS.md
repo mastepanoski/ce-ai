@@ -65,6 +65,8 @@ src/
 
 `docs/solutions/` documents solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in documented areas.
 
+`CONCEPTS.md` defines shared domain vocabulary (entities, named processes, status concepts) for this project. Relevant when orienting to the codebase or discussing domain concepts.
+
 ---
 
 ## 🚫 Mandatory Agent Constraints (DO NOT VIOLATE)
