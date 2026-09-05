@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.40.1] - 2026-09-05
+
+### Fixed
+- **Encapsulate Inferred-Stage Monotonicity Guard in Authoritative State Mutator (`src/state/state.rs`, `#306`):**
+  - Moved the non-regression invariant for `WorkflowSource::Inferred` into `State::validate_and_set_workflow_for_branch` so that inferred checkpoints unconditionally reject any stage rewind (`target_stage < current_stage`) as a silent no-op (`Ok(())`).
+  - Closes the defense-in-depth gap where the monotonicity invariant previously lived exclusively in the `maybe_auto_checkpoint` caller, protecting all future callers, batch reconciliations, and test harnesses against inferred stage regressions.
+  - Added unit test `inferred_checkpoint_cannot_regress_previous_inferred_checkpoint` directly testing the authoritative state setter.
+
 ## [1.40.0] - 2026-09-05
 
 ### Added
