@@ -39,19 +39,108 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
         .unwrap_or_default();
     let opencode_dir = ctx.resolve_opencode_dir(&state);
+    let home_dir = crate::harness::home_dir_from_ctx(ctx);
 
-    let manifest = InstallManifest::load(&opencode_dir)
-        .map_err(|_| CeError::Runtime("no install-manifest.json — run install first".into()))?;
-    let source_root = resolve_source_root(&manifest.source)?;
+    let (source_root, version, source_json) =
+        resolve_sync_source_and_version(ctx, &state, &home_dir, &opencode_dir)?;
+
     if args.watch {
-        return run_watch(ctx, args, &source_root, &manifest);
+        let opencode_manifest = InstallManifest::load(&opencode_dir).ok();
+        return run_watch(
+            ctx,
+            args,
+            &source_root,
+            &version,
+            &source_json,
+            opencode_manifest.as_ref(),
+        );
     }
-    sync_with(
-        ctx,
-        &source_root,
-        &manifest.version,
-        manifest.source.clone(),
-    )
+    sync_with(ctx, &source_root, &version, source_json)
+}
+
+/// Resolves the source tree, version, and source JSON from an available install manifest,
+/// the installed harnesses state, or release provenance.
+fn resolve_sync_source_and_version(
+    _ctx: &Context,
+    state: &State,
+    home_dir: &Path,
+    opencode_dir: &Path,
+) -> Result<(PathBuf, String, serde_json::Value), CeError> {
+    // 1. If OpenCode install manifest exists, use it.
+    if let Ok(manifest) = InstallManifest::load(opencode_dir) {
+        let source_root = resolve_source_root(&manifest.source)?;
+        return Ok((source_root, manifest.version, manifest.source));
+    }
+
+    // 2. Try loading install-manifest.json from other installed harnesses
+    for entry in &state.installed_harnesses {
+        if let Some(h_name) = entry["name"].as_str() {
+            if let Ok(h_kind) = h_name.parse::<HarnessKind>() {
+                let config_dir = if h_kind == HarnessKind::Custom {
+                    entry
+                        .get("custom")
+                        .and_then(|c| c.get("plugins_dir"))
+                        .and_then(|p| p.as_str())
+                        .map(PathBuf::from)
+                } else if let Some(target_dir) = entry.get("target_dir").and_then(|t| t.as_str()) {
+                    Some(PathBuf::from(target_dir))
+                } else {
+                    Some(h_kind.harness_dir(home_dir))
+                };
+                if let Some(cfg_dir) = config_dir {
+                    if let Ok(m) = InstallManifest::load(&cfg_dir) {
+                        let source_root = resolve_source_root(&m.source)?;
+                        return Ok((source_root, m.version, m.source));
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Check source and version recorded directly in state.installed_harnesses
+    for entry in &state.installed_harnesses {
+        if let (Some(source), Some(version)) = (
+            entry.get("source"),
+            entry.get("version").and_then(|v| v.as_str()),
+        ) {
+            if !source.is_null() {
+                if let Ok(root) = resolve_source_root(source) {
+                    return Ok((root, version.to_string(), source.clone()));
+                }
+            }
+        }
+    }
+
+    // 4. Check release provenance
+    if let Some(prov) = &state.release_provenance {
+        let source_json = serde_json::json!({
+            "kind": "github-release",
+            "tag": prov.tag,
+            "tree": prov.extraction_path,
+        });
+        if let Ok(root) = resolve_source_root(&source_json) {
+            return Ok((root, prov.tag.clone(), source_json));
+        }
+    }
+
+    // 5. Fail-fast with clear error if no harnesses are installed
+    let mut total_harnesses = state
+        .installed_harnesses
+        .iter()
+        .filter_map(|h| h["name"].as_str())
+        .count();
+    if total_harnesses == 0 {
+        total_harnesses = HarnessKind::detect_ce_installed_harnesses(home_dir).len();
+    }
+    if total_harnesses == 0 {
+        return Err(CeError::Runtime(
+            "no harnesses installed — run ce-ai install first".into(),
+        ));
+    }
+
+    Err(CeError::Runtime(
+        "no install-manifest.json — run install first".into(),
+    ))
 }
 
 /// Resolves the source tree recorded in the manifest (local path or the
@@ -82,10 +171,37 @@ pub(crate) fn sync_with(
     source_json: serde_json::Value,
 ) -> Result<(), CeError> {
     let state_path = ctx.config_dir.join("state.json");
-    let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())?;
+    let mut state =
+        State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())?;
     let opencode_dir = ctx.resolve_opencode_dir(&state);
+    let home_dir = crate::harness::home_dir_from_ctx(ctx);
 
-    let manifest = InstallManifest::load(&opencode_dir)?;
+    let mut active_harnesses: Vec<String> = state
+        .installed_harnesses
+        .iter()
+        .filter_map(|h| h["name"].as_str().map(|s| s.to_string()))
+        .collect();
+
+    for h in HarnessKind::detect_ce_installed_harnesses(&home_dir) {
+        let name = h.to_string();
+        if !active_harnesses.contains(&name) {
+            active_harnesses.push(name);
+        }
+    }
+
+    let opencode_manifest = InstallManifest::load(&opencode_dir).ok();
+    let opencode_active =
+        active_harnesses.iter().any(|h| h == "opencode") || opencode_manifest.is_some();
+    if opencode_active && !active_harnesses.contains(&"opencode".to_string()) {
+        active_harnesses.push("opencode".to_string());
+    }
+
+    if active_harnesses.is_empty() {
+        return Err(CeError::Runtime(
+            "no harnesses installed — run ce-ai install first".into(),
+        ));
+    }
+
     let managed_dir = opencode_dir.join(MANAGED_DIR);
 
     // Desired: managed-rel path -> sha256, plus the source-rel path to copy from.
@@ -95,21 +211,44 @@ pub(crate) fn sync_with(
         desired.insert(managed_rel.clone(), hash);
         source_rel.insert(managed_rel, src_rel);
     }
-    let installed: BTreeMap<String, String> = manifest
-        .files
-        .iter()
-        .map(|f| (f.path.clone(), f.sha256.clone()))
-        .collect();
 
-    let plan = diff::diff(&desired, &installed, &managed_dir);
+    // Retirement respect (R13): once an opencode surface is adopted, the
+    // managed-dir skills tree stays retired — sync must not re-harvest it.
+    let skip_managed_skills_harvest = state
+        .skill_surfaces
+        .iter()
+        .any(|s| s.harness == "opencode" && s.status == "adopted");
+    if skip_managed_skills_harvest {
+        desired.retain(|k, _| !k.starts_with("skills/"));
+        source_rel.retain(|k, _| !k.starts_with("skills/"));
+    }
+
+    let opencode_plan = if opencode_active {
+        let installed: BTreeMap<String, String> = opencode_manifest
+            .as_ref()
+            .map(|m| {
+                m.files
+                    .iter()
+                    .map(|f| (f.path.clone(), f.sha256.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        Some(diff::diff(&desired, &installed, &managed_dir))
+    } else {
+        None
+    };
 
     if ctx.dry_run {
-        if plan.actions.is_empty() {
+        if let Some(plan) = &opencode_plan {
+            if plan.actions.is_empty() {
+                println!("plan: no changes");
+            }
+            for action in &plan.actions {
+                let (verb, path) = plan_verb(action);
+                println!("plan: {verb} {path}");
+            }
+        } else if !ctx.quiet {
             println!("plan: no changes");
-        }
-        for action in &plan.actions {
-            let (verb, path) = plan_verb(action);
-            println!("plan: {verb} {path}");
         }
         return Ok(());
     }
@@ -132,87 +271,63 @@ pub(crate) fn sync_with(
         };
     }
 
-    for action in &plan.actions {
-        match action {
-            Action::Copy { path } | Action::Restore { path } => {
-                let verb = if matches!(action, Action::Copy { .. }) {
-                    "copy"
-                } else {
-                    "restore"
-                };
-                arm!(&managed_dir.join(path));
-                let src = source_root.join(&source_rel[path]);
-                write_atomic(&managed_dir.join(path), &std::fs::read(&src)?)?;
-                println!("sync: {verb} {path}");
+    if opencode_active {
+        if let Some(plan) = &opencode_plan {
+            for action in &plan.actions {
+                match action {
+                    Action::Copy { path } | Action::Restore { path } => {
+                        let verb = if matches!(action, Action::Copy { .. }) {
+                            "copy"
+                        } else {
+                            "restore"
+                        };
+                        arm!(&managed_dir.join(path));
+                        let src = source_root.join(&source_rel[path]);
+                        write_atomic(&managed_dir.join(path), &std::fs::read(&src)?)?;
+                        println!("sync: {verb} {path}");
+                    }
+                    Action::Remove { path } => {
+                        arm!(&managed_dir.join(path));
+                        std::fs::remove_file(managed_dir.join(path))?;
+                        println!("sync: remove {path}");
+                    }
+                }
             }
-            Action::Remove { path } => {
-                arm!(&managed_dir.join(path));
-                std::fs::remove_file(managed_dir.join(path))?;
-                println!("sync: remove {path}");
+            if plan.actions.is_empty() && !ctx.quiet {
+                println!("sync: up to date");
             }
         }
-    }
-    if plan.actions.is_empty() && !ctx.quiet {
-        println!("sync: up to date");
-    }
 
-    // Rewrite the manifest with refreshed hashes and version/source (SU-2).
-    let files: Vec<ManifestFile> = desired
-        .iter()
-        .map(|(path, sha256)| ManifestFile {
-            path: path.clone(),
-            sha256: sha256.clone(),
-        })
-        .collect();
-    arm!(&opencode_dir.join(MANAGED_DIR).join("install-manifest.json"));
-    InstallManifest {
-        version: version.to_string(),
-        plugin_name: manifest.plugin_name.clone(),
-        installed_at: manifest.installed_at.clone(),
-        source: source_json.clone(),
-        files,
-        config_mutations: manifest.config_mutations.clone(),
+        // Rewrite the manifest with refreshed hashes and version/source (SU-2).
+        let files: Vec<ManifestFile> = desired
+            .iter()
+            .map(|(path, sha256)| ManifestFile {
+                path: path.clone(),
+                sha256: sha256.clone(),
+            })
+            .collect();
+        arm!(&opencode_dir.join(MANAGED_DIR).join("install-manifest.json"));
+        InstallManifest {
+            version: version.to_string(),
+            plugin_name: opencode_manifest
+                .as_ref()
+                .map(|m| m.plugin_name.clone())
+                .unwrap_or_else(|| "compound-engineering".into()),
+            installed_at: opencode_manifest
+                .as_ref()
+                .map(|m| m.installed_at.clone())
+                .unwrap_or_else(|| Utc::now().to_rfc3339()),
+            source: source_json.clone(),
+            files,
+            config_mutations: opencode_manifest
+                .as_ref()
+                .map(|m| m.config_mutations.clone())
+                .unwrap_or_default(),
+        }
+        .write(&opencode_dir)?;
     }
-    .write(&opencode_dir)?;
 
     // Refresh and sync across all active host-detected and registered harness entries in state.json (SU-2, SU-5).
-    let state_path = ctx.config_dir.join("state.json");
-    let mut state =
-        State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())?;
-
-    // Retirement respect (R13): once an opencode surface is adopted, the
-    // managed-dir skills tree stays retired — sync must not re-harvest it.
-    let skip_managed_skills_harvest = state
-        .skill_surfaces
-        .iter()
-        .any(|s| s.harness == "opencode" && s.status == "adopted");
-    if skip_managed_skills_harvest {
-        desired.retain(|k, _| !k.starts_with("skills/"));
-        source_rel.retain(|k, _| !k.starts_with("skills/"));
-    }
-
-    let mut active_harnesses: Vec<String> = state
-        .installed_harnesses
-        .iter()
-        .filter_map(|h| h["name"].as_str().map(|s| s.to_string()))
-        .collect();
-
-    if let Ok(home) = std::env::var("HOME") {
-        let home_path = Path::new(&home);
-        for h in HarnessKind::detect_ce_installed_harnesses(home_path) {
-            let name = h.to_string();
-            if !active_harnesses.contains(&name) {
-                active_harnesses.push(name);
-            }
-        }
-    }
-    if active_harnesses.is_empty() {
-        active_harnesses.push("opencode".to_string());
-    }
-
-    let home_dir = crate::harness::home_dir_from_ctx(ctx);
-
-    // Custom-mode directory snapshots must survive the state rebuild below.
     let prior_custom: BTreeMap<String, serde_json::Value> = state
         .installed_harnesses
         .iter()
@@ -271,13 +386,16 @@ pub(crate) fn sync_with(
                         sha256: desired[rel].clone(),
                     });
                 }
+                let prior_mutations = InstallManifest::load(&cfg.plugins_dir)
+                    .map(|m| m.config_mutations)
+                    .unwrap_or_default();
                 InstallManifest {
                     version: version.to_string(),
                     plugin_name: "compound-engineering".into(),
                     installed_at: Utc::now().to_rfc3339(),
                     source: source_json.clone(),
                     files,
-                    config_mutations: manifest.config_mutations.clone(),
+                    config_mutations: prior_mutations,
                 }
                 .write(&cfg.plugins_dir)?;
             } else if let Some(spec) = registration_spec(h_kind) {
@@ -286,6 +404,19 @@ pub(crate) fn sync_with(
                 // harness-owned directories — adoption is the only delivery
                 // path (token-neutrality, R4).
                 spec.register_companions(&target_config)?;
+                let manifest_path = config_dir.join(MANAGED_DIR).join("install-manifest.json");
+                if manifest_path.exists() {
+                    arm!(&manifest_path);
+                    let _ = InstallManifest {
+                        version: version.to_string(),
+                        plugin_name: "compound-engineering".into(),
+                        installed_at: Utc::now().to_rfc3339(),
+                        source: source_json.clone(),
+                        files: vec![],
+                        config_mutations: vec![],
+                    }
+                    .write(&config_dir);
+                }
             } else if h_kind == HarnessKind::Opencode {
                 // OpenCode's own registration: plugin entry + skills paths.
                 crate::opencode::config::ensure_plugin_and_skills(
@@ -331,16 +462,22 @@ pub(crate) fn sync_with(
     // Repair model-assignment desync: import effective opencode.json
     // assignments into state.json (config→state; #111). Config is the live
     // truth — state is never pushed back over user-edited config here.
-    let opencode_json = opencode_dir.join("opencode.json");
-    let config = crate::opencode::config::read_config(&opencode_json)?;
-    for (slot, model) in crate::commands::models::import_config_assignments(&mut state, &config) {
-        if !ctx.quiet {
-            println!("sync: imported model {slot} = {model}");
-        }
-    }
-    for slot in crate::commands::models::purge_stale_assignments(&mut state, &config) {
-        if !ctx.quiet {
-            println!("sync: purged stale assignment {slot}");
+    if opencode_active {
+        let opencode_json = opencode_dir.join("opencode.json");
+        if opencode_json.exists() {
+            let config = crate::opencode::config::read_config(&opencode_json)?;
+            for (slot, model) in
+                crate::commands::models::import_config_assignments(&mut state, &config)
+            {
+                if !ctx.quiet {
+                    println!("sync: imported model {slot} = {model}");
+                }
+            }
+            for slot in crate::commands::models::purge_stale_assignments(&mut state, &config) {
+                if !ctx.quiet {
+                    println!("sync: purged stale assignment {slot}");
+                }
+            }
         }
     }
 
@@ -403,11 +540,13 @@ pub(crate) fn sync_with(
     if !ctx.dry_run {
         let mut surfaces: Vec<SurfaceCheck> = Vec::new();
 
-        let drift = verify_tree_against(&managed_dir, &desired);
-        surfaces.push(SurfaceCheck {
-            harness: "opencode".into(),
-            status: CheckStatus::from_drift(desired.len(), drift),
-        });
+        if opencode_active {
+            let drift = verify_tree_against(&managed_dir, &desired);
+            surfaces.push(SurfaceCheck {
+                harness: "opencode".into(),
+                status: CheckStatus::from_drift(desired.len(), drift),
+            });
+        }
 
         let skills_expected: BTreeMap<String, String> = desired
             .iter()
@@ -794,7 +933,9 @@ pub fn run_watch(
     ctx: &Context,
     args: &Args,
     source_root: &Path,
-    manifest: &InstallManifest,
+    version: &str,
+    source_json: &serde_json::Value,
+    opencode_manifest: Option<&InstallManifest>,
 ) -> Result<(), CeError> {
     setup_ctrlc();
 
@@ -820,7 +961,7 @@ pub fn run_watch(
             }
         }
 
-        match check_and_repair_drift(ctx, source_root, manifest) {
+        match check_and_repair_drift(ctx, source_root, version, source_json, opencode_manifest) {
             Ok(true) => {
                 repaired_count += 1;
                 if !ctx.quiet {
@@ -849,7 +990,9 @@ pub fn run_watch(
 fn check_and_repair_drift(
     ctx: &Context,
     source_root: &Path,
-    manifest: &InstallManifest,
+    version: &str,
+    source_json: &serde_json::Value,
+    opencode_manifest: Option<&InstallManifest>,
 ) -> Result<bool, CeError> {
     let state = State::load(&ctx.config_dir.join("state.json")).unwrap_or_default();
     let opencode_dir = ctx.resolve_opencode_dir(&state);
@@ -870,31 +1013,36 @@ fn check_and_repair_drift(
     if opencode_adopted {
         desired.retain(|k, _| !k.starts_with("skills/"));
     }
-    let installed: BTreeMap<String, String> = manifest
-        .files
-        .iter()
-        .map(|f| (f.path.clone(), f.sha256.clone()))
-        .collect();
 
-    let plan = diff::diff(&desired, &installed, &managed_dir);
-    if plan.actions.is_empty() {
-        return Ok(false);
-    }
+    if let Some(manifest) = opencode_manifest {
+        let installed: BTreeMap<String, String> = manifest
+            .files
+            .iter()
+            .map(|f| (f.path.clone(), f.sha256.clone()))
+            .collect();
 
-    if ctx.dry_run {
-        println!(
-            "plan: dry-run watch detected {} drift action(s)",
-            plan.actions.len()
-        );
-        for action in &plan.actions {
-            let (verb, path) = plan_verb(action);
-            println!("plan: {verb} {path}");
+        let plan = diff::diff(&desired, &installed, &managed_dir);
+        if plan.actions.is_empty() {
+            return Ok(false);
         }
-        return Ok(false);
+
+        if ctx.dry_run {
+            println!(
+                "plan: dry-run watch detected {} drift action(s)",
+                plan.actions.len()
+            );
+            for action in &plan.actions {
+                let (verb, path) = plan_verb(action);
+                println!("plan: {verb} {path}");
+            }
+            return Ok(false);
+        }
+
+        sync_with(ctx, source_root, version, source_json.clone())?;
+        return Ok(true);
     }
 
-    sync_with(ctx, source_root, &manifest.version, manifest.source.clone())?;
-    Ok(true)
+    Ok(false)
 }
 
 fn plan_verb(action: &Action) -> (&'static str, &str) {

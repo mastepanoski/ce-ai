@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.3] - 2026-09-04
+
+### Fixed
+- **Decoupled `ce-ai sync` and `upgrade` from OpenCode Manifest Precondition (`src/commands/sync.rs`, `src/commands/tests/sync.rs`, `tests/cli.rs`):**
+  - Resolved `ce-ai sync` and `ce-ai upgrade` failing with exit code 1 (`no install-manifest.json — run install first`) when OpenCode is not installed (e.g. standalone `claude`, `copilot`, `cursor`, or `custom` harness environments).
+  - Implemented `resolve_sync_source_and_version` helper to dynamically source plugin package and version information across multiple providers: probing OpenCode manifest if present, standalone harness manifests on disk (e.g. `~/.<harness>/compound-engineering/install-manifest.json` and custom plugins directories), `state.installed_harnesses` metadata, or release provenance.
+  - Returns a clear error message `no harnesses installed — run ce-ai install first` when `state.installed_harnesses` is empty and no harnesses are host-detected.
+  - Gated OpenCode managed directory synchronization, manifest persistence, model assignment updates, and matrix reporting behind `opencode_active`, ensuring non-OpenCode environments display their active harnesses cleanly in the Sync Verification Matrix without an erroneous `opencode` row.
+  - Preserved custom harness manifest mutations directly from `cfg.plugins_dir` when updating custom harness installs during sync.
+  - Added CLI integration tests and unit tests verifying sync and upgrade flows across standalone native harnesses, custom harness installs, and empty state validation.
+
 ## [1.37.2] - 2026-09-04
 
 ### Fixed
