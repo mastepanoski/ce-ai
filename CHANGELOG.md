@@ -5,6 +5,15 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.1] - 2026-09-05
+
+### Fixed
+- **Condition `ce-ai doctor` Git-Hooks Probe on `.githooks` Convention Adoption (`src/commands/doctor.rs`, `tests/cli.rs`):**
+  - Gated `.githooks` verification in `src/commands/doctor.rs` on whether the repository has actually adopted the `.githooks` convention (`root_path.join(".githooks").exists()`).
+  - Repositories using alternative git hook managers (e.g. Husky with `core.hooksPath = .husky/_`, lefthook, pre-commit) without a `.githooks/` directory are now logged as informational (`doctor-info: git-hooks core.hooksPath set to '...' (not the .githooks convention; skipping)`) instead of triggering false-positive failure findings.
+  - Repositories that have adopted `.githooks/` continue to report drift findings if `core.hooksPath` points elsewhere or if `.githooks/pre-commit` is missing.
+  - Updated existing integration test `doctor_reports_git_hooks_misconfigured_finding` and added regression test `doctor_ignores_non_githooks_hooks_path_when_not_adopted`.
+
 ## [1.38.0] - 2026-09-04
 
 ### Added
