@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.39.3] - 2026-09-05
+
+### Fixed
+- **Hermetic Git Environment in CLI Test Fixtures (`tests/cli.rs`):**
+  - Resolved intermittent/false-positive test failures (`audit_suggests_codegraph_init_without_gentle_ai`, `doctor_workspace_scope_opencode_install_has_no_false_positive_findings`, `install_workspace_scope_ensures_compound_engineering_in_gitignore`) when `cargo test` is executed inside a Git hook (`.githooks/pre-commit`) where `GIT_DIR`, `GIT_INDEX_FILE`, and other Git plumbing environment variables are exported (#302).
+  - Introduced centralized `git_cmd()` helper in `tests/cli.rs` that explicitly strips `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, and `GIT_PREFIX` on all test repository setup invocations.
+  - Replaced all raw `std::process::Command::new("git")` instantiations in CLI test fixtures with `git_cmd()`, guaranteeing 100% hermetic isolation across all test runs and pre-commit hooks.
+
 ## [1.39.2] - 2026-09-05
 
 ### Fixed
