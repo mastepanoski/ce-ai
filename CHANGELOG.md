@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.39.1] - 2026-09-05
+
+### Fixed
+- **CodeGraph Subprocess Execution End-to-End Test Coverage (`tests/cli.rs`):**
+  - Added hermetic mock executable helper (`fake_codegraph`) in CLI integration test suite.
+  - Added integration tests exercising the end-to-end happy path of `ce-ai tools init codegraph` creating `.codegraph/` on disk when `codegraph` is present on `PATH`.
+  - Added integration test exercising the auto-initialization happy path of `init_codegraph_if_available` during `ce-ai init-prj` project adoption.
+
 ## [1.39.0] - 2026-09-05
 
 ### Added

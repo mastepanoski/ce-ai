@@ -5803,3 +5803,81 @@ fn audit_suggests_codegraph_init_without_gentle_ai() {
         ))
         .stdout(predicate::str::contains("gentle-ai").not());
 }
+
+#[cfg(unix)]
+fn fake_codegraph(parent: &Path) -> PathBuf {
+    let bin = parent.join("fake_codegraph_bin");
+    fs::create_dir_all(&bin).unwrap();
+    let script = r#"#!/bin/sh
+if [ "$1" = "--version" ]; then
+    echo "codegraph v1.4.1"
+    exit 0
+fi
+if [ "$1" = "init" ]; then
+    target="${2:-.}"
+    mkdir -p "$target/.codegraph"
+    echo "✓ CodeGraph initialized"
+    exit 0
+fi
+exit 0
+"#;
+    let path = bin.join("codegraph");
+    fs::write(&path, script).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    bin
+}
+
+#[cfg(unix)]
+#[test]
+fn tools_init_codegraph_happy_path_creates_index() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("ce-ai");
+    let home = tmp.path().join("home");
+    let project_dir = tmp.path().join("project");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    let fake_bin = fake_codegraph(tmp.path());
+    let path_var = std::env::var("PATH").unwrap_or_default();
+
+    let mut cmd = ceai(&config_dir, &home);
+    cmd.env("PATH", format!("{}:{path_var}", fake_bin.display()))
+        .current_dir(&project_dir)
+        .args(["tools", "init", "codegraph"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("✓ Initialized CodeGraph index"));
+
+    assert!(project_dir.join(".codegraph").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn init_prj_auto_initializes_codegraph_when_present() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("ce-ai");
+    let home = tmp.path().join("home");
+    let project_dir = tmp.path().join("project");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&project_dir)
+        .output()
+        .unwrap();
+
+    let fake_bin = fake_codegraph(tmp.path());
+    let path_var = std::env::var("PATH").unwrap_or_default();
+
+    let mut cmd = ceai(&config_dir, &home);
+    cmd.env("PATH", format!("{}:{path_var}", fake_bin.display()))
+        .current_dir(&project_dir)
+        .arg("init-prj")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "✓ Initialized CodeGraph index (.codegraph/)",
+        ));
+
+    assert!(project_dir.join(".codegraph").exists());
+}
