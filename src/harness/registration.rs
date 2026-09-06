@@ -57,8 +57,19 @@ pub(crate) fn registration_spec(kind: HarnessKind) -> Option<RegistrationSpec> {
         HarnessKind::Kimi => native(crate::harness::kimi::register_kimi_mcp_server),
         HarnessKind::Agy => native(crate::harness::agy::register_agy_mcp_server),
         HarnessKind::Fx => native(crate::harness::fx::register_fx_mcp_server),
-        // Pi is No-MCP by design (objective 8): skills tree only.
+        // Pi is No-MCP by design (Objective 8): skills tree only (~/.pi/agent/skills/).
+        // Companion integration (codegraph, engram) is fulfilled via CLI binaries
+        // available on PATH; Pi exposes no JSON/YAML configuration file for MCP registration.
         HarnessKind::Pi => RegistrationSpec { register_mcp: None },
+        // Custom has a snapshot-driven layout and optional `--mcp-file` (handled via dedicated arm
+        // in install/sync/uninstall).
+        // Opencode uses its dedicated config writer (`crate::opencode::config::register_companions`).
+        // Deepseek is de-scoped during developer preview: `dsh` uses YAML patch layers under
+        // `~/.dsh` and `install --harness deepseek` returns CeError::Usage.
         HarnessKind::Custom | HarnessKind::Opencode | HarnessKind::Deepseek => return None,
     })
 }
+
+#[cfg(test)]
+#[path = "tests/registration.rs"]
+mod tests;

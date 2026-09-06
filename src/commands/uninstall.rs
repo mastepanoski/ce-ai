@@ -37,6 +37,10 @@ pub struct Args {
     /// managed CE block.
     #[arg(long)]
     pub rules_file: Option<PathBuf>,
+    /// Custom mode (--harness custom): MCP JSON configuration file holding
+    /// companion server definitions.
+    #[arg(long)]
+    pub mcp_file: Option<PathBuf>,
 }
 
 impl Default for Args {
@@ -48,6 +52,7 @@ impl Default for Args {
             plugins_dir: None,
             skills_dir: None,
             rules_file: None,
+            mcp_file: None,
         }
     }
 }
@@ -98,6 +103,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                                 plugins_dir: args.plugins_dir.clone(),
                                 skills_dir: args.skills_dir.clone(),
                                 rules_file: args.rules_file.clone(),
+                                mcp_file: args.mcp_file.clone(),
                             },
                         ) {
                             Ok(cfg) => cfg,
@@ -165,6 +171,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                             rules.display()
                         );
                     }
+                }
+
+                if let Some(mcp) = &cfg.mcp_file {
+                    crate::harness::custom::unregister_companions(mcp)?;
                 }
 
                 state

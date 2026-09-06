@@ -143,7 +143,25 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
                 }
                 continue;
             }
-            if name == "opencode" || name == "custom" || name == "deepseek" {
+            if name == "custom" {
+                if let Some(cfg) = entry
+                    .get("custom")
+                    .and_then(crate::harness::custom::CustomHarnessConfig::from_state_json)
+                {
+                    if let Some(mcp) = &cfg.mcp_file {
+                        let env = std::collections::BTreeMap::new();
+                        crate::harness::custom::register_custom_mcp_server(
+                            mcp,
+                            &tool_lower,
+                            cmd,
+                            args,
+                            &env,
+                        )?;
+                    }
+                }
+                continue;
+            }
+            if name == "opencode" || name == "deepseek" {
                 continue;
             }
             let Ok(kind) = name.parse::<crate::harness::HarnessKind>() else {

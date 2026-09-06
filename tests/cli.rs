@@ -6320,3 +6320,442 @@ fn init_prj_and_deinit_prj_roundtrip_all_harness_hooks() {
         "Pi extension file must be removed symmetrically"
     );
 }
+
+#[test]
+fn install_registers_codegraph_and_engram_for_opencode_and_custom() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+
+    // 1. OpenCode install auto-registers companions
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "opencode",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let opencode_json = home.join(".config/opencode/opencode.json");
+    let opencode_cfg = read_json(&opencode_json);
+    assert_eq!(
+        opencode_cfg["mcpServers"]["codegraph"],
+        serde_json::json!({ "command": "codegraph", "args": ["mcp"] })
+    );
+    assert_eq!(
+        opencode_cfg["mcpServers"]["engram"],
+        serde_json::json!({ "command": "engram", "args": ["serve"] })
+    );
+
+    // 2. Custom install with --mcp-file auto-registers companions
+    let plugins = home.join("custom/plugins");
+    let skills = home.join("custom/skills");
+    let mcp_file = home.join("custom/mcp.json");
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_file.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let custom_cfg = read_json(&mcp_file);
+    assert_eq!(
+        custom_cfg["mcpServers"]["codegraph"],
+        serde_json::json!({ "command": "codegraph", "args": ["mcp"], "env": {} })
+    );
+    assert_eq!(
+        custom_cfg["mcpServers"]["engram"],
+        serde_json::json!({ "command": "engram", "args": ["serve"], "env": {} })
+    );
+
+    // Simulate drift: remove companion entries
+    let mut modified_opencode = opencode_cfg.clone();
+    modified_opencode["mcpServers"]
+        .as_object_mut()
+        .unwrap()
+        .remove("codegraph");
+    fs::write(
+        &opencode_json,
+        serde_json::to_string_pretty(&modified_opencode).unwrap(),
+    )
+    .unwrap();
+
+    let mut modified_custom = custom_cfg.clone();
+    modified_custom["mcpServers"]
+        .as_object_mut()
+        .unwrap()
+        .remove("engram");
+    fs::write(
+        &mcp_file,
+        serde_json::to_string_pretty(&modified_custom).unwrap(),
+    )
+    .unwrap();
+
+    // Run sync
+    ceai(&config_dir, &home).arg("sync").assert().success();
+
+    // Verify sync restored companions
+    let synced_opencode = read_json(&opencode_json);
+    assert!(synced_opencode["mcpServers"].get("codegraph").is_some());
+    let synced_custom = read_json(&mcp_file);
+    assert!(synced_custom["mcpServers"].get("engram").is_some());
+
+    // Uninstall custom harness cleans up custom mcp registrations
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "custom", "--yes"])
+        .assert()
+        .success();
+
+    let custom_cfg_after = read_json(&mcp_file);
+    assert!(custom_cfg_after["mcpServers"].get("codegraph").is_none());
+    assert!(custom_cfg_after["mcpServers"].get("engram").is_none());
+
+    // 3. Pi install is No-MCP: succeeds without writing MCP config
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "pi",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(home
+        .join(".pi/agent/compound-engineering/install-manifest.json")
+        .exists());
+    assert!(!home.join(".pi/agent/mcp.json").exists());
+}
+
+#[test]
+fn install_custom_switching_mcp_file_unregisters_companions_from_old_path() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let plugins = home.join("custom/plugins");
+    let skills = home.join("custom/skills");
+    let mcp_a = home.join("custom/mcp_a.json");
+    let mcp_b = home.join("custom/mcp_b.json");
+
+    // 1. Install with mcp_a
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_a.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let cfg_a = read_json(&mcp_a);
+    assert!(cfg_a["mcpServers"].get("codegraph").is_some());
+    assert!(cfg_a["mcpServers"].get("engram").is_some());
+
+    // Add a foreign user-owned tool to mcp_a to verify preservation
+    let mut custom_a = cfg_a;
+    custom_a["mcpServers"]["user-server"] = serde_json::json!({ "command": "my-tool" });
+    fs::write(&mcp_a, serde_json::to_string_pretty(&custom_a).unwrap()).unwrap();
+
+    // 2. Reinstall pointing to mcp_b
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_b.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // 3. mcp_a should have companions unregistered while user-server is preserved
+    let cfg_a_after = read_json(&mcp_a);
+    assert!(cfg_a_after["mcpServers"].get("codegraph").is_none());
+    assert!(cfg_a_after["mcpServers"].get("engram").is_none());
+    assert_eq!(
+        cfg_a_after["mcpServers"]["user-server"],
+        serde_json::json!({ "command": "my-tool" })
+    );
+
+    // 4. mcp_b should have companions registered
+    let cfg_b = read_json(&mcp_b);
+    assert!(cfg_b["mcpServers"].get("codegraph").is_some());
+    assert!(cfg_b["mcpServers"].get("engram").is_some());
+}
+
+#[test]
+fn tools_install_custom_fails_when_mcp_file_is_malformed() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let plugins = home.join("custom/plugins");
+    let skills = home.join("custom/skills");
+    let mcp_file = home.join("custom/mcp.json");
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_file.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // Corrupt mcp.json
+    fs::write(&mcp_file, "{ invalid json content").unwrap();
+
+    // ce-ai tools install context7 should fail with exit code 1 (Runtime error)
+    ceai(&config_dir, &home)
+        .args(["tools", "install", "context7"])
+        .assert()
+        .failure()
+        .code(1);
+}
+
+#[test]
+fn uninstall_custom_fails_when_mcp_file_is_malformed() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let plugins = home.join("custom/plugins");
+    let skills = home.join("custom/skills");
+    let mcp_file = home.join("custom/mcp.json");
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_file.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // Corrupt mcp.json
+    fs::write(&mcp_file, "{ invalid json content").unwrap();
+
+    // ce-ai uninstall --harness custom should fail with exit code 1 (Runtime error)
+    ceai(&config_dir, &home)
+        .args(["uninstall", "--harness", "custom", "--yes"])
+        .assert()
+        .failure()
+        .code(1);
+}
+
+#[test]
+fn install_custom_with_mcp_file_persists_in_custom_harness_json_and_updates_on_reinstall() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let plugins = home.join("custom/plugins");
+    let skills = home.join("custom/skills");
+    let mcp_1 = home.join("custom/mcp_1.json");
+    let mcp_2 = home.join("custom/mcp_2.json");
+    let cfg_file = home.join(".ce-ai/custom_harness.json");
+
+    // 1. Install with --mcp-file mcp_1
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_1.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // Verify custom_harness.json has mcp_file pointing to mcp_1
+    assert!(cfg_file.exists(), "custom_harness.json must be persisted");
+    let saved_cfg1 = read_json(&cfg_file);
+    assert_eq!(
+        saved_cfg1["mcp_file"],
+        mcp_1.display().to_string(),
+        "custom_harness.json must record mcp_file"
+    );
+    assert_eq!(saved_cfg1["plugins_dir"], plugins.display().to_string());
+    assert_eq!(saved_cfg1["skills_dir"], skills.display().to_string());
+
+    // Also verify state.json has it
+    let state1 = read_json(&config_dir.join("state.json"));
+    let entry1 = state1["installed_harnesses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|h| h["name"] == "custom")
+        .expect("custom state entry");
+    assert_eq!(entry1["custom"]["mcp_file"], mcp_1.display().to_string());
+
+    // 2. Reinstall with different --mcp-file mcp_2
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_2.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // Verify custom_harness.json updated to mcp_2
+    let saved_cfg2 = read_json(&cfg_file);
+    assert_eq!(
+        saved_cfg2["mcp_file"],
+        mcp_2.display().to_string(),
+        "custom_harness.json must update mcp_file on reinstall"
+    );
+
+    // Verify state.json updated to mcp_2
+    let state2 = read_json(&config_dir.join("state.json"));
+    let entry2 = state2["installed_harnesses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|h| h["name"] == "custom")
+        .expect("custom state entry");
+    assert_eq!(entry2["custom"]["mcp_file"], mcp_2.display().to_string());
+}
+
+#[test]
+fn install_custom_sequential_racing_installs_last_write_wins_without_corruption() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let plugins = home.join("custom/plugins");
+    let skills = home.join("custom/skills");
+    let mcp_1 = home.join("custom/mcp_1.json");
+    let mcp_2 = home.join("custom/mcp_2.json");
+
+    // Two rapid sequential installs with different --mcp-file without unregistering in between
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_1.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_2.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // Contract: Last-write-wins determinism without file corruption.
+    // 1. state.json is valid uncorrupted JSON and holds exactly 1 custom entry pointing to mcp_2
+    let state_file = config_dir.join("state.json");
+    assert!(state_file.exists());
+    let state = read_json(&state_file);
+    let custom_entries: Vec<_> = state["installed_harnesses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|h| h["name"] == "custom")
+        .collect();
+    assert_eq!(custom_entries.len(), 1, "exactly one custom harness entry");
+    assert_eq!(
+        custom_entries[0]["custom"]["mcp_file"],
+        mcp_2.display().to_string(),
+        "last write wins in state.json"
+    );
+
+    // 2. custom_harness.json is valid uncorrupted JSON and points to mcp_2
+    let cfg_file = home.join(".ce-ai/custom_harness.json");
+    assert!(cfg_file.exists());
+    let custom_cfg = read_json(&cfg_file);
+    assert_eq!(
+        custom_cfg["mcp_file"],
+        mcp_2.display().to_string(),
+        "last write wins in custom_harness.json"
+    );
+
+    // 3. mcp_2 has active companions, while mcp_1 has had companions unregistered
+    let mcp_2_cfg = read_json(&mcp_2);
+    assert!(mcp_2_cfg["mcpServers"].get("codegraph").is_some());
+    assert!(mcp_2_cfg["mcpServers"].get("engram").is_some());
+
+    let mcp_1_cfg = read_json(&mcp_1);
+    assert!(
+        mcp_1_cfg.get("mcpServers").is_none() || mcp_1_cfg["mcpServers"].get("codegraph").is_none()
+    );
+    assert!(
+        mcp_1_cfg.get("mcpServers").is_none() || mcp_1_cfg["mcpServers"].get("engram").is_none()
+    );
+}

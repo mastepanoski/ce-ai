@@ -143,6 +143,58 @@ pub fn register_mcp_server(
     register_mcp_server_with_store(&FsConfigStore, config_path, tool_name, server_def)
 }
 
+/// Registers companion MCP servers (`codegraph`, `engram`) into `opencode.json`.
+pub fn register_companions(config_path: &Path) -> Result<(), CeError> {
+    register_mcp_server(
+        config_path,
+        "codegraph",
+        serde_json::json!({ "command": "codegraph", "args": ["mcp"] }),
+    )?;
+    register_mcp_server(
+        config_path,
+        "engram",
+        serde_json::json!({ "command": "engram", "args": ["serve"] }),
+    )?;
+    Ok(())
+}
+
+/// Unregisters an MCP server from `opencode.json`.
+pub fn unregister_mcp_server(config_path: &Path, tool_name: &str) -> Result<bool, CeError> {
+    if !config_path.exists() {
+        return Ok(false);
+    }
+    let content = std::fs::read_to_string(config_path)?;
+    let mut config: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return Ok(false),
+    };
+    if let Some(mcp_servers) = config.get_mut("mcpServers").and_then(|m| m.as_object_mut()) {
+        if mcp_servers.remove(tool_name).is_some() {
+            if mcp_servers.is_empty() {
+                if let Some(obj) = config.as_object_mut() {
+                    obj.remove("mcpServers");
+                }
+            }
+            let bytes = serde_json::to_vec_pretty(&config).map_err(|e| {
+                CeError::Runtime(format!(
+                    "Failed to serialize opencode.json at {}: {e}",
+                    config_path.display()
+                ))
+            })?;
+            crate::state::write_atomic(config_path, &bytes)?;
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Unregisters companion MCP servers (`codegraph`, `engram`) from `opencode.json`.
+pub fn unregister_companions(config_path: &Path) -> Result<(), CeError> {
+    let _ = unregister_mcp_server(config_path, "codegraph")?;
+    let _ = unregister_mcp_server(config_path, "engram")?;
+    Ok(())
+}
+
 #[cfg(test)]
 #[path = "tests/config.rs"]
 mod tests;

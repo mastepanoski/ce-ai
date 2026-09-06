@@ -44,6 +44,10 @@ pub struct Args {
     /// managed CE block.
     #[arg(long)]
     pub rules_file: Option<PathBuf>,
+    /// Custom mode (--harness custom): MCP JSON configuration file receiving
+    /// companion server registrations.
+    #[arg(long)]
+    pub mcp_file: Option<PathBuf>,
 }
 
 use crate::harness::HarnessKind;
@@ -135,6 +139,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 plugins_dir: args.plugins_dir.clone(),
                 skills_dir: args.skills_dir.clone(),
                 rules_file: args.rules_file.clone(),
+                mcp_file: args.mcp_file.clone(),
             };
             Some(crate::harness::custom::CustomHarnessConfig::resolve(
                 &home_dir, &flags,
@@ -150,7 +155,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             harness_kind.harness_dir(&home_dir)
         };
         let target_config = harness_kind.config_path(&config_dir);
-        let needs_backup = custom_cfg.is_none() && target_config.exists();
+        // `.is_file()` (not `.exists()`): some kinds (e.g. Pi, whose config
+        // surface is a skills directory, not a JSON file) resolve
+        // `config_path()` to a directory. Backing up a directory would try
+        // to `std::fs::read` it and fail with "Is a directory" (os error 21).
+        let needs_backup = custom_cfg.is_none() && target_config.is_file();
 
         // Dry-run plans only; SU-4 guarantees zero writes.
         if ctx.dry_run {
@@ -269,6 +278,27 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 });
             }
 
+            let prior_custom = state
+                .installed_harnesses
+                .iter()
+                .find(|h| h["name"].as_str() == Some("custom"))
+                .and_then(|h| {
+                    crate::harness::custom::CustomHarnessConfig::from_state_json(&h["custom"])
+                });
+            if let Some(prior_cfg) = &prior_custom {
+                if let Some(old_mcp) = &prior_cfg.mcp_file {
+                    if cfg.mcp_file.as_ref() != Some(old_mcp) {
+                        arm!(old_mcp);
+                        crate::harness::custom::unregister_companions(old_mcp)?;
+                    }
+                }
+            }
+
+            if let Some(mcp) = &cfg.mcp_file {
+                arm!(mcp);
+                crate::harness::custom::register_companions(mcp)?;
+            }
+
             arm!(&cfg
                 .plugins_dir
                 .join(MANAGED_DIR)
@@ -308,6 +338,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 &skills_path(&config_dir).to_string_lossy(),
             )?;
             mutation.backup = backup.map(|p| p.display().to_string());
+            crate::opencode::config::register_companions(&target_config)?;
 
             InstallManifest {
                 version: version.to_string(),
@@ -362,6 +393,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
         if let Some(cfg) = &custom_cfg {
             entry["custom"] = cfg.to_state_json();
+            if !ctx.dry_run {
+                let custom_cfg_path =
+                    crate::harness::custom::CustomHarnessConfig::config_path(&home_dir);
+                arm!(&custom_cfg_path);
+                cfg.save(&home_dir)?;
+            }
         }
         state.installed_harnesses.push(entry);
 

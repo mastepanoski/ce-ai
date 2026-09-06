@@ -240,6 +240,22 @@ pub fn remove_session_start_plugin(config_dir: &Path) -> Result<bool, CeError> {
                     }
                 }
 
+                if let Some(mcp_servers) =
+                    config.get_mut("mcpServers").and_then(|m| m.as_object_mut())
+                {
+                    for companion in &["codegraph", "engram", "context7", "rtk"] {
+                        if mcp_servers.remove(*companion).is_some() {
+                            changed = true;
+                        }
+                    }
+                    if mcp_servers.is_empty() {
+                        if let Some(obj) = config.as_object_mut() {
+                            obj.remove("mcpServers");
+                            changed = true;
+                        }
+                    }
+                }
+
                 if config.as_object().map(|o| o.is_empty()).unwrap_or(false) {
                     crate::state::report_best_effort_remove(
                         &config_file,
