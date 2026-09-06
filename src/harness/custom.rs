@@ -60,6 +60,18 @@ impl CustomHarnessConfig {
         })
     }
 
+    /// Atomically persists this configuration to `<home>/.ce-ai/custom_harness.json`.
+    pub fn save(&self, home: &Path) -> Result<(), CeError> {
+        let path = Self::config_path(home);
+        let bytes = serde_json::to_vec_pretty(self).map_err(|e| {
+            CeError::Runtime(format!(
+                "failed to serialize {CONFIG_FILE_NAME} at {}: {e}",
+                path.display()
+            ))
+        })?;
+        crate::state::write_atomic(&path, &bytes)
+    }
+
     /// Resolves the effective configuration with flag ▸ config-file
     /// precedence, `~` expansion, and relative-path anchoring. Fails fast
     /// with `CeError::Usage` when `plugins_dir`/`skills_dir` are unresolvable.

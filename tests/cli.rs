@@ -6585,3 +6585,177 @@ fn uninstall_custom_fails_when_mcp_file_is_malformed() {
         .failure()
         .code(1);
 }
+
+#[test]
+fn install_custom_with_mcp_file_persists_in_custom_harness_json_and_updates_on_reinstall() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let plugins = home.join("custom/plugins");
+    let skills = home.join("custom/skills");
+    let mcp_1 = home.join("custom/mcp_1.json");
+    let mcp_2 = home.join("custom/mcp_2.json");
+    let cfg_file = home.join(".ce-ai/custom_harness.json");
+
+    // 1. Install with --mcp-file mcp_1
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_1.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // Verify custom_harness.json has mcp_file pointing to mcp_1
+    assert!(cfg_file.exists(), "custom_harness.json must be persisted");
+    let saved_cfg1 = read_json(&cfg_file);
+    assert_eq!(
+        saved_cfg1["mcp_file"],
+        mcp_1.display().to_string(),
+        "custom_harness.json must record mcp_file"
+    );
+    assert_eq!(saved_cfg1["plugins_dir"], plugins.display().to_string());
+    assert_eq!(saved_cfg1["skills_dir"], skills.display().to_string());
+
+    // Also verify state.json has it
+    let state1 = read_json(&config_dir.join("state.json"));
+    let entry1 = state1["installed_harnesses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|h| h["name"] == "custom")
+        .expect("custom state entry");
+    assert_eq!(entry1["custom"]["mcp_file"], mcp_1.display().to_string());
+
+    // 2. Reinstall with different --mcp-file mcp_2
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_2.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // Verify custom_harness.json updated to mcp_2
+    let saved_cfg2 = read_json(&cfg_file);
+    assert_eq!(
+        saved_cfg2["mcp_file"],
+        mcp_2.display().to_string(),
+        "custom_harness.json must update mcp_file on reinstall"
+    );
+
+    // Verify state.json updated to mcp_2
+    let state2 = read_json(&config_dir.join("state.json"));
+    let entry2 = state2["installed_harnesses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|h| h["name"] == "custom")
+        .expect("custom state entry");
+    assert_eq!(entry2["custom"]["mcp_file"], mcp_2.display().to_string());
+}
+
+#[test]
+fn install_custom_sequential_racing_installs_last_write_wins_without_corruption() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    let plugins = home.join("custom/plugins");
+    let skills = home.join("custom/skills");
+    let mcp_1 = home.join("custom/mcp_1.json");
+    let mcp_2 = home.join("custom/mcp_2.json");
+
+    // Two rapid sequential installs with different --mcp-file without unregistering in between
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_1.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "custom",
+            "--plugins-dir",
+            plugins.to_str().unwrap(),
+            "--skills-dir",
+            skills.to_str().unwrap(),
+            "--mcp-file",
+            mcp_2.to_str().unwrap(),
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // Contract: Last-write-wins determinism without file corruption.
+    // 1. state.json is valid uncorrupted JSON and holds exactly 1 custom entry pointing to mcp_2
+    let state_file = config_dir.join("state.json");
+    assert!(state_file.exists());
+    let state = read_json(&state_file);
+    let custom_entries: Vec<_> = state["installed_harnesses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|h| h["name"] == "custom")
+        .collect();
+    assert_eq!(custom_entries.len(), 1, "exactly one custom harness entry");
+    assert_eq!(
+        custom_entries[0]["custom"]["mcp_file"],
+        mcp_2.display().to_string(),
+        "last write wins in state.json"
+    );
+
+    // 2. custom_harness.json is valid uncorrupted JSON and points to mcp_2
+    let cfg_file = home.join(".ce-ai/custom_harness.json");
+    assert!(cfg_file.exists());
+    let custom_cfg = read_json(&cfg_file);
+    assert_eq!(
+        custom_cfg["mcp_file"],
+        mcp_2.display().to_string(),
+        "last write wins in custom_harness.json"
+    );
+
+    // 3. mcp_2 has active companions, while mcp_1 has had companions unregistered
+    let mcp_2_cfg = read_json(&mcp_2);
+    assert!(mcp_2_cfg["mcpServers"].get("codegraph").is_some());
+    assert!(mcp_2_cfg["mcpServers"].get("engram").is_some());
+
+    let mcp_1_cfg = read_json(&mcp_1);
+    assert!(
+        mcp_1_cfg.get("mcpServers").is_none() || mcp_1_cfg["mcpServers"].get("codegraph").is_none()
+    );
+    assert!(
+        mcp_1_cfg.get("mcpServers").is_none() || mcp_1_cfg["mcpServers"].get("engram").is_none()
+    );
+}

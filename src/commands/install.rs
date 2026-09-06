@@ -393,6 +393,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
         if let Some(cfg) = &custom_cfg {
             entry["custom"] = cfg.to_state_json();
+            if !ctx.dry_run {
+                let custom_cfg_path =
+                    crate::harness::custom::CustomHarnessConfig::config_path(&home_dir);
+                arm!(&custom_cfg_path);
+                cfg.save(&home_dir)?;
+            }
         }
         state.installed_harnesses.push(entry);
 

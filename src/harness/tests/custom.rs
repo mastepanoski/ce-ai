@@ -336,3 +336,32 @@ fn unregister_companions_removes_both_and_preserves_other_servers() {
     assert!(json["mcpServers"].get("engram").is_none());
     assert!(json["mcpServers"].get("user-tool").is_some());
 }
+
+#[test]
+fn save_and_load_from_home_round_trips_custom_config_including_mcp_file() {
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path();
+    let cfg = CustomHarnessConfig {
+        plugins_dir: home.join("plugins"),
+        skills_dir: home.join("skills"),
+        rules_file: Some(home.join("rules.md")),
+        mcp_file: Some(home.join("mcp.json")),
+    };
+
+    cfg.save(home).unwrap();
+
+    let loaded = CustomHarnessConfig::load_from_home(home)
+        .unwrap()
+        .expect("config should exist");
+    assert_eq!(loaded, cfg);
+
+    // Re-saving with updated mcp_file updates custom_harness.json cleanly
+    let mut cfg2 = cfg.clone();
+    cfg2.mcp_file = Some(home.join("mcp_updated.json"));
+    cfg2.save(home).unwrap();
+
+    let loaded2 = CustomHarnessConfig::load_from_home(home)
+        .unwrap()
+        .expect("config should exist");
+    assert_eq!(loaded2, cfg2);
+}
