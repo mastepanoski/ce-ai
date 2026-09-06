@@ -193,3 +193,12 @@ fn test_configure_rtk_hook_dry_run() {
     // In dry-run, no files or directories should be created
     assert!(!home.join(".claude").exists());
 }
+
+#[test]
+fn test_unconfigure_rtk_hook_dry_run() {
+    let temp = tempdir().unwrap();
+    let home = temp.path();
+
+    let res = unconfigure_rtk_hook(home, HarnessKind::Claude, true, true);
+    assert!(res.unwrap());
+}

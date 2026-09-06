@@ -114,6 +114,13 @@ pub fn configure_rtk_hook(
         return Ok(false);
     }
 
+    if dry_run {
+        if !quiet {
+            println!("[dry-run] would configure rtk hook for {harness}");
+        }
+        return Ok(true);
+    }
+
     if !is_rtk_available() {
         if !quiet {
             eprintln!(
@@ -121,13 +128,6 @@ pub fn configure_rtk_hook(
             );
         }
         return Ok(false);
-    }
-
-    if dry_run {
-        if !quiet {
-            println!("[dry-run] would configure rtk hook for {harness}");
-        }
-        return Ok(true);
     }
 
     let Some(args) = rtk_init_args(harness) else {
@@ -189,15 +189,15 @@ pub fn unconfigure_rtk_hook(
         return Ok(false);
     }
 
-    if !is_rtk_available() {
-        return Ok(false);
-    }
-
     if dry_run {
         if !quiet {
             println!("[dry-run] would unconfigure rtk hook for {harness}");
         }
         return Ok(true);
+    }
+
+    if !is_rtk_available() {
+        return Ok(false);
     }
 
     let Some(args) = rtk_uninstall_args(harness) else {
