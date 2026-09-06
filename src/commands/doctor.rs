@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 
 use crate::commands::Context;
 use crate::error::CeError;
+use crate::harness::HarnessKind;
 use crate::opencode::config::read_config;
 use crate::opencode::manifest::InstallManifest;
 use crate::opencode::plugins::MANAGED_DIR;
@@ -153,6 +154,50 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             }
             FreshnessStatus::Offline { current } => {
                 println!("doctor-info: {} v{} (offline)", name, current);
+            }
+        }
+    }
+
+    // RTK Hook Readiness & Limitation Disclosure Probe (#308)
+    let home_dir = crate::harness::home_dir_from_ctx(ctx);
+    let rtk_available = crate::harness::rtk::is_rtk_available();
+
+    if rtk_available {
+        println!(
+            "doctor-info: rtk output compression: active (note: rtk command filters may alter or swallow stdout on wrapped commands like 'gh issue view --comments'; opt out via --skip-rtk or CE_AI_SKIP_RTK=1 if needed)"
+        );
+        for h in &state.installed_harnesses {
+            if let Some(name) = h["name"].as_str() {
+                if let Ok(kind) = name.parse::<HarnessKind>() {
+                    if crate::harness::rtk::is_rtk_supported(kind)
+                        && !crate::harness::rtk::is_rtk_hook_configured(&home_dir, kind)
+                    {
+                        let msg = format!(
+                            "rtk-hook-missing: hook not configured for installed supported harness '{kind}' (run 'ce-ai install --harness {kind}' or 'rtk init -g')"
+                        );
+                        if args.strict {
+                            findings.push(msg);
+                        } else {
+                            println!("doctor-warn: {}", msg);
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        let has_supported_installed = state.installed_harnesses.iter().any(|h| {
+            h["name"]
+                .as_str()
+                .and_then(|n| n.parse::<HarnessKind>().ok())
+                .map(crate::harness::rtk::is_rtk_supported)
+                .unwrap_or(false)
+        });
+        if has_supported_installed {
+            let msg = "rtk-missing: companion tool 'rtk' not installed on PATH for supported harness(es) (suggested: 'ce-ai tools install rtk')".to_string();
+            if args.strict {
+                findings.push(msg);
+            } else {
+                println!("doctor-warn: {}", msg);
             }
         }
     }

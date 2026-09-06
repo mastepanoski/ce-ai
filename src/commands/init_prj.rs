@@ -130,6 +130,8 @@ pub fn run(
     target_path_opt: Option<PathBuf>,
     tier_str: &str,
     force: bool,
+    skip_rtk: bool,
+    skip_companions: bool,
 ) -> Result<(), CeError> {
     let raw_target = match target_path_opt {
         Some(p) => p,
@@ -273,6 +275,13 @@ pub fn run(
 
         init_codegraph_if_available(&target_dir, ctx.quiet);
 
+        // Auto-configure RTK hook injection for detected supported harnesses unless opted out
+        if !crate::harness::rtk::is_rtk_opted_out(skip_rtk, skip_companions) {
+            reconcile_rtk_hooks_if_supported(&target_dir, &state, ctx)?;
+        } else if !ctx.quiet {
+            println!("rtk: hook injection skipped (opted out)");
+        }
+
         state.save(&global_state_path)?;
     }
 
@@ -378,6 +387,55 @@ fn init_codegraph_if_available(target_dir: &Path, quiet: bool) {
             }
         }
     }
+}
+
+fn reconcile_rtk_hooks_if_supported(
+    target_dir: &Path,
+    state: &State,
+    ctx: &Context,
+) -> Result<(), CeError> {
+    use crate::harness::HarnessKind;
+    let home = crate::harness::home_dir_from_ctx(ctx);
+
+    let has_installed = |name: &str| {
+        state
+            .installed_harnesses
+            .iter()
+            .any(|h| h["name"].as_str() == Some(name))
+    };
+
+    if target_dir.join(".cursor").exists() || has_installed("cursor") {
+        crate::harness::rtk::configure_rtk_hook(
+            &home,
+            HarnessKind::Cursor,
+            ctx.dry_run,
+            ctx.quiet,
+        )?;
+    }
+    if target_dir.join(".claude").exists()
+        || target_dir.join("CLAUDE.md").exists()
+        || has_installed("claude")
+    {
+        crate::harness::rtk::configure_rtk_hook(
+            &home,
+            HarnessKind::Claude,
+            ctx.dry_run,
+            ctx.quiet,
+        )?;
+    }
+    if target_dir.join(".codex").exists() || has_installed("codex") {
+        crate::harness::rtk::configure_rtk_hook(&home, HarnessKind::Codex, ctx.dry_run, ctx.quiet)?;
+    }
+    if target_dir.join(".github").exists() || has_installed("copilot") {
+        crate::harness::rtk::configure_rtk_hook(
+            &home,
+            HarnessKind::Copilot,
+            ctx.dry_run,
+            ctx.quiet,
+        )?;
+    }
+
+    Ok(())
 }
 
 /// Reconciles harness project rules and hooks across all supported harnesses for an adopted project.

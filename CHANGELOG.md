@@ -5,6 +5,21 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.42.0] - 2026-09-06
+
+### Added
+- **Auto-configure RTK Hook Injection for Natively-Supported Harnesses (`#308`):**
+  - **Automated Hook Injection**: Automatically configures RTK CLI output reduction hooks during `ce-ai install` and `ce-ai init-prj` exclusively for harnesses officially supported by RTK (`Claude Code`, `Cursor`, `GitHub Copilot`, `Codex CLI`).
+  - **Explicit Documented No-Op for Unsupported Harnesses**: Harnesses not officially covered by RTK (`Opencode`, `Custom`, `Deepseek`, `Pi`, `Grok`, `Kimi`, `Agy`, `Fx`) are treated as explicit, non-fatal no-ops.
+  - **Missing Executable Resilience**: If the `rtk` binary is not present on `PATH`, `install` and `init-prj` emit a diagnostic guidance message and proceed cleanly without failure.
+  - **Granular and Blanket Opt-Out**: Introduced `--skip-rtk` and `--skip-companions` CLI flags for `ce-ai install` and `ce-ai init-prj`, alongside `CE_AI_SKIP_RTK=1` and `CE_AI_SKIP_COMPANIONS=1` environment variables to bypass hook injection in automated or CI/CD pipelines.
+  - **Symmetric Hook Uninstallation**: Added hook removal in `ce-ai uninstall` to ensure complete cleanup on supported harnesses.
+  - **Audit Severity Escalation**: Escalate `CliCompressionDetector` in `ce-ai audit` from `Info` to `Warn` for supported harnesses lacking RTK hooks, while maintaining `Info` for unsupported ones.
+  - **Doctor Diagnostics & Limitation Disclosure**: `ce-ai doctor` probes RTK hook presence for installed supported harnesses and documents the observed limitation where RTK command filters may alter or swallow stdout on wrapped commands (such as `gh issue view --comments`).
+
+### Fixed
+- **Hermetic Home Directory Resolution (`#308`)**: Replaced ad-hoc `std::env::var("HOME")` reads in `install`, `init-prj`, and `doctor` with `crate::harness::home_dir_from_ctx(ctx)` to prevent environment leakage to the host system and ensure in-process test isolation.
+
 ## [1.41.0] - 2026-09-05
 
 ### Added

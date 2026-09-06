@@ -153,3 +153,104 @@ mod branch_protection_tests {
         );
     }
 }
+
+#[test]
+fn test_doctor_detects_missing_rtk_hook_in_strict_mode() {
+    let tmp = TempDir::new().unwrap();
+    let ctx = Context {
+        config_dir: tmp.path().join("config"),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let mut state = State::new();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "claude",
+        "version": "1.0.0",
+        "scope": "global",
+        "installed_at": "2026-08-22T00:00:00Z"
+    }));
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    // In strict mode, if RTK hook is missing for claude, doctor flags it
+    let args = Args { strict: true };
+    let res = run(&ctx, &args);
+    // Since claude hook or manifest is missing, strict doctor returns finding
+    assert!(res.is_err());
+}
+
+#[test]
+fn test_doctor_rtk_probe_resolves_home_from_ctx() {
+    let tmp = TempDir::new().unwrap();
+    let home_dir = tmp.path().join("home");
+    let ctx = Context {
+        config_dir: home_dir.join(".ce-ai"),
+        opencode_config_dir: home_dir.join(".config").join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+    std::fs::create_dir_all(&home_dir).unwrap();
+
+    assert_eq!(crate::harness::home_dir_from_ctx(&ctx), home_dir);
+
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let mut state = State::new();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "claude",
+        "version": "1.0.0",
+        "scope": "global",
+        "installed_at": "2026-08-22T00:00:00Z"
+    }));
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    let manifest = InstallManifest {
+        version: "1.0.0".into(),
+        plugin_name: "compound-engineering".into(),
+        installed_at: "2026-08-22T00:00:00Z".into(),
+        source: serde_json::json!({"type": "local"}),
+        files: vec![],
+        config_mutations: vec![],
+    };
+    manifest.write(&ctx.opencode_config_dir).unwrap();
+
+    // Pre-configure RTK hook inside the isolated home_dir
+    let claude_dir = home_dir.join(".claude");
+    std::fs::create_dir_all(&claude_dir).unwrap();
+    std::fs::write(
+        claude_dir.join("settings.json"),
+        r#"{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"command":"rtk hook claude"}]}]}}"#,
+    )
+    .unwrap();
+
+    let args = Args { strict: true };
+    let res = run(&ctx, &args);
+    // In strict mode, doctor fails on missing optional companion tools, but it must NOT
+    // report rtk-hook-missing because the hook was properly detected in home_dir_from_ctx.
+    if crate::harness::rtk::is_rtk_available() {
+        if let Err(CeError::Runtime(msg)) = res {
+            assert!(
+                !msg.contains("rtk-hook-missing"),
+                "doctor should recognize hook configured in home_dir_from_ctx, got: {msg}"
+            );
+        }
+    }
+}

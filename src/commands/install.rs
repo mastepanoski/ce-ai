@@ -23,7 +23,7 @@ use crate::state::write_atomic;
 
 /// Source-tree dirs ce-ai manages; see `crate::source::cache::MANAGED_PREFIXES`.
 
-#[derive(clap::Args)]
+#[derive(clap::Args, Debug, Clone)]
 pub struct Args {
     /// Harness to install into (e.g. opencode, claude, or all).
     #[arg(long)]
@@ -48,6 +48,12 @@ pub struct Args {
     /// companion server registrations.
     #[arg(long)]
     pub mcp_file: Option<PathBuf>,
+    /// Skip auto-configuring RTK hook injection.
+    #[arg(long, default_value_t = false)]
+    pub skip_rtk: bool,
+    /// Skip configuring all companion tools (both MCP and hooks).
+    #[arg(long, default_value_t = false)]
+    pub skip_companions: bool,
 }
 
 use crate::harness::HarnessKind;
@@ -187,6 +193,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             for rel in managed.keys() {
                 println!("plan: copy {rel}");
             }
+            if !crate::harness::rtk::is_rtk_opted_out(args.skip_rtk, args.skip_companions)
+                && crate::harness::rtk::is_rtk_supported(*harness_kind)
+            {
+                println!("plan: configure rtk hook for {harness_kind}");
+            }
             println!("plan: write install-manifest.json");
             println!("plan: update state.json");
             continue;
@@ -296,7 +307,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
             if let Some(mcp) = &cfg.mcp_file {
                 arm!(mcp);
-                crate::harness::custom::register_companions(mcp)?;
+                if !args.skip_companions {
+                    crate::harness::custom::register_companions(mcp)?;
+                }
             }
 
             arm!(&cfg
@@ -317,7 +330,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             // (see harness::registration). Skills are never copied into
             // harness-owned directories — adoption (skills adopt) is the only
             // delivery path (token-neutrality, R4).
-            spec.register_companions(&target_config)?;
+            if !args.skip_companions {
+                spec.register_companions(&target_config)?;
+            }
             arm!(&config_dir.join(MANAGED_DIR).join("install-manifest.json"));
             InstallManifest {
                 version: version.to_string(),
@@ -338,7 +353,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 &skills_path(&config_dir).to_string_lossy(),
             )?;
             mutation.backup = backup.map(|p| p.display().to_string());
-            crate::opencode::config::register_companions(&target_config)?;
+            if !args.skip_companions {
+                crate::opencode::config::register_companions(&target_config)?;
+            }
 
             InstallManifest {
                 version: version.to_string(),
@@ -349,6 +366,14 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 config_mutations: vec![mutation],
             }
             .write(&config_dir)?;
+        }
+
+        // Auto-configure RTK hook injection for natively-supported harnesses
+        if !crate::harness::rtk::is_rtk_opted_out(args.skip_rtk, args.skip_companions) {
+            let home = crate::harness::home_dir_from_ctx(ctx);
+            crate::harness::rtk::configure_rtk_hook(&home, *harness_kind, ctx.dry_run, ctx.quiet)?;
+        } else if !ctx.quiet {
+            println!("rtk: hook injection skipped (opted out)");
         }
 
         // Ensure the structural `ce-ai` orchestrator agent exists.
