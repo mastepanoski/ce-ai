@@ -381,18 +381,52 @@ pub fn register_companions(mcp_file: &Path) -> Result<(), CeError> {
     Ok(())
 }
 
+/// Unregisters companion MCP servers (`codegraph`, `engram`) from the custom MCP file.
+pub fn unregister_companions(mcp_file: &Path) -> Result<(), CeError> {
+    unregister_custom_mcp_server(mcp_file, "codegraph")?;
+    unregister_custom_mcp_server(mcp_file, "engram")?;
+    Ok(())
+}
+
 /// Removes an MCP server definition from the custom harness's MCP file.
 pub fn unregister_custom_mcp_server(config_path: &Path, name: &str) -> Result<bool, CeError> {
     if !config_path.exists() {
         return Ok(false);
     }
     let content = std::fs::read_to_string(config_path)?;
-    let mut config: serde_json::Value = match serde_json::from_str(&content) {
-        Ok(v) => v,
-        Err(_) => return Ok(false),
-    };
+    if content.trim().is_empty() {
+        return Ok(false);
+    }
+    let mut config: serde_json::Value = serde_json::from_str(&content).map_err(|e| {
+        CeError::Runtime(format!(
+            "Failed to parse custom MCP config at {}: {e}",
+            config_path.display()
+        ))
+    })?;
+
+    if !config.is_object() {
+        return Err(CeError::Runtime(format!(
+            "Custom MCP config at {} must be a JSON object",
+            config_path.display()
+        )));
+    }
+
+    if let Some(mcp_val) = config.get("mcpServers") {
+        if !mcp_val.is_object() {
+            return Err(CeError::Runtime(format!(
+                "`mcpServers` in {} must be an object",
+                config_path.display()
+            )));
+        }
+    }
+
     if let Some(mcp_servers) = config.get_mut("mcpServers").and_then(|v| v.as_object_mut()) {
         if mcp_servers.remove(name).is_some() {
+            if mcp_servers.is_empty() {
+                if let Some(obj) = config.as_object_mut() {
+                    obj.remove("mcpServers");
+                }
+            }
             let bytes = serde_json::to_vec_pretty(&config).map_err(|e| {
                 CeError::Runtime(format!(
                     "Failed to serialize custom MCP config at {}: {e}",

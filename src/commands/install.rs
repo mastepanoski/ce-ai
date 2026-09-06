@@ -278,6 +278,22 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 });
             }
 
+            let prior_custom = state
+                .installed_harnesses
+                .iter()
+                .find(|h| h["name"].as_str() == Some("custom"))
+                .and_then(|h| {
+                    crate::harness::custom::CustomHarnessConfig::from_state_json(&h["custom"])
+                });
+            if let Some(prior_cfg) = &prior_custom {
+                if let Some(old_mcp) = &prior_cfg.mcp_file {
+                    if cfg.mcp_file.as_ref() != Some(old_mcp) {
+                        arm!(old_mcp);
+                        crate::harness::custom::unregister_companions(old_mcp)?;
+                    }
+                }
+            }
+
             if let Some(mcp) = &cfg.mcp_file {
                 arm!(mcp);
                 crate::harness::custom::register_companions(mcp)?;

@@ -174,8 +174,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 }
 
                 if let Some(mcp) = &cfg.mcp_file {
-                    let _ = crate::harness::custom::unregister_custom_mcp_server(mcp, "codegraph");
-                    let _ = crate::harness::custom::unregister_custom_mcp_server(mcp, "engram");
+                    crate::harness::custom::unregister_companions(mcp)?;
                 }
 
                 state

@@ -150,13 +150,13 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
                 {
                     if let Some(mcp) = &cfg.mcp_file {
                         let env = std::collections::BTreeMap::new();
-                        let _ = crate::harness::custom::register_custom_mcp_server(
+                        crate::harness::custom::register_custom_mcp_server(
                             mcp,
                             &tool_lower,
                             cmd,
                             args,
                             &env,
-                        );
+                        )?;
                     }
                 }
                 continue;

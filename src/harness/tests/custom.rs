@@ -290,3 +290,49 @@ fn register_and_unregister_custom_mcp_server() {
 
     assert!(!unregister_custom_mcp_server(&mcp_path, "codegraph").unwrap());
 }
+
+#[test]
+fn register_and_unregister_custom_mcp_server_fails_on_malformed_json() {
+    let tmp = TempDir::new().unwrap();
+    let mcp_path = tmp.path().join("corrupt.json");
+    std::fs::write(&mcp_path, "{ not valid json").unwrap();
+
+    let env = std::collections::BTreeMap::new();
+    let reg_err = register_custom_mcp_server(&mcp_path, "tool", "cmd", &[], &env).unwrap_err();
+    assert!(matches!(reg_err, CeError::Runtime(_)));
+
+    let unreg_err = unregister_custom_mcp_server(&mcp_path, "tool").unwrap_err();
+    assert!(matches!(unreg_err, CeError::Runtime(_)));
+}
+
+#[test]
+fn register_and_unregister_custom_mcp_server_fails_when_not_an_object() {
+    let tmp = TempDir::new().unwrap();
+    let mcp_path = tmp.path().join("not_obj.json");
+    std::fs::write(&mcp_path, "[1, 2, 3]").unwrap();
+
+    let env = std::collections::BTreeMap::new();
+    let reg_err = register_custom_mcp_server(&mcp_path, "tool", "cmd", &[], &env).unwrap_err();
+    assert!(matches!(reg_err, CeError::Runtime(_)));
+
+    let unreg_err = unregister_custom_mcp_server(&mcp_path, "tool").unwrap_err();
+    assert!(matches!(unreg_err, CeError::Runtime(_)));
+}
+
+#[test]
+fn unregister_companions_removes_both_and_preserves_other_servers() {
+    let tmp = TempDir::new().unwrap();
+    let mcp_path = tmp.path().join("mcp.json");
+
+    let env = std::collections::BTreeMap::new();
+    register_custom_mcp_server(&mcp_path, "user-tool", "cmd", &[], &env).unwrap();
+    register_companions(&mcp_path).unwrap();
+
+    unregister_companions(&mcp_path).unwrap();
+
+    let content = std::fs::read_to_string(&mcp_path).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert!(json["mcpServers"].get("codegraph").is_none());
+    assert!(json["mcpServers"].get("engram").is_none());
+    assert!(json["mcpServers"].get("user-tool").is_some());
+}
