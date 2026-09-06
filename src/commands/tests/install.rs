@@ -37,3 +37,38 @@ fn install_config_store_port_mutates_without_filesystem() {
     let cfg = store.read_config(path).unwrap();
     assert_eq!(cfg["plugin"], serde_json::json!(["/virtual/plugin.js"]));
 }
+
+#[test]
+fn install_args_parses_skip_rtk_and_skip_companions() {
+    use clap::Parser;
+
+    #[derive(Parser, Debug)]
+    struct Cli {
+        #[command(flatten)]
+        install: crate::commands::install::Args,
+    }
+
+    let default_args = Cli::try_parse_from(["ce-ai", "--harness", "claude"]).unwrap();
+    assert!(!default_args.install.skip_rtk);
+    assert!(!default_args.install.skip_companions);
+
+    let rtk_args = Cli::try_parse_from(["ce-ai", "--harness", "claude", "--skip-rtk"]).unwrap();
+    assert!(rtk_args.install.skip_rtk);
+    assert!(!rtk_args.install.skip_companions);
+
+    let companion_args =
+        Cli::try_parse_from(["ce-ai", "--harness", "claude", "--skip-companions"]).unwrap();
+    assert!(!companion_args.install.skip_rtk);
+    assert!(companion_args.install.skip_companions);
+
+    let both_args = Cli::try_parse_from([
+        "ce-ai",
+        "--harness",
+        "claude",
+        "--skip-rtk",
+        "--skip-companions",
+    ])
+    .unwrap();
+    assert!(both_args.install.skip_rtk);
+    assert!(both_args.install.skip_companions);
+}

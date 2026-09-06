@@ -238,6 +238,16 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             } else if target_config.is_file() {
                 std::fs::remove_file(&target_config)?;
             }
+
+            if crate::harness::rtk::is_rtk_supported(harness_kind) {
+                let _ = crate::harness::rtk::unconfigure_rtk_hook(
+                    &home_dir,
+                    harness_kind,
+                    ctx.dry_run,
+                    ctx.quiet,
+                );
+            }
+
             let managed_dir = config_dir.join(MANAGED_DIR);
             if managed_dir.exists() {
                 std::fs::remove_dir_all(&managed_dir)?;

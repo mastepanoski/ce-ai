@@ -58,6 +58,12 @@ pub enum Commands {
         /// Force overwrite of modified managed blocks
         #[arg(long)]
         force: bool,
+        /// Skip auto-configuring RTK hook injection.
+        #[arg(long, default_value_t = false)]
+        skip_rtk: bool,
+        /// Skip configuring all companion tools (both MCP and hooks).
+        #[arg(long, default_value_t = false)]
+        skip_companions: bool,
     },
     /// Remove managed Compound Engineering workflow blocks from a project repository cleanly.
     #[command(name = "deinit-prj")]
@@ -85,9 +91,13 @@ impl CeCommand for Commands {
             Commands::Usage(sub) => crate::commands::usage::run(ctx, sub),
             Commands::Workflow(args) => workflow::run(ctx, args),
             Commands::Audit(args) => audit::run(ctx, args),
-            Commands::InitPrj { path, tier, force } => {
-                init_prj::run(ctx, path.clone(), tier, *force)
-            }
+            Commands::InitPrj {
+                path,
+                tier,
+                force,
+                skip_rtk,
+                skip_companions,
+            } => init_prj::run(ctx, path.clone(), tier, *force, *skip_rtk, *skip_companions),
             Commands::DeinitPrj { path } => deinit_prj::run(ctx, path.clone()),
             Commands::Guard(args) => guard::run(ctx, args),
         }

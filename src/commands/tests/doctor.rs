@@ -153,3 +153,38 @@ mod branch_protection_tests {
         );
     }
 }
+
+#[test]
+fn test_doctor_detects_missing_rtk_hook_in_strict_mode() {
+    let tmp = TempDir::new().unwrap();
+    let ctx = Context {
+        config_dir: tmp.path().join("config"),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let mut state = State::new();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "claude",
+        "version": "1.0.0",
+        "scope": "global",
+        "installed_at": "2026-08-22T00:00:00Z"
+    }));
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    // In strict mode, if RTK hook is missing for claude, doctor flags it
+    let args = Args { strict: true };
+    let res = run(&ctx, &args);
+    // Since claude hook or manifest is missing, strict doctor returns finding
+    assert!(res.is_err());
+}

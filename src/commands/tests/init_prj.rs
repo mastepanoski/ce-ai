@@ -100,3 +100,26 @@ fn test_reconcile_project_harness_hooks_upgrades_stale_hooks() {
     assert!(pi_content.contains("agent_end"));
     assert!(pi_content.contains("session_before_compact"));
 }
+
+#[test]
+fn test_reconcile_rtk_hooks_if_supported_in_dry_run() {
+    let tmp = TempDir::new().unwrap();
+    let project_dir = tmp.path();
+
+    // Create .claude and .cursor in project
+    fs::create_dir_all(project_dir.join(".claude")).unwrap();
+    fs::create_dir_all(project_dir.join(".cursor")).unwrap();
+
+    let state = State::default();
+    let ctx = Context {
+        config_dir: tmp.path().join("config"),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        quiet: true,
+        dry_run: true,
+        verbose: false,
+    };
+
+    let res = reconcile_rtk_hooks_if_supported(project_dir, &state, &ctx);
+    assert!(res.is_ok());
+}

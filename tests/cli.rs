@@ -6759,3 +6759,185 @@ fn install_custom_sequential_racing_installs_last_write_wins_without_corruption(
         mcp_1_cfg.get("mcpServers").is_none() || mcp_1_cfg["mcpServers"].get("engram").is_none()
     );
 }
+
+#[test]
+fn test_install_supported_harness_rtk_hook_injection_or_dry_run() {
+    let temp = TempDir::new().unwrap();
+    let config_dir = temp.path().join("config");
+    let home = temp.path().join("home");
+    let source = ce_source(temp.path());
+
+    // Dry-run install of supported harness Claude outputs RTK plan
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "claude",
+            "--dry-run",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "plan: configure rtk hook for claude",
+        ));
+}
+
+#[test]
+fn test_install_opt_out_skip_rtk_flag() {
+    let temp = TempDir::new().unwrap();
+    let config_dir = temp.path().join("config");
+    let home = temp.path().join("home");
+    let source = ce_source(temp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "claude",
+            "--skip-rtk",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "rtk: hook injection skipped (opted out)",
+        ));
+
+    // Verify no RTK hook was injected into settings.json
+    let settings_path = home.join(".claude/settings.json");
+    if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path).unwrap();
+        assert!(!content.contains("rtk hook claude"));
+    }
+}
+
+#[test]
+fn test_install_opt_out_env_var() {
+    let temp = TempDir::new().unwrap();
+    let config_dir = temp.path().join("config");
+    let home = temp.path().join("home");
+    let source = ce_source(temp.path());
+
+    ceai(&config_dir, &home)
+        .env("CE_AI_SKIP_RTK", "1")
+        .args([
+            "install",
+            "--harness",
+            "claude",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "rtk: hook injection skipped (opted out)",
+        ));
+}
+
+#[test]
+fn test_install_opt_out_skip_companions_flag() {
+    let temp = TempDir::new().unwrap();
+    let config_dir = temp.path().join("config");
+    let home = temp.path().join("home");
+    let source = ce_source(temp.path());
+
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "claude",
+            "--skip-companions",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "rtk: hook injection skipped (opted out)",
+        ));
+}
+
+#[test]
+fn test_install_unsupported_harness_rtk_is_noop() {
+    let temp = TempDir::new().unwrap();
+    let config_dir = temp.path().join("config");
+    let home = temp.path().join("home");
+    let source = ce_source(temp.path());
+
+    // Installing opencode (unsupported by RTK) succeeds cleanly without error
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "opencode",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_init_prj_opt_out_skip_rtk() {
+    let temp = TempDir::new().unwrap();
+    let config_dir = temp.path().join("config");
+    let home = temp.path().join("home");
+    let prj = temp.path().join("project");
+    fs::create_dir_all(&prj).unwrap();
+
+    // Initialize git repo in project
+    let mut git_init = git_cmd();
+    git_init.args(["init", prj.to_str().unwrap()]);
+    assert!(git_init.status().unwrap().success());
+
+    ceai(&config_dir, &home)
+        .args([
+            "init-prj",
+            prj.to_str().unwrap(),
+            "--tier",
+            "minimal",
+            "--skip-rtk",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "rtk: hook injection skipped (opted out)",
+        ));
+}
+
+#[test]
+fn test_audit_escalates_supported_harness_without_rtk_hook() {
+    let temp = TempDir::new().unwrap();
+    let config_dir = temp.path().join("config");
+    let home = temp.path().join("home");
+
+    // Pre-populate state.json with Claude installed but no RTK hook configured
+    fs::create_dir_all(&config_dir).unwrap();
+    let claude_dir = home.join(".claude");
+    fs::create_dir_all(&claude_dir).unwrap();
+    fs::write(claude_dir.join("settings.json"), "{}").unwrap();
+    let state = serde_json::json!({
+        "version": 1,
+        "installed_harnesses": [
+            {
+                "name": "claude",
+                "version": "1.0.0",
+                "scope": "global",
+                "installed_at": "2026-09-06T00:00:00Z"
+            }
+        ]
+    });
+    fs::write(config_dir.join("state.json"), state.to_string()).unwrap();
+
+    ceai(&config_dir, &home)
+        .arg("audit")
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("WARN")
+                .and(predicate::str::contains("cli-compression/claude")),
+        );
+}

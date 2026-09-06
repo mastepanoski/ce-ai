@@ -12,6 +12,7 @@ pub mod grok;
 pub mod kimi;
 pub mod pi;
 pub mod registration;
+pub mod rtk;
 pub mod usage;
 
 pub use grok::{

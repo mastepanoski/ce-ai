@@ -244,19 +244,49 @@ impl Detector for DocsGroundingDetector {
 
 struct CliCompressionDetector;
 impl Detector for CliCompressionDetector {
-    fn detect(&self, _ctx: &AuditCtx, harnesses: &[HarnessKind]) -> Vec<AuditCheck> {
+    fn detect(&self, ctx: &AuditCtx, harnesses: &[HarnessKind]) -> Vec<AuditCheck> {
         let mut checks = Vec::new();
         let rtk_in_path = is_in_path("rtk");
 
         for h in harnesses {
             let id = format!("cli-compression/{h}");
-            if rtk_in_path {
+            let is_supported = crate::harness::rtk::is_rtk_supported(*h);
+            let hook_configured =
+                is_supported && crate::harness::rtk::is_rtk_hook_configured(&ctx.home_dir, *h);
+
+            if is_supported {
+                if rtk_in_path && hook_configured {
+                    checks.push(AuditCheck {
+                        id,
+                        category: "tokens".into(),
+                        status: AuditStatus::Pass,
+                        satisfied_by: Some("rtk".into()),
+                        detail: "CLI output compressor hook active".into(),
+                    });
+                } else if rtk_in_path {
+                    checks.push(AuditCheck {
+                        id,
+                        category: "tokens".into(),
+                        status: AuditStatus::Warn,
+                        satisfied_by: Some("rtk".into()),
+                        detail: format!("RTK binary present on PATH but hook not configured for supported harness '{h}' (re-run 'ce-ai install --harness {h}')"),
+                    });
+                } else {
+                    checks.push(AuditCheck {
+                        id,
+                        category: "tokens".into(),
+                        status: AuditStatus::Warn,
+                        satisfied_by: None,
+                        detail: format!("CLI compression pre-processor not installed for supported harness '{h}' (suggested: 'ce-ai tools install rtk')"),
+                    });
+                }
+            } else if rtk_in_path {
                 checks.push(AuditCheck {
                     id,
                     category: "tokens".into(),
-                    status: AuditStatus::Pass,
+                    status: AuditStatus::Info,
                     satisfied_by: Some("rtk".into()),
-                    detail: "CLI output compressor active".into(),
+                    detail: format!("RTK binary present on PATH, but hook injection is not supported for harness '{h}'"),
                 });
             } else {
                 checks.push(AuditCheck {
@@ -264,7 +294,9 @@ impl Detector for CliCompressionDetector {
                     category: "tokens".into(),
                     status: AuditStatus::Info,
                     satisfied_by: None,
-                    detail: "CLI compression pre-processor not installed (suggested: 'ce-ai tools install rtk')".into(),
+                    detail: format!(
+                        "RTK hook injection not officially supported for harness '{h}'"
+                    ),
                 });
             }
         }
