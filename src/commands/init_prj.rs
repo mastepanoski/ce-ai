@@ -395,10 +395,7 @@ fn reconcile_rtk_hooks_if_supported(
     ctx: &Context,
 ) -> Result<(), CeError> {
     use crate::harness::HarnessKind;
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| ctx.config_dir.clone());
+    let home = crate::harness::home_dir_from_ctx(ctx);
 
     let has_installed = |name: &str| {
         state

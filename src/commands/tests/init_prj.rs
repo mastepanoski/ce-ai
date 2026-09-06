@@ -123,3 +123,34 @@ fn test_reconcile_rtk_hooks_if_supported_in_dry_run() {
     let res = reconcile_rtk_hooks_if_supported(project_dir, &state, &ctx);
     assert!(res.is_ok());
 }
+
+#[test]
+fn test_reconcile_rtk_hooks_if_supported_resolves_home_from_ctx() {
+    let tmp = TempDir::new().unwrap();
+    let project_dir = tmp.path().join("project");
+    let home_dir = tmp.path().join("home");
+    fs::create_dir_all(&project_dir).unwrap();
+    fs::create_dir_all(&home_dir).unwrap();
+
+    // Create .claude in project so reconcile triggers for Claude
+    fs::create_dir_all(project_dir.join(".claude")).unwrap();
+
+    let state = State::default();
+    let ctx = Context {
+        config_dir: home_dir.join(".ce-ai"),
+        opencode_config_dir: home_dir.join(".config").join("opencode"),
+        workspace_root: None,
+        quiet: true,
+        dry_run: false,
+        verbose: false,
+    };
+
+    assert_eq!(crate::harness::home_dir_from_ctx(&ctx), home_dir);
+
+    let res = reconcile_rtk_hooks_if_supported(&project_dir, &state, &ctx);
+    assert!(res.is_ok());
+
+    if crate::harness::rtk::is_rtk_available() {
+        assert!(home_dir.join(".claude").exists());
+    }
+}

@@ -3,7 +3,6 @@
 //! Exits non-zero when any finding exists.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 use crate::commands::Context;
 use crate::error::CeError;
@@ -160,10 +159,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 
     // RTK Hook Readiness & Limitation Disclosure Probe (#308)
-    let home_dir = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| ctx.config_dir.clone());
+    let home_dir = crate::harness::home_dir_from_ctx(ctx);
     let rtk_available = crate::harness::rtk::is_rtk_available();
 
     if rtk_available {

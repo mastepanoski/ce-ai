@@ -370,10 +370,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
         // Auto-configure RTK hook injection for natively-supported harnesses
         if !crate::harness::rtk::is_rtk_opted_out(args.skip_rtk, args.skip_companions) {
-            let home = std::env::var("HOME")
-                .or_else(|_| std::env::var("USERPROFILE"))
-                .map(PathBuf::from)
-                .unwrap_or_else(|_| ctx.config_dir.clone());
+            let home = crate::harness::home_dir_from_ctx(ctx);
             crate::harness::rtk::configure_rtk_hook(&home, *harness_kind, ctx.dry_run, ctx.quiet)?;
         } else if !ctx.quiet {
             println!("rtk: hook injection skipped (opted out)");

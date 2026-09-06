@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Audit Severity Escalation**: Escalate `CliCompressionDetector` in `ce-ai audit` from `Info` to `Warn` for supported harnesses lacking RTK hooks, while maintaining `Info` for unsupported ones.
   - **Doctor Diagnostics & Limitation Disclosure**: `ce-ai doctor` probes RTK hook presence for installed supported harnesses and documents the observed limitation where RTK command filters may alter or swallow stdout on wrapped commands (such as `gh issue view --comments`).
 
+### Fixed
+- **Hermetic Home Directory Resolution (`#308`)**: Replaced ad-hoc `std::env::var("HOME")` reads in `install`, `init-prj`, and `doctor` with `crate::harness::home_dir_from_ctx(ctx)` to prevent environment leakage to the host system and ensure in-process test isolation.
+
 ## [1.41.0] - 2026-09-05
 
 ### Added
