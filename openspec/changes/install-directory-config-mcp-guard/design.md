@@ -1,22 +1,11 @@
-//! Exhaustive per-harness registration specification shared by `install`
-//! and `sync` (Strategy-via-data): a single table whose match lists every
-//! [`HarnessKind`] variant, so adding one is a compile error until it is
-//! classified — the forgotten-arm fictional-write bug class becomes
-//! structurally impossible on this surface.
+# Design: Companion MCP Registration Directory Guard & Contextual Error Wrapping
 
-use std::collections::BTreeMap;
-use std::path::Path;
+## Component Architecture
 
-use crate::error::CeError;
-use crate::harness::HarnessKind;
+### 1. `RegistrationSpec` Struct Update (`src/harness/registration.rs`)
+Add `kind: HarnessKind` field to `RegistrationSpec`:
 
-/// Vendor MCP registrar signature shared by every native adapter.
-pub(crate) type McpRegistrar =
-    fn(&Path, &str, &str, &[&str], &BTreeMap<String, String>) -> Result<(), CeError>;
-
-/// Strategy-table entry describing how a kind registers Compound Engineering.
-/// Skills-root conventions live in `sync_skills_root` (commands::sync) —
-/// adoption and verification derive roots from it, not from this table.
+```rust
 #[derive(Clone, Copy)]
 pub(crate) struct RegistrationSpec {
     /// The harness kind for this registration spec.
@@ -24,10 +13,13 @@ pub(crate) struct RegistrationSpec {
     /// Vendor registrar; `None` for No-MCP harnesses such as pi.
     pub(crate) register_mcp: Option<McpRegistrar>,
 }
+```
 
+### 2. Guard & Error Wrapping in `register_companions`
+Implement the directory check and I/O error wrapping in `RegistrationSpec::register_companions`:
+
+```rust
 impl RegistrationSpec {
-    /// Registers the companion MCP servers (`codegraph`, `engram`) when the
-    /// vendor supports MCP definitions; silent no-op otherwise.
     pub(crate) fn register_companions(&self, target_config: &Path) -> Result<(), CeError> {
         let Some(register) = self.register_mcp else {
             return Ok(());
@@ -56,18 +48,18 @@ impl RegistrationSpec {
         Ok(())
     }
 }
+```
 
-/// Exhaustive re-registration table. Dedicated call-site arms remain for
-/// `Custom` (state-snapshot-driven layout), `Opencode` (plugin/skills JSON
-/// writer) and `Deepseek` (de-scoped).
+### 3. Strategy Table Instantiation (`registration_spec`)
+Update `registration_spec(kind: HarnessKind)` to initialize `kind`:
+
+```rust
 pub(crate) fn registration_spec(kind: HarnessKind) -> Option<RegistrationSpec> {
     let native = |reg: McpRegistrar| RegistrationSpec {
         kind,
         register_mcp: Some(reg),
     };
     Some(match kind {
-        // Cursor reads MCP servers only — it has no skills-tree consumer,
-        // so nothing is copied into its directory.
         HarnessKind::Cursor => RegistrationSpec {
             kind,
             register_mcp: Some(crate::harness::cursor::register_cursor_mcp_server),
@@ -79,22 +71,17 @@ pub(crate) fn registration_spec(kind: HarnessKind) -> Option<RegistrationSpec> {
         HarnessKind::Kimi => native(crate::harness::kimi::register_kimi_mcp_server),
         HarnessKind::Agy => native(crate::harness::agy::register_agy_mcp_server),
         HarnessKind::Fx => native(crate::harness::fx::register_fx_mcp_server),
-        // Pi is No-MCP by design (Objective 8): skills tree only (~/.pi/agent/skills/).
-        // Companion integration (codegraph, engram) is fulfilled via CLI binaries
-        // available on PATH; Pi exposes no JSON/YAML configuration file for MCP registration.
         HarnessKind::Pi => RegistrationSpec {
             kind,
             register_mcp: None,
         },
-        // Custom has a snapshot-driven layout and optional `--mcp-file` (handled via dedicated arm
-        // in install/sync/uninstall).
-        // Opencode uses its dedicated config writer (`crate::opencode::config::register_companions`).
-        // Deepseek is de-scoped during developer preview: `dsh` uses YAML patch layers under
-        // `~/.dsh` and `install --harness deepseek` returns CeError::Usage.
         HarnessKind::Custom | HarnessKind::Opencode | HarnessKind::Deepseek => return None,
     })
 }
+```
 
-#[cfg(test)]
-#[path = "tests/registration.rs"]
-mod tests;
+### 4. Diagnostic Warning Format
+The warning string format is:
+`warn: skipping companion MCP registration for <harness>: '<path>' exists but is not a regular config file (expected a JSON/TOML file)`
+Output destination: `stderr` (`eprintln!`).
+Exit code: 0 (non-fatal; continues loop).

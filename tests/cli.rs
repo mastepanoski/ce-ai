@@ -7124,3 +7124,66 @@ fn workflow_resume_and_status_detect_tasks_desync_and_doctor_warns() {
                 .and(predicates::str::contains("progress: 0/2")),
         );
 }
+
+#[test]
+fn install_harness_all_survives_directory_config_path_and_warns() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source_top_level_skills(tmp.path());
+
+    // 1. Setup Opencode so it is detected as installed on host
+    fs::create_dir_all(home.join(".config").join("opencode")).unwrap();
+    fs::write(
+        home.join(".config").join("opencode").join("opencode.json"),
+        "{}",
+    )
+    .unwrap();
+
+    // 2. Setup Claude with .claude.json as an existing DIRECTORY (simulating #314)
+    let claude_config_dir = home.join(".claude.json");
+    fs::create_dir_all(&claude_config_dir).unwrap();
+
+    // 3. Run ce-ai install --harness all
+    ceai(&config_dir, &home)
+        .args([
+            "install",
+            "--harness",
+            "all",
+            "--source",
+            source.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "installed compound-engineering for opencode",
+        ))
+        .stdout(predicates::str::contains(
+            "installed compound-engineering for claude",
+        ))
+        .stderr(predicates::str::contains(
+            "warn: skipping companion MCP registration for claude:",
+        ))
+        .stderr(predicates::str::contains(
+            claude_config_dir.to_str().unwrap(),
+        ));
+
+    // 4. Verify state.json was written and records both harnesses (no mid-loop abort)
+    let state_file = config_dir.join("state.json");
+    assert!(
+        state_file.exists(),
+        "state.json must exist after successful multi-harness install"
+    );
+    let state_content = fs::read_to_string(&state_file).unwrap();
+    assert!(state_content.contains("opencode"));
+    assert!(state_content.contains("claude"));
+
+    // 5. Verify install manifest was written for claude as well
+    let claude_manifest = home
+        .join(".claude")
+        .join("compound-engineering")
+        .join("install-manifest.json");
+    assert!(
+        claude_manifest.exists(),
+        "claude install manifest must exist"
+    );
+}
