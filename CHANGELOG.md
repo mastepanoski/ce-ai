@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.44.1] - 2026-09-07
+
+### Fixed
+- **Companion MCP Registration Directory Guard & Contextual Error Wrapping (`#314`):**
+  - **Directory Path Guard in `register_companions`**: Added check in `RegistrationSpec::register_companions` (`src/harness/registration.rs`) to detect when a target config path is an existing directory (`exists() && !is_file()`), emitting a descriptive warning (`warn: skipping companion MCP registration for <harness>: '<path>' exists but is not a regular config file`) and returning `Ok(())` instead of attempting file read and aborting with `Is a directory (os error 21)`.
+  - **Contextual I/O Error Wrapping**: Wrapped unexpected `CeError::Io` failures occurring during MCP vendor registration with harness kind and target config path context, ensuring actionable diagnostic error output.
+  - **Multi-Harness Install Loop Resilience**: Prevented directory config paths in individual harnesses from aborting `ce-ai install --harness all` or `ce-ai sync` mid-loop, ensuring all remaining harnesses install cleanly and `state.json` / transaction journal commit successfully without rollback.
+
 ## [1.44.0] - 2026-09-07
 
 ### Added

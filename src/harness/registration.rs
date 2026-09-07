@@ -19,6 +19,8 @@ pub(crate) type McpRegistrar =
 /// adoption and verification derive roots from it, not from this table.
 #[derive(Clone, Copy)]
 pub(crate) struct RegistrationSpec {
+    /// The harness kind for this registration spec.
+    pub(crate) kind: HarnessKind,
     /// Vendor registrar; `None` for No-MCP harnesses such as pi.
     pub(crate) register_mcp: Option<McpRegistrar>,
 }
@@ -30,9 +32,27 @@ impl RegistrationSpec {
         let Some(register) = self.register_mcp else {
             return Ok(());
         };
+
+        if target_config.exists() && !target_config.is_file() {
+            eprintln!(
+                "warn: skipping companion MCP registration for {}: '{}' exists but is not a regular config file (expected a JSON/TOML file)",
+                self.kind,
+                target_config.display()
+            );
+            return Ok(());
+        }
+
         let env = BTreeMap::new();
-        register(target_config, "codegraph", "codegraph", &["mcp"], &env)?;
-        register(target_config, "engram", "engram", &["serve"], &env)?;
+        let wrap_io = |err: CeError| match err {
+            CeError::Io(e) => {
+                let msg = format!("{}: '{}': {e}", self.kind, target_config.display());
+                CeError::Io(std::io::Error::new(e.kind(), msg))
+            }
+            other => other,
+        };
+
+        register(target_config, "codegraph", "codegraph", &["mcp"], &env).map_err(wrap_io)?;
+        register(target_config, "engram", "engram", &["serve"], &env).map_err(wrap_io)?;
         Ok(())
     }
 }
@@ -42,12 +62,14 @@ impl RegistrationSpec {
 /// writer) and `Deepseek` (de-scoped).
 pub(crate) fn registration_spec(kind: HarnessKind) -> Option<RegistrationSpec> {
     let native = |reg: McpRegistrar| RegistrationSpec {
+        kind,
         register_mcp: Some(reg),
     };
     Some(match kind {
         // Cursor reads MCP servers only — it has no skills-tree consumer,
         // so nothing is copied into its directory.
         HarnessKind::Cursor => RegistrationSpec {
+            kind,
             register_mcp: Some(crate::harness::cursor::register_cursor_mcp_server),
         },
         HarnessKind::Claude => native(crate::harness::claude::register_claude_mcp_server),
@@ -60,7 +82,10 @@ pub(crate) fn registration_spec(kind: HarnessKind) -> Option<RegistrationSpec> {
         // Pi is No-MCP by design (Objective 8): skills tree only (~/.pi/agent/skills/).
         // Companion integration (codegraph, engram) is fulfilled via CLI binaries
         // available on PATH; Pi exposes no JSON/YAML configuration file for MCP registration.
-        HarnessKind::Pi => RegistrationSpec { register_mcp: None },
+        HarnessKind::Pi => RegistrationSpec {
+            kind,
+            register_mcp: None,
+        },
         // Custom has a snapshot-driven layout and optional `--mcp-file` (handled via dedicated arm
         // in install/sync/uninstall).
         // Opencode uses its dedicated config writer (`crate::opencode::config::register_companions`).
