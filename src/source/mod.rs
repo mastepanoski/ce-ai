@@ -2,6 +2,7 @@
 //! Wired into CLI commands in later PRs; until then items are exercised by unit tests.
 
 pub mod archive;
+pub mod builtin_skills;
 pub mod cache;
 pub mod registry;
 pub mod release;

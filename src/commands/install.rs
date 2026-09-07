@@ -175,6 +175,14 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 for rel in managed.keys() {
                     println!("plan: copy {rel}");
                 }
+                if !managed
+                    .contains_key(crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH)
+                {
+                    println!(
+                        "plan: copy {}",
+                        crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH
+                    );
+                }
                 if let Some(rules) = &cfg.rules_file {
                     println!("plan: ensure managed CE block in {}", rules.display());
                 }
@@ -192,6 +200,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             );
             for rel in managed.keys() {
                 println!("plan: copy {rel}");
+            }
+            if !managed.contains_key(crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH) {
+                println!(
+                    "plan: copy {}",
+                    crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH
+                );
             }
             if !crate::harness::rtk::is_rtk_opted_out(args.skip_rtk, args.skip_companions)
                 && crate::harness::rtk::is_rtk_supported(*harness_kind)
@@ -237,6 +251,20 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                     sha256: hash.clone(),
                 });
             }
+            if !managed.contains_key(crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH) {
+                let dest = crate::source::builtin_skills::custom_builtin_skill_target(
+                    &cfg.skills_dir,
+                    crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH,
+                );
+                arm!(&dest);
+                let mf = crate::source::builtin_skills::seed_custom_builtin_skill(
+                    &cfg.skills_dir,
+                    crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH,
+                    crate::source::builtin_skills::BUILTIN_SEQUENTIAL_THINKING_SKILL,
+                    ctx.dry_run,
+                )?;
+                files.push(mf);
+            }
         } else {
             arm!(&plugin_entry(&config_dir));
             files.push(install_loader(&source_path, &config_dir)?);
@@ -253,6 +281,20 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                     path: rel.clone(),
                     sha256: hash.clone(),
                 });
+            }
+            if !managed.contains_key(crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH) {
+                let dest = crate::source::builtin_skills::builtin_skill_target(
+                    &managed_dir,
+                    crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH,
+                );
+                arm!(&dest);
+                let mf = crate::source::builtin_skills::seed_builtin_skill(
+                    &managed_dir,
+                    crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH,
+                    crate::source::builtin_skills::BUILTIN_SEQUENTIAL_THINKING_SKILL,
+                    ctx.dry_run,
+                )?;
+                files.push(mf);
             }
         }
 
@@ -442,6 +484,19 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 
     if !ctx.dry_run {
+        let global_skills = ctx.config_dir.join("skills");
+        if !global_skills
+            .join("sequential-thinking")
+            .join("SKILL.md")
+            .exists()
+        {
+            let _ = crate::source::builtin_skills::seed_custom_builtin_skill(
+                &global_skills,
+                crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH,
+                crate::source::builtin_skills::BUILTIN_SEQUENTIAL_THINKING_SKILL,
+                false,
+            );
+        }
         state.save(&state_path)?;
         if let Some(j) = journal.take() {
             j.complete()?;

@@ -181,7 +181,7 @@ fn sync_with_host_detected_native_harnesses_reports_registered_and_succeeds() {
         .assert()
         .success()
         .stdout(predicates::str::contains(
-            "✓ opencode: verified — 2/2 managed files match SHA256",
+            "✓ opencode: verified — 3/3 managed files match SHA256",
         ))
         .stdout(predicates::str::contains(
             "○ claude: registered — ce-ai manages no skill files here (MCP companions only; nothing to hash-verify)",
@@ -454,7 +454,8 @@ fn install_fresh_install_creates_backup_entry_loader_skills_and_manifest() {
         paths,
         vec![
             "plugins/compound-engineering.js",
-            "skills/ce-brainstorm/SKILL.md"
+            "skills/ce-brainstorm/SKILL.md",
+            "skills/sequential-thinking/SKILL.md"
         ]
     );
     assert!(manifest["config_mutations"][0]["backup"].as_str().is_some());
@@ -740,7 +741,8 @@ fn sync_restores_deleted_managed_file_and_updates_manifest() {
         files,
         vec![
             "plugins/compound-engineering.js",
-            "skills/ce-brainstorm/SKILL.md"
+            "skills/ce-brainstorm/SKILL.md",
+            "skills/sequential-thinking/SKILL.md"
         ]
     );
     for file in manifest["files"].as_array().unwrap() {
@@ -2587,6 +2589,67 @@ fn skills_resolve_accepts_positional_query_and_validates_missing() {
 }
 
 #[test]
+fn skills_resolve_sequential_thinking_parity_and_doctor_configured() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // 1. Verify sequential-thinking was seeded to disk during install
+    let global_skill = config_dir.join("skills/sequential-thinking/SKILL.md");
+    let opencode_skill =
+        home.join(".config/opencode/compound-engineering/skills/sequential-thinking/SKILL.md");
+    assert!(global_skill.exists() || opencode_skill.exists());
+
+    // 2. Resolve for OpenCode: status=paths-injected and valid file URI
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .args(["skills", "resolve", "sequential-thinking"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("status=paths-injected"))
+        .stdout(predicate::str::contains("- **sequential-thinking**:"))
+        .stdout(predicate::str::contains("Path: `file://"));
+
+    // 3. Resolve with --json for OpenCode
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .args(["skills", "resolve", "sequential-thinking", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"resolution_status\": \"paths-injected\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"name\": \"sequential-thinking\"",
+        ));
+
+    // 4. Universal parity: resolve for Pi harness without MCP requirement
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .args([
+            "skills",
+            "resolve",
+            "--harness",
+            "pi",
+            "sequential-thinking",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("status=paths-injected"))
+        .stdout(predicate::str::contains("- **sequential-thinking**:"))
+        .stdout(predicate::str::contains("Path: `file://"));
+
+    // 5. Doctor diagnostics: sequential-thinking must be reported as configured
+    ceai(&config_dir, &home)
+        .current_dir(tmp.path())
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("skill-suggestion: sequential-thinking").not());
+}
+
+#[test]
 fn audit_subcommand_runs_advisory_and_json_mode() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
@@ -4047,7 +4110,7 @@ fn install_custom_with_flags_copies_layout_manifest_state_and_rules_block() {
     // Manifest with per-file SHA256 under the managed dir.
     let manifest = read_json(&custom_manifest_path(&plugins));
     let files = manifest["files"].as_array().unwrap();
-    assert_eq!(files.len(), 2);
+    assert_eq!(files.len(), 3);
     let loader = files
         .iter()
         .find(|f| f["path"] == "plugins/compound-engineering.js")
@@ -4056,6 +4119,11 @@ fn install_custom_with_flags_copies_layout_manifest_state_and_rules_block() {
         loader["sha256"],
         sha256_hex(b"export default function ceLoader() {}\n")
     );
+    let seq = files
+        .iter()
+        .find(|f| f["path"] == "skills/sequential-thinking/SKILL.md")
+        .unwrap();
+    assert!(!seq["sha256"].as_str().unwrap().is_empty());
     assert_eq!(
         manifest["config_mutations"][0]["file"],
         rules.display().to_string()
@@ -5548,7 +5616,7 @@ fn sync_standalone_custom_harness_without_opencode_succeeds() {
         .assert()
         .success()
         .stdout(predicates::str::contains(
-            "✓ custom: verified — 2/2 managed files match SHA256",
+            "✓ custom: verified — 3/3 managed files match SHA256",
         ))
         .stdout(predicates::str::contains("0 failed"))
         .stdout(predicates::str::contains("opencode").not());

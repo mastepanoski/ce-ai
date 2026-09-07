@@ -137,3 +137,88 @@ fn test_registry_atomic_save_and_load() {
     assert_eq!(loaded.skills.len(), 1);
     assert_eq!(loaded.skills[0].name, "test-skill");
 }
+
+#[test]
+fn test_sequential_thinking_frontmatter_parsing_and_compatibility() {
+    use crate::source::builtin_skills::BUILTIN_SEQUENTIAL_THINKING_SKILL;
+
+    let fm = parse_skill_frontmatter(BUILTIN_SEQUENTIAL_THINKING_SKILL);
+    assert_eq!(fm.name, "sequential-thinking");
+    assert_eq!(fm.scope, "global");
+    assert!(!fm.description.is_empty());
+    assert!(fm.triggers.contains(&"complex reasoning".to_string()));
+    assert!(fm.triggers.contains(&"sequential thought".to_string()));
+    assert!(fm.triggers.contains(&"hypothesis testing".to_string()));
+}
+
+#[test]
+fn test_sequential_thinking_indexing_resolution_and_degradation() {
+    use crate::source::builtin_skills::BUILTIN_SEQUENTIAL_THINKING_SKILL;
+
+    let temp = tempfile::tempdir().unwrap();
+    let ce_ai_dir = temp.path().join(".ce-ai");
+    let skills_dir = ce_ai_dir.join("skills");
+    let seq_dir = skills_dir.join("sequential-thinking");
+    fs::create_dir_all(&seq_dir).unwrap();
+
+    let skill_path = seq_dir.join("SKILL.md");
+    fs::write(&skill_path, BUILTIN_SEQUENTIAL_THINKING_SKILL).unwrap();
+
+    let ctx = Context {
+        config_dir: ce_ai_dir.clone(),
+        opencode_config_dir: temp.path().join(".config/opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let registry = SkillRegistry::build(&ctx).unwrap();
+    let entry = registry
+        .skills
+        .iter()
+        .find(|s| s.name == "sequential-thinking")
+        .expect("sequential-thinking must be indexed in registry");
+
+    assert_eq!(
+        entry.sha256,
+        compute_file_sha256(&skill_path).unwrap(),
+        "indexed sha256 must match file sha256"
+    );
+    assert!(
+        entry.harness_paths.contains_key("pi"),
+        "entry must map to pi harness"
+    );
+    assert!(
+        entry.harness_paths.contains_key("opencode"),
+        "entry must map to opencode harness"
+    );
+
+    // Initial resolution with valid SHA256
+    let (status, matched, md) = registry.resolve(HarnessKind::Pi, "sequential-thinking");
+    assert_eq!(status, "paths-injected");
+    assert_eq!(matched.len(), 1);
+    assert_eq!(matched[0].name, "sequential-thinking");
+    assert!(md.contains("status=paths-injected"));
+    let canonical_skill_path = skill_path.canonicalize().unwrap();
+    assert!(md.contains(&format!("Path: `file://{}", canonical_skill_path.display())));
+
+    // Check is_skill_configured auto-detection
+    assert!(
+        !crate::source::tools_registry::is_skill_configured(&ctx, "sequential-thinking"),
+        "before saving registry, is_skill_configured must be false"
+    );
+    registry
+        .save(&ce_ai_dir.join("skills-registry.json"))
+        .unwrap();
+    assert!(
+        crate::source::tools_registry::is_skill_configured(&ctx, "sequential-thinking"),
+        "after saving registry, is_skill_configured must be true"
+    );
+
+    // Tamper with file to verify degradation
+    fs::write(&skill_path, "tampered content without frontmatter").unwrap();
+    let (deg_status, _, deg_md) = registry.resolve(HarnessKind::Pi, "sequential-thinking");
+    assert_eq!(deg_status, "fallback-fuzzy");
+    assert!(deg_md.contains("status=fallback-fuzzy"));
+}

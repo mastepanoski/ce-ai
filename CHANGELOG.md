@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.43.0] - 2026-09-06
+
+### Added
+- **Canonical Sequential-Thinking Skill Integration & Zero-Daemon Cognitive Invariant (`#309`):**
+  - **Authored Canonical Skill Protocol**: Authored production-grade `skills/sequential-thinking/SKILL.md` establishing a structured in-context reasoning protocol covering step progression, hypothesis testing, dynamic revision, falsification criteria, and synthesis.
+  - **Dual-Compatible Frontmatter**: Implemented unified YAML frontmatter satisfying `ce-ai`'s `SkillRegistry` (`name`, `description`, `scope`, `triggers`) while seamlessly supporting slash-command conventions (`argument-hint`).
+  - **Compile-Time Embedded Fallback Asset (`src/source/builtin_skills.rs`)**: Embedded canonical skill content via `include_str!` and provided atomic seeding helpers (`seed_builtin_skill`, `seed_custom_builtin_skill`).
+  - **Lifecycle Seeding in Install & Sync (`src/commands/install.rs`, `src/commands/sync.rs`)**: Added automated fallback seeding into managed directories and global managed tier (`~/.ce-ai/skills/`) when absent from source trees or upstream tarballs, strictly respecting `--dry-run` safety invariants (SU-4).
+  - **Auto-Configured Doctor Diagnostics**: Once indexed, `is_skill_configured("sequential-thinking")` automatically returns `true`, satisfying diagnostic health probes and eliminating unconfigured warnings across `ce-ai doctor` and `ce-ai tools status`.
+  - **Universal Harness Parity & Zero-Daemon Execution**: Verified that `sequential-thinking` resolves identically across all 12 supported harnesses—including Pi (No-MCP)—with zero external processes or Node.js runtime dependencies.
+
 ## [1.42.0] - 2026-09-06
 
 ### Added
