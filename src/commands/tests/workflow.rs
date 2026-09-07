@@ -338,3 +338,110 @@ fn test_maybe_auto_checkpoint_respects_opt_out_and_monotonic_guard() {
     assert_eq!(current.stage, WorkflowStage::WorkTdd);
     assert_eq!(current.source, WorkflowSource::Manual);
 }
+
+#[test]
+fn test_extract_paths_from_task_text() {
+    let text1 = "1. Author canonical skills/sequential-thinking/SKILL.md in repository root";
+    let paths1 = extract_paths_from_task_text(text1);
+    assert_eq!(paths1, vec!["skills/sequential-thinking/SKILL.md"]);
+
+    let text2 = "2. Create `src/source/builtin_skills.rs` and update `tests/cli.rs`";
+    let paths2 = extract_paths_from_task_text(text2);
+    assert!(paths2.contains(&"src/source/builtin_skills.rs".to_string()));
+    assert!(paths2.contains(&"tests/cli.rs".to_string()));
+
+    let text3 = "Wire fallback seeding into `src/commands/install.rs` and `src/commands/sync.rs`";
+    let paths3 = extract_paths_from_task_text(text3);
+    assert!(paths3.contains(&"src/commands/install.rs".to_string()));
+    assert!(paths3.contains(&"src/commands/sync.rs".to_string()));
+
+    let text4 = "Setup database migration and configure redis cache";
+    let paths4 = extract_paths_from_task_text(text4);
+    assert!(paths4.is_empty());
+}
+
+#[test]
+fn test_reconcile_tasks_with_git_exact_and_prefix_matches() {
+    let tmp = TempDir::new().unwrap();
+    let tasks_path = tmp.path().join("tasks.md");
+    let content = "\
+# Tasks
+- [ ] 1. Implement feature in `src/commands/foo.rs`
+- [ ] 2. Update `tests/cli.rs`
+- [x] 3. Documentation in `docs/`
+";
+    std::fs::write(&tasks_path, content).unwrap();
+
+    let touched = vec!["src/commands/foo.rs".to_string(), "Cargo.toml".to_string()];
+
+    let report = reconcile_tasks_with_git(tmp.path(), "my-feat", &tasks_path, &touched).unwrap();
+    assert!(report.has_desync());
+    assert_eq!(report.completed_tasks, 1);
+    assert_eq!(report.total_tasks, 3);
+    assert_eq!(report.desynced_tasks.len(), 1);
+    assert_eq!(report.desynced_tasks[0].task_index, 1);
+    assert_eq!(
+        report.desynced_tasks[0].matched_files,
+        vec!["src/commands/foo.rs"]
+    );
+
+    let warn = report.warning_line();
+    assert!(warn.contains("Tasks desync detected"));
+    assert!(warn.contains("1 unchecked task(s) reference modified files"));
+    assert!(warn.contains("1/3 completed"));
+}
+
+#[test]
+fn test_reconcile_tasks_with_git_aggregate_fallback() {
+    let tmp = TempDir::new().unwrap();
+    let tasks_path = tmp.path().join("tasks.md");
+    let content = "\
+# Tasks
+- [ ] 1. Do preliminary setup
+- [ ] 2. Perform backend work
+";
+    std::fs::write(&tasks_path, content).unwrap();
+
+    let touched = vec!["src/main.rs".to_string()];
+
+    let report = reconcile_tasks_with_git(tmp.path(), "my-feat", &tasks_path, &touched).unwrap();
+    assert!(report.has_desync());
+    assert!(report.is_aggregate_desync);
+    assert_eq!(report.completed_tasks, 0);
+    assert_eq!(report.total_tasks, 2);
+
+    let warn = report.warning_line();
+    assert!(warn.contains("Tasks desync detected"));
+    assert!(warn.contains("0/2 completed"));
+}
+
+#[test]
+fn test_reconcile_tasks_with_git_all_completed_no_desync() {
+    let tmp = TempDir::new().unwrap();
+    let tasks_path = tmp.path().join("tasks.md");
+    let content = "\
+# Tasks
+- [x] 1. Implement feature in `src/commands/foo.rs`
+- [X] 2. Update `tests/cli.rs`
+";
+    std::fs::write(&tasks_path, content).unwrap();
+
+    let touched = vec!["src/commands/foo.rs".to_string()];
+    let report = reconcile_tasks_with_git(tmp.path(), "my-feat", &tasks_path, &touched);
+    assert!(report.is_none());
+}
+
+#[test]
+fn test_reconcile_tasks_with_git_graceful_degradation_r7() {
+    let tmp = TempDir::new().unwrap();
+    let non_existent = tmp.path().join("does_not_exist.md");
+    let touched = vec!["src/commands/foo.rs".to_string()];
+
+    // Non-existent tasks.md -> gracefully returns None
+    assert!(reconcile_tasks_with_git(tmp.path(), "my-feat", &non_existent, &touched).is_none());
+
+    // Empty touched files (e.g. git failure / non-git workspace) -> gracefully returns None
+    let real_tasks = tmp.path().join("tasks.md");
+    std::fs::write(&real_tasks, "- [ ] 1. Task in `src/foo.rs`").unwrap();
+    assert!(reconcile_tasks_with_git(tmp.path(), "my-feat", &real_tasks, &[]).is_none());
+}

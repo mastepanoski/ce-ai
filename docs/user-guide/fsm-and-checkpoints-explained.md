@@ -289,6 +289,7 @@ These hooks execute at turn boundaries and before context compaction, evaluating
 - **Monotonic Progression**: Automated checkpoints only advance forward (`source: "inferred"`).
 - **Adoption Opt-In**: Repositories must be adopted via `ce-ai init-prj` for hooks and automated checkpointing to activate.
 - **Configurable Opt-Out**: Users can disable automated checkpointing by setting `"auto_checkpoint": false` in `state.json`.
+- **Tasks Checkbox Desync Guard**: When modified working tree files or branch commits are detected while `tasks.md` has unchecked items, automated checkpoint advancement past Stage 4 is inhibited, and diagnostic warnings are surfaced in `workflow resume`, `status`, `checkpoint`, and `ce-ai doctor`.
 
 ---
 

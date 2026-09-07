@@ -179,6 +179,18 @@ pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
             );
         }
     }
+
+    let repo_state = probe_repo_state(
+        ctx,
+        &state.current_workflow_for_branch(&repo_root, branch.as_deref()),
+    );
+    if let Some(desync) = &repo_state.task_desync {
+        let warn = desync.warning_line();
+        if !warn.is_empty() {
+            lines.push(warn);
+        }
+    }
+
     Ok(lines)
 }
 
@@ -226,6 +238,12 @@ pub fn checkpoint_lines(
             "! Warning: Drift detected in {} managed files. Run 'ce-ai sync' to reconcile.",
             repo_state.manifest_drift_count
         ));
+    }
+    if let Some(desync) = &repo_state.task_desync {
+        let warn = desync.warning_line();
+        if !warn.is_empty() {
+            lines.push(warn);
+        }
     }
 
     Ok(lines)
@@ -321,6 +339,12 @@ pub fn resume_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
                 info.completed_tasks, info.total_tasks
             ));
         }
+        if let Some(desync) = &repo_state.task_desync {
+            let warn = desync.warning_line();
+            if !warn.is_empty() {
+                lines.push(format!("  {warn}"));
+            }
+        }
     }
 
     lines.push(String::new());
@@ -340,6 +364,8 @@ pub struct RepoState {
     pub adoption_status: Option<AdoptionBlockStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub openspec_context: Option<OpenSpecContextInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_desync: Option<TaskDesyncReport>,
 }
 
 pub fn probe_git_branch(repo_root: &Path) -> Option<String> {
@@ -390,7 +416,7 @@ pub fn probe_git_head_sha(repo_root: &Path) -> Option<String> {
 
 pub fn probe_git_dirty_files(repo_root: &Path) -> (bool, Vec<String>) {
     let out = match std::process::Command::new("git")
-        .args(["status", "--porcelain=v1"])
+        .args(["status", "--porcelain=v1", "-uall"])
         .current_dir(repo_root)
         .output()
     {
@@ -447,6 +473,16 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
     let adoption_status = probe_adoption_status(ctx);
     let openspec_context = probe_openspec_context_in(&repo_root, wf);
 
+    let task_desync = openspec_context.as_ref().and_then(|info| {
+        let touched_files = probe_feature_touched_files(&repo_root);
+        reconcile_tasks_with_git(
+            &repo_root,
+            &info.feature,
+            &info.path.join("tasks.md"),
+            &touched_files,
+        )
+    });
+
     RepoState {
         git_branch,
         head_sha,
@@ -455,6 +491,7 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
         manifest_drift_count,
         adoption_status,
         openspec_context,
+        task_desync,
     }
 }
 
@@ -547,6 +584,266 @@ pub fn probe_openspec_context_in(
         completed_tasks,
         total_tasks,
     })
+}
+
+/// Match details for an unchecked task that correlates with modified files.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskDesyncMatch {
+    pub task_index: usize,
+    pub task_text: String,
+    pub matched_files: Vec<String>,
+}
+
+/// Comprehensive report on tasks.md progress vs real git changes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskDesyncReport {
+    pub feature: String,
+    pub tasks_path: PathBuf,
+    pub completed_tasks: usize,
+    pub total_tasks: usize,
+    pub desynced_tasks: Vec<TaskDesyncMatch>,
+    pub is_aggregate_desync: bool,
+}
+
+impl TaskDesyncReport {
+    pub fn has_desync(&self) -> bool {
+        !self.desynced_tasks.is_empty() || self.is_aggregate_desync
+    }
+
+    pub fn warning_line(&self) -> String {
+        if !self.desynced_tasks.is_empty() {
+            let count = self.desynced_tasks.len();
+            let mut sample_files: Vec<String> = Vec::new();
+            for m in &self.desynced_tasks {
+                for f in &m.matched_files {
+                    if !sample_files.contains(f) {
+                        sample_files.push(f.clone());
+                    }
+                }
+            }
+            let preview = if sample_files.len() <= 2 {
+                sample_files.join(", ")
+            } else {
+                format!(
+                    "{}, +{} more",
+                    sample_files[..2].join(", "),
+                    sample_files.len() - 2
+                )
+            };
+            format!(
+                "! Warning: Tasks desync detected — {count} unchecked task(s) reference modified files ({preview}), but tasks.md shows {}/{} completed. Update tasks.md (- [x]) to reflect progress.",
+                self.completed_tasks, self.total_tasks
+            )
+        } else if self.is_aggregate_desync {
+            format!(
+                "! Warning: Tasks desync detected — working tree / branch contains modified code, but tasks.md shows 0/{} completed. Update tasks.md (- [x]) to reflect progress.",
+                self.total_tasks
+            )
+        } else {
+            String::new()
+        }
+    }
+}
+
+fn is_potential_path(token: &str) -> bool {
+    if token.is_empty() || token.contains(' ') || token.contains('\n') {
+        return false;
+    }
+    if token.starts_with("http://") || token.starts_with("https://") {
+        return false;
+    }
+    let lower = token.to_lowercase();
+    if lower.starts_with("openspec/") || lower == "openspec" || lower.starts_with(".git/") {
+        return false;
+    }
+    if lower == "cargo.lock" || lower.ends_with(".lock") {
+        return false;
+    }
+    let has_slash = token.contains('/');
+    let has_ext = [
+        ".rs", ".ts", ".js", ".json", ".toml", ".md", ".sh", ".yml", ".yaml",
+    ]
+    .iter()
+    .any(|ext| lower.ends_with(ext));
+
+    has_slash || has_ext
+}
+
+pub fn extract_paths_from_task_text(text: &str) -> Vec<String> {
+    let mut candidates = Vec::new();
+    let mut in_backtick = false;
+    let mut current_bt = String::new();
+    for ch in text.chars() {
+        if ch == '`' {
+            if in_backtick {
+                let trimmed = current_bt.trim().trim_matches(['\'', '"', '(', ')']);
+                if is_potential_path(trimmed) && !candidates.iter().any(|c| c == trimmed) {
+                    candidates.push(trimmed.to_string());
+                }
+                current_bt.clear();
+                in_backtick = false;
+            } else {
+                in_backtick = true;
+            }
+        } else if in_backtick {
+            current_bt.push(ch);
+        }
+    }
+    for word in text.split_whitespace() {
+        let clean = word
+            .trim_start_matches(['`', '(', '[', '"', '\''])
+            .trim_end_matches(['`', ')', ']', '"', '\'', ':', ',', '.']);
+        if is_potential_path(clean) && !candidates.iter().any(|c| c == clean) {
+            candidates.push(clean.to_string());
+        }
+    }
+    candidates
+}
+
+pub fn probe_branch_committed_files(repo_root: &Path) -> Vec<String> {
+    let merge_base = std::process::Command::new("git")
+        .args(["merge-base", "HEAD", "origin/main"])
+        .current_dir(repo_root)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            std::process::Command::new("git")
+                .args(["merge-base", "HEAD", "main"])
+                .current_dir(repo_root)
+                .output()
+                .ok()
+                .filter(|o| o.status.success())
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                .filter(|s| !s.is_empty())
+        });
+
+    let diff_target = match merge_base {
+        Some(base) => format!("{base}...HEAD"),
+        None => "HEAD~1...HEAD".to_string(),
+    };
+
+    let out = match std::process::Command::new("git")
+        .args(["diff", "--name-only", &diff_target])
+        .current_dir(repo_root)
+        .output()
+    {
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
+        _ => return Vec::new(),
+    };
+
+    out.lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect()
+}
+
+pub fn probe_feature_touched_files(repo_root: &Path) -> Vec<String> {
+    let (_, dirty) = probe_git_dirty_files(repo_root);
+    let committed = probe_branch_committed_files(repo_root);
+
+    let mut touched = Vec::new();
+    for f in dirty.into_iter().chain(committed) {
+        let lower = f.to_lowercase();
+        if lower.starts_with("openspec/") || lower.starts_with(".git/") || lower.ends_with(".lock")
+        {
+            continue;
+        }
+        if !touched.contains(&f) {
+            touched.push(f);
+        }
+    }
+    touched.sort();
+    touched
+}
+
+pub fn reconcile_tasks_with_git(
+    _repo_root: &Path,
+    feature: &str,
+    tasks_path: &Path,
+    touched_files: &[String],
+) -> Option<TaskDesyncReport> {
+    if !tasks_path.exists() {
+        return None;
+    }
+    let content = std::fs::read_to_string(tasks_path).ok()?;
+
+    let mut completed_tasks = 0;
+    let mut total_tasks = 0;
+    let mut unchecked_tasks: Vec<(usize, String)> = Vec::new();
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]") {
+            completed_tasks += 1;
+            total_tasks += 1;
+        } else if trimmed.starts_with("- [ ]") {
+            let task_text = trimmed
+                .strip_prefix("- [ ]")
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            unchecked_tasks.push((total_tasks + 1, task_text));
+            total_tasks += 1;
+        }
+    }
+
+    if total_tasks == 0 {
+        return None;
+    }
+
+    let mut desynced_tasks = Vec::new();
+    for (idx, task_text) in unchecked_tasks {
+        let candidate_paths = extract_paths_from_task_text(&task_text);
+        let mut matched_files = Vec::new();
+        for p in candidate_paths {
+            for touched in touched_files {
+                let is_match = touched == &p
+                    || (p.ends_with('/') && touched.starts_with(&p))
+                    || (touched.ends_with('/') && p.starts_with(touched))
+                    || touched.starts_with(&format!("{p}/"))
+                    || p.starts_with(&format!("{touched}/"))
+                    || touched.ends_with(&format!("/{p}"));
+                if is_match && !matched_files.contains(touched) {
+                    matched_files.push(touched.clone());
+                }
+            }
+        }
+        if !matched_files.is_empty() {
+            desynced_tasks.push(TaskDesyncMatch {
+                task_index: idx,
+                task_text,
+                matched_files,
+            });
+        }
+    }
+
+    // Aggregate fallback (R2):
+    // If no unchecked task had explicit matching paths, but completed_tasks == 0 and
+    // touched_files contains implementation code (under src/, tests/, or skills/)
+    let is_aggregate_desync = desynced_tasks.is_empty()
+        && completed_tasks == 0
+        && total_tasks > 0
+        && touched_files
+            .iter()
+            .any(|f| f.starts_with("src/") || f.starts_with("tests/") || f.starts_with("skills/"));
+
+    let report = TaskDesyncReport {
+        feature: feature.to_string(),
+        tasks_path: tasks_path.to_path_buf(),
+        completed_tasks,
+        total_tasks,
+        desynced_tasks,
+        is_aggregate_desync,
+    };
+
+    if report.has_desync() {
+        Some(report)
+    } else {
+        None
+    }
 }
 
 #[derive(Deserialize, Default, Debug)]
@@ -911,6 +1208,19 @@ pub fn maybe_auto_checkpoint(
 
     if !current_stage.can_transition_to(inferred_stage) {
         return Ok(None);
+    }
+
+    // Desync guard (R6): Do NOT auto-advance to Verification (Stage 5), KnowledgeCapture (Stage 6),
+    // or GitShipping (Stage 7) if tasks are desynced
+    if inferred_stage.number() >= WorkflowStage::Verification.number() {
+        let repo_state = probe_repo_state(ctx, &current_wf);
+        if repo_state
+            .task_desync
+            .as_ref()
+            .is_some_and(|d| d.has_desync())
+        {
+            return Ok(None);
+        }
     }
 
     let updated = State::atomic_update_workflow(state_path, repo_root, branch.as_deref(), |s| {

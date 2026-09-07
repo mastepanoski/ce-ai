@@ -470,6 +470,32 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
     }
 
+    // OpenSpec Tasks Desync Probe (Issue #313):
+    // Verifies whether active OpenSpec changes have checkboxes synchronized with real code modifications.
+    let repo_root = ctx.repo_root();
+    let current_wf = state.current_workflow_for_branch(&repo_root, None);
+    if let Some(info) =
+        crate::commands::workflow::probe_openspec_context_in(&repo_root, &current_wf)
+    {
+        let touched_files = crate::commands::workflow::probe_feature_touched_files(&repo_root);
+        if let Some(desync) = crate::commands::workflow::reconcile_tasks_with_git(
+            &repo_root,
+            &info.feature,
+            &info.path.join("tasks.md"),
+            &touched_files,
+        ) {
+            let count = if desync.desynced_tasks.is_empty() {
+                desync.total_tasks
+            } else {
+                desync.desynced_tasks.len()
+            };
+            println!(
+                "doctor-warn: openspec tasks desync in '{}': {count} unchecked task(s) with git modifications (progress: {}/{})",
+                info.feature, desync.completed_tasks, desync.total_tasks
+            );
+        }
+    }
+
     for finding in &findings {
         println!("{finding}");
     }
