@@ -181,7 +181,7 @@ fn sync_with_host_detected_native_harnesses_reports_registered_and_succeeds() {
         .assert()
         .success()
         .stdout(predicates::str::contains(
-            "✓ opencode: verified — 2/2 managed files match SHA256",
+            "✓ opencode: verified — 3/3 managed files match SHA256",
         ))
         .stdout(predicates::str::contains(
             "○ claude: registered — ce-ai manages no skill files here (MCP companions only; nothing to hash-verify)",
@@ -5616,7 +5616,7 @@ fn sync_standalone_custom_harness_without_opencode_succeeds() {
         .assert()
         .success()
         .stdout(predicates::str::contains(
-            "✓ custom: verified — 2/2 managed files match SHA256",
+            "✓ custom: verified — 3/3 managed files match SHA256",
         ))
         .stdout(predicates::str::contains("0 failed"))
         .stdout(predicates::str::contains("opencode").not());

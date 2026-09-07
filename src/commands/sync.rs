@@ -212,6 +212,16 @@ pub(crate) fn sync_with(
         source_rel.insert(managed_rel, src_rel);
     }
 
+    if !desired.contains_key(crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH) {
+        let hash = crate::state::diff::sha256_hex(
+            crate::source::builtin_skills::BUILTIN_SEQUENTIAL_THINKING_SKILL.as_bytes(),
+        );
+        desired.insert(
+            crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH.to_string(),
+            hash,
+        );
+    }
+
     // Retirement respect (R13): once an opencode surface is adopted, the
     // managed-dir skills tree stays retired — sync must not re-harvest it.
     let skip_managed_skills_harvest = state
@@ -282,8 +292,18 @@ pub(crate) fn sync_with(
                             "restore"
                         };
                         arm!(&managed_dir.join(path));
-                        let src = source_root.join(&source_rel[path]);
-                        write_atomic(&managed_dir.join(path), &std::fs::read(&src)?)?;
+                        let content = if let Some(src) = source_rel.get(path) {
+                            std::fs::read(source_root.join(src))?
+                        } else if path
+                            == crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH
+                        {
+                            crate::source::builtin_skills::BUILTIN_SEQUENTIAL_THINKING_SKILL
+                                .as_bytes()
+                                .to_vec()
+                        } else {
+                            return Err(CeError::Runtime(format!("missing source for {path}")));
+                        };
+                        write_atomic(&managed_dir.join(path), &content)?;
                         println!("sync: {verb} {path}");
                     }
                     Action::Remove { path } => {
@@ -299,27 +319,13 @@ pub(crate) fn sync_with(
         }
 
         // Rewrite the manifest with refreshed hashes and version/source (SU-2).
-        let mut files: Vec<ManifestFile> = desired
+        let files: Vec<ManifestFile> = desired
             .iter()
             .map(|(path, sha256)| ManifestFile {
                 path: path.clone(),
                 sha256: sha256.clone(),
             })
             .collect();
-        if !desired.contains_key(crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH) {
-            let dest = crate::source::builtin_skills::builtin_skill_target(
-                &managed_dir,
-                crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH,
-            );
-            arm!(&dest);
-            let mf = crate::source::builtin_skills::seed_builtin_skill(
-                &managed_dir,
-                crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH,
-                crate::source::builtin_skills::BUILTIN_SEQUENTIAL_THINKING_SKILL,
-                ctx.dry_run,
-            )?;
-            files.push(mf);
-        }
         arm!(&opencode_dir.join(MANAGED_DIR).join("install-manifest.json"));
         InstallManifest {
             version: version.to_string(),
