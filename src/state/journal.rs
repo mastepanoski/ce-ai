@@ -1,11 +1,13 @@
-//! Operation journal for transactional multi-file commands (Issue #166).
+//! Operation journal for transactional multi-file commands (Issue #166, #312).
 //!
 //! Every tracked filesystem mutation records its prior content in an
-//! atomically-persisted journal **before** being performed. A crashed or
-//! failing command leaves the journal behind; the next install/sync rolls
-//! applied mutations back in reverse (deterministic recovery) before
-//! starting fresh, and `ce-ai doctor` flags the presence of a stale journal.
+//! append-only journal **before** being performed. A crashed or failing command
+//! leaves the journal behind; the next install/sync rolls applied mutations back
+//! in reverse (deterministic recovery) before starting fresh, and `ce-ai doctor`
+//! flags the presence of a stale journal.
 
+use std::fs::File;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -19,6 +21,12 @@ pub fn journal_path(config_dir: &Path) -> PathBuf {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+struct JournalHeader {
+    command: String,
+    started_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct RecordedOp {
     path: PathBuf,
     applied: bool,
@@ -26,8 +34,9 @@ struct RecordedOp {
     prior: Option<Vec<u8>>,
 }
 
+/// Legacy format used prior to append-only JSONL (v1.44.1 and earlier).
 #[derive(Debug, Serialize, Deserialize)]
-struct JournalData {
+struct LegacyJournalData {
     command: String,
     started_at: String,
     ops: Vec<RecordedOp>,
@@ -37,7 +46,7 @@ struct JournalData {
 /// [`Journal::complete`] after the command's final state persistence.
 pub struct Journal {
     path: PathBuf,
-    data: JournalData,
+    file: File,
     fail_after_writes: Option<usize>,
     writes_seen: usize,
 }
@@ -49,18 +58,7 @@ impl Journal {
     pub fn begin(config_dir: &Path, command: &str) -> Result<Self, CeError> {
         let path = journal_path(config_dir);
         if path.exists() {
-            match std::fs::read(&path)
-                .map_err(|e| CeError::State(e.to_string()))
-                .and_then(|b| {
-                    serde_json::from_slice::<JournalData>(&b)
-                        .map_err(|e| CeError::State(e.to_string()))
-                }) {
-                Ok(data) => Journal::rollback(&data),
-                Err(err) => eprintln!(
-                    "warning: ignoring corrupt install journal at {}: {err}",
-                    path.display()
-                ),
-            }
+            Self::recover_stale_journal(&path);
             let _ = std::fs::remove_file(&path);
         }
 
@@ -68,27 +66,96 @@ impl Journal {
             .ok()
             .and_then(|v| v.parse::<usize>().ok());
 
-        let data = JournalData {
+        let header = JournalHeader {
             command: command.to_string(),
             started_at: chrono::Utc::now().to_rfc3339(),
-            ops: Vec::new(),
         };
-        write_atomic(
-            &path,
-            &serde_json::to_vec_pretty(&data).map_err(CeError::Json)?,
-        )?;
+        let mut header_bytes = serde_json::to_vec(&header).map_err(CeError::Json)?;
+        header_bytes.push(b'\n');
+
+        // Atomically initialize the journal file with the header line.
+        write_atomic(&path, &header_bytes)?;
+
+        // Maintain an open handle in append mode for linear-time arming.
+        let file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .map_err(CeError::Io)?;
+
         Ok(Self {
             path,
-            data,
+            file,
             fail_after_writes,
             writes_seen: 0,
         })
     }
 
+    /// Reconstructs and rolls back mutations from a stale journal file.
+    fn recover_stale_journal(path: &Path) {
+        let bytes = match std::fs::read(path) {
+            Ok(b) => b,
+            Err(err) => {
+                eprintln!(
+                    "warning: ignoring unreadable install journal at {}: {err}",
+                    path.display()
+                );
+                return;
+            }
+        };
+
+        let mut lines = bytes
+            .split(|&b| b == b'\n')
+            .map(|l| l.strip_suffix(b"\r").unwrap_or(l))
+            .filter(|l| !l.iter().all(|b| b.is_ascii_whitespace()));
+
+        let first_line = match lines.next() {
+            Some(line) => line,
+            None => {
+                eprintln!(
+                    "warning: ignoring corrupt install journal at {}: file is empty",
+                    path.display()
+                );
+                return;
+            }
+        };
+
+        match serde_json::from_slice::<JournalHeader>(first_line) {
+            Ok(header) => {
+                let mut ops = Vec::new();
+                for line in lines {
+                    match serde_json::from_slice::<RecordedOp>(line) {
+                        Ok(op) => ops.push(op),
+                        Err(err) => {
+                            // Mid-write partial lines on crash are safely ignored;
+                            // earlier valid records are preserved for rollback.
+                            eprintln!(
+                                "warning: ignoring incomplete journal entry at {}: {err}",
+                                path.display()
+                            );
+                        }
+                    }
+                }
+                Journal::rollback(&header.command, &ops);
+            }
+            Err(_) => {
+                // Check if this is a legacy single-blob journal from earlier ce-ai versions.
+                match serde_json::from_slice::<LegacyJournalData>(&bytes) {
+                    Ok(legacy) => Journal::rollback(&legacy.command, &legacy.ops),
+                    Err(err) => {
+                        eprintln!(
+                            "warning: ignoring corrupt install journal at {}: {err}",
+                            path.display()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     /// Best-effort reverse rollback of every applied mutation.
-    fn rollback(data: &JournalData) {
+    fn rollback(command: &str, ops: &[RecordedOp]) {
         let mut reverted = 0usize;
-        for op in data.ops.iter().rev().filter(|o| o.applied) {
+        for op in ops.iter().rev().filter(|o| o.applied) {
             let res = match &op.prior {
                 Some(bytes) => std::fs::write(&op.path, bytes),
                 // File was created by the command: remove it. Missing is fine.
@@ -108,25 +175,29 @@ impl Journal {
         }
         if reverted > 0 {
             eprintln!(
-                "warning: recovered incomplete '{}' — rolled back {reverted} mutation(s)",
-                data.command
+                "warning: recovered incomplete '{command}' — rolled back {reverted} mutation(s)"
             );
         }
     }
 
     /// Arms a mutation: captures prior content, marks the op applied and
-    /// persists the journal **before** the caller mutates the path. When
-    /// fault injection triggers, returns an error instead so the caller
-    /// aborts mid-sequence with the journal intact for recovery.
+    /// appends the op record directly to the journal file **before** the caller
+    /// mutates the path. When fault injection triggers, returns an error
+    /// instead so the caller aborts mid-sequence with the journal intact for recovery.
     pub fn arm(&mut self, path: &Path) -> Result<(), CeError> {
         self.writes_seen += 1;
         let prior = std::fs::read(path).ok();
-        self.data.ops.push(RecordedOp {
+        let op = RecordedOp {
             path: path.to_path_buf(),
             applied: true,
             prior,
-        });
-        self.persist()?;
+        };
+
+        let mut op_bytes = serde_json::to_vec(&op).map_err(CeError::Json)?;
+        op_bytes.push(b'\n');
+        self.file.write_all(&op_bytes).map_err(CeError::Io)?;
+        self.file.sync_all().map_err(CeError::Io)?;
+
         if self.fail_after_writes.is_some_and(|n| self.writes_seen > n) {
             return Err(CeError::Runtime(format!(
                 "injected fault (CE_AI_FAIL_AFTER_WRITES={}): aborted before mutation #{} of {}",
@@ -140,25 +211,29 @@ impl Journal {
 
     /// Removes the journal after the command's final state persistence.
     pub fn complete(self) -> Result<(), CeError> {
+        // Drop the file handle first to release OS file locks (required on Windows).
+        drop(self.file);
         match std::fs::remove_file(&self.path) {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(e) => Err(CeError::Io(e)),
         }
     }
-
-    fn persist(&self) -> Result<(), CeError> {
-        write_atomic(
-            &self.path,
-            &serde_json::to_vec_pretty(&self.data).map_err(CeError::Json)?,
-        )
-    }
 }
 
 /// Reads the recorded command name from a journal file, best-effort.
 pub fn recorded_command(config_dir: &Path) -> Option<String> {
     let bytes = std::fs::read(journal_path(config_dir)).ok()?;
-    let data: JournalData = serde_json::from_slice(&bytes).ok()?;
+    let first_line = bytes
+        .split(|&b| b == b'\n')
+        .map(|l| l.strip_suffix(b"\r").unwrap_or(l))
+        .find(|l| !l.iter().all(|b| b.is_ascii_whitespace()))?;
+
+    if let Ok(header) = serde_json::from_slice::<JournalHeader>(first_line) {
+        return Some(header.command);
+    }
+    // Fallback for legacy format
+    let data: LegacyJournalData = serde_json::from_slice(&bytes).ok()?;
     Some(data.command)
 }
 
