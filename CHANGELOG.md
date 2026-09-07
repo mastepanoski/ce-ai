@@ -5,6 +5,20 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.44.0] - 2026-09-07
+
+### Added
+- **OpenSpec Tasks Checkbox Desync Reconciliation & Non-Blocking Warnings (`#313`):**
+  - **Git Diff & Task List Reconciliation (`src/commands/workflow.rs`)**: Implemented `reconcile_tasks_with_git` comparing active feature modified files (working tree changes via `git status --porcelain=v1 -uall` and branch committed changes via `git diff --name-only <merge_base>...HEAD`) against unchecked tasks in `openspec/changes/<feature>/tasks.md`.
+  - **Path Extraction & Multi-Level Matching**: Implemented `extract_paths_from_task_text` extracting backticked file references and path-like tokens, evaluating exact matches, directory prefix/suffix matches, and aggregate desync heuristics when tasks are unmarked while code is actively modified.
+  - **Cross-Surface Non-Blocking Warnings**:
+    - `ce-ai workflow resume`: Surfaces a diagnostic warning banner under the `tasks progress` block in the context re-hydration prompt.
+    - `ce-ai workflow status`: Displays the desync warning in the CLI status output and TUI dashboard.
+    - `ce-ai workflow checkpoint`: Echoes the warning banner while saving manual checkpoints without blocking developer sovereignty.
+    - `ce-ai doctor`: Emits non-fatal `doctor-warn: openspec tasks desync in '<feature>': ...` diagnostics exiting with code 0.
+  - **FSM Auto-Checkpoint Guard**: Inhibited automated checkpoint progression in `maybe_auto_checkpoint` from advancing past Stage 4 (TDD Work) to Stage 5 (Verification), Stage 6 (Knowledge Capture), or Stage 7 (Git Shipping) while tasks remain desynced.
+  - **Graceful Degradation (R7)**: Handled missing git binaries, non-git directories, or detached branches by gracefully returning `None` with zero panics or aborts.
+
 ## [1.43.0] - 2026-09-06
 
 ### Added

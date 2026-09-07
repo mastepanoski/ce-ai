@@ -7009,3 +7009,118 @@ fn test_audit_escalates_supported_harness_without_rtk_hook() {
                 .and(predicate::str::contains("cli-compression/claude")),
         );
 }
+
+#[test]
+fn workflow_resume_and_status_detect_tasks_desync_and_doctor_warns() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    let proj = tmp.path().join("proj");
+    fs::create_dir_all(&proj).unwrap();
+
+    git_cmd()
+        .args(["init", "-q"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    // Create openspec/changes/feat-desync/tasks.md
+    let feat_dir = proj.join("openspec").join("changes").join("feat-desync");
+    fs::create_dir_all(&feat_dir).unwrap();
+    fs::write(feat_dir.join("proposal.md"), "# Proposal").unwrap();
+    fs::write(feat_dir.join("spec.md"), "# Spec").unwrap();
+    let tasks_content = "\
+# Tasks
+- [ ] 1. Implement feature in `src/foo.rs`
+- [ ] 2. Add integration test in `tests/test.rs`
+";
+    fs::write(feat_dir.join("tasks.md"), tasks_content).unwrap();
+
+    // Create src/foo.rs so git detects modified/untracked implementation file
+    let src_dir = proj.join("src");
+    fs::create_dir_all(&src_dir).unwrap();
+    fs::write(src_dir.join("foo.rs"), "pub fn foo() {}\n").unwrap();
+
+    // 1. ce-ai workflow resume outputs Tasks desync detected warning
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["workflow", "resume"])
+        .assert()
+        .success()
+        .stdout(
+            predicates::str::contains("! Warning: Tasks desync detected")
+                .and(predicates::str::contains("0/2 completed"))
+                .and(predicates::str::contains("src/foo.rs")),
+        );
+
+    // 2. ce-ai workflow status outputs Tasks desync detected warning
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "! Warning: Tasks desync detected",
+        ));
+
+    // 3. ce-ai workflow checkpoint advances through stages and outputs Tasks desync warning
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--stage",
+            "2",
+            "--task",
+            "Specifying feature",
+            "--feature",
+            "feat-desync",
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--stage",
+            "3",
+            "--task",
+            "Planning feature",
+        ])
+        .assert()
+        .success();
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args([
+            "workflow",
+            "checkpoint",
+            "--stage",
+            "4",
+            "--task",
+            "Implementing foo",
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "workflow: checkpoint saved successfully!",
+        ))
+        .stdout(predicates::str::contains(
+            "! Warning: Tasks desync detected",
+        ));
+
+    // 4. ce-ai doctor outputs doctor-warn and exits 0
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(
+            predicates::str::contains("doctor-warn: openspec tasks desync in 'feat-desync'")
+                .and(predicates::str::contains("progress: 0/2")),
+        );
+}
