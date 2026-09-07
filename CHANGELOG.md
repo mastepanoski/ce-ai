@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.44.2] - 2026-09-07
+
+### Fixed
+- **Append-Only JSONL Operation Journal for Linear-Time Mutation Arming (`#312`):**
+  - **Append-Only JSONL Disk Format**: Replaced the $O(N^2)$ single-blob JSON journal with an append-only JSON Lines format (`install-journal.json`), where line 1 is an initial metadata header (`JournalHeader { command, started_at }`) and subsequent lines are individual `RecordedOp` records appended incrementally.
+  - **Linear-Time Arming ($O(1)$ per mutation)**: Maintained a persistent open `File` handle in `Journal` with append mode, eliminating all intermediate tempfile allocations, whole-file re-serializations, and renames in `Journal::arm`. Each operation writes only its own record followed by `sync_all()`, preserving physical fsync durability.
+  - **Resilient Recovery & Incomplete Trailing Line Handling**: Updated `Journal::begin` to parse JSONL line-by-line, safely ignoring incomplete trailing lines caused by mid-write crashes while deterministically recovering and rolling back all preceding complete operations.
+  - **Legacy Journal Compatibility**: Preserved fallback deserialization in `Journal::begin` and `recorded_command` for stale journals written in the legacy single-blob JSON format.
+  - **Windows File Handle Safety**: Explicitly closed open file handles in `Journal::complete` before unlinking to prevent OS sharing violation errors on Windows.
+
 ## [1.44.1] - 2026-09-07
 
 ### Fixed
