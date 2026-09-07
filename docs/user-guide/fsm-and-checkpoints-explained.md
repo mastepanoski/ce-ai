@@ -289,6 +289,9 @@ The warning banner is non-blocking to preserve operator control:
   ```
 - In automated inference (`maybe_auto_checkpoint`), the FSM is guarded from auto-advancing past Stage 4 to Stage 5 (Verification), Stage 6 (Knowledge Capture), or Stage 7 (Git Shipping) while desync is active.
 
+> [!NOTE]
+> **Persistent Desync Banners Across Sessions**: If a tasks desync warning banner appears to persist across sessions without apparent cause in the filesystem or after `tasks.md` has been updated, the cause is typically an AI memory plugin (such as Engram) re-surfacing verbatim user prompt history containing the historical banner text. This is an LLM behavioral artifact of prompt re-hydration, not a `ce-ai` state bug. See [`docs/solutions/architecture/engram-context-echo-behavioral-risk.md`](../solutions/architecture/engram-context-echo-behavioral-risk.md).
+
 ---
 
 ### 📍 Step 5: Automated Stage Inference & Turn-End Checkpointing

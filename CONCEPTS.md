@@ -61,3 +61,7 @@ A multi-branch state partition scheme that indexes workflow progression by canon
 ### OpenSpec Tasks Desync Reconciliation
 A multi-level Git-to-checklist reconciliation engine (`src/commands/workflow.rs`) that compares modified working tree (`git status -uall`) and branch files against unchecked tasks (`- [ ]`) in `openspec/changes/<feature>/tasks.md`. It surfaces non-blocking diagnostic warnings across `ce-ai workflow resume`, `status`, `checkpoint`, and `ce-ai doctor`, while inhibiting automated FSM progression past Stage 4 (TDD & Work) until tasks are updated, preserving developer sovereignty and manual checkpointing.
 
+### Engram Context Echo (Behavioral Loop)
+A cognitive feedback loop in AI agents where historical `ce-ai` status banners (e.g. `tasks progress: 0/N completed`), previously quoted in user prompts and persisted by memory systems like Engram (`FormatContext`), are re-injected verbatim into subsequent sessions. Without temporal framing, the LLM confuses historical prompt quotes with live repository state, mistakenly perceiving workflow progression as stalled. `ce-ai`'s stage inference remains strictly isolated and hermetic, deriving progress exclusively from Git state and `tasks.md`. See [`docs/solutions/architecture/engram-context-echo-behavioral-risk.md`](docs/solutions/architecture/engram-context-echo-behavioral-risk.md).
+
+
