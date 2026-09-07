@@ -1,3 +1,5 @@
+> STATUS (v1.44.2): Full pedagogical guardrail command live in src/commands/guard.rs with test suite in src/commands/tests/guard.rs. Residual open boxes below were not re-audited item-by-item.
+
 # Tasks: Pedagogical Guardrail Mode (`ce-ai guard`)
 
 ## Implementation Work Units

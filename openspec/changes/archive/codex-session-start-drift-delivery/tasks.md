@@ -1,3 +1,5 @@
+> STATUS (v1.44.2): Delivered in PR #282: native SessionStart hook lifecycle functions (has_session_start_hook, ensure_session_start_hook, remove_session_start_hook) live in src/harness/codex.rs. Residual open boxes below were not re-audited item-by-item.
+
 # Tasks: Guaranteed Turn-0 Drift Delivery for OpenAI Codex CLI
 
 - [ ] 1. Implement Codex hook lifecycle functions in `src/harness/codex.rs` (~120 LOC)

@@ -1,3 +1,5 @@
+> STATUS (v1.44.2): CodeGraph initialization and cleanup logic live in src/commands/audit.rs, src/commands/init_prj.rs, src/commands/doctor.rs, src/commands/tools.rs, and src/commands/uninstall.rs. Residual open boxes below were not re-audited item-by-item.
+
 # Tasks: CodeGraph Native Init Support & gentle-ai Residual Cleanup
 
 Total Estimated Changed Lines: ~120 LOC (Forecast: well within 400 LOC budget).

@@ -15,7 +15,7 @@ releases to their frozen contracts.
 
 | Folder | Open boxes | Next action |
 | :--- | :--- | :--- |
-| *(none — ledger clean as of v1.21.0)* | | |
+| *(none — ledger clean as of v1.44.2)* | | |
 
 Historical notes:
 - v1.20.1 sweep: 51 folders archived under criteria (1) and (2); evidence
@@ -25,3 +25,7 @@ Historical notes:
 - v1.21.0: `context_exhaustion_resilience` completed its last open
   requirement (doctor branch-protection probe) and was archived fully
   checked.
+- v1.44.2 sweep: 7 folders archived under criterion (2) (STATUS-verified
+  shipped); evidence sources were live code symbols across harness hooks
+  (Codex, Pi, Cursor), generic session-start drift delivery, CodeGraph init
+  commands/tests, and pedagogical guardrail commands.

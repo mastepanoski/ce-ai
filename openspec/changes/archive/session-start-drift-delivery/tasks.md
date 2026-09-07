@@ -1,3 +1,5 @@
+> STATUS (v1.44.2): Generic foundation delivered: workflow resume with fast RepoState drift detection live and operational, serving as the base across all harness-specific session-start implementations. Residual open boxes below were not re-audited item-by-item.
+
 # Tasks: Session-Start Drift Delivery Implementation
 
 ## Work Unit 1: Claude Code Settings Hook Management (`src/harness/claude.rs`)

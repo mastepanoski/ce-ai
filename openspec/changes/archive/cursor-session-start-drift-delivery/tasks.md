@@ -1,3 +1,5 @@
+> STATUS (v1.44.2): Delivered: CURSOR_HOOK_EVENTS and has_session_start_hook integration live in src/harness/cursor.rs. Residual open boxes below were not re-audited item-by-item.
+
 # Tasks: Cursor sessionStart Lifecycle Hook Integration
 
 - [ ] 1. Enhance `src/commands/workflow.rs` resume JSON payload with `additional_context` (~15 LOC)

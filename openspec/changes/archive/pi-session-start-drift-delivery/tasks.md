@@ -1,3 +1,5 @@
+> STATUS (v1.44.2): Delivered: embedded session_start JS hook extension and hook lifecycle functions (has_session_start_hook, ensure_session_start_hook, remove_session_start_hook) live in src/harness/pi.rs. Residual open boxes below were not re-audited item-by-item.
+
 # Tasks: Guaranteed Turn-0 Drift Delivery for Pi Coding Agent
 
 - [ ] 1. Implement Pi extension lifecycle helpers in `src/harness/pi.rs` (~70 LOC)

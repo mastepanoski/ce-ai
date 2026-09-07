@@ -1,3 +1,5 @@
+> STATUS (v1.44.2): Happy-path subprocess execution tests and CodeGraph init coverage live in tests/cli.rs and associated command suites. Residual open boxes below were not re-audited item-by-item.
+
 # Tasks: CodeGraph Subprocess Execution Happy Path Coverage
 
 Total Estimated Changed Lines: ~75 LOC (Forecast: well within 400 LOC budget).
