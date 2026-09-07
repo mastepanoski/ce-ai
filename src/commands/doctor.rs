@@ -496,6 +496,16 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
     }
 
+    // OpenSpec Unarchived Completed Changes Probe (Issue #323):
+    // Detects fully-completed OpenSpec changes lingering outside openspec/changes/archive/.
+    let unarchived = crate::commands::workflow::probe_unarchived_completed_changes(&repo_root);
+    for item in &unarchived {
+        println!(
+            "doctor-warn: openspec change '{}' is complete ({}/{} tasks) but not archived — see openspec/changes/archive/README.md",
+            item.feature, item.completed_tasks, item.total_tasks
+        );
+    }
+
     for finding in &findings {
         println!("{finding}");
     }

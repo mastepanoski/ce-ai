@@ -445,3 +445,111 @@ fn test_reconcile_tasks_with_git_graceful_degradation_r7() {
     std::fs::write(&real_tasks, "- [ ] 1. Task in `src/foo.rs`").unwrap();
     assert!(reconcile_tasks_with_git(tmp.path(), "my-feat", &real_tasks, &[]).is_none());
 }
+
+#[test]
+fn test_count_task_checkboxes_parsing_and_toctou_degradation() {
+    let tmp = TempDir::new().unwrap();
+    let tasks_path = tmp.path().join("tasks.md");
+
+    // Case 1: Valid content with mixed checkmarks, plain text, and whitespace
+    let content = "\
+# Tasks: Feature Foo
+- [x] Task 1 completed
+  - [x] Subtask 1.1 completed
+- [X] Task 2 completed with capital X
+- [ ] Task 3 pending
+  - [ ] Subtask 3.1 pending
+Plain notes without checkbox
+- Bullet without box
+";
+    std::fs::write(&tasks_path, content).unwrap();
+    let (completed, total) = count_task_checkboxes(&tasks_path);
+    assert_eq!(completed, 3);
+    assert_eq!(total, 5);
+
+    // Case 2: Non-existent path -> gracefully returns (0, 0) without panic
+    let non_existent = tmp.path().join("does_not_exist.md");
+    let (completed, total) = count_task_checkboxes(&non_existent);
+    assert_eq!(completed, 0);
+    assert_eq!(total, 0);
+
+    // Case 3: Directory passed instead of file -> gracefully returns (0, 0) without panic
+    let dir_path = tmp.path().join("a_dir");
+    std::fs::create_dir_all(&dir_path).unwrap();
+    let (completed, total) = count_task_checkboxes(&dir_path);
+    assert_eq!(completed, 0);
+    assert_eq!(total, 0);
+}
+
+#[test]
+fn test_probe_unarchived_completed_changes_multi_directory() {
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path();
+    let changes_dir = repo_root.join("openspec").join("changes");
+
+    // 1. Fully completed change outside archive/ -> must be detected
+    let complete_dir = changes_dir.join("feat-alpha-done");
+    std::fs::create_dir_all(&complete_dir).unwrap();
+    std::fs::write(
+        complete_dir.join("tasks.md"),
+        "- [x] Task 1\n- [X] Task 2\n",
+    )
+    .unwrap();
+
+    // 2. Fully completed second change -> must be detected and sorted alphabetically
+    let complete_dir_2 = changes_dir.join("feat-beta-done");
+    std::fs::create_dir_all(&complete_dir_2).unwrap();
+    std::fs::write(
+        complete_dir_2.join("tasks.md"),
+        "- [x] Unit 1\n- [x] Unit 2\n- [x] Unit 3\n",
+    )
+    .unwrap();
+
+    // 3. Incomplete change (1/2) -> must NOT be detected
+    let incomplete_dir = changes_dir.join("feat-gamma-wip");
+    std::fs::create_dir_all(&incomplete_dir).unwrap();
+    std::fs::write(
+        incomplete_dir.join("tasks.md"),
+        "- [x] Task 1\n- [ ] Task 2\n",
+    )
+    .unwrap();
+
+    // 4. Change with 0 tasks -> must NOT be detected
+    let empty_tasks_dir = changes_dir.join("feat-empty");
+    std::fs::create_dir_all(&empty_tasks_dir).unwrap();
+    std::fs::write(empty_tasks_dir.join("tasks.md"), "# Tasks without boxes\n").unwrap();
+
+    // 5. Change with no tasks.md file -> must NOT be detected
+    let no_tasks_dir = changes_dir.join("feat-no-tasks-file");
+    std::fs::create_dir_all(&no_tasks_dir).unwrap();
+    std::fs::write(no_tasks_dir.join("proposal.md"), "# Proposal\n").unwrap();
+
+    // 6. Fully completed change inside archive/ -> must NOT be detected
+    let archived_dir = changes_dir.join("archive").join("feat-archived-done");
+    std::fs::create_dir_all(&archived_dir).unwrap();
+    std::fs::write(
+        archived_dir.join("tasks.md"),
+        "- [x] Arch 1\n- [x] Arch 2\n",
+    )
+    .unwrap();
+
+    // 7. Regular file directly inside openspec/changes -> must NOT cause panic or be detected
+    std::fs::write(changes_dir.join("notes.txt"), "some notes\n").unwrap();
+
+    let unarchived = probe_unarchived_completed_changes(repo_root);
+    assert_eq!(unarchived.len(), 2);
+    assert_eq!(unarchived[0].feature, "feat-alpha-done");
+    assert_eq!(unarchived[0].completed_tasks, 2);
+    assert_eq!(unarchived[0].total_tasks, 2);
+
+    assert_eq!(unarchived[1].feature, "feat-beta-done");
+    assert_eq!(unarchived[1].completed_tasks, 3);
+    assert_eq!(unarchived[1].total_tasks, 3);
+}
+
+#[test]
+fn test_probe_unarchived_completed_changes_non_existent_openspec_dir() {
+    let tmp = TempDir::new().unwrap();
+    let unarchived = probe_unarchived_completed_changes(tmp.path());
+    assert!(unarchived.is_empty());
+}

@@ -190,6 +190,12 @@ pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
             lines.push(warn);
         }
     }
+    if !repo_state.unarchived_completed_changes.is_empty() {
+        let count = repo_state.unarchived_completed_changes.len();
+        lines.push(format!(
+            "! Warning: {count} OpenSpec change(s) complete but not archived — run 'ce-ai doctor' for details"
+        ));
+    }
 
     Ok(lines)
 }
@@ -244,6 +250,12 @@ pub fn checkpoint_lines(
         if !warn.is_empty() {
             lines.push(warn);
         }
+    }
+    if !repo_state.unarchived_completed_changes.is_empty() {
+        let count = repo_state.unarchived_completed_changes.len();
+        lines.push(format!(
+            "! Warning: {count} OpenSpec change(s) complete but not archived — run 'ce-ai doctor' for details"
+        ));
     }
 
     Ok(lines)
@@ -326,6 +338,15 @@ pub fn resume_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
         }
     }
 
+    if repo_state.unarchived_completed_changes.is_empty() {
+        lines.push("  openspec ledger: clean (0 pending archival)".to_string());
+    } else {
+        let count = repo_state.unarchived_completed_changes.len();
+        lines.push(format!(
+            "  openspec ledger: ! {count} change(s) complete but not archived — run 'ce-ai doctor' for details"
+        ));
+    }
+
     if let Some(info) = &repo_state.openspec_context {
         lines.push(String::new());
         lines.push(format!("== [Context Re-hydration: {}] ==", info.feature));
@@ -366,6 +387,15 @@ pub struct RepoState {
     pub openspec_context: Option<OpenSpecContextInfo>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub task_desync: Option<TaskDesyncReport>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unarchived_completed_changes: Vec<UnarchivedChange>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnarchivedChange {
+    pub feature: String,
+    pub completed_tasks: usize,
+    pub total_tasks: usize,
 }
 
 pub fn probe_git_branch(repo_root: &Path) -> Option<String> {
@@ -483,6 +513,8 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
         )
     });
 
+    let unarchived_completed_changes = probe_unarchived_completed_changes(&repo_root);
+
     RepoState {
         git_branch,
         head_sha,
@@ -492,6 +524,7 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
         adoption_status,
         openspec_context,
         task_desync,
+        unarchived_completed_changes,
     }
 }
 
@@ -559,21 +592,11 @@ pub fn probe_openspec_context_in(
     let tasks_path = change_dir.join("tasks.md");
     let has_tasks = tasks_path.exists();
 
-    let mut completed_tasks = 0;
-    let mut total_tasks = 0;
-    if has_tasks {
-        if let Ok(content) = std::fs::read_to_string(&tasks_path) {
-            for line in content.lines() {
-                let trimmed = line.trim();
-                if trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]") {
-                    completed_tasks += 1;
-                    total_tasks += 1;
-                } else if trimmed.starts_with("- [ ]") {
-                    total_tasks += 1;
-                }
-            }
-        }
-    }
+    let (completed_tasks, total_tasks) = if has_tasks {
+        count_task_checkboxes(&tasks_path)
+    } else {
+        (0, 0)
+    };
 
     Some(OpenSpecContextInfo {
         feature: target_feature,
@@ -584,6 +607,67 @@ pub fn probe_openspec_context_in(
         completed_tasks,
         total_tasks,
     })
+}
+
+/// Parses a tasks.md file and returns (completed_tasks, total_tasks).
+/// Gracefully returns (0, 0) if the file cannot be read or does not exist.
+pub fn count_task_checkboxes(tasks_path: &Path) -> (usize, usize) {
+    let mut completed_tasks = 0;
+    let mut total_tasks = 0;
+    if let Ok(content) = std::fs::read_to_string(tasks_path) {
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]") {
+                completed_tasks += 1;
+                total_tasks += 1;
+            } else if trimmed.starts_with("- [ ]") {
+                total_tasks += 1;
+            }
+        }
+    }
+    (completed_tasks, total_tasks)
+}
+
+/// Scans openspec/changes/ across the entire repository for completed features that have not been moved to archive/.
+/// Gracefully ignores unreadable directories/files (TOCTOU resilience).
+pub fn probe_unarchived_completed_changes(repo_root: &Path) -> Vec<UnarchivedChange> {
+    let openspec_dir = repo_root.join("openspec").join("changes");
+    let mut completed_changes = Vec::new();
+    let entries = match std::fs::read_dir(&openspec_dir) {
+        Ok(read) => read,
+        Err(_) => return completed_changes,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let dir_name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(name) => name,
+            None => continue,
+        };
+        if dir_name == "archive" {
+            continue;
+        }
+
+        let tasks_path = path.join("tasks.md");
+        if !tasks_path.is_file() {
+            continue;
+        }
+
+        let (completed, total) = count_task_checkboxes(&tasks_path);
+        if total > 0 && completed == total {
+            completed_changes.push(UnarchivedChange {
+                feature: dir_name.to_string(),
+                completed_tasks: completed,
+                total_tasks: total,
+            });
+        }
+    }
+
+    completed_changes.sort_by(|a, b| a.feature.cmp(&b.feature));
+    completed_changes
 }
 
 /// Match details for an unchecked task that correlates with modified files.

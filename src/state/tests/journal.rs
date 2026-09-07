@@ -68,8 +68,11 @@ fn corrupt_journal_is_treated_as_absent() {
     assert!(journal_path(&cfg).exists());
 }
 
+static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn fault_injection_fails_after_n_successful_arms() {
+    let _guard = ENV_LOCK.lock().unwrap();
     let tmp = tempdir().unwrap();
     let cfg = tmp.path().join("cfg");
     std::fs::create_dir_all(&cfg).unwrap();
@@ -98,6 +101,7 @@ fn recorded_command_reads_command_field() {
 
 #[test]
 fn fault_injection_and_recovery_with_jsonl_format() {
+    let _guard = ENV_LOCK.lock().unwrap();
     let tmp = tempdir().unwrap();
     let cfg = tmp.path().join("cfg");
     std::fs::create_dir_all(&cfg).unwrap();
