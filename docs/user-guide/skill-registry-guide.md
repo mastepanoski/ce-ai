@@ -67,3 +67,14 @@ When `ce-ai` builds or refreshes the skill index (`install`, `sync`, `upgrade`, 
   1. Registry file existence and JSON schema validity.
   2. Existence of underlying `SKILL.md` files.
   3. Resolution-time SHA256 digest integrity.
+
+---
+
+## Canonical Built-in Skills
+
+`ce-ai` packages foundational cognitive skills directly within the binary as compile-time embedded assets, ensuring they are available immediately across all supported harnesses:
+
+- **`sequential-thinking`**: Step-by-step reasoning, hypothesis refinement, revision tracking, and falsification criteria.
+  - Resolved on-demand via `ce-ai skills resolve sequential-thinking`.
+  - Guaranteed to be seeded into managed skill directories during `install` and `sync`.
+  - Zero external daemons, zero Node.js/npm dependencies, and 100% harness parity (including Pi No-MCP).

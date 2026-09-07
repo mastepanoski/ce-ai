@@ -299,13 +299,27 @@ pub(crate) fn sync_with(
         }
 
         // Rewrite the manifest with refreshed hashes and version/source (SU-2).
-        let files: Vec<ManifestFile> = desired
+        let mut files: Vec<ManifestFile> = desired
             .iter()
             .map(|(path, sha256)| ManifestFile {
                 path: path.clone(),
                 sha256: sha256.clone(),
             })
             .collect();
+        if !desired.contains_key(crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH) {
+            let dest = crate::source::builtin_skills::builtin_skill_target(
+                &managed_dir,
+                crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH,
+            );
+            arm!(&dest);
+            let mf = crate::source::builtin_skills::seed_builtin_skill(
+                &managed_dir,
+                crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH,
+                crate::source::builtin_skills::BUILTIN_SEQUENTIAL_THINKING_SKILL,
+                ctx.dry_run,
+            )?;
+            files.push(mf);
+        }
         arm!(&opencode_dir.join(MANAGED_DIR).join("install-manifest.json"));
         InstallManifest {
             version: version.to_string(),
@@ -385,6 +399,22 @@ pub(crate) fn sync_with(
                         path: rel.clone(),
                         sha256: desired[rel].clone(),
                     });
+                }
+                if !source_rel
+                    .contains_key(crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH)
+                {
+                    let dest = crate::source::builtin_skills::custom_builtin_skill_target(
+                        &cfg.skills_dir,
+                        crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH,
+                    );
+                    arm!(&dest);
+                    let mf = crate::source::builtin_skills::seed_custom_builtin_skill(
+                        &cfg.skills_dir,
+                        crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH,
+                        crate::source::builtin_skills::BUILTIN_SEQUENTIAL_THINKING_SKILL,
+                        ctx.dry_run,
+                    )?;
+                    files.push(mf);
                 }
                 let prior_mutations = InstallManifest::load(&cfg.plugins_dir)
                     .map(|m| m.config_mutations)
@@ -532,6 +562,20 @@ pub(crate) fn sync_with(
     }
 
     if !ctx.dry_run {
+        let global_skills = ctx.config_dir.join("skills");
+        if !global_skills
+            .join("sequential-thinking")
+            .join("SKILL.md")
+            .exists()
+        {
+            let _ = crate::source::builtin_skills::seed_custom_builtin_skill(
+                &global_skills,
+                crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH,
+                crate::source::builtin_skills::BUILTIN_SEQUENTIAL_THINKING_SKILL,
+                false,
+            );
+        }
+
         for project in &state.projects {
             if project.path.exists() {
                 let inner_body = crate::commands::init_prj::render_block_content(project.tier);
