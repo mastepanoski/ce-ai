@@ -58,3 +58,6 @@ A non-regression invariant guaranteeing that inferred workflow transitions (`Wor
 ### Branch-Scoped Workflow Isolation
 A multi-branch state partition scheme that indexes workflow progression by canonical workspace root and sanitized Git branch name (`<canonical_root>::<branch>`), preventing feature branches and bugfix work from clobbering one another's active workflow stage in multi-branch or worktree setups.
 
+### OpenSpec Tasks Desync Reconciliation
+A multi-level Git-to-checklist reconciliation engine (`src/commands/workflow.rs`) that compares modified working tree (`git status -uall`) and branch files against unchecked tasks (`- [ ]`) in `openspec/changes/<feature>/tasks.md`. It surfaces non-blocking diagnostic warnings across `ce-ai workflow resume`, `status`, `checkpoint`, and `ce-ai doctor`, while inhibiting automated FSM progression past Stage 4 (TDD & Work) until tasks are updated, preserving developer sovereignty and manual checkpointing.
+

@@ -69,6 +69,7 @@ A common beginner question is: *"Why do we need OpenSpec if we already did a bra
   - `/ce-plan` takes `spec.md` and `design.md` as inputs and **writes the executable checklist into `openspec/changes/<feature_name>/tasks.md`**.
 - **`/ce-work` Execution Loop**:
   - Reads `tasks.md`, executes TDD (Red-Green-Refactor), and marks checkboxes (`- [x] Task 1`).
+  - **Tasks Desync Diagnostic Guard**: If code modifications or branch commits exist while `tasks.md` remains unmarked (`0/N`), `ce-ai` flags a non-blocking desync warning across `workflow resume`, `status`, `checkpoint`, and `doctor`, prompting the agent or developer to update progress and guarding automated stage advancement.
 
 ---
 

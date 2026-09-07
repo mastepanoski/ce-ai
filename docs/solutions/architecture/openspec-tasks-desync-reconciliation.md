@@ -43,7 +43,7 @@ Release v1.44.0 introduces git-diff to task-list reconciliation in `src/commands
 `reconcile_tasks_with_git` matches extracted touched files against unchecked tasks (`- [ ]`) in `tasks.md`:
 - **Path Extraction**: `extract_paths_from_task_text` extracts candidate file paths enclosed in markdown backticks (e.g. `` `src/commands/workflow.rs` ``) as well as bare path-like tokens containing directory slashes or standard file extensions.
 - **Exact & Prefix Matching**: For each unchecked task, if any referenced path exactly matches a touched file, or matches as a directory prefix/suffix, a desync match (`TaskDesyncMatch`) is recorded.
-- **Aggregate Fallback**: If 0 tasks are marked completed (`0/N`) and at least two functional code files are touched, but task descriptions use conceptual descriptions without specific path references, an aggregate desync match is flagged.
+- **Aggregate Fallback**: If no unchecked task has explicit path matches, but 0 tasks are marked completed (`0/N` with `total_tasks > 0`) and any implementation code file (under `src/`, `tests/`, or `skills/`) is touched, an aggregate desync match (`is_aggregate_desync = true`) is flagged.
 
 ### 3. Non-Blocking Diagnostic Warnings
 

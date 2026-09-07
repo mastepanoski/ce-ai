@@ -262,6 +262,33 @@ workflow: re-hydrated context successfully. Proceeding with active task.
 
 The new agent immediately knows **where it is**, **what was already built**, and **what needs to be done next**—without asking the user or re-doing completed work.
 
+#### ⚠️ What Happens When Tasks Desync? (`tasks.md` vs. Git Reality)
+
+If an agent or developer implements code changes or makes commits on the feature branch, but forgets to update `openspec/changes/<feature>/tasks.md` (leaving checkboxes unchecked at `- [ ]`):
+
+```bash
+ce-ai workflow status
+```
+
+**Output with Desync Warning**:
+```text
+== [Workflow FSM & Progress Recovery Status] ==
+7-Stage Cycle: [1:Ideation] ➔ [2:OpenSpec] ➔ [3:Plan] ➔ [4:Work/TDD] ➔ [5:Verify] ➔ [6:Compound] ➔ [7:Ship]
+current phase: Stage 4: TDD & Work
+active subtask: Unit 2: Companion Tools Manager (tasks.md 0/4 completed)
+! Warning: Tasks desync detected — 1 unchecked task(s) reference modified files (src/commands/workflow.rs), but tasks.md shows 0/4 completed. Update tasks.md (- [x]) to reflect progress.
+recovery status: Ready (100% state preserved)
+```
+
+The warning banner is non-blocking to preserve operator control:
+- In `ce-ai workflow checkpoint`, manual checkpoints are recorded normally, but the CLI displays the warning to prompt the operator to mark `- [x]`.
+- In `ce-ai workflow resume`, the banner is injected directly into the context re-hydration block under `tasks progress`.
+- In `ce-ai doctor`, a non-fatal diagnostic warning is emitted without failing the health check (exit code 0):
+  ```text
+  doctor-warn: openspec tasks desync in 'my-feature': 1 unchecked task(s) with git modifications (progress: 0/4)
+  ```
+- In automated inference (`maybe_auto_checkpoint`), the FSM is guarded from auto-advancing past Stage 4 to Stage 5 (Verification), Stage 6 (Knowledge Capture), or Stage 7 (Git Shipping) while desync is active.
+
 ---
 
 ### 📍 Step 5: Automated Stage Inference & Turn-End Checkpointing
@@ -280,7 +307,7 @@ These hooks execute at turn boundaries and before context compaction, evaluating
 - **Stage 2 (OpenSpec)**: `proposal.md` and `spec.md` present under `openspec/changes/<feature>/` without tasks.
 - **Stage 3 (Execution Plan)**: `tasks.md` present with zero completed tasks.
 - **Stage 4 (TDD & Work)**: `tasks.md` with in-progress tasks, OR **Direct Entry** (`fix/*` or `feat/*` branch with uncommitted changes, bypassing ideation for fast bug repair via `ce-debug`).
-- **Stage 5 (Verification)**: All tasks in `tasks.md` marked completed (`[x]`).
+- **Stage 5 (Verification)**: All tasks in `tasks.md` marked completed (`[x]`) and no active tasks desync (auto-advancement is guarded if unchecked tasks reference touched files or aggregate code changes are detected).
 - **Stage 6 (Knowledge Capture)**: New or modified solutions in `docs/solutions/*.md`.
 - **Stage 7 (Git Shipping)**: Active PR created on GitHub or branch merged.
 
