@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.1] - 2026-09-08
+
+### Fixed
+- **OpenCode Loader Regression on `sync`/`upgrade` (`#325`):**
+  - **Shared Loader Validation (`src/opencode/plugins.rs`)**: Extracted the SessionStart-hook content check from `install_loader` into `is_valid_loader_content` and a new `resolve_loader_bytes(source_root)`, so both fresh installs and sync's drift-repair path resolve the loader through the same validated fallback to `BUILTIN_LOADER` instead of substituting stale bytes silently.
+  - **Sync Engine (`src/commands/sync.rs`)**: `sync_with` now resolves the loader once via `resolve_loader_bytes` and reuses it for both the desired-hash computation and the `Copy`/`Restore` write path, instead of reading raw, unvalidated bytes from the resolved source tree. Previously, `ce-ai sync` (and therefore `ce-ai upgrade`, which calls `sync_with` internally) could regress an already-correct, `session.created`-capable loader back to a stale upstream release loader lacking the hook, producing a persistent `ce-ai doctor` "SessionStart plugin missing or outdated" loop that `sync`/`install --harness opencode` could not durably fix.
+  - **Regression Coverage**: Added `sync_with_does_not_regress_opencode_loader_when_source_lacks_session_hook` (`src/commands/tests/sync.rs`) pinning that `sync_with` never regresses a correct installed loader when the resolved source's own loader is stale.
+
 ## [1.45.0] - 2026-09-07
 
 ### Added

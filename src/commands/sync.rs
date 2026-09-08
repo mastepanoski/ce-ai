@@ -212,6 +212,20 @@ pub(crate) fn sync_with(
         source_rel.insert(managed_rel, src_rel);
     }
 
+    // The OpenCode loader gets the same content validation as `install_loader`
+    // (never a raw copy): a stale upstream source lacking the SessionStart
+    // hook must not regress an already-correct installed loader, and any
+    // repair action must write the same validated bytes `install` would.
+    // Resolved once and reused below (the write step and the manifest
+    // rewrite) so this override doesn't re-read the file per lookup. Note
+    // `managed_tree` above already read the same path once while hashing
+    // the raw source tree, so this is a second read, not the only one.
+    let loader_bytes = crate::opencode::plugins::resolve_loader_bytes(source_root);
+    desired.insert(
+        crate::opencode::plugins::LOADER_REL_PATH.to_string(),
+        crate::state::diff::sha256_hex(&loader_bytes),
+    );
+
     if !desired.contains_key(crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH) {
         let hash = crate::state::diff::sha256_hex(
             crate::source::builtin_skills::BUILTIN_SEQUENTIAL_THINKING_SKILL.as_bytes(),
@@ -292,7 +306,9 @@ pub(crate) fn sync_with(
                             "restore"
                         };
                         arm!(&managed_dir.join(path));
-                        let content = if let Some(src) = source_rel.get(path) {
+                        let content = if path == crate::opencode::plugins::LOADER_REL_PATH {
+                            loader_bytes.clone()
+                        } else if let Some(src) = source_rel.get(path) {
                             std::fs::read(source_root.join(src))?
                         } else if path
                             == crate::source::builtin_skills::SEQUENTIAL_THINKING_REL_PATH

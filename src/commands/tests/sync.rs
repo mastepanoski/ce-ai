@@ -277,6 +277,80 @@ fn resolve_sync_source_and_version_fails_fast_with_empty_state() {
     }
 }
 
+/// Issue #325: `sync` (and therefore `upgrade`, which calls `sync_with`
+/// internally) used to copy the OpenCode loader byte-for-byte from the
+/// resolved source tree whenever it drifted, with no content validation.
+/// A correctly-installed loader (with the SessionStart `session.created`
+/// hook) would get silently regressed to a stale upstream release loader
+/// that lacks the hook, because the raw source bytes differ from what is
+/// already on disk. This pins that `sync_with` never regresses an
+/// already-correct loader when the resolved source's own loader is stale.
+#[test]
+fn sync_with_does_not_regress_opencode_loader_when_source_lacks_session_hook() {
+    use crate::commands::sync::sync_with;
+    use crate::commands::Context;
+    use crate::opencode::manifest::{InstallManifest, ManifestFile};
+    use crate::opencode::plugins::LOADER_REL_PATH;
+
+    let tmp = tempdir().unwrap();
+
+    // Stale upstream release source: loader has neither the SessionStart
+    // hook nor the legacy stub.
+    let source_root = tmp.path().join("ce-source");
+    let stale_loader = b"export default async function OldLoader() { return {} }";
+    std::fs::create_dir_all(source_root.join(".opencode/plugins")).unwrap();
+    std::fs::write(
+        source_root.join(".opencode/plugins/compound-engineering.js"),
+        stale_loader,
+    )
+    .unwrap();
+
+    // Already-installed, correct loader (as `install_loader` would have
+    // written it), tracked by a matching install-manifest entry.
+    let opencode_dir = tmp.path().join("opencode-config");
+    let correct_loader = b"export default function ceLoader() { /* session.created */ }";
+    let loader_dest = opencode_dir.join("compound-engineering/plugins/compound-engineering.js");
+    std::fs::create_dir_all(loader_dest.parent().unwrap()).unwrap();
+    std::fs::write(&loader_dest, correct_loader).unwrap();
+
+    InstallManifest {
+        version: "v1.0.0".into(),
+        plugin_name: "compound-engineering".into(),
+        installed_at: "2026-09-07T00:00:00Z".into(),
+        source: serde_json::json!({"kind": "github-release", "tag": "v1.0.0"}),
+        files: vec![ManifestFile {
+            path: LOADER_REL_PATH.to_string(),
+            sha256: sha256_hex(correct_loader),
+        }],
+        config_mutations: vec![],
+    }
+    .write(&opencode_dir)
+    .unwrap();
+
+    let ctx = Context {
+        config_dir: tmp.path().join("config"),
+        opencode_config_dir: opencode_dir.clone(),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    sync_with(
+        &ctx,
+        &source_root,
+        "v1.0.1",
+        serde_json::json!({"kind": "local", "path": source_root.display().to_string()}),
+    )
+    .unwrap();
+
+    let on_disk = std::fs::read_to_string(&loader_dest).unwrap();
+    assert!(
+        on_disk.contains("session.created") || on_disk.contains("ceLoader"),
+        "sync regressed the correct SessionStart loader to the stale source loader: {on_disk}"
+    );
+}
+
 #[test]
 fn resolve_sync_source_and_version_resolves_from_non_opencode_entry() {
     use crate::commands::sync::resolve_sync_source_and_version;
