@@ -254,3 +254,132 @@ fn test_doctor_rtk_probe_resolves_home_from_ctx() {
         }
     }
 }
+
+#[test]
+fn test_doctor_code_review_mid_tier_note_matrix() {
+    let mut state = State::new();
+    let empty_config = serde_json::json!({});
+
+    // 1. Neither configured -> None
+    assert!(
+        crate::commands::models::check_code_review_mid_tier_note(&state, &empty_config).is_none()
+    );
+
+    // 2. ce-code-review in config, mid-tier unset -> Some(note)
+    let config_review_only = serde_json::json!({
+        "agent": {
+            "ce-code-review": { "model": "anthropic/claude-sonnet-4-5" }
+        }
+    });
+    let note =
+        crate::commands::models::check_code_review_mid_tier_note(&state, &config_review_only);
+    assert!(note.is_some());
+    let note_str = note.unwrap();
+    assert!(note_str.contains("ce-code-review-mid-tier"));
+    assert!(note_str.contains("persona-level cost tiering has no explicit target on opencode"));
+    assert!(note_str
+        .contains("ce-ai models set --harness opencode ce-code-review-mid-tier <provider/model>"));
+
+    // 3. ce-code-review in state, mid-tier unset -> Some(note)
+    state.set_model_assignment("ce-code-review", "anthropic", "claude-sonnet-4-5");
+    let note_from_state =
+        crate::commands::models::check_code_review_mid_tier_note(&state, &empty_config);
+    assert!(note_from_state.is_some());
+
+    // 4. Both configured in config -> None
+    let config_both = serde_json::json!({
+        "agent": {
+            "ce-code-review": { "model": "anthropic/claude-sonnet-4-5" },
+            "ce-code-review-mid-tier": { "model": "anthropic/claude-haiku-3-5" }
+        }
+    });
+    let mut state_clean = State::new();
+    assert!(
+        crate::commands::models::check_code_review_mid_tier_note(&state_clean, &config_both)
+            .is_none()
+    );
+
+    // 5. Both configured across state and config -> None
+    state_clean.set_model_assignment("ce-code-review-mid-tier", "anthropic", "claude-haiku-3-5");
+    assert!(crate::commands::models::check_code_review_mid_tier_note(
+        &state_clean,
+        &config_review_only
+    )
+    .is_none());
+
+    // 6. Only mid-tier configured -> None
+    let config_mid_tier_only = serde_json::json!({
+        "agent": {
+            "ce-code-review-mid-tier": { "model": "anthropic/claude-haiku-3-5" }
+        }
+    });
+    let clean_state2 = State::new();
+    assert!(crate::commands::models::check_code_review_mid_tier_note(
+        &clean_state2,
+        &config_mid_tier_only
+    )
+    .is_none());
+}
+
+#[test]
+fn test_doctor_runs_cleanly_with_mid_tier_note() {
+    let tmp = TempDir::new().unwrap();
+    let ctx = Context {
+        config_dir: tmp.path().join("config"),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let mut state = State::new();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "opencode",
+        "version": "1.0.0",
+        "scope": "global",
+        "installed_at": "2026-08-22T00:00:00Z"
+    }));
+    state.set_model_assignment("ce-code-review", "anthropic", "claude-sonnet-4-5");
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    let manifest = InstallManifest {
+        version: "1.0.0".into(),
+        plugin_name: "compound-engineering".into(),
+        installed_at: "2026-08-22T00:00:00Z".into(),
+        source: serde_json::json!({"type": "local"}),
+        files: vec![],
+        config_mutations: vec![],
+    };
+    manifest.write(&ctx.opencode_config_dir).unwrap();
+
+    // SessionStart plugin properly configured
+    crate::opencode::plugins::ensure_session_start_plugin(&ctx.opencode_config_dir).unwrap();
+
+    // opencode.json matches state for ce-code-review so no drift finding occurs
+    let mut config = read_config(&ctx.opencode_config_dir.join("opencode.json")).unwrap();
+    config["agent"] = serde_json::json!({
+        "ce-code-review": { "model": "anthropic/claude-sonnet-4-5" }
+    });
+    crate::state::write_atomic(
+        &ctx.opencode_config_dir.join("opencode.json"),
+        &serde_json::to_vec_pretty(&config).unwrap(),
+    )
+    .unwrap();
+
+    let args = Args::default();
+    let res = run(&ctx, &args);
+    // Doctor must succeed (exit 0) because mid-tier note is informational, not a blocking finding!
+    assert!(
+        res.is_ok(),
+        "doctor should pass with Ok(()), got: {:?}",
+        res
+    );
+}

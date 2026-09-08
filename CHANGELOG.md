@@ -5,6 +5,15 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.46.0] - 2026-09-08
+
+### Added
+- **Mid-Tier Model Slot for `ce-code-review` Persona Dispatch (`#328`):**
+  - **Slot Definition & Predicates (`src/harness/agents.rs`)**: Defined `CODE_REVIEW_MID_TIER_SLOT = "ce-code-review-mid-tier"` and extended `CE_AGENT_SLOTS` to 7 items, providing `CE_AGENT_STAGE_SLOTS` alongside `is_tier_slot` and `is_stage_slot` helpers.
+  - **Model Setting & Persistence (`src/commands/models.rs`)**: Enabled `ce-ai models set --harness opencode ce-code-review-mid-tier <provider/model>` through standard atomic persistence in `opencode.json` and `state.json`, preserving user keys and appending versioned snapshots.
+  - **Hierarchical List Display (`src/commands/models.rs`)**: Formatted `ce-ai models list` with distinguished hierarchy (`  └─ mid-tier (ce-code-review-mid-tier): <model>`) when configured alongside `ce-code-review`, and explicit sub-slot labeling when standalone.
+  - **Doctor Health Diagnostic (`src/commands/doctor.rs`)**: Added non-blocking informational note (`doctor-info:`) alerting when `ce-code-review` has an assigned model on OpenCode but `ce-code-review-mid-tier` is unconfigured, recommending the exact command to configure it.
+
 ## [1.45.1] - 2026-09-08
 
 ### Fixed

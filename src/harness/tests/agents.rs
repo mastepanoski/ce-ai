@@ -47,3 +47,20 @@ fn skips_markdown_based_harnesses() {
     assert!(!created);
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "# rules");
 }
+
+#[test]
+fn test_mid_tier_slot_constants_and_predicates() {
+    assert_eq!(CODE_REVIEW_MID_TIER_SLOT, "ce-code-review-mid-tier");
+    assert_eq!(CE_AGENT_STAGE_SLOTS.len(), 6);
+    assert_eq!(CE_AGENT_SLOTS.len(), 7);
+    assert!(CE_AGENT_SLOTS.contains(&CODE_REVIEW_MID_TIER_SLOT));
+    for stage in CE_AGENT_STAGE_SLOTS {
+        assert!(CE_AGENT_SLOTS.contains(&stage));
+        assert!(is_stage_slot(stage));
+        assert!(!is_tier_slot(stage));
+    }
+    assert!(is_tier_slot(CODE_REVIEW_MID_TIER_SLOT));
+    assert!(!is_stage_slot(CODE_REVIEW_MID_TIER_SLOT));
+    assert!(!is_tier_slot("definitely-unknown"));
+    assert!(!is_stage_slot("definitely-unknown"));
+}

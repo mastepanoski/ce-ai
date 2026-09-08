@@ -190,3 +190,118 @@ fn discovery_supported_only_for_opencode() {
     assert!(discovery_supported("opencode"));
     assert!(!discovery_supported("claude"));
 }
+
+#[test]
+fn format_model_assignments_distinguishes_mid_tier_slot() {
+    use crate::state::state::ModelAssignment;
+    let mut assignments = std::collections::BTreeMap::new();
+
+    // Empty case
+    assert_eq!(
+        format_model_assignments(&assignments),
+        vec!["models: none".to_string()]
+    );
+
+    // Both ce-code-review and mid-tier configured
+    assignments.insert(
+        "ce-ai".to_string(),
+        ModelAssignment {
+            provider_id: "opencode-go".to_string(),
+            model_id: "kimi-k2.6".to_string(),
+            effort: None,
+        },
+    );
+    assignments.insert(
+        "ce-code-review".to_string(),
+        ModelAssignment {
+            provider_id: "anthropic".to_string(),
+            model_id: "claude-sonnet-4-5".to_string(),
+            effort: None,
+        },
+    );
+    assignments.insert(
+        "ce-code-review-mid-tier".to_string(),
+        ModelAssignment {
+            provider_id: "anthropic".to_string(),
+            model_id: "claude-haiku-3-5".to_string(),
+            effort: None,
+        },
+    );
+
+    let lines = format_model_assignments(&assignments);
+    assert_eq!(
+        lines,
+        vec![
+            "ce-ai: opencode-go/kimi-k2.6".to_string(),
+            "ce-code-review: anthropic/claude-sonnet-4-5".to_string(),
+            "  └─ mid-tier (ce-code-review-mid-tier): anthropic/claude-haiku-3-5".to_string(),
+        ]
+    );
+
+    // Only mid-tier configured, parent ce-code-review absent
+    assignments.remove("ce-code-review");
+    let fallback_lines = format_model_assignments(&assignments);
+    assert_eq!(
+        fallback_lines,
+        vec![
+            "ce-ai: opencode-go/kimi-k2.6".to_string(),
+            "ce-code-review-mid-tier (mid-tier sub-slot): anthropic/claude-haiku-3-5".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn set_mid_tier_slot_persists_and_creates_snapshot() {
+    let tmp = TempDir::new().unwrap();
+    let ctx = hermetic_ctx(&tmp);
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+    std::fs::write(
+        ctx.opencode_config_dir.join("opencode.json"),
+        r#"{"agent":{}}"#,
+    )
+    .unwrap();
+
+    set(
+        &ctx,
+        "opencode",
+        "ce-code-review-mid-tier",
+        "anthropic/claude-haiku-3-5",
+    )
+    .unwrap();
+
+    let state = State::load(&ctx.config_dir.join("state.json")).unwrap();
+    assert_eq!(
+        state
+            .model_assignments
+            .get("ce-code-review-mid-tier")
+            .unwrap()
+            .provider_id,
+        "anthropic"
+    );
+    assert_eq!(
+        state
+            .model_assignments
+            .get("ce-code-review-mid-tier")
+            .unwrap()
+            .model_id,
+        "claude-haiku-3-5"
+    );
+
+    let config = read_config(&ctx.opencode_config_dir.join("opencode.json")).unwrap();
+    assert_eq!(
+        config["agent"]["ce-code-review-mid-tier"]["model"],
+        "anthropic/claude-haiku-3-5"
+    );
+    assert!(
+        config["agent"]["ce-code-review-mid-tier"]
+            .get("variant")
+            .is_none(),
+        "never writes variant"
+    );
+
+    // Snapshot was created in profiles/versions
+    let versions_dir = ctx.config_dir.join("profiles").join("versions");
+    assert!(versions_dir.exists());
+    let count = std::fs::read_dir(&versions_dir).unwrap().count();
+    assert!(count >= 1);
+}

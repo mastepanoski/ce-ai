@@ -14,8 +14,11 @@ use crate::state::write_atomic;
 /// Agent slot name reserved for the Compound Engineering orchestrator.
 pub const ORCHESTRATOR_AGENT: &str = "ce-ai";
 
-/// CE workflow slots whose configuration ce-ai tracks across harnesses.
-pub const CE_AGENT_SLOTS: [&str; 6] = [
+/// Slot name for ce-code-review's mid-tier persona dispatch.
+pub const CODE_REVIEW_MID_TIER_SLOT: &str = "ce-code-review-mid-tier";
+
+/// Primary CE workflow stage slots.
+pub const CE_AGENT_STAGE_SLOTS: [&str; 6] = [
     ORCHESTRATOR_AGENT,
     "ce-brainstorm",
     "ce-plan",
@@ -23,6 +26,27 @@ pub const CE_AGENT_SLOTS: [&str; 6] = [
     "ce-code-review",
     "ce-doc-review",
 ];
+
+/// All CE workflow and tiering slots whose configuration ce-ai tracks across harnesses.
+pub const CE_AGENT_SLOTS: [&str; 7] = [
+    ORCHESTRATOR_AGENT,
+    "ce-brainstorm",
+    "ce-plan",
+    "ce-work",
+    "ce-code-review",
+    "ce-doc-review",
+    CODE_REVIEW_MID_TIER_SLOT,
+];
+
+/// Checks if a slot is an internal persona/tiering slot rather than a top-level stage.
+pub fn is_tier_slot(slot: &str) -> bool {
+    slot == CODE_REVIEW_MID_TIER_SLOT
+}
+
+/// Checks if a slot is a primary workflow stage slot.
+pub fn is_stage_slot(slot: &str) -> bool {
+    CE_AGENT_STAGE_SLOTS.contains(&slot)
+}
 
 /// Description advertised for the orchestrator agent.
 pub const ORCHESTRATOR_DESCRIPTION: &str = "CE AI Orchestrator - coordinates compound engineering";
