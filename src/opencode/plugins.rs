@@ -29,27 +29,39 @@ pub fn skills_path(config_dir: &Path) -> PathBuf {
     config_dir.join(MANAGED_DIR).join("skills")
 }
 
+/// Whether `content` is a recognized-valid OpenCode plugin loader: it either
+/// carries the SessionStart `session.created` hook, or matches the legacy
+/// `ceLoader` stub used before the hook existed. Anything else (e.g. an
+/// upstream release tarball that predates the hook) is stale/incompatible.
+fn is_valid_loader_content(content: &str) -> bool {
+    content.contains("session.created")
+        || content.starts_with("export default function ceLoader() {}")
+}
+
+/// Resolves the OpenCode plugin loader bytes for a given source tree,
+/// validating that the source's own loader is still recognized (see
+/// `is_valid_loader_content`). When it isn't, falls back to
+/// `BUILTIN_LOADER`, the loader embedded in this `ce-ai` binary. Shared by
+/// `install_loader` (fresh installs) and the sync engine's drift-repair
+/// path, so neither can regress an already-correct installed loader to a
+/// stale/incompatible one.
+pub fn resolve_loader_bytes(source_root: &Path) -> Vec<u8> {
+    let src = source_root.join(SOURCE_LOADER_PATH);
+    match std::fs::read(&src) {
+        Ok(b) => match std::str::from_utf8(&b) {
+            Ok(s) if is_valid_loader_content(s) => b,
+            Ok(_) => BUILTIN_LOADER.as_bytes().to_vec(),
+            Err(_) => b,
+        },
+        Err(_) => BUILTIN_LOADER.as_bytes().to_vec(),
+    }
+}
+
 /// Copies the CE loader from the source tree into
 /// `<config>/compound-engineering/plugins/compound-engineering.js` (OI-3).
 /// Returns the managed-relative path and its SHA256 for the manifest (OI-5).
 pub fn install_loader(source_root: &Path, config_dir: &Path) -> Result<ManifestFile, CeError> {
-    let src = source_root.join(SOURCE_LOADER_PATH);
-    let bytes = match std::fs::read(&src) {
-        Ok(b) => {
-            if let Ok(s) = std::str::from_utf8(&b) {
-                if s.contains("session.created")
-                    || s.starts_with("export default function ceLoader() {}")
-                {
-                    b
-                } else {
-                    BUILTIN_LOADER.as_bytes().to_vec()
-                }
-            } else {
-                b
-            }
-        }
-        Err(_) => BUILTIN_LOADER.as_bytes().to_vec(),
-    };
+    let bytes = resolve_loader_bytes(source_root);
     let dest = plugin_entry(config_dir);
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)?;
@@ -71,9 +83,7 @@ pub fn has_session_start_plugin(config_dir: &Path) -> bool {
     let Ok(content) = std::fs::read_to_string(&loader_path) else {
         return false;
     };
-    if !content.contains("session.created")
-        && !content.starts_with("export default function ceLoader() {}")
-    {
+    if !is_valid_loader_content(&content) {
         return false;
     }
 

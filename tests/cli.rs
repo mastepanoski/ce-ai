@@ -691,7 +691,11 @@ fn ce_tarball_v9(dir: &Path) -> PathBuf {
     add_entry(
         &mut builder,
         "ce-v9/.opencode/plugins/compound-engineering.js",
-        "export default function ceLoaderV9() {}\n",
+        // Contains the SessionStart marker so the loader-safety fallback
+        // (#325: sync/upgrade must never regress a session.created-capable
+        // loader) treats this fixture as a valid, distinguishable v9 loader
+        // rather than a stale one to be substituted with BUILTIN_LOADER.
+        "export default function ceLoaderV9() { /* session.created */ }\n",
     );
     add_entry(
         &mut builder,
@@ -1019,7 +1023,7 @@ fn upgrade_to_tag_resolves_from_cache_and_runs_sync() {
         .success();
     assert_eq!(
         fs::read_to_string(loader_path(&home)).unwrap(),
-        "export default function ceLoaderV9() {}\n"
+        "export default function ceLoaderV9() { /* session.created */ }\n"
     );
     assert_eq!(
         fs::read_to_string(managed_dir(&home).join("skills/ce-foo/SKILL.md")).unwrap(),
