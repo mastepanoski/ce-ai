@@ -264,6 +264,33 @@ pub fn model_drift_findings(state: &State, config: &serde_json::Value) -> Vec<St
     findings
 }
 
+/// Evaluates whether an informational note should be emitted regarding unconfigured
+/// mid-tier persona dispatch for `ce-code-review`.
+pub fn check_code_review_mid_tier_note(
+    state: &State,
+    config: &serde_json::Value,
+) -> Option<String> {
+    let has_model = |slot: &str| -> bool {
+        let in_config = config
+            .get("agent")
+            .and_then(|a| a.get(slot))
+            .and_then(|e| e.get("model"))
+            .and_then(|m| m.as_str())
+            .is_some_and(|m| !m.is_empty());
+        let in_state = state.model_assignments.contains_key(slot);
+        in_config || in_state
+    };
+
+    let mid_tier = crate::harness::agents::CODE_REVIEW_MID_TIER_SLOT;
+    if has_model("ce-code-review") && !has_model(mid_tier) {
+        Some(format!(
+            "ce-code-review has a model assigned but '{mid_tier}' is not configured; persona-level cost tiering has no explicit target on opencode and may silently fall back to the session model (run 'ce-ai models set --harness opencode {mid_tier} <provider/model>' to configure)"
+        ))
+    } else {
+        None
+    }
+}
+
 /// Imports effective `opencode.json` model assignments into `state`,
 /// returning the imported `(slot, model)` pairs. Config is treated as the
 /// live truth because users may edit it outside ce-ai (#111); opencode.json
@@ -318,17 +345,58 @@ pub fn purge_stale_assignments(state: &mut State, config: &serde_json::Value) ->
     stale
 }
 
+/// Formats model assignments for display, presenting tiering sub-slots
+/// distinguished from top-level workflow stage slots.
+pub fn format_model_assignments(
+    assignments: &std::collections::BTreeMap<String, crate::state::state::ModelAssignment>,
+) -> Vec<String> {
+    if assignments.is_empty() {
+        return vec!["models: none".to_string()];
+    }
+
+    let mut lines = Vec::new();
+    let mid_tier_slot = crate::harness::agents::CODE_REVIEW_MID_TIER_SLOT;
+    let mid_tier_assignment = assignments.get(mid_tier_slot);
+
+    for (slot, assignment) in assignments {
+        if slot == mid_tier_slot {
+            // Rendered either under its parent or standalone below
+            continue;
+        }
+        lines.push(format!(
+            "{slot}: {}/{}",
+            assignment.provider_id, assignment.model_id
+        ));
+        if slot == "ce-code-review" {
+            if let Some(sub) = mid_tier_assignment {
+                lines.push(format!(
+                    "  └─ mid-tier ({mid_tier_slot}): {}/{}",
+                    sub.provider_id, sub.model_id
+                ));
+            }
+        }
+    }
+
+    // Standalone fallback if ce-code-review was not assigned but mid-tier was
+    if let Some(sub) = mid_tier_assignment {
+        if !assignments.contains_key("ce-code-review") {
+            lines.push(format!(
+                "{mid_tier_slot} (mid-tier sub-slot): {}/{}",
+                sub.provider_id, sub.model_id
+            ));
+        }
+    }
+
+    lines
+}
+
 fn list(ctx: &Context) -> Result<(), CeError> {
     let state = State::load_with_workspace_overrides(
         &ctx.config_dir.join("state.json"),
         ctx.workspace_root.as_deref(),
     )?;
-    if state.model_assignments.is_empty() {
-        println!("models: none");
-        return Ok(());
-    }
-    for (slot, assignment) in &state.model_assignments {
-        println!("{slot}: {}/{}", assignment.provider_id, assignment.model_id);
+    for line in format_model_assignments(&state.model_assignments) {
+        println!("{line}");
     }
     Ok(())
 }

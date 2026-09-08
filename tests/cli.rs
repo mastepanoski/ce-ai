@@ -876,6 +876,74 @@ fn models_set_unknown_slot_persists_with_warning() {
 }
 
 #[test]
+fn models_mid_tier_slot_set_list_and_doctor_diagnostic() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // 1. Assign ce-code-review
+    ceai(&config_dir, &home)
+        .args([
+            "models",
+            "set",
+            "ce-code-review",
+            "anthropic/claude-sonnet-4-5",
+        ])
+        .assert()
+        .success();
+
+    // Doctor reports diagnostic note for unconfigured mid-tier slot (Exit 0)
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "doctor-info: ce-code-review has a model assigned but 'ce-code-review-mid-tier' is not configured",
+        ));
+
+    // Models list shows ce-code-review without mid-tier
+    ceai(&config_dir, &home)
+        .args(["models", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "ce-code-review: anthropic/claude-sonnet-4-5",
+        ));
+
+    // 2. Assign mid-tier slot
+    ceai(&config_dir, &home)
+        .args([
+            "models",
+            "set",
+            "--harness",
+            "opencode",
+            "ce-code-review-mid-tier",
+            "anthropic/claude-haiku-3-5",
+        ])
+        .assert()
+        .success();
+
+    // Models list shows hierarchical mid-tier sub-slot
+    ceai(&config_dir, &home)
+        .args(["models", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "  └─ mid-tier (ce-code-review-mid-tier): anthropic/claude-haiku-3-5",
+        ));
+
+    // Doctor diagnostic note is now absent
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "doctor-info: ce-code-review has a model assigned but 'ce-code-review-mid-tier' is not configured",
+        ).not());
+}
+
+#[test]
 fn models_profile_save_load_round_trip_restores_snapshot() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));

@@ -114,6 +114,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         findings.extend(crate::commands::models::model_drift_findings(
             &state, &config,
         ));
+        if let Some(note) =
+            crate::commands::models::check_code_review_mid_tier_note(&state, &config)
+        {
+            println!("doctor-info: {note}");
+        }
     }
 
     // Skill Registry Integrity Health Probe
