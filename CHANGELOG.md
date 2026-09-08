@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.0] - 2026-09-07
+
+### Added
+- **Deterministic Detection of Unarchived Completed OpenSpec Changes (`#323`):**
+  - **Repo-Wide Probe & Checkbox Counting (`src/commands/workflow.rs`)**: Implemented `probe_unarchived_completed_changes` scanning every non-archive directory under `openspec/changes/`, extracting `count_task_checkboxes` to count completed vs total task checkboxes across both active and sibling features with TOCTOU graceful degradation.
+  - **`RepoState` Integration**: Extended `RepoState` with `unarchived_completed_changes: Vec<UnarchivedChange>` containing feature name and completed/total task counts, enabling deterministic detection across both text and `--json` workflows.
+  - **Turn-0 Non-Discretionary Resume Surface**: Added a compact, single-line summary (`openspec ledger: clean (0 pending archival)` or `openspec ledger: ! N change(s) complete but not archived — run 'ce-ai doctor' for details`) to `"== [Environment State & Drift Status] =="` in `resume_lines`, guaranteeing Turn-0 delivery via native harness hooks (`SessionStart` / `PreInvocation`) without relying on discretionary health checks.
+  - **Non-Blocking Warnings in Workflow Status & Checkpoint**: Emitted warnings in `ce-ai workflow status` and `ce-ai workflow checkpoint` alerting developers when completed changes linger in the changes ledger.
+  - **Verbose Diagnostics in `ce-ai doctor`**: Added granular `doctor-warn: openspec change '<feature>' is complete (N/N tasks) but not archived — see openspec/changes/archive/README.md` reporting per unarchived feature without elevating to fatal findings (exits 0).
+
 ## [1.44.2] - 2026-09-07
 
 ### Fixed

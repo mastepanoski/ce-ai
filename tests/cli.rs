@@ -7187,3 +7187,126 @@ fn install_harness_all_survives_directory_config_path_and_warns() {
         "claude install manifest must exist"
     );
 }
+
+#[test]
+fn workflow_and_doctor_detect_unarchived_completed_changes() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    let proj = tmp.path().join("proj");
+    fs::create_dir_all(&proj).unwrap();
+
+    git_cmd()
+        .args(["init", "-q"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    // 1. Initially with clean workspace (no openspec changes), resume output shows ledger clean
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["workflow", "resume"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "openspec ledger: clean (0 pending archival)",
+        ));
+
+    // 2. Create a fully completed change: openspec/changes/feat-done/tasks.md
+    let feat_done = proj.join("openspec").join("changes").join("feat-done");
+    fs::create_dir_all(&feat_done).unwrap();
+    fs::write(feat_done.join("proposal.md"), "# Proposal").unwrap();
+    fs::write(feat_done.join("spec.md"), "# Spec").unwrap();
+    let tasks_content = "\
+# Tasks
+- [x] 1. Complete task one
+- [X] 2. Complete task two
+";
+    fs::write(feat_done.join("tasks.md"), tasks_content).unwrap();
+
+    // Also create an incomplete change: openspec/changes/feat-wip/tasks.md (should not trigger)
+    let feat_wip = proj.join("openspec").join("changes").join("feat-wip");
+    fs::create_dir_all(&feat_wip).unwrap();
+    fs::write(
+        feat_wip.join("tasks.md"),
+        "# Tasks\n- [x] 1. Done\n- [ ] 2. Pending\n",
+    )
+    .unwrap();
+
+    // Also create a completed change inside archive/ (should not trigger)
+    let feat_archived = proj
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join("feat-archived");
+    fs::create_dir_all(&feat_archived).unwrap();
+    fs::write(
+        feat_archived.join("tasks.md"),
+        "# Tasks\n- [x] 1. Done\n- [x] 2. Done\n",
+    )
+    .unwrap();
+
+    // 3. Surface 1: ce-ai workflow resume (plain text)
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["workflow", "resume"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "openspec ledger: ! 1 change(s) complete but not archived — run 'ce-ai doctor' for details",
+        ));
+
+    // Surface 1 (JSON): ce-ai workflow resume --json
+    let json_output = ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["workflow", "resume", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json_str = String::from_utf8(json_output).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+
+    let add_ctx = parsed["additionalContext"].as_str().unwrap();
+    assert!(add_ctx.contains(
+        "openspec ledger: ! 1 change(s) complete but not archived — run 'ce-ai doctor' for details"
+    ));
+
+    let hook_ctx = parsed["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .unwrap();
+    assert!(hook_ctx.contains(
+        "openspec ledger: ! 1 change(s) complete but not archived — run 'ce-ai doctor' for details"
+    ));
+
+    let unarchived = parsed["repo_state"]["unarchived_completed_changes"]
+        .as_array()
+        .unwrap();
+    assert_eq!(unarchived.len(), 1);
+    assert_eq!(unarchived[0]["feature"], "feat-done");
+    assert_eq!(unarchived[0]["completed_tasks"], 2);
+    assert_eq!(unarchived[0]["total_tasks"], 2);
+
+    // 4. Surface 2: ce-ai workflow status
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "! Warning: 1 OpenSpec change(s) complete but not archived — run 'ce-ai doctor' for details",
+        ));
+
+    // 5. Surface 3: ce-ai doctor (verbose details + non-fatal exit 0)
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "doctor-warn: openspec change 'feat-done' is complete (2/2 tasks) but not archived — see openspec/changes/archive/README.md",
+        ));
+}

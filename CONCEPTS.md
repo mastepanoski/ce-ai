@@ -64,4 +64,8 @@ A multi-level Git-to-checklist reconciliation engine (`src/commands/workflow.rs`
 ### Engram Context Echo (Behavioral Loop)
 A cognitive feedback loop in AI agents where historical `ce-ai` status banners (e.g. `tasks progress: 0/N completed`), previously quoted in user prompts and persisted by memory systems like Engram (`FormatContext`), are re-injected verbatim into subsequent sessions. Without temporal framing, the LLM confuses historical prompt quotes with live repository state, mistakenly perceiving workflow progression as stalled. `ce-ai`'s stage inference remains strictly isolated and hermetic, deriving progress exclusively from Git state and `tasks.md`. See [`docs/solutions/architecture/engram-context-echo-behavioral-risk.md`](docs/solutions/architecture/engram-context-echo-behavioral-risk.md).
 
+### OpenSpec Ledger Completeness Probe
+A repo-wide, non-discretionary health probe (`probe_unarchived_completed_changes`) that scans all direct subdirectories in `openspec/changes/` (excluding `archive/`) for change folders where 100% of tasks in `tasks.md` are completed. It guarantees deterministic detection by anchoring a compact ledger summary line into Turn-0 session delivery (`ce-ai workflow resume` via native harness `SessionStart` hooks), `workflow status`, `workflow checkpoint`, and verbose diagnostics in `ce-ai doctor`, preventing completed changes from lingering unarchived outside compound engineering sessions.
+
+
 
