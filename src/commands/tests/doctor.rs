@@ -383,3 +383,60 @@ fn test_doctor_runs_cleanly_with_mid_tier_note() {
         res
     );
 }
+
+#[test]
+fn test_doctor_claude_marketplace_divergence_is_non_blocking() {
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let claude_dir = home.join(".claude");
+    let plugins_dir = claude_dir.join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+    let plugins_file = plugins_dir.join("installed_plugins.json");
+    std::fs::write(
+        &plugins_file,
+        serde_json::json!({
+            "version": 2,
+            "plugins": {
+                "compound-engineering@compound-engineering-plugin": [{
+                    "scope": "user",
+                    "version": "3.8.4"
+                }]
+            }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let ctx = Context {
+        config_dir: tmp.path().join("config"),
+        opencode_config_dir: home.join(".config").join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let mut state = State::new();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "claude",
+        "version": "compound-engineering-v3.24.0",
+        "scope": "global",
+        "installed_at": "2026-08-22T00:00:00Z"
+    }));
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    // Doctor must succeed (exit 0) because marketplace divergence is informational, not a blocking finding!
+    let res = run(&ctx, &Args::default());
+    assert!(
+        res.is_ok(),
+        "doctor should pass with Ok(()), got: {:?}",
+        res
+    );
+}
