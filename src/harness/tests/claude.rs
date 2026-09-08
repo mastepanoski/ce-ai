@@ -198,3 +198,201 @@ fn preserves_user_hooks_and_settings_in_claude_settings_json() {
         "echo user-hook"
     );
 }
+
+#[test]
+fn test_normalize_plugin_version() {
+    assert_eq!(
+        normalize_plugin_version("compound-engineering-v3.24.0"),
+        "3.24.0"
+    );
+    assert_eq!(
+        normalize_plugin_version("compound-engineering@3.24.0"),
+        "3.24.0"
+    );
+    assert_eq!(normalize_plugin_version("v3.24.0"), "3.24.0");
+    assert_eq!(normalize_plugin_version("3.24.0"), "3.24.0");
+    assert_eq!(normalize_plugin_version("  v1.2.3  "), "1.2.3");
+}
+
+#[test]
+fn test_marketplace_divergence_missing_or_malformed_file() {
+    let tmp = TempDir::new().unwrap();
+    let claude_dir = tmp.path().join(".claude");
+    let cwd = tmp.path().join("cwd");
+
+    let mut state = crate::state::state::State::default();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "claude",
+        "scope": "global",
+        "version": "compound-engineering-v3.24.0",
+    }));
+
+    // 1. Missing plugins directory and file -> empty
+    let divs = check_claude_marketplace_divergence(&state, &cwd, &claude_dir);
+    assert!(divs.is_empty());
+
+    // 2. Empty file -> empty
+    let plugins_dir = claude_dir.join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+    let plugins_file = plugins_dir.join("installed_plugins.json");
+    std::fs::write(&plugins_file, "").unwrap();
+    let divs = check_claude_marketplace_divergence(&state, &cwd, &claude_dir);
+    assert!(divs.is_empty());
+
+    // 3. Malformed JSON -> empty
+    std::fs::write(&plugins_file, "{ corrupted json...").unwrap();
+    let divs = check_claude_marketplace_divergence(&state, &cwd, &claude_dir);
+    assert!(divs.is_empty());
+}
+
+#[test]
+fn test_marketplace_divergence_claude_harness_not_installed() {
+    let tmp = TempDir::new().unwrap();
+    let claude_dir = tmp.path().join(".claude");
+    let cwd = tmp.path().join("cwd");
+
+    let plugins_dir = claude_dir.join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+    let plugins_file = plugins_dir.join("installed_plugins.json");
+    std::fs::write(
+        &plugins_file,
+        serde_json::json!({
+            "version": 2,
+            "plugins": {
+                "compound-engineering@compound-engineering-plugin": [{
+                    "scope": "user",
+                    "version": "3.17.1"
+                }]
+            }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    // State has opencode, but NOT claude
+    let mut state = crate::state::state::State::default();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "opencode",
+        "scope": "global",
+        "version": "compound-engineering-v3.24.0",
+    }));
+
+    let divs = check_claude_marketplace_divergence(&state, &cwd, &claude_dir);
+    assert!(divs.is_empty());
+}
+
+#[test]
+fn test_marketplace_divergence_matching_version_no_divergence() {
+    let tmp = TempDir::new().unwrap();
+    let claude_dir = tmp.path().join(".claude");
+    let cwd = tmp.path().join("cwd");
+
+    let plugins_dir = claude_dir.join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+    let plugins_file = plugins_dir.join("installed_plugins.json");
+    std::fs::write(
+        &plugins_file,
+        serde_json::json!({
+            "version": 2,
+            "plugins": {
+                "compound-engineering@compound-engineering-plugin": [{
+                    "scope": "user",
+                    "version": "3.24.0"
+                }]
+            }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let mut state = crate::state::state::State::default();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "claude",
+        "scope": "global",
+        "version": "compound-engineering-v3.24.0",
+    }));
+
+    let divs = check_claude_marketplace_divergence(&state, &cwd, &claude_dir);
+    assert!(divs.is_empty());
+}
+
+#[test]
+fn test_marketplace_divergence_user_scope_and_applicability() {
+    let tmp = TempDir::new().unwrap();
+    let claude_dir = tmp.path().join(".claude");
+    let matching_proj = tmp.path().join("my-project");
+    let other_proj = tmp.path().join("other-project");
+    let cwd = matching_proj.join("src");
+
+    std::fs::create_dir_all(&cwd).unwrap();
+    std::fs::create_dir_all(&other_proj).unwrap();
+
+    let plugins_dir = claude_dir.join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+    let plugins_file = plugins_dir.join("installed_plugins.json");
+    std::fs::write(
+        &plugins_file,
+        serde_json::json!({
+            "version": 2,
+            "plugins": {
+                "compound-engineering@compound-engineering-plugin": [
+                    {
+                        "scope": "user",
+                        "version": "3.17.1"
+                    },
+                    {
+                        "scope": "project",
+                        "projectPath": matching_proj.to_str().unwrap(),
+                        "version": "3.8.4"
+                    },
+                    {
+                        "scope": "local",
+                        "projectPath": other_proj.to_str().unwrap(),
+                        "version": "3.8.4"
+                    }
+                ],
+                "unrelated-tool@official": [
+                    {
+                        "scope": "user",
+                        "version": "1.0.0"
+                    }
+                ]
+            }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let mut state = crate::state::state::State::default();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "claude",
+        "scope": "global",
+        "version": "compound-engineering-v3.24.0",
+    }));
+
+    // When running from matching_proj/src:
+    // - user scope (3.17.1) applies
+    // - matching_proj scope (3.8.4) applies (projectPath is ancestor of cwd)
+    // - other_proj scope does NOT apply
+    // - unrelated-tool is ignored
+    let divs = check_claude_marketplace_divergence(&state, &cwd, &claude_dir);
+    assert_eq!(divs.len(), 2);
+
+    let user_div = divs.iter().find(|d| d.scope == "user").unwrap();
+    assert_eq!(
+        user_div.plugin_id,
+        "compound-engineering@compound-engineering-plugin"
+    );
+    assert_eq!(user_div.native_version, "3.17.1");
+    assert_eq!(user_div.ce_version, "compound-engineering-v3.24.0");
+    assert_eq!(user_div.project_path, None);
+
+    let proj_div = divs.iter().find(|d| d.scope == "project").unwrap();
+    assert_eq!(
+        proj_div.plugin_id,
+        "compound-engineering@compound-engineering-plugin"
+    );
+    assert_eq!(proj_div.native_version, "3.8.4");
+    assert_eq!(proj_div.ce_version, "compound-engineering-v3.24.0");
+    assert_eq!(proj_div.project_path, Some(matching_proj));
+}

@@ -477,6 +477,135 @@ pub fn remove_session_start_hook(settings_path: &Path) -> Result<bool, CeError> 
     Ok(true)
 }
 
+/// Divergence finding between Claude Code's native plugin marketplace
+/// (`~/.claude/plugins/installed_plugins.json`) and ce-ai's managed installation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClaudeMarketplaceDivergence {
+    pub plugin_id: String,
+    pub scope: String,
+    pub native_version: String,
+    pub ce_version: String,
+    pub project_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct NativeInstalledPlugins {
+    #[serde(default)]
+    pub plugins: BTreeMap<String, Vec<NativePluginEntry>>,
+}
+
+#[derive(Debug, Deserialize, Clone, Default)]
+struct NativePluginEntry {
+    #[serde(default)]
+    pub scope: String,
+    #[serde(rename = "projectPath", default)]
+    pub project_path: Option<PathBuf>,
+    #[serde(default)]
+    pub version: String,
+}
+
+/// Normalizes version strings by stripping `compound-engineering-`, `compound-engineering@`, and `v` prefixes.
+pub fn normalize_plugin_version(raw: &str) -> &str {
+    let s = raw.trim();
+    let s = s.strip_prefix("compound-engineering-").unwrap_or(s);
+    let s = s.strip_prefix("compound-engineering@").unwrap_or(s);
+    s.strip_prefix('v').unwrap_or(s)
+}
+
+/// Checks for version divergence between Claude Code's native marketplace plugins and ce-ai managed harness.
+/// Returns a list of applicable divergences (user scope, or project/local matching cwd).
+pub fn check_claude_marketplace_divergence(
+    state: &crate::state::state::State,
+    cwd: &Path,
+    claude_dir: &Path,
+) -> Vec<ClaudeMarketplaceDivergence> {
+    let claude_entry = state.installed_harnesses.iter().find(|h| {
+        if h.get("name").and_then(|n| n.as_str()) != Some("claude") {
+            return false;
+        }
+        match h.get("scope").and_then(|s| s.as_str()) {
+            Some("workspace") => h
+                .get("target_dir")
+                .and_then(|d| d.as_str())
+                .map(|d| {
+                    let p = Path::new(d);
+                    cwd == p || cwd.starts_with(p)
+                })
+                .unwrap_or(true),
+            Some("global") | None => true,
+            _ => false,
+        }
+    });
+
+    let Some(claude_entry) = claude_entry else {
+        return Vec::new();
+    };
+
+    let ce_version = claude_entry
+        .get("version")
+        .and_then(|v| v.as_str())
+        .or_else(|| state.release_provenance.as_ref().map(|p| p.tag.as_str()));
+
+    let Some(ce_version) = ce_version else {
+        return Vec::new();
+    };
+
+    let installed_plugins_path = claude_dir.join("plugins").join("installed_plugins.json");
+    if !installed_plugins_path.exists() {
+        return Vec::new();
+    }
+
+    let Ok(content) = std::fs::read_to_string(&installed_plugins_path) else {
+        return Vec::new();
+    };
+
+    let Ok(registry) = serde_json::from_str::<NativeInstalledPlugins>(&content) else {
+        return Vec::new();
+    };
+
+    let norm_ce = normalize_plugin_version(ce_version);
+    let mut divergences = Vec::new();
+
+    for (plugin_id, entries) in registry.plugins {
+        let is_ce_plugin =
+            plugin_id == "compound-engineering" || plugin_id.starts_with("compound-engineering@");
+        if !is_ce_plugin {
+            continue;
+        }
+
+        for entry in entries {
+            let is_applicable = match entry.scope.as_str() {
+                "user" => true,
+                "project" | "local" => {
+                    if let Some(ref proj_path) = entry.project_path {
+                        cwd == proj_path.as_path() || cwd.starts_with(proj_path)
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            };
+
+            if !is_applicable {
+                continue;
+            }
+
+            let norm_native = normalize_plugin_version(&entry.version);
+            if norm_native != norm_ce {
+                divergences.push(ClaudeMarketplaceDivergence {
+                    plugin_id: plugin_id.clone(),
+                    scope: entry.scope,
+                    native_version: entry.version,
+                    ce_version: ce_version.to_string(),
+                    project_path: entry.project_path,
+                });
+            }
+        }
+    }
+
+    divergences
+}
+
 #[cfg(test)]
 #[path = "tests/claude.rs"]
 mod tests;

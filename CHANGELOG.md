@@ -5,6 +5,15 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.47.0] - 2026-09-08
+
+### Added
+- **Claude Code Native Plugin Marketplace Divergence Diagnostic in `doctor` (`#327`):**
+  - **Native Marketplace Discovery (`src/harness/claude.rs`)**: Implemented `check_claude_marketplace_divergence` to inspect `<claude_dir>/plugins/installed_plugins.json` using tolerant serde deserialization, strictly read-only with zero mutation or command execution against native files.
+  - **Scope-Aware Applicability Matching**: Evaluates `user` scope globally across all working directories, and `project`/`local` scopes when `cwd` or repo root matches or descends from the configured `projectPath`, without making arbitrary assumptions about internal Claude Code scope precedence.
+  - **Version Normalization (`normalize_plugin_version`)**: Normalizes version strings by stripping `compound-engineering-`, `compound-engineering@`, and `v` prefixes to accurately compare ce-ai managed tags against native marketplace versions.
+  - **Advisory Health Reporting (`src/commands/doctor.rs`)**: Emits `doctor-info:` notices identifying divergent scopes and versions, providing the exact remediation command (`claude plugin marketplace update <marketplace> && claude plugin update <plugin>`) while maintaining exit code 0.
+
 ## [1.46.0] - 2026-09-08
 
 ### Added

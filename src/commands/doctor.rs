@@ -226,6 +226,29 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         );
     }
 
+    // Claude Code Native Plugin Marketplace Divergence Probe (#327)
+    let claude_dir = HarnessKind::Claude.harness_dir(&home_dir);
+    let cwd = std::env::current_dir().unwrap_or_else(|_| repo_root.clone());
+    let claude_divergences =
+        crate::harness::claude::check_claude_marketplace_divergence(&state, &cwd, &claude_dir);
+    for d in claude_divergences {
+        let marketplace = d
+            .plugin_id
+            .split_once('@')
+            .map(|(_, m)| m)
+            .unwrap_or("compound-engineering-plugin");
+        let update_cmd = format!(
+            "claude plugin marketplace update {marketplace} && claude plugin update {}",
+            d.plugin_id
+        );
+        let norm_native = crate::harness::claude::normalize_plugin_version(&d.native_version);
+        let norm_ce = crate::harness::claude::normalize_plugin_version(&d.ce_version);
+        println!(
+            "doctor-info: claude native plugin marketplace divergence detected for '{}' (scope: {}): native marketplace has v{} but ce-ai managed harness is v{} (run '{}' to update)",
+            d.plugin_id, d.scope, norm_native, norm_ce, update_cmd
+        );
+    }
+
     // Project adoption health checks
     for p in &state.projects {
         let agents_file = p.path.join(&p.file);

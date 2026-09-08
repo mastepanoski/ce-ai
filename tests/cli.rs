@@ -1227,6 +1227,54 @@ fn doctor_clean_install_reports_ok() {
 }
 
 #[test]
+fn doctor_detects_claude_marketplace_divergence_advisory() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Register claude in ce-ai state
+    let state_file = config_dir.join("state.json");
+    let mut state = ce_ai::state::state::State::load(&state_file).unwrap();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "claude",
+        "scope": "global",
+        "version": "compound-engineering-v3.24.0",
+        "installed_at": "2026-09-08T00:00:00Z",
+    }));
+    state.save(&state_file).unwrap();
+
+    // Create native marketplace installed_plugins.json in ~/.claude/plugins/
+    let claude_dir = home.join(".claude");
+    let plugins_dir = claude_dir.join("plugins");
+    fs::create_dir_all(&plugins_dir).unwrap();
+    fs::write(
+        plugins_dir.join("installed_plugins.json"),
+        serde_json::json!({
+            "version": 2,
+            "plugins": {
+                "compound-engineering@compound-engineering-plugin": [{
+                    "scope": "user",
+                    "version": "3.8.4"
+                }]
+            }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let mut cmd = ceai(&config_dir, &home);
+    cmd.env("CLAUDE_CONFIG_DIR", &claude_dir);
+    cmd.current_dir(tmp.path())
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "doctor-info: claude native plugin marketplace divergence detected for 'compound-engineering@compound-engineering-plugin' (scope: user): native marketplace has v3.8.4 but ce-ai managed harness is v3.24.0 (run 'claude plugin marketplace update compound-engineering-plugin && claude plugin update compound-engineering@compound-engineering-plugin' to update)",
+        ));
+}
+
+#[test]
 fn doctor_reports_diff_finding_with_non_zero_exit() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
