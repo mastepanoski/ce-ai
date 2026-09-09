@@ -16,6 +16,8 @@ fn test_current_target_resolves_known_triples() {
     );
     let target_str = target.unwrap();
     let known = [
+        "x86_64-unknown-linux-musl",
+        "aarch64-unknown-linux-musl",
         "x86_64-unknown-linux-gnu",
         "aarch64-unknown-linux-gnu",
         "x86_64-apple-darwin",

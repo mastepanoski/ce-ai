@@ -20,8 +20,8 @@ GH_REPO="${GH_REPO:-mastepanoski/ce-ai}"
 ASSETS=(
   "ce-ai-x86_64-apple-darwin.tar.gz"
   "ce-ai-aarch64-apple-darwin.tar.gz"
-  "ce-ai-x86_64-unknown-linux-gnu.tar.gz"
-  "ce-ai-aarch64-unknown-linux-gnu.tar.gz"
+  "ce-ai-x86_64-unknown-linux-musl.tar.gz"
+  "ce-ai-aarch64-unknown-linux-musl.tar.gz"
   "ce-ai-x86_64-pc-windows-msvc.zip"
   "ce-ai-aarch64-pc-windows-msvc.zip"
 )

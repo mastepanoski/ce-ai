@@ -25,12 +25,13 @@ Prior to Release v0.8.0, installing `ce-ai` required building from source via `c
 
 ### 1. Multi-Arch Release Matrix (`.github/workflows/release.yml`)
 - **Matrix Targets**:
-  - `x86_64-unknown-linux-gnu` (Linux x86_64)
-  - `aarch64-unknown-linux-gnu` (Linux ARM64)
+  - `x86_64-unknown-linux-musl` (Linux x86_64, static)
+  - `aarch64-unknown-linux-musl` (Linux ARM64, static)
   - `x86_64-apple-darwin` (macOS Intel)
   - `aarch64-apple-darwin` (macOS Apple Silicon)
   - `x86_64-pc-windows-msvc` (Windows x86_64)
   - `aarch64-pc-windows-msvc` (Windows ARM64)
+- **Why static musl for Linux**: Linux artifacts are built as fully static `*-unknown-linux-musl` binaries via `cross`, not dynamically-linked glibc binaries. A `-gnu` binary is locked to the glibc version of the build runner (e.g. Ubuntu 24.04 → glibc 2.39) and fails with `GLIBC_X.YY not found` on older distros (Debian 12 → glibc 2.36). Static musl links only the Rust/musl code, so the binary runs on any Linux regardless of host glibc.
 
 ### 2. POSIX-Compliant Universal Installer (`scripts/install.sh`)
 - Auto-detects `uname -s` and `uname -m`.
