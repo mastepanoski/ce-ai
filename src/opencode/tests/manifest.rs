@@ -53,3 +53,29 @@ fn load_missing_manifest_errors() {
     let dir = tempdir().unwrap();
     assert!(InstallManifest::load(dir.path()).is_err());
 }
+
+#[test]
+fn harvest_collects_sha256_for_all_managed_files() {
+    let dir = tempdir().unwrap();
+    let managed = dir.path().join("compound-engineering");
+    std::fs::create_dir_all(managed.join("plugins")).unwrap();
+    std::fs::create_dir_all(managed.join("skills/ce-brainstorm")).unwrap();
+    std::fs::write(managed.join("plugins/compound-engineering.js"), b"loader").unwrap();
+    std::fs::write(managed.join("skills/ce-brainstorm/SKILL.md"), b"# skill").unwrap();
+    // install-manifest.json itself must never be harvested.
+    std::fs::write(managed.join("install-manifest.json"), b"{}").unwrap();
+
+    let files = InstallManifest::harvest(&managed);
+    assert_eq!(files.len(), 2);
+    // Deterministic path-sorted order.
+    assert_eq!(files[0].path, "plugins/compound-engineering.js");
+    assert_eq!(files[1].path, "skills/ce-brainstorm/SKILL.md");
+    assert_eq!(files[0].sha256, crate::state::diff::sha256_hex(b"loader"));
+    assert_eq!(files[1].sha256, crate::state::diff::sha256_hex(b"# skill"));
+}
+
+#[test]
+fn harvest_missing_dir_returns_empty() {
+    let dir = tempdir().unwrap();
+    assert!(InstallManifest::harvest(&dir.path().join("nope")).is_empty());
+}

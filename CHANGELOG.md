@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Empty SHA256 Manifests for Non-OpenCode Harnesses (`sync`):**
+  - **Root Cause (`src/commands/sync.rs`)**: The registration-spec arm rewrote `install-manifest.json` for every table-driven harness (claude, kimi, codex, copilot, cursor, grok, agy, fx) with `files: vec![]` on every sync — discarding all real digests written by `install` and silencing write errors with `let _ =`. OpenCode kept ~395 hashed entries while claude/kimi manifests were empty, permanently blinding drift detection.
+  - **On-Disk Harvest (`src/opencode/manifest.rs`)**: Added `InstallManifest::harvest(managed_dir)`, which records one sorted `{path, sha256}` entry per file physically present in the managed tree (excluding `install-manifest.json` itself). `sync` now rewrites registration-harness manifests with harvested hashes, preserves the prior `installed_at`/`config_mutations`, and propagates write errors instead of ignoring them.
+- **Multi-Harness Drift Detection (`status` / `doctor` / `workflow resume`):**
+  - **`probe_manifest_drift_count` (`src/commands/workflow.rs`)**: Now sums drift actions across the OpenCode, claude, and kimi manifests (resolved via `home_dir_from_ctx` + `HarnessKind::harness_dir`) instead of loading only `ctx.opencode_config_dir`.
+  - **`ce-ai doctor` (`src/commands/doctor.rs`)**: The diff probe additionally checks claude/kimi manifests when present and reports harness-prefixed findings (`diff: claude modified …`); missing manifests degrade silently.
+  - **`ce-ai status` (`src/commands/status.rs`)**: The drift section iterates OpenCode + claude + kimi manifests, printing `drift: <harness>: <kind> <path>` for non-OpenCode drift while keeping the `drift: none` and `drift: unknown (no install manifest)` contracts byte-identical.
+
 ## [1.47.0] - 2026-09-08
 
 ### Added

@@ -92,29 +92,47 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
     }
 
     // Drift: compare managed files on disk against the install manifest (SU-3).
+    // OpenCode keeps its historical output format; claude/kimi manifests
+    // (when present) report with an explicit harness prefix.
     let opencode_dir = ctx.resolve_opencode_dir(&state);
-    let managed = opencode_dir.join(MANAGED_DIR);
-    match InstallManifest::load(&opencode_dir) {
-        Ok(manifest) => {
-            let desired: BTreeMap<String, String> = manifest
-                .files
-                .iter()
-                .map(|f| (f.path.clone(), f.sha256.clone()))
-                .collect();
-            let drift = diff::diff(&desired, &desired, &managed);
-            if drift.actions.is_empty() {
-                println!("drift: none");
-            }
-            for action in &drift.actions {
-                let (kind, path) = match action {
-                    Action::Copy { path } => ("missing", path),
-                    Action::Restore { path } => ("modified", path),
-                    Action::Remove { path } => ("stale", path),
-                };
-                println!("drift: {kind} {path}");
+    let mut any_manifest = false;
+    let mut total_actions = 0usize;
+    let mut print_drift = |label: Option<&str>, config_dir: &std::path::Path| {
+        let Ok(manifest) = InstallManifest::load(config_dir) else {
+            return;
+        };
+        any_manifest = true;
+        let desired: BTreeMap<String, String> = manifest
+            .files
+            .iter()
+            .map(|f| (f.path.clone(), f.sha256.clone()))
+            .collect();
+        let managed = config_dir.join(MANAGED_DIR);
+        let drift = diff::diff(&desired, &desired, &managed);
+        total_actions += drift.actions.len();
+        for action in &drift.actions {
+            let (kind, path) = match action {
+                Action::Copy { path } => ("missing", path),
+                Action::Restore { path } => ("modified", path),
+                Action::Remove { path } => ("stale", path),
+            };
+            match label {
+                Some(harness) => println!("drift: {harness}: {kind} {path}"),
+                None => println!("drift: {kind} {path}"),
             }
         }
-        Err(_) => println!("drift: unknown (no install manifest)"),
+    };
+    print_drift(None, &opencode_dir);
+    if let Ok(home) = std::env::var("HOME") {
+        let home_path = std::path::Path::new(&home);
+        for kind in crate::commands::workflow::DRIFT_PROBE_HARNESSES {
+            print_drift(Some(kind.as_str()), &kind.harness_dir(home_path));
+        }
+    }
+    if !any_manifest {
+        println!("drift: unknown (no install manifest)");
+    } else if total_actions == 0 {
+        println!("drift: none");
     }
 
     // Project Adoption Status

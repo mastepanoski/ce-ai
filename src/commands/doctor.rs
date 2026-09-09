@@ -49,6 +49,33 @@ fn github_slug_from_remote(repo_root: &std::path::Path) -> Option<String> {
     github_slug_from_url(&String::from_utf8_lossy(&out.stdout))
 }
 
+/// Diff findings for non-OpenCode managed harnesses (claude, kimi) when their
+/// manifests exist — same engine as the OpenCode diff, per-harness managed
+/// trees, harness-prefixed finding strings (`diff: <harness> <kind> <path>`).
+pub(crate) fn non_opencode_diff_findings(home_dir: &std::path::Path) -> Vec<String> {
+    let mut findings = Vec::new();
+    for kind in crate::commands::workflow::DRIFT_PROBE_HARNESSES {
+        let harness_dir = kind.harness_dir(home_dir);
+        if let Ok(manifest) = InstallManifest::load(&harness_dir) {
+            let desired: BTreeMap<String, String> = manifest
+                .files
+                .iter()
+                .map(|f| (f.path.clone(), f.sha256.clone()))
+                .collect();
+            let managed = harness_dir.join(MANAGED_DIR);
+            for action in diff::diff(&desired, &desired, &managed).actions {
+                let (verb, path) = match action {
+                    Action::Copy { path } => ("missing", path),
+                    Action::Restore { path } => ("modified", path),
+                    Action::Remove { path } => ("stale", path),
+                };
+                findings.push(format!("diff: {kind} {verb} {path}"));
+            }
+        }
+    }
+    findings
+}
+
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let state = State::load_with_workspace_overrides(
         &ctx.config_dir.join("state.json"),
@@ -81,6 +108,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             findings.push(format!("diff: {kind} {path}"));
         }
     }
+
+    // Diff for non-OpenCode managed harnesses (claude, kimi) when their
+    // manifests exist — same engine, per-harness managed trees.
+    let home_dir_for_diff = crate::harness::home_dir_from_ctx(ctx);
+    findings.extend(non_opencode_diff_findings(&home_dir_for_diff));
 
     // State consistency: the opencode state entry and the manifest must agree.
     let repo_root = ctx.repo_root();

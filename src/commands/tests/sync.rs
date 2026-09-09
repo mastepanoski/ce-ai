@@ -386,3 +386,107 @@ fn resolve_sync_source_and_version_resolves_from_non_opencode_entry() {
     assert_eq!(ver, "1.6.3");
     assert_eq!(src["kind"], "local");
 }
+
+/// harness-manifest-sha256-coverage: `sync` used to rewrite the install
+/// manifest of every registration-spec harness (claude, kimi, ...) with
+/// `files: vec![]`, permanently blinding drift detection outside OpenCode.
+/// This pins that sync harvests real SHA256 entries from the on-disk managed
+/// tree and preserves the prior manifest's `installed_at`.
+#[test]
+fn sync_with_harvests_real_hashes_for_registration_harness_manifests() {
+    use crate::commands::sync::sync_with;
+    use crate::commands::Context;
+    use crate::opencode::manifest::InstallManifest;
+    use crate::state::state::State;
+
+    // Force default (home-derived) harness paths; restored at test end.
+    // (Branch A carries no access to the harness env lock — it ships with the
+    // Kimi divergence change — so this uses plain save/remove/restore.)
+    let saved_kimi_home = std::env::var_os("KIMI_CODE_HOME");
+    std::env::remove_var("KIMI_CODE_HOME");
+    let tmp = tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let kimi_dir = home.join(".kimi-code");
+
+    // Source tree with the CE loader (required by sync's desired-set build).
+    let source_root = tmp.path().join("ce-source");
+    std::fs::create_dir_all(source_root.join(".opencode/plugins")).unwrap();
+    std::fs::write(
+        source_root.join(".opencode/plugins/compound-engineering.js"),
+        b"export default function ceLoader() { /* session.created */ }",
+    )
+    .unwrap();
+
+    // Pre-existing EMPTY manifest (the audited broken state) + managed tree.
+    let managed = kimi_dir.join("compound-engineering");
+    std::fs::create_dir_all(managed.join("plugins")).unwrap();
+    std::fs::create_dir_all(managed.join("skills/ce-brainstorm")).unwrap();
+    std::fs::write(managed.join("plugins/compound-engineering.js"), b"loader").unwrap();
+    std::fs::write(managed.join("skills/ce-brainstorm/SKILL.md"), b"# skill").unwrap();
+    InstallManifest {
+        version: "compound-engineering-v3.24.0".into(),
+        plugin_name: "compound-engineering".into(),
+        installed_at: "2026-01-02T03:04:05Z".into(),
+        source: serde_json::json!({"kind": "local", "path": source_root.display().to_string()}),
+        files: vec![],
+        config_mutations: vec![],
+    }
+    .write(&kimi_dir)
+    .unwrap();
+
+    let ctx = Context {
+        config_dir: home.join(".ce-ai"),
+        opencode_config_dir: home.join(".config").join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+
+    let mut state = State::new();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "kimi",
+        "version": "compound-engineering-v3.24.0",
+        "scope": "global",
+        "installed_at": "2026-08-22T00:00:00Z"
+    }));
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    sync_with(
+        &ctx,
+        &source_root,
+        "compound-engineering-v3.24.1",
+        serde_json::json!({"kind": "local", "path": source_root.display().to_string()}),
+    )
+    .unwrap();
+
+    let rewritten = InstallManifest::load(&kimi_dir).unwrap();
+    assert_eq!(rewritten.version, "compound-engineering-v3.24.1");
+    assert_eq!(
+        rewritten.installed_at, "2026-01-02T03:04:05Z",
+        "sync must preserve the prior manifest installed_at"
+    );
+    assert_eq!(
+        rewritten.files.len(),
+        2,
+        "harvested entries: {:?}",
+        rewritten.files
+    );
+    let loader = rewritten
+        .files
+        .iter()
+        .find(|f| f.path == "plugins/compound-engineering.js")
+        .expect("loader entry harvested");
+    assert_eq!(loader.sha256, sha256_hex(b"loader"));
+    let skill = rewritten
+        .files
+        .iter()
+        .find(|f| f.path == "skills/ce-brainstorm/SKILL.md")
+        .expect("skill entry harvested");
+    assert_eq!(skill.sha256, sha256_hex(b"# skill"));
+
+    if let Some(v) = saved_kimi_home {
+        std::env::set_var("KIMI_CODE_HOME", v);
+    }
+}

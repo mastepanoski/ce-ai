@@ -459,20 +459,27 @@ pub(crate) fn sync_with(
                 // Strategy table: one exhaustive entry per table-driven kind
                 // (see harness::registration). Skills are never copied into
                 // harness-owned directories — adoption is the only delivery
-                // path (token-neutrality, R4).
+                // path (token-neutrality, R4). The manifest therefore records
+                // the hashes of what is actually on disk in the managed tree
+                // (harvest), preserving the prior manifest's metadata, so
+                // drift detection stays truthful for non-OpenCode harnesses.
                 spec.register_companions(&target_config)?;
                 let manifest_path = config_dir.join(MANAGED_DIR).join("install-manifest.json");
                 if manifest_path.exists() {
+                    let prior = InstallManifest::load(&config_dir).ok();
                     arm!(&manifest_path);
-                    let _ = InstallManifest {
+                    InstallManifest {
                         version: version.to_string(),
                         plugin_name: "compound-engineering".into(),
-                        installed_at: Utc::now().to_rfc3339(),
+                        installed_at: prior
+                            .as_ref()
+                            .map(|m| m.installed_at.clone())
+                            .unwrap_or_else(|| Utc::now().to_rfc3339()),
                         source: source_json.clone(),
-                        files: vec![],
-                        config_mutations: vec![],
+                        files: InstallManifest::harvest(&config_dir.join(MANAGED_DIR)),
+                        config_mutations: prior.map(|m| m.config_mutations).unwrap_or_default(),
                     }
-                    .write(&config_dir);
+                    .write(&config_dir)?;
                 }
             } else if h_kind == HarnessKind::Opencode {
                 // OpenCode's own registration: plugin entry + skills paths.
