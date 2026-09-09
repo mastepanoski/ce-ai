@@ -442,10 +442,92 @@ fn test_doctor_claude_marketplace_divergence_is_non_blocking() {
 }
 
 #[test]
+fn test_doctor_kimi_marketplace_divergence_and_orphan_are_non_blocking() {
+    // Shield against parallel adapter tests that mutate KIMI_CODE_HOME:
+    // hold the harness env lock and force the default (home-derived) paths.
+    let _guard = crate::harness::tests::HARNESS_ENV_LOCK.lock().unwrap();
+    let saved_kimi_home = std::env::var_os("KIMI_CODE_HOME");
+    std::env::remove_var("KIMI_CODE_HOME");
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let kimi_dir = home.join(".kimi-code");
+
+    // Native plugin manager: enabled compound-engineering at 3.14.3.
+    let root = kimi_dir
+        .join("plugins")
+        .join("managed")
+        .join("compound-engineering");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(
+        root.join("package.json"),
+        r#"{"name":"compound-engineering","version":"3.14.3"}"#,
+    )
+    .unwrap();
+    let plugins_dir = kimi_dir.join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+    std::fs::write(
+        plugins_dir.join("installed.json"),
+        serde_json::json!({
+            "version": 1,
+            "plugins": [
+                { "id": "compound-engineering", "root": root, "enabled": true }
+            ]
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    // Orphan ce-ai managed tree (install-manifest marker, unreferenced config.toml).
+    let managed_dir = kimi_dir.join("compound-engineering");
+    std::fs::create_dir_all(&managed_dir).unwrap();
+    std::fs::write(managed_dir.join("install-manifest.json"), "{}").unwrap();
+    std::fs::write(kimi_dir.join("config.toml"), "extra_skill_dirs = []\n").unwrap();
+
+    std::env::set_var("KIMI_CODE_HOME", &kimi_dir);
+
+    let ctx = Context {
+        config_dir: home.join(".ce-ai"),
+        opencode_config_dir: home.join(".config").join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let mut state = State::new();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "kimi",
+        "version": "compound-engineering-v3.24.0",
+        "scope": "global",
+        "installed_at": "2026-08-22T00:00:00Z"
+    }));
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    // Doctor must succeed (exit 0): divergence is doctor-info, orphan tree is doctor-warn.
+    let res = run(&ctx, &Args::default());
+    assert!(
+        res.is_ok(),
+        "doctor should pass with Ok(()), got: {:?}",
+        res
+    );
+
+    if let Some(v) = saved_kimi_home {
+        std::env::set_var("KIMI_CODE_HOME", v);
+    }
+}
+
+#[test]
 fn test_doctor_detects_claude_manifest_drift() {
-    // Force default (home-derived) harness paths; restored at test end.
-    // (Branch A carries no access to the harness env lock — it ships with the
-    // Kimi divergence change — so this uses plain save/remove/restore.)
+    // Shield against parallel adapter tests that mutate CLAUDE_CONFIG_DIR:
+    // hold the harness env lock and force the default (home-derived) paths.
+    let _guard = crate::harness::tests::HARNESS_ENV_LOCK.lock().unwrap();
     let saved_claude_dir = std::env::var_os("CLAUDE_CONFIG_DIR");
     std::env::remove_var("CLAUDE_CONFIG_DIR");
     let tmp = TempDir::new().unwrap();
@@ -517,9 +599,9 @@ fn test_doctor_detects_claude_manifest_drift() {
 
 #[test]
 fn test_doctor_ignores_absent_claude_manifest() {
-    // Force default (home-derived) harness paths; restored at test end.
-    // (Branch A carries no access to the harness env lock — it ships with the
-    // Kimi divergence change — so this uses plain save/remove/restore.)
+    // Shield against parallel adapter tests that mutate CLAUDE_CONFIG_DIR:
+    // hold the harness env lock and force the default (home-derived) paths.
+    let _guard = crate::harness::tests::HARNESS_ENV_LOCK.lock().unwrap();
     let saved_claude_dir = std::env::var_os("CLAUDE_CONFIG_DIR");
     std::env::remove_var("CLAUDE_CONFIG_DIR");
     let tmp = TempDir::new().unwrap();
@@ -569,9 +651,10 @@ fn test_doctor_ignores_absent_claude_manifest() {
 
 #[test]
 fn test_probe_manifest_drift_count_includes_claude_and_kimi() {
-    // Force default (home-derived) harness paths; restored at test end.
-    // (Branch A carries no access to the harness env lock — it ships with the
-    // Kimi divergence change — so this uses plain save/remove/restore.)
+    // Shield against parallel adapter tests that mutate CLAUDE_CONFIG_DIR /
+    // KIMI_CODE_HOME: hold the harness env lock and force the default
+    // (home-derived) paths.
+    let _guard = crate::harness::tests::HARNESS_ENV_LOCK.lock().unwrap();
     let saved_claude_dir = std::env::var_os("CLAUDE_CONFIG_DIR");
     let saved_kimi_home = std::env::var_os("KIMI_CODE_HOME");
     std::env::remove_var("CLAUDE_CONFIG_DIR");

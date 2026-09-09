@@ -427,4 +427,4 @@ pub trait HarnessAdapter {
 
 #[cfg(test)]
 #[path = "tests/mod_tests.rs"]
-mod tests;
+pub(crate) mod tests;

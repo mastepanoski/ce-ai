@@ -281,6 +281,27 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         );
     }
 
+    // Kimi Code Native Plugin Manager Divergence Probe:
+    // Kimi's native plugin manager (~/.kimi-code/plugins/installed.json) can
+    // shadow the ce-ai managed tree with its own pinned version.
+    let kimi_dir = HarnessKind::Kimi.harness_dir(&home_dir);
+    let kimi_divergences =
+        crate::harness::kimi::check_kimi_marketplace_divergence(&state, &cwd, &kimi_dir);
+    for d in &kimi_divergences {
+        let norm_native = crate::harness::claude::normalize_plugin_version(&d.native_version);
+        let norm_ce = crate::harness::claude::normalize_plugin_version(&d.ce_version);
+        println!(
+            "doctor-info: kimi native plugin divergence detected for '{}' : native plugin manager has v{} but ce-ai managed harness is v{} (update the plugin via Kimi's native plugin manager, or uninstall the native plugin to use the ce-ai managed tree exclusively)",
+            d.plugin_id, norm_native, norm_ce
+        );
+    }
+    if let Some(orphan) = crate::harness::kimi::check_kimi_orphan_managed_tree(&kimi_dir) {
+        println!(
+            "doctor-warn: kimi managed tree '{}' is not referenced by Kimi config (extra_skill_dirs) — the ce-ai managed skills are inactive for Kimi (reference the tree from ~/.kimi-code/config.toml, or remove it with 'ce-ai uninstall --harness kimi')",
+            orphan.managed_dir.display()
+        );
+    }
+
     // Project adoption health checks
     for p in &state.projects {
         let agents_file = p.path.join(&p.file);
