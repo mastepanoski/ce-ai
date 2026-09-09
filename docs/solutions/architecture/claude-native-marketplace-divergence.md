@@ -38,3 +38,11 @@ Consequently, running `ce-ai upgrade` correctly updates `ce-ai`'s tree to the la
    - Emits `doctor-info:` notices identifying the plugin, scope, native version, and `ce-ai` managed version.
    - Details the exact remediation command: `claude plugin marketplace update <marketplace> && claude plugin update <plugin>`.
    - Does not add to `findings`, ensuring `ce-ai doctor` exits `0`.
+
+## Sibling Probe: Kimi Code (v1.48.0)
+
+The same divergence class exists for Kimi Code's native plugin manager, and `ce-ai` ships a structurally identical probe (`src/harness/kimi.rs`). This document stays Claude-focused; the Kimi probe is documented here as a cross-link only:
+
+- `check_kimi_marketplace_divergence` (kimi.rs:193) reads `~/.kimi-code/plugins/installed.json`, reuses `normalize_plugin_version` from the Claude adapter, and applies the same scope-applicability rules (global always, workspace only under the registered `target_dir`), emitting the same advisory `doctor-info` contract.
+- `check_kimi_orphan_managed_tree` (kimi.rs:303) additionally detects the inverse failure mode: a ce-ai managed tree under `~/.kimi-code/compound-engineering/` that Kimi's config does not reference via `extra_skill_dirs` in `~/.kimi-code/config.toml`, reported as `doctor-warn` (the ce-ai-managed skills are installed but inactive for Kimi).
+- Both are wired into `ce-ai doctor` (doctor.rs:284-303) as advisory output only — neither contributes to `findings`, so `ce-ai doctor` still exits `0`.

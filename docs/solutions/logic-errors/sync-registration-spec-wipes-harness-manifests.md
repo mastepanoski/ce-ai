@@ -111,5 +111,5 @@ The root cause was a semantic lie in the manifest: the registration arm rewrote 
 
 - PR #335 — fix: restore SHA256 manifest coverage for non-OpenCode harnesses
 - PR #336 — feat(doctor): detect Kimi native plugin marketplace divergence and orphan managed tree
-- Related learnings: `multi-harness-support-implementation.md` and `multi-harness-propagation-and-sync-verification.md` document the sync machinery this fix repaired (their "sync verifies SHA256 per harness" claims only became true for non-OpenCode harnesses in v1.48.0 — candidates for a correction note via ce-compound-refresh)
+- Related learnings: `multi-harness-support-implementation.md` and `multi-harness-propagation-and-sync-verification.md` document the sync machinery this fix repaired (refreshed in v1.48.0 via ce-compound-refresh — their verification-matrix claims now state that per-harness hash integrity became real for non-OpenCode harnesses only in v1.48.0)
 - src/opencode/manifest.rs (`InstallManifest::harvest`), src/commands/sync.rs (registration arm), src/commands/workflow.rs (`probe_manifest_drift_count`), src/commands/status.rs (multi-harness drift section)

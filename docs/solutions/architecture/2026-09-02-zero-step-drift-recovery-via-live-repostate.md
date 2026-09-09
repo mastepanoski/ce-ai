@@ -2,7 +2,7 @@
 module: workflow
 tags: [workflow, repo-state, drift-recovery, skill-state, arxiv-2608-26263v2, arxiv-2603-29919, sha256, openspec, evaluation-framework]
 problem_type: architecture
-last_updated: 2026-09-05
+last_updated: 2026-09-09
 ---
 
 # Zero-Step Environment Drift Recovery via Live `RepoState` Sync
@@ -20,6 +20,7 @@ Implemented Turn-0 canonical environment synchronization via live `RepoState` pr
 2. **Sub-15ms Live Probing Engine (`probe_repo_state`):**
    - Runs shallow `git rev-parse` and `git status --porcelain=v1` to discover active branch and uncommitted modifications.
    - Computes plugin manifest drift against `InstallManifest` using `crate::state::diff::diff`.
+   - Since v1.48.0 (`harness-manifest-sha256-coverage`), the drift count is no longer OpenCode-only: `probe_manifest_drift_count` sums the OpenCode manifest plus the manifests of every harness in `DRIFT_PROBE_HARNESSES` (Claude, Kimi), each diffed against its own per-harness managed tree.
    - Delegates adoption block classification directly to `check_adoption_block_status()` in `src/commands/init_prj.rs` (preserving the Single Source of Truth).
 
 3. **Deterministic Integrity Rule:**
@@ -28,5 +29,5 @@ Implemented Turn-0 canonical environment synchronization via live `RepoState` pr
 ## Key Learnings
 1. **Turn-0 Ground-Truth Injection Eliminates Agent Lag:** Providing structured disk truth at the exact moment of context resume prevents agents from generating multi-turn hallucinated plans on top of stale working tree assumptions.
 2. **SSOT Diagnostic Reuse:** Reusing `check_adoption_block_status()` across `doctor`, `status`, and `workflow resume` ensures all subsystems report identical adoption block diagnostics without diverging.
-3. **`diff::diff` Scope in `probe_manifest_drift_count`:** Passing `diff::diff(&desired, &desired, &managed_dir)` compares `desired` exclusively against disk, accurately reporting modified (`Restore`) and missing (`Copy`) files without requiring a separate tracking state. Note: because `desired` is passed for both map parameters, this probe does not detect orphaned/stale files (files present on disk but absent from the manifest, e.g. after a version downgrade). Full orphan detection is owned by `ce-ai doctor` and `ce-ai sync`.
+3. **`diff::diff` Scope in `probe_manifest_drift_count`:** Passing `diff::diff(&desired, &desired, &managed_dir)` compares `desired` exclusively against disk, accurately reporting modified (`Restore`) and missing (`Copy`) files without requiring a separate tracking state. Note: because `desired` is passed for both map parameters, this probe does not detect orphaned/stale files (files present on disk but absent from the manifest, e.g. after a version downgrade). Full orphan detection is owned by `ce-ai doctor` and `ce-ai sync`. This learning remains correct post-v1.48.0 — and the same multi-harness coverage now applies to it: because each `DRIFT_PROBE_HARNESSES` manifest is re-harvested from its own managed tree on sync, `ce-ai doctor` reports `stale`/`Remove` findings for claude and kimi trees as well (`non_opencode_diff_findings`, `src/commands/doctor.rs`), not just for OpenCode.
 4. **Evaluating future "agent efficiency" research against this design:** arXiv:2608.26263v2 was pre-published research at the time this feature shipped; it has since been formally published as "SKILL.state: Scalable Long-Horizon Agent Skills" (EMNLP 2026), independently confirming the explicit-mutable-state-over-transcript-replay approach taken here. When a *new* paper is proposed against `ce-ai`, the load-bearing question is whether it touches orchestration code (`state.rs`, `workflow.rs`, `adopt.rs`, `sync.rs`) or targets inference/model-serving internals `ce-ai` — a CLI orchestrator with no inference loop of its own — cannot act on. A concrete example of the former: SkillReducer (arXiv:2603.29919) proposes compressing skill routing-descriptions and bodies for token efficiency, but `ce-ai`'s skill adoption/sync (`classify_found`, `canonical_skills` in `adopt.rs`; `managed_tree` in `sync.rs`) marks a skill "adoptable" only on byte-exact SHA256 match against the canonical source. Compression applied at sync time would change the hash and break adoption detection — the same deterministic-integrity invariant behind Key Learning #3 above. Any such compression would have to happen upstream, at the canonical-source authoring stage, before hashes are computed.

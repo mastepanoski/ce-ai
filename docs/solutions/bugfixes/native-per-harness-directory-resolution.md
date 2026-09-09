@@ -19,22 +19,44 @@ When installing, updating, or syncing non-OpenCode harnesses (e.g. `ce-ai instal
 4. **Integration Testing**: Added end-to-end CLI integration tests in `tests/cli.rs` (`install_cursor_harness_writes_to_native_dir_and_leaves_opencode_pristine`, `uninstall_cursor_harness_cleans_native_dir_artifacts`) confirming zero artifact leakage into `~/.config/opencode/`.
 
 ## Key Code Snippet
+
+Principle: resolve via `HarnessKind::harness_dir`, never hardcode — every
+lifecycle command (`install`, `uninstall`, `sync`, `models set`) asks the
+kind for its native root, and most native roots honor vendor env-var
+overrides (v1.48.0):
+
 ```rust
 /// Returns the native configuration directory root for this harness relative to `home_dir`.
 pub fn harness_dir(&self, home_dir: &Path) -> PathBuf {
     match self {
         HarnessKind::Opencode => home_dir.join(".config").join("opencode"),
-        HarnessKind::Claude => home_dir.join(".config").join("claude"),
-        HarnessKind::Pi => home_dir.join(".pi"),
+        HarnessKind::Claude => std::env::var_os("CLAUDE_CONFIG_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home_dir.join(".claude")),
+        HarnessKind::Pi => std::env::var_os("PI_CODING_AGENT_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home_dir.join(".pi").join("agent")),
         HarnessKind::Cursor => home_dir.join(".cursor"),
-        HarnessKind::Copilot => home_dir.join(".config").join("github-copilot"),
-        HarnessKind::Codex => home_dir.join(".config").join("codex"),
-        HarnessKind::Grok => home_dir.join(".config").join("grok"),
-        HarnessKind::Kimi => home_dir.join(".config").join("kimi"),
-        HarnessKind::Agy => home_dir.join(".gemini").join("antigravity-cli"),
+        HarnessKind::Copilot => std::env::var_os("COPILOT_CONFIG_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home_dir.join(".copilot")),
+        HarnessKind::Codex => std::env::var_os("CODEX_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home_dir.join(".codex")),
+        HarnessKind::Grok => std::env::var_os("GROK_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home_dir.join(".grok")),
+        HarnessKind::Kimi => std::env::var_os("KIMI_CODE_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home_dir.join(".kimi-code")),
+        HarnessKind::Agy => crate::harness::agy::AgyAdapter.harness_dir(home_dir),
         HarnessKind::Deepseek => home_dir.join(".config").join("deepseek"),
-        HarnessKind::Fx => home_dir.join(".config").join("fx"),
-        HarnessKind::Custom => home_dir.join(".config").join("custom"),
+        HarnessKind::Fx => std::env::var_os("FX_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home_dir.join(".fx")),
+        // Single custom-mode contract: the config file lives directly
+        // under ~/.ce-ai (see harness::custom::CONFIG_FILE_NAME).
+        HarnessKind::Custom => home_dir.join(".ce-ai"),
     }
 }
 ```
