@@ -5,6 +5,19 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.48.1] - 2026-09-09
+
+### Fixed
+- **FSM Stage Inference Degradation & Fallback Transparency (#337):**
+  - **Mtime Fallback Provenance Transparency (`FeatureResolution` in `state.rs`, `workflow.rs`, `status.rs`, `doctor.rs`)**:
+    Added `FeatureResolution` enum (`branch` | `mtime_fallback`) to `WorkflowState`. When an active feature is inferred via filesystem mtime rather than git branch matching, `workflow status`, `status`, and `doctor` emit clear informative warnings (`workflow feature '<feat>' resolved via mtime fallback (unreliable without git branch)`).
+  - **Uncommitted OpenSpec Detection in Worktrees (`probe_openspec_has_uncommitted` in `workflow.rs`, `doctor.rs`)**:
+    Added hermetic git status inspection for `openspec/changes/<feature>`. `doctor` now warns (`doctor-warn: openspec change '<feat>': esta spec no está commiteada — puede no ser visible en otros worktrees`) to prevent cross-worktree desync when specs are uncommitted.
+  - **Multi-Cycle Same-Branch FSM Lockup Guard Bypass (`maybe_auto_checkpoint` in `workflow.rs`, `state.rs`)**:
+    When an inferred feature differs from the saved workflow on the same `(workspace, branch)` tuple and inferred stage is Stage 1 (Ideation), `maybe_auto_checkpoint` detects a new cycle, bypasses the monotonic regression guard, transitions legally to Stage 1, records the task as `(nuevo ciclo detectado)`, and updates the workflow state.
+  - **Stage Inference Precedence (`infer_stage_from_repo` in `workflow.rs`)**:
+    Evaluates Stage 1 (Ideation) artifacts (`docs/ideation/` or `docs/brainstorms/*.md`) prior to Direct Entry Bypass for Stage 4 (Work/TDD), ensuring that brainstorming files on work branches correctly resolve to Ideation.
+
 ## [1.48.0] - 2026-09-08
 
 ### Added

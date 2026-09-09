@@ -7430,3 +7430,168 @@ fn workflow_and_doctor_detect_unarchived_completed_changes() {
             "doctor-warn: openspec change 'feat-done' is complete (2/2 tasks) but not archived — see openspec/changes/archive/README.md",
         ));
 }
+
+#[test]
+fn test_workflow_fsm_mtime_fallback_uncommitted_spec_and_second_cycle() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = dir.path().join("home");
+    let config_dir = home.join(".ce-ai");
+    let proj = dir.path().join("project");
+    fs::create_dir_all(&proj).unwrap();
+
+    let source = ce_source_top_level_skills(dir.path());
+    user_config(
+        &home,
+        r#"{"models":{"ce-brainstorm":"anthropic/claude-3-5-sonnet"}}"#,
+    );
+
+    ceai(&config_dir, &home)
+        .arg("install")
+        .arg("--harness")
+        .arg("opencode")
+        .arg("--source")
+        .arg(&source)
+        .assert()
+        .success();
+
+    // 1. Non-git workspace: adopt project and create OpenSpec change
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["init-prj", "--tier", "full"])
+        .assert()
+        .success();
+
+    let change_fallback = proj.join("openspec").join("changes").join("feat-fallback");
+    fs::create_dir_all(&change_fallback).unwrap();
+    fs::write(change_fallback.join("proposal.md"), "# Proposal\n").unwrap();
+    fs::write(change_fallback.join("spec.md"), "# Spec\n").unwrap();
+
+    // 1a. ce-ai status reports mtime fallback warning
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "workflow-warn: active feature 'feat-fallback' resolved via mtime fallback (unreliable without git branch)",
+        ));
+
+    // 1b. ce-ai workflow status reports mtime fallback warning
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "! Warning: Active feature 'feat-fallback' resolved via mtime fallback (unreliable without git branch)",
+        ));
+
+    // 1c. ce-ai doctor reports mtime fallback warning without failing
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "doctor-warn: workflow feature 'feat-fallback' resolved via mtime fallback (unreliable without git branch)",
+        ));
+
+    // 2. Git repo with uncommitted OpenSpec change:
+    git_cmd()
+        .args(["init"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    git_cmd()
+        .args(["checkout", "-b", "feat/my-feature"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    let change_git = proj.join("openspec").join("changes").join("my-feature");
+    fs::create_dir_all(&change_git).unwrap();
+    fs::write(change_git.join("proposal.md"), "# Proposal\n").unwrap();
+    fs::write(change_git.join("spec.md"), "# Spec\n").unwrap();
+
+    // 2a. Doctor warns that spec is uncommitted and may not be visible in other worktrees
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "doctor-warn: openspec change 'my-feature': esta spec no está commiteada — puede no ser visible en otros worktrees",
+        ));
+
+    // 2b. After committing the spec, warning disappears
+    git_cmd()
+        .args(["add", "."])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    git_cmd()
+        .args([
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "commit spec",
+        ])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    use predicates::prelude::PredicateBooleanExt;
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("esta spec no está commiteada").not());
+
+    // 3. Second cycle on same branch:
+    // Advance legally to Stage 7 (Ship) for my-feature
+    for s in ["3", "4", "5", "6", "7"] {
+        ceai(&config_dir, &home)
+            .current_dir(&proj)
+            .args([
+                "workflow",
+                "checkpoint",
+                "--stage",
+                s,
+                "--task",
+                "Progressing cycle 1",
+                "-f",
+                "my-feature",
+            ])
+            .assert()
+            .success();
+    }
+
+    // Start Cycle 2 on the same branch: archive my-feature and add brainstorm idea
+    let archive_dir = proj
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join("my-feature");
+    fs::create_dir_all(&archive_dir).unwrap();
+    let _ = fs::remove_dir_all(&change_git);
+    let _ = fs::remove_dir_all(&change_fallback);
+
+    let brainstorms = proj.join("docs").join("brainstorms");
+    fs::create_dir_all(&brainstorms).unwrap();
+    fs::write(brainstorms.join("idea2.md"), "# Brainstorm 2\n").unwrap();
+
+    // Auto-checkpoint triggered by workflow status must transition to Stage 1 (new cycle detected)
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "current phase: Stage 1: Ideation",
+        ))
+        .stdout(predicates::str::contains("nuevo ciclo detectado"));
+}

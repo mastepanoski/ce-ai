@@ -195,13 +195,43 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
 
     // Git Environment State
     let root = ctx.repo_root();
-    if let Some(branch) = crate::commands::workflow::probe_git_branch(&root) {
+    let branch = crate::commands::workflow::probe_git_branch(&root);
+    if let Some(ref b) = branch {
         let (clean, dirty_files) = crate::commands::workflow::probe_git_dirty_files(&root);
         if clean {
-            println!("git: {branch} (clean)");
+            println!("git: {b} (clean)");
         } else {
-            println!("git: {branch} ({} modified files)", dirty_files.len());
+            println!("git: {b} ({} modified files)", dirty_files.len());
         }
+    }
+
+    // Active Workflow State & Mtime Fallback Warning (Issue #337)
+    let state_path = ctx.config_dir.join("state.json");
+    let _ = crate::commands::workflow::maybe_auto_checkpoint(ctx, &root, &state_path);
+    let effective_state = State::load(&state_path).unwrap_or_else(|_| state.clone());
+    let current_wf = effective_state.current_workflow_for_branch(&root, branch.as_deref());
+    let openspec_info = crate::commands::workflow::probe_openspec_context_in(&root, &current_wf);
+
+    let is_mtime_fallback = current_wf
+        .as_ref()
+        .and_then(|w| w.resolution)
+        .map(|r| r == crate::state::state::FeatureResolution::MtimeFallback)
+        .unwrap_or(false)
+        || openspec_info
+            .as_ref()
+            .and_then(|i| i.resolution)
+            .map(|r| r == crate::state::state::FeatureResolution::MtimeFallback)
+            .unwrap_or(false);
+
+    if is_mtime_fallback {
+        let feat = openspec_info
+            .as_ref()
+            .map(|i| i.feature.as_str())
+            .or_else(|| current_wf.as_ref().and_then(|w| w.feature_name.as_deref()))
+            .unwrap_or("unknown");
+        println!(
+            "workflow-warn: active feature '{feat}' resolved via mtime fallback (unreliable without git branch)"
+        );
     }
 
     Ok(())

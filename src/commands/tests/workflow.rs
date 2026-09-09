@@ -70,6 +70,7 @@ fn probe_openspec_context_detects_features_and_counts_tasks() {
         feature_name: Some("my-feature".to_string()),
         updated_at: "2026-09-02T00:00:00Z".to_string(),
         source: WorkflowSource::Manual,
+        resolution: None,
     });
 
     let info = probe_openspec_context_in(repo_root, &wf).expect("must detect feature");
@@ -206,7 +207,7 @@ fn test_stage_inference_stages_1_to_5() {
     std::fs::create_dir_all(&brainstorms).unwrap();
     std::fs::write(brainstorms.join("idea.md"), "# Big Idea").unwrap();
 
-    let (stage1, _, feat1) =
+    let (stage1, _, feat1, _) =
         infer_stage_from_repo(repo_root, Some("main")).expect("must infer stage 1");
     assert_eq!(stage1, WorkflowStage::Ideation);
     assert_eq!(feat1, None);
@@ -217,7 +218,7 @@ fn test_stage_inference_stages_1_to_5() {
     std::fs::write(change_dir.join("proposal.md"), "# Proposal").unwrap();
     std::fs::write(change_dir.join("spec.md"), "# Spec").unwrap();
 
-    let (stage2, _, feat2) =
+    let (stage2, _, feat2, _) =
         infer_stage_from_repo(repo_root, Some("feat/test-feat")).expect("must infer stage 2");
     assert_eq!(stage2, WorkflowStage::OpenSpec);
     assert_eq!(feat2.as_deref(), Some("test-feat"));
@@ -226,7 +227,7 @@ fn test_stage_inference_stages_1_to_5() {
     let tasks_file = change_dir.join("tasks.md");
     std::fs::write(&tasks_file, "- [ ] Task 1\n- [ ] Task 2\n").unwrap();
 
-    let (stage3, _, feat3) =
+    let (stage3, _, feat3, _) =
         infer_stage_from_repo(repo_root, Some("feat/test-feat")).expect("must infer stage 3");
     assert_eq!(stage3, WorkflowStage::ExecutionPlan);
     assert_eq!(feat3.as_deref(), Some("test-feat"));
@@ -234,7 +235,7 @@ fn test_stage_inference_stages_1_to_5() {
     // 4. Stage 4: Work/TDD (1/2 tasks completed)
     std::fs::write(&tasks_file, "- [x] Task 1\n- [ ] Task 2\n").unwrap();
 
-    let (stage4, _, feat4) =
+    let (stage4, _, feat4, _) =
         infer_stage_from_repo(repo_root, Some("feat/test-feat")).expect("must infer stage 4");
     assert_eq!(stage4, WorkflowStage::WorkTdd);
     assert_eq!(feat4.as_deref(), Some("test-feat"));
@@ -242,7 +243,7 @@ fn test_stage_inference_stages_1_to_5() {
     // 5. Stage 5: Verification (all tasks completed)
     std::fs::write(&tasks_file, "- [x] Task 1\n- [x] Task 2\n").unwrap();
 
-    let (stage5, _, feat5) =
+    let (stage5, _, feat5, _) =
         infer_stage_from_repo(repo_root, Some("feat/test-feat")).expect("must infer stage 5");
     assert_eq!(stage5, WorkflowStage::Verification);
     assert_eq!(feat5.as_deref(), Some("test-feat"));
@@ -552,4 +553,156 @@ fn test_probe_unarchived_completed_changes_non_existent_openspec_dir() {
     let tmp = TempDir::new().unwrap();
     let unarchived = probe_unarchived_completed_changes(tmp.path());
     assert!(unarchived.is_empty());
+}
+
+#[test]
+fn test_stage_inference_resolution_branch_vs_mtime_fallback() {
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path();
+
+    let change_dir = repo_root
+        .join("openspec")
+        .join("changes")
+        .join("feat-resolution");
+    std::fs::create_dir_all(&change_dir).unwrap();
+    std::fs::write(change_dir.join("proposal.md"), "# Proposal").unwrap();
+    std::fs::write(change_dir.join("spec.md"), "# Spec").unwrap();
+
+    // 1. Branch matching openspec directory resolves as FeatureResolution::Branch
+    let (stage_branch, _, feat_branch, res_branch) =
+        infer_stage_from_repo(repo_root, Some("feat/feat-resolution")).expect("must infer stage");
+    assert_eq!(stage_branch, WorkflowStage::OpenSpec);
+    assert_eq!(feat_branch.as_deref(), Some("feat-resolution"));
+    assert_eq!(
+        res_branch,
+        Some(crate::state::state::FeatureResolution::Branch)
+    );
+
+    // 2. Branch not matching (or None / no git) falls back to mtime -> FeatureResolution::MtimeFallback
+    let (stage_fallback, _, feat_fallback, res_fallback) =
+        infer_stage_from_repo(repo_root, Some("main")).expect("must infer stage via fallback");
+    assert_eq!(stage_fallback, WorkflowStage::OpenSpec);
+    assert_eq!(feat_fallback.as_deref(), Some("feat-resolution"));
+    assert_eq!(
+        res_fallback,
+        Some(crate::state::state::FeatureResolution::MtimeFallback)
+    );
+}
+
+#[test]
+fn test_probe_openspec_uncommitted_detection() {
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path();
+
+    // Initialize real git repo hermetically
+    let mut git_init = std::process::Command::new("git");
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
+        git_init.env_remove(var);
+    }
+    git_init
+        .args(["init"])
+        .current_dir(repo_root)
+        .output()
+        .unwrap();
+
+    let change_dir = repo_root.join("openspec").join("changes").join("feat-git");
+    std::fs::create_dir_all(&change_dir).unwrap();
+    std::fs::write(change_dir.join("proposal.md"), "# Proposal").unwrap();
+
+    // 1. Untracked file -> detected as uncommitted
+    assert!(probe_openspec_has_uncommitted(repo_root, "feat-git"));
+
+    // 2. Committed file -> clean, not uncommitted
+    let mut git_add = std::process::Command::new("git");
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
+        git_add.env_remove(var);
+    }
+    git_add
+        .args(["add", "."])
+        .current_dir(repo_root)
+        .output()
+        .unwrap();
+
+    let mut git_commit = std::process::Command::new("git");
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
+        git_commit.env_remove(var);
+    }
+    git_commit
+        .args([
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "commit spec",
+        ])
+        .current_dir(repo_root)
+        .output()
+        .unwrap();
+
+    assert!(!probe_openspec_has_uncommitted(repo_root, "feat-git"));
+
+    // 3. New untracked tasks.md added -> detected as uncommitted
+    std::fs::write(change_dir.join("tasks.md"), "- [ ] Task 1\n").unwrap();
+    assert!(probe_openspec_has_uncommitted(repo_root, "feat-git"));
+}
+
+#[test]
+fn test_maybe_auto_checkpoint_second_cycle_on_same_branch() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    std::fs::create_dir_all(&config_dir).unwrap();
+    let state_path = config_dir.join("state.json");
+
+    let repo_root = tmp.path().join("repo");
+    std::fs::create_dir_all(&repo_root).unwrap();
+
+    let ctx = Context::resolve(Some(config_dir), false, false, true).unwrap();
+
+    let adoption_entry = crate::state::state::ProjectAdoptionEntry {
+        path: repo_root.clone(),
+        file: "AGENTS.md".into(),
+        tier: crate::state::state::AdoptionTier::Full,
+        block_version: 4,
+        block_sha256: "fake-sha".into(),
+        created_file: true,
+        adopted_at: "2026-09-05T00:00:00Z".into(),
+    };
+
+    let mut state = State::new();
+    state.projects.push(adoption_entry);
+    // Cycle 1 is at Stage 7 (GitShipping) on feature "feat-first"
+    let init_wf = WorkflowState {
+        stage: WorkflowStage::GitShipping,
+        task: "Shipped feat-first".into(),
+        feature_name: Some("feat-first".into()),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        source: WorkflowSource::Manual,
+        resolution: Some(FeatureResolution::Branch),
+    };
+    let key = State::workspace_branch_key(&repo_root, None);
+    state.workflows.insert(key, init_wf.clone());
+    state.workflow = Some(init_wf);
+    state.save(&state_path).unwrap();
+
+    // Start Cycle 2: docs/brainstorms/idea.md exists, no openspec dir
+    let brainstorms = repo_root.join("docs").join("brainstorms");
+    std::fs::create_dir_all(&brainstorms).unwrap();
+    std::fs::write(brainstorms.join("idea2.md"), "# Big Idea 2").unwrap();
+
+    // Auto-checkpoint must succeed (not blocked by monotonic guard) because it's a new cycle (feature changed)
+    let res = maybe_auto_checkpoint(&ctx, &repo_root, &state_path).unwrap();
+    assert!(
+        res.is_some(),
+        "new cycle must not be blocked by monotonic guard"
+    );
+    let wf = res.unwrap();
+    assert_eq!(wf.stage, WorkflowStage::Ideation);
+    assert_eq!(wf.source, WorkflowSource::Inferred);
+    assert!(
+        wf.task.to_lowercase().contains("nuevo ciclo detectado"),
+        "task should indicate new cycle detected, got: {}",
+        wf.task
+    );
 }

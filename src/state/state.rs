@@ -127,6 +127,28 @@ pub enum WorkflowSource {
     Inferred,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FeatureResolution {
+    Branch,
+    MtimeFallback,
+}
+
+impl FeatureResolution {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FeatureResolution::Branch => "branch",
+            FeatureResolution::MtimeFallback => "mtime_fallback",
+        }
+    }
+}
+
+impl std::fmt::Display for FeatureResolution {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct WorkflowState {
     pub stage: WorkflowStage,
@@ -136,6 +158,8 @@ pub struct WorkflowState {
     pub updated_at: String,
     #[serde(default)]
     pub source: WorkflowSource,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolution: Option<FeatureResolution>,
 }
 
 /// One tracked file of an adopted skills surface (path relative to the
@@ -374,6 +398,7 @@ impl State {
                         ts
                     },
                     source: WorkflowSource::Manual,
+                    resolution: None,
                 });
             }
         }
@@ -390,17 +415,48 @@ impl State {
         feature: Option<String>,
         source: WorkflowSource,
     ) -> Result<(), CeError> {
+        self.validate_and_set_workflow_for_branch_with_resolution(
+            root,
+            branch,
+            target_stage,
+            task,
+            feature,
+            source,
+            None,
+        )
+    }
+
+    /// Validates stage transition and updates state.workflows with optional feature resolution provenance.
+    #[allow(clippy::too_many_arguments)]
+    pub fn validate_and_set_workflow_for_branch_with_resolution(
+        &mut self,
+        root: &Path,
+        branch: Option<&str>,
+        target_stage: WorkflowStage,
+        task: &str,
+        feature: Option<String>,
+        source: WorkflowSource,
+        resolution: Option<FeatureResolution>,
+    ) -> Result<(), CeError> {
         let current_wf = self.current_workflow_for_branch(root, branch);
         let current_stage = current_wf
             .as_ref()
             .map(|wf| wf.stage)
             .unwrap_or(WorkflowStage::Ideation);
 
+        let is_new_cycle = match (&current_wf, &feature) {
+            (Some(wf), feat) => {
+                target_stage.number() == 1 && wf.feature_name.as_deref() != feat.as_deref()
+            }
+            _ => false,
+        };
+
         // Monotonic provenance guard:
         // 1. Inferred checkpoints can NEVER equal or regress an existing Manual checkpoint.
         // 2. Inferred checkpoints can NEVER regress any existing checkpoint (Manual or Inferred).
+        // Exception: New cycle detected (target_stage is Stage 1 and feature changed).
         if let Some(ref wf) = current_wf {
-            if source == WorkflowSource::Inferred {
+            if source == WorkflowSource::Inferred && !is_new_cycle {
                 if wf.source == WorkflowSource::Manual
                     && target_stage.number() <= current_stage.number()
                 {
@@ -428,21 +484,23 @@ impl State {
         let is_reset_to_stage_1 =
             target_stage == WorkflowStage::Ideation && current_stage != WorkflowStage::Ideation;
 
-        let feature_name = match feature {
+        let (feature_name, resolution) = match feature {
             Some(f) => {
                 let trimmed = f.trim().to_string();
                 if trimmed.is_empty() {
-                    None
+                    (None, None)
                 } else {
-                    Some(trimmed)
+                    (Some(trimmed), resolution)
                 }
             }
             None => {
                 if is_reset_to_stage_1 {
-                    None
+                    (None, None)
                 } else {
-                    self.current_workflow_for_branch(root, branch)
-                        .and_then(|wf| wf.feature_name)
+                    let current = self.current_workflow_for_branch(root, branch);
+                    let feat = current.as_ref().and_then(|wf| wf.feature_name.clone());
+                    let res = resolution.or_else(|| current.as_ref().and_then(|wf| wf.resolution));
+                    (feat, res)
                 }
             }
         };
@@ -453,6 +511,7 @@ impl State {
             feature_name,
             updated_at: chrono::Utc::now().to_rfc3339(),
             source,
+            resolution,
         };
 
         let key = Self::workspace_branch_key(root, branch);
@@ -511,6 +570,7 @@ impl State {
                     feature_name: None,
                     updated_at: chrono::Utc::now().to_rfc3339(),
                     source: WorkflowSource::Manual,
+                    resolution: None,
                 }))
         }
     }
