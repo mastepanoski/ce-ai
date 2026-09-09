@@ -5,7 +5,13 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.48.0] - 2026-09-08
+
+### Added
+- **Kimi Code Native Plugin Manager Divergence Diagnostic in `doctor`:**
+  - **Native Plugin Discovery (`src/harness/kimi.rs`)**: Implemented `check_kimi_marketplace_divergence` to inspect `<kimi_dir>/plugins/installed.json` (array-shaped native registry), evaluating only *enabled* `compound-engineering` entries and resolving the native version from `<root>/package.json` (fallback `<root>/plugin.json`), strictly read-only with graceful degradation on any missing or malformed file.
+  - **Orphan Managed Tree Detection (`src/harness/kimi.rs`)**: Implemented `check_kimi_orphan_managed_tree`, which reports (non-blocking `doctor-warn:`) when a ce-ai managed tree exists under the Kimi harness dir but is not referenced by `~/.kimi-code/config.toml` `extra_skill_dirs`, rendering the managed skills inactive for Kimi.
+  - **Advisory Health Reporting (`src/commands/doctor.rs`)**: Emits `doctor-info:` divergence notices (native plugin version vs ce-ai managed version, normalized with the shared `normalize_plugin_version`) and the orphan-tree warning without altering `findings` or the exit code.
 
 ### Fixed
 - **Empty SHA256 Manifests for Non-OpenCode Harnesses (`sync`):**
@@ -868,7 +874,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.48.0] - 2026-09-08
 
 ### Fixed
 - **Models Tab Shows Live Harness Config**: The TUI Models tab now reads assignments from the selected harness's config file (switch scope with ◄/►) instead of stale `state.json` entries — deleting a model from `opencode.json` is immediately reflected (#111).

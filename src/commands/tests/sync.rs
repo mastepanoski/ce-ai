@@ -399,9 +399,9 @@ fn sync_with_harvests_real_hashes_for_registration_harness_manifests() {
     use crate::opencode::manifest::InstallManifest;
     use crate::state::state::State;
 
-    // Force default (home-derived) harness paths; restored at test end.
-    // (Branch A carries no access to the harness env lock — it ships with the
-    // Kimi divergence change — so this uses plain save/remove/restore.)
+    // Shield against parallel adapter tests that mutate KIMI_CODE_HOME:
+    // hold the harness env lock and force the default (home-derived) paths.
+    let _guard = crate::harness::tests::HARNESS_ENV_LOCK.lock().unwrap();
     let saved_kimi_home = std::env::var_os("KIMI_CODE_HOME");
     std::env::remove_var("KIMI_CODE_HOME");
     let tmp = tempdir().unwrap();
