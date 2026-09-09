@@ -49,6 +49,33 @@ fn github_slug_from_remote(repo_root: &std::path::Path) -> Option<String> {
     github_slug_from_url(&String::from_utf8_lossy(&out.stdout))
 }
 
+/// Diff findings for non-OpenCode managed harnesses (claude, kimi) when their
+/// manifests exist — same engine as the OpenCode diff, per-harness managed
+/// trees, harness-prefixed finding strings (`diff: <harness> <kind> <path>`).
+pub(crate) fn non_opencode_diff_findings(home_dir: &std::path::Path) -> Vec<String> {
+    let mut findings = Vec::new();
+    for kind in crate::commands::workflow::DRIFT_PROBE_HARNESSES {
+        let harness_dir = kind.harness_dir(home_dir);
+        if let Ok(manifest) = InstallManifest::load(&harness_dir) {
+            let desired: BTreeMap<String, String> = manifest
+                .files
+                .iter()
+                .map(|f| (f.path.clone(), f.sha256.clone()))
+                .collect();
+            let managed = harness_dir.join(MANAGED_DIR);
+            for action in diff::diff(&desired, &desired, &managed).actions {
+                let (verb, path) = match action {
+                    Action::Copy { path } => ("missing", path),
+                    Action::Restore { path } => ("modified", path),
+                    Action::Remove { path } => ("stale", path),
+                };
+                findings.push(format!("diff: {kind} {verb} {path}"));
+            }
+        }
+    }
+    findings
+}
+
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let state = State::load_with_workspace_overrides(
         &ctx.config_dir.join("state.json"),
@@ -81,6 +108,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             findings.push(format!("diff: {kind} {path}"));
         }
     }
+
+    // Diff for non-OpenCode managed harnesses (claude, kimi) when their
+    // manifests exist — same engine, per-harness managed trees.
+    let home_dir_for_diff = crate::harness::home_dir_from_ctx(ctx);
+    findings.extend(non_opencode_diff_findings(&home_dir_for_diff));
 
     // State consistency: the opencode state entry and the manifest must agree.
     let repo_root = ctx.repo_root();
@@ -246,6 +278,27 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         println!(
             "doctor-info: claude native plugin marketplace divergence detected for '{}' (scope: {}): native marketplace has v{} but ce-ai managed harness is v{} (run '{}' to update)",
             d.plugin_id, d.scope, norm_native, norm_ce, update_cmd
+        );
+    }
+
+    // Kimi Code Native Plugin Manager Divergence Probe:
+    // Kimi's native plugin manager (~/.kimi-code/plugins/installed.json) can
+    // shadow the ce-ai managed tree with its own pinned version.
+    let kimi_dir = HarnessKind::Kimi.harness_dir(&home_dir);
+    let kimi_divergences =
+        crate::harness::kimi::check_kimi_marketplace_divergence(&state, &cwd, &kimi_dir);
+    for d in &kimi_divergences {
+        let norm_native = crate::harness::claude::normalize_plugin_version(&d.native_version);
+        let norm_ce = crate::harness::claude::normalize_plugin_version(&d.ce_version);
+        println!(
+            "doctor-info: kimi native plugin divergence detected for '{}' : native plugin manager has v{} but ce-ai managed harness is v{} (update the plugin via Kimi's native plugin manager, or uninstall the native plugin to use the ce-ai managed tree exclusively)",
+            d.plugin_id, norm_native, norm_ce
+        );
+    }
+    if let Some(orphan) = crate::harness::kimi::check_kimi_orphan_managed_tree(&kimi_dir) {
+        println!(
+            "doctor-warn: kimi managed tree '{}' is not referenced by Kimi config (extra_skill_dirs) — the ce-ai managed skills are inactive for Kimi (reference the tree from ~/.kimi-code/config.toml, or remove it with 'ce-ai uninstall --harness kimi')",
+            orphan.managed_dir.display()
         );
     }
 
