@@ -264,6 +264,37 @@ pub fn check_kimi_marketplace_divergence(
     divergences
 }
 
+/// Cross-platform "does this config entry point at that directory" check.
+///
+/// Resolution order: raw `Path` equality, then `canonicalize` on both sides
+/// (handles symlinks, Windows `\\?\` prefixes, and mixed separators for
+/// existing paths), then a separator/case-normalized string comparison so a
+/// hand-written `extra_skill_dirs` entry using forward slashes — or a path
+/// that no longer exists and therefore cannot be canonicalized — never
+/// produces a false orphan finding.
+fn paths_refer_to_same(entry: &Path, target: &Path) -> bool {
+    if entry == target {
+        return true;
+    }
+    if let (Ok(a), Ok(b)) = (entry.canonicalize(), target.canonicalize()) {
+        if a == b {
+            return true;
+        }
+    }
+    let normalize = |p: &Path| {
+        let mut s = p.to_string_lossy().replace('\\', "/");
+        while s.ends_with('/') {
+            s.pop();
+        }
+        if cfg!(windows) {
+            s.to_lowercase()
+        } else {
+            s
+        }
+    };
+    normalize(entry) == normalize(target)
+}
+
 /// Detects a ce-ai managed tree under the Kimi harness dir that Kimi's native
 /// configuration does not reference via `extra_skill_dirs`. Returns `Some`
 /// when the managed tree exists (marked by `install-manifest.json`) and no
@@ -288,13 +319,9 @@ pub fn check_kimi_orphan_managed_tree(kimi_dir: &Path) -> Option<KimiOrphanManag
         })
         .unwrap_or_default();
 
-    let is_referenced = referenced.iter().any(|entry| {
-        entry == &managed_dir
-            || entry
-                .canonicalize()
-                .and_then(|e| managed_dir.canonicalize().map(|m| e == m))
-                .unwrap_or(false)
-    });
+    let is_referenced = referenced
+        .iter()
+        .any(|entry| paths_refer_to_same(entry, &managed_dir));
 
     if is_referenced {
         None

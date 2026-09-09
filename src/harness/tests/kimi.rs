@@ -303,10 +303,20 @@ fn test_kimi_orphan_managed_tree_matrix() {
     std::fs::write(kimi_dir.join("config.toml"), "extra_skill_dirs = []\n").unwrap();
     assert!(check_kimi_orphan_managed_tree(&kimi_dir).is_some());
 
-    // 5. config.toml referencing the managed dir -> not orphan
+    // 5. config.toml referencing the managed dir -> not orphan.
+    //    Serialize via the toml crate: hand-formatting a basic string with
+    //    display() emits unescaped Windows backslashes, which are invalid
+    //    TOML escapes and made this case fail on windows-latest CI.
+    let mut table = toml::Table::new();
+    table.insert(
+        "extra_skill_dirs".to_string(),
+        toml::Value::Array(vec![toml::Value::String(
+            managed_dir.to_string_lossy().into_owned(),
+        )]),
+    );
     std::fs::write(
         kimi_dir.join("config.toml"),
-        format!("extra_skill_dirs = [\"{}\"]\n", managed_dir.display()),
+        toml::to_string(&table).unwrap(),
     )
     .unwrap();
     assert!(check_kimi_orphan_managed_tree(&kimi_dir).is_none());
@@ -314,4 +324,50 @@ fn test_kimi_orphan_managed_tree_matrix() {
     // 6. Malformed config.toml degrades to orphan warning (not referenced)
     std::fs::write(kimi_dir.join("config.toml"), "not = [valid toml").unwrap();
     assert!(check_kimi_orphan_managed_tree(&kimi_dir).is_some());
+}
+
+#[test]
+fn test_kimi_orphan_managed_tree_forward_slash_reference() {
+    let tmp = TempDir::new().unwrap();
+    let kimi_dir = tmp.path().join(".kimi-code");
+    let managed_dir = kimi_dir.join("compound-engineering");
+    std::fs::create_dir_all(&managed_dir).unwrap();
+    std::fs::write(managed_dir.join("install-manifest.json"), "{}").unwrap();
+
+    // Hand-edited configs may use forward slashes regardless of the native
+    // separator; such an entry must count as a reference, not an orphan.
+    let forward_slashed = managed_dir.to_string_lossy().replace('\\', "/");
+    let mut table = toml::Table::new();
+    table.insert(
+        "extra_skill_dirs".to_string(),
+        toml::Value::Array(vec![toml::Value::String(forward_slashed)]),
+    );
+    std::fs::write(
+        kimi_dir.join("config.toml"),
+        toml::to_string(&table).unwrap(),
+    )
+    .unwrap();
+
+    assert!(check_kimi_orphan_managed_tree(&kimi_dir).is_none());
+}
+
+#[test]
+fn test_paths_refer_to_same_normalizes_separators() {
+    // Windows-style input is compared deterministically on every platform:
+    // raw equality fails, canonicalize fails (paths do not exist), so the
+    // separator/case normalization fallback must decide.
+    assert!(paths_refer_to_same(
+        Path::new("C:\\Users\\dev\\.kimi-code\\compound-engineering"),
+        Path::new("C:/Users/dev/.kimi-code/compound-engineering"),
+    ));
+    // Trailing separator must not matter.
+    assert!(paths_refer_to_same(
+        Path::new("/opt/ce/compound-engineering/"),
+        Path::new("/opt/ce/compound-engineering"),
+    ));
+    // Different directories must never match.
+    assert!(!paths_refer_to_same(
+        Path::new("/opt/ce/other"),
+        Path::new("/opt/ce/compound-engineering"),
+    ));
 }
