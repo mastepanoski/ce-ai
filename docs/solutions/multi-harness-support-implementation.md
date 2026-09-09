@@ -7,7 +7,9 @@ problem_type: architecture
 # Solution: Multi-Harness Support Implementation
 
 > Updated for v1.19.x–v1.20.x (registration strategy table, real custom
-> mode, sync error transparency). Original v0.3.0 notes corrected — they
+> mode, sync error transparency); refreshed v1.48.0 (registration table
+> relocated to `harness::registration`, manifest re-harvest, verification
+> matrix scope corrected). Original v0.3.0 notes corrected — they
 > described a `generic_json.rs` adapter that only ever implemented Custom,
 > and listed DeepSeek as supported before its de-scope.
 
@@ -28,16 +30,26 @@ assignment translation, and host harness auto-probing across vendors.
    owning its config writer (`register_<vendor>_mcp_server`) with identical
    signatures; no shared generic-JSON adapter ever served them.
 3. **Exhaustive registration table** — `registration_spec(kind)` in
-   `src/commands/sync.rs` maps each kind to `{register_mcp, skills_subpath}`;
-   adding a variant is a compile error until classified (v1.19.2). The same
-   consolidation for `install.rs` is tracked follow-up debt.
+   `src/harness/registration.rs` maps each kind to its vendor MCP
+   registrar (dedicated arms remain for Custom, OpenCode, and de-scoped
+   Deepseek); adding a variant is a compile error until classified
+   (v1.19.2). Both consumers share the table: `install.rs` and `sync.rs`
+   import it (consolidation completed for install in v1.48.0).
 4. **Custom mode contract** — flags ▸ state snapshot ▸
    `~/.ce-ai/custom_harness.json`; assets copied into user directories with
    a SHA256 manifest; surgical uninstall (v1.19.0).
 5. **Sync transparency** — per-harness arms propagate IO errors; the
-   verification matrix hash-checks all eight directory-copying skill
-   surfaces (v1.19.1); best-effort cleanups report via
-   `state::report_best_effort_*` helpers (v1.20.1).
+   verification matrix hash-checks only surfaces with managed assets
+   (OpenCode, Custom, and adopted ledger surfaces) — skills are never
+   copied into native harness directories, so registration-only harnesses
+   are reported `registered (nothing to verify)` (v1.19.1; scope
+   corrected v1.48.0). Per-harness SHA256 integrity instead lives in each
+   harness's `install-manifest.json`, re-harvested from the on-disk
+   managed tree on every sync (`InstallManifest::harvest`,
+   `src/opencode/manifest.rs`), and is certified independently by
+   `ce-ai doctor`, `ce-ai status`, and `ce-ai workflow resume`.
+   Best-effort cleanups report via `state::report_best_effort_*` helpers
+   (v1.20.1).
 
 ## Key Invariants
 
