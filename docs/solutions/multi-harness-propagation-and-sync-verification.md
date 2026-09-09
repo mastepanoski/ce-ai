@@ -41,7 +41,7 @@ tags:
 - `ce-ai upgrade` (and TUI `Upgrade Release`) fetches the latest GitHub release tag, extracts the tarball, updates managed skills/loaders across all target harnesses, and updates `state.json` from `kind: local` to `kind: github-release`.
 
 ### 3. Multi-Harness Target Propagation (`src/commands/install.rs`, `src/commands/sync.rs`)
-- **`install::run`**: Iterates over `target_harnesses` when `--harness all` is passed, ensuring plugin entries and skill paths are merged into every target harness configuration file (`claude.json`, `config.json`, `.cursorrules`, `antigravity.json`, `kimi.json`, etc.).
+- **`install::run`**: Iterates over `target_harnesses` when `--harness all` is passed. The OpenCode arm merges the plugin entry and skill paths into `opencode.json` via `ensure_plugin_and_skills`; every table-driven harness arm routes through `registration_spec` → `register_companions`, which registers the companion MCP server into that harness's `HarnessKind::config_path` — `settings.json` (claude, `.claude.json` legacy), `mcp.json` (kimi, cursor, fx), `mcp_config.json` (agy), `mcp-config.json` (copilot), `config.toml` (codex, grok); `pi` registers no MCP config by design.
 - **`sync_with`**: Probes host-detected CE installations (`detect_ce_installed_harnesses`) alongside registered entries. The OpenCode arm applies `ensure_plugin_and_skills` (plugin entry + skills paths) plus companion registration; every table-driven harness arm routes through `registration_spec` → `register_companions` and re-harvests its `install-manifest.json` SHA256 entries from the on-disk managed tree (v1.48.0), populating `state.installed_harnesses` for all active harnesses.
 
 ### 4. Deterministic Sync Verification Matrix (`src/commands/sync.rs`)
