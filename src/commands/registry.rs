@@ -9,8 +9,8 @@ use std::path::PathBuf;
 use clap::Subcommand;
 
 use crate::commands::{
-    audit, backups, deinit_prj, doctor, guard, init_prj, install, models, skills, status, sync,
-    tools, uninstall, upgrade, usage, workflow, Context,
+    audit, backups, deinit_prj, doctor, gate, guard, init_prj, install, models, skills, status,
+    sync, tools, uninstall, upgrade, usage, workflow, Context,
 };
 use crate::error::CeError;
 
@@ -73,6 +73,9 @@ pub enum Commands {
     },
     /// Pedagogical Guardrail Mode for junior developer oversight (Issue #114).
     Guard(guard::Args),
+    /// Observe-only gate check for agent tool write monitoring (Spike #333).
+    #[command(subcommand)]
+    Gate(gate::GateCommands),
 }
 
 impl CeCommand for Commands {
@@ -100,6 +103,9 @@ impl CeCommand for Commands {
             } => init_prj::run(ctx, path.clone(), tier, *force, *skip_rtk, *skip_companions),
             Commands::DeinitPrj { path } => deinit_prj::run(ctx, path.clone()),
             Commands::Guard(args) => guard::run(ctx, args),
+            Commands::Gate(cmd) => match cmd {
+                gate::GateCommands::Check(args) => gate::run_gate_check(ctx, args),
+            },
         }
     }
 }

@@ -74,5 +74,9 @@ A cognitive feedback loop in AI agents where historical `ce-ai` status banners (
 ### OpenSpec Ledger Completeness Probe
 A repo-wide, non-discretionary health probe (`probe_unarchived_completed_changes`) that scans all direct subdirectories in `openspec/changes/` (excluding `archive/`) for change folders where 100% of tasks in `tasks.md` are completed. It guarantees deterministic detection by anchoring a compact ledger summary line into Turn-0 session delivery (`ce-ai workflow resume` via native harness `SessionStart` hooks), `workflow status`, `workflow checkpoint`, and verbose diagnostics in `ce-ai doctor`, preventing completed changes from lingering unarchived outside compound engineering sessions.
 
+### Gate Check (Observe-Only Spike)
+A non-blocking, telemetry-only verification mechanism (`ce-ai gate check`) that evaluates agent tool write operations targeting `src/**` under Stage 4 (`ce-work`) against active OpenSpec contracts (`proposal.md`, `spec.md`, `tasks.md`). To avoid developer disruption and false positive lockouts, the spike strictly observes without blocking writes (exit code `0`), inspects only the declared checkpoint stage from `state.json` (never re-inferring stage), isolates edge cases (`mtime_fallback`, `worktree_uncommitted`, `stale_cycle_guard`) into distinct telemetry buckets, provides an immediate kill-switch (`CE_AI_DISABLE_GATE_CHECK=1` or `--disabled`), and aggregates metrics transparently in `status` and `doctor`.
+
+
 
 

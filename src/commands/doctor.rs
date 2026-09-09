@@ -618,6 +618,25 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         );
     }
 
+    // Gate Check Spike Telemetry Metrics (Issue #333)
+    let gate_stats = crate::commands::gate::load_gate_stats(&ctx.config_dir).unwrap_or_default();
+    if gate_stats.total_observed > 0 {
+        let edge_total = gate_stats.mtime_fallback
+            + gate_stats.worktree_uncommitted
+            + gate_stats.stale_cycle_guard;
+        println!(
+            "gate-check: {} observed ({} would-block, {} pass, {} undetermined, {} edge-case: {} mtime_fallback, {} worktree_uncommitted, {} stale_cycle_guard)",
+            gate_stats.total_observed,
+            gate_stats.would_block,
+            gate_stats.pass,
+            gate_stats.undetermined,
+            edge_total,
+            gate_stats.mtime_fallback,
+            gate_stats.worktree_uncommitted,
+            gate_stats.stale_cycle_guard,
+        );
+    }
+
     for finding in &findings {
         println!("{finding}");
     }

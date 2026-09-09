@@ -471,6 +471,7 @@ pub fn reconcile_project_harness_hooks(target_dir: &Path, inner_body: &str) -> R
 
         let settings_path = target_dir.join(".claude").join("settings.json");
         let _ = crate::harness::claude::ensure_session_start_hook(&settings_path);
+        let _ = crate::harness::claude::ensure_claude_gate_hook(&settings_path);
     }
 
     // 3. Codex

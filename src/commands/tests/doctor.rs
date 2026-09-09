@@ -750,3 +750,50 @@ fn test_doctor_warns_on_mtime_fallback_and_uncommitted_spec() {
     let res = run(&ctx, &args);
     assert!(res.is_ok());
 }
+
+#[test]
+fn test_doctor_reports_gate_check_telemetry() {
+    use crate::commands::gate::{log_gate_event, GateDecision, GateEventRecord};
+
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path().join("repo");
+    let config_dir = tmp.path().join("config");
+    let opencode_dir = tmp.path().join("opencode");
+    std::fs::create_dir_all(&repo_root).unwrap();
+    std::fs::create_dir_all(&config_dir).unwrap();
+    std::fs::create_dir_all(&opencode_dir).unwrap();
+
+    std::fs::write(
+        config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let record = GateEventRecord {
+        timestamp: "2026-09-09T12:00:00Z".to_string(),
+        harness: "claude".to_string(),
+        tool: "Write".to_string(),
+        path: "src/main.rs".to_string(),
+        workspace: repo_root.display().to_string(),
+        branch: Some("feat/foo".to_string()),
+        stage: Some(4),
+        feature: Some("foo".to_string()),
+        decision: GateDecision::WouldBlock,
+        edge_case: None,
+        reason: "missing proposal.md".to_string(),
+    };
+    log_gate_event(&config_dir, &record).unwrap();
+
+    let ctx = Context {
+        config_dir,
+        opencode_config_dir: opencode_dir,
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: false,
+    };
+
+    let args = Args::default();
+    let res = run(&ctx, &args);
+    assert!(res.is_ok());
+}
