@@ -7595,3 +7595,173 @@ fn test_workflow_fsm_mtime_fallback_uncommitted_spec_and_second_cycle() {
         ))
         .stdout(predicates::str::contains("nuevo ciclo detectado"));
 }
+
+#[test]
+fn test_gate_check_spike_observe_only_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let home = tmp.path().join("home");
+    let proj = tmp.path().join("my-repo");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(&proj).unwrap();
+
+    let events_file = config_dir.join("gate-events.jsonl");
+
+    // 1. Kill-switch short-circuit (flag and env vars) -> zero logging, exit 0
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args([
+            "gate",
+            "check",
+            "--tool",
+            "Write",
+            "--path",
+            "src/main.rs",
+            "--disabled",
+        ])
+        .assert()
+        .success();
+    assert!(!events_file.exists());
+
+    ceai(&config_dir, &home)
+        .env("CE_AI_DISABLE_GATE_CHECK", "1")
+        .current_dir(&proj)
+        .args(["gate", "check", "--tool", "Write", "--path", "src/main.rs"])
+        .assert()
+        .success();
+    assert!(!events_file.exists());
+
+    ceai(&config_dir, &home)
+        .env("CE_AI_GATE_CHECK_DISABLED", "true")
+        .current_dir(&proj)
+        .args(["gate", "check", "--tool", "Write", "--path", "src/main.rs"])
+        .assert()
+        .success();
+    assert!(!events_file.exists());
+
+    // 2. Non-write tool calls and non-src paths -> zero logging, exit 0
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["gate", "check", "--tool", "Read", "--path", "src/main.rs"])
+        .assert()
+        .success();
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["gate", "check", "--tool", "Write", "--path", "README.md"])
+        .assert()
+        .success();
+    assert!(!events_file.exists());
+
+    // Initialize git repository on branch feat/gate-test
+    git_cmd()
+        .args(["init"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    git_cmd()
+        .args(["checkout", "-b", "feat/gate-test"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    // 3. Stage 4 write without OpenSpec contract -> logs would-block, exit 0
+    for (stage, task) in [
+        ("1", "Ideation"),
+        ("2", "Specifying"),
+        ("3", "Planning"),
+        ("4", "Implementing"),
+    ] {
+        ceai(&config_dir, &home)
+            .current_dir(&proj)
+            .args([
+                "workflow",
+                "checkpoint",
+                "--stage",
+                stage,
+                "--task",
+                task,
+                "-f",
+                "gate-test",
+            ])
+            .assert()
+            .success();
+    }
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["gate", "check", "--tool", "Write", "--path", "src/lib.rs"])
+        .assert()
+        .success();
+
+    let logs = fs::read_to_string(&events_file).unwrap();
+    assert!(logs.contains("\"decision\":\"would_block\""));
+
+    // 4. Stage 4 write with complete OpenSpec contract -> logs pass, exit 0
+    let spec_dir = proj.join("openspec").join("changes").join("gate-test");
+    fs::create_dir_all(&spec_dir).unwrap();
+    fs::write(spec_dir.join("proposal.md"), "# Proposal\n").unwrap();
+    fs::write(spec_dir.join("spec.md"), "# Spec\n").unwrap();
+    fs::write(spec_dir.join("tasks.md"), "# Tasks\n").unwrap();
+
+    // Commit the specs so worktree is clean
+    git_cmd()
+        .args(["add", "."])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    git_cmd()
+        .args([
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "add gate-test spec",
+        ])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["gate", "check", "--tool", "Edit", "--path", "src/engine.rs"])
+        .assert()
+        .success();
+
+    let logs = fs::read_to_string(&events_file).unwrap();
+    assert!(logs.contains("\"decision\":\"pass\""));
+
+    // 5. Uncommitted spec -> logs edge_case: worktree_uncommitted via Claude Code stdin JSON payload
+    fs::write(spec_dir.join("proposal.md"), "# Proposal modified\n").unwrap();
+
+    let stdin_payload = r#"{"tool_name":"Write","tool_input":{"path":"src/sub.rs"}}"#;
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["gate", "check"])
+        .write_stdin(stdin_payload)
+        .assert()
+        .success();
+
+    let logs = fs::read_to_string(&events_file).unwrap();
+    assert!(logs.contains("\"edge_case\":\"worktree_uncommitted\""));
+
+    // 6. Verify ce-ai status and ce-ai doctor output aggregated telemetry counts
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "gate-check: 3 observed (1 would-block, 1 pass, 0 undetermined, 1 edge-case: 0 mtime_fallback, 1 worktree_uncommitted, 0 stale_cycle_guard)",
+        ));
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .arg("doctor")
+        .assert()
+        .stdout(predicates::str::contains(
+            "gate-check: 3 observed (1 would-block, 1 pass, 0 undetermined, 1 edge-case: 0 mtime_fallback, 1 worktree_uncommitted, 0 stale_cycle_guard)",
+        ));
+}

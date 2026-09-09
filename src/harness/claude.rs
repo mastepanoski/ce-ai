@@ -477,6 +477,200 @@ pub fn remove_session_start_hook(settings_path: &Path) -> Result<bool, CeError> 
     Ok(true)
 }
 
+pub const GATE_CHECK_COMMAND: &str = "ce-ai gate check";
+pub const GATE_HOOK_EVENT: &str = "PreToolUse";
+pub const GATE_HOOK_MATCHER: &str = "Write|Edit";
+
+/// Checks if `.claude/settings.json` contains a PreToolUse hook executing `ce-ai gate check`.
+pub fn has_claude_gate_hook(settings_path: &Path) -> bool {
+    if !settings_path.exists() {
+        return false;
+    }
+    let Ok(content) = std::fs::read_to_string(settings_path) else {
+        return false;
+    };
+    let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return false;
+    };
+    let Some(hooks) = val.get("hooks") else {
+        return false;
+    };
+    hooks
+        .get(GATE_HOOK_EVENT)
+        .and_then(|s| s.as_array())
+        .map(|arr| {
+            arr.iter().any(|entry| {
+                entry
+                    .get("hooks")
+                    .and_then(|h_arr| h_arr.as_array())
+                    .map(|cmds| {
+                        cmds.iter().any(|cmd| {
+                            cmd.get("command").and_then(|c| c.as_str()) == Some(GATE_CHECK_COMMAND)
+                        })
+                    })
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false)
+}
+
+/// Ensures `.claude/settings.json` contains PreToolUse hook for `ce-ai gate check`.
+/// Preserves any pre-existing user hooks or extra settings. Idempotent.
+pub fn ensure_claude_gate_hook(settings_path: &Path) -> Result<bool, CeError> {
+    if has_claude_gate_hook(settings_path) {
+        return Ok(false);
+    }
+
+    let mut root: serde_json::Value = if settings_path.exists() {
+        let content = std::fs::read_to_string(settings_path)?;
+        serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    let root_obj = root
+        .as_object_mut()
+        .ok_or_else(|| CeError::Runtime("settings root is not an object".to_string()))?;
+    let hooks_val = root_obj
+        .entry("hooks")
+        .or_insert_with(|| serde_json::json!({}));
+    if !hooks_val.is_object() {
+        *hooks_val = serde_json::json!({});
+    }
+
+    let hooks_obj = hooks_val
+        .as_object_mut()
+        .ok_or_else(|| CeError::Runtime("hooks is not an object".to_string()))?;
+
+    let event_val = hooks_obj
+        .entry(GATE_HOOK_EVENT)
+        .or_insert_with(|| serde_json::json!([]));
+    if !event_val.is_array() {
+        *event_val = serde_json::json!([]);
+    }
+
+    let event_arr = event_val
+        .as_array_mut()
+        .ok_or_else(|| CeError::Runtime(format!("{GATE_HOOK_EVENT} is not an array")))?;
+
+    let target_hook = serde_json::json!({
+        "type": "command",
+        "command": GATE_CHECK_COMMAND
+    });
+
+    let matcher_entry = event_arr.iter_mut().find(|entry| {
+        entry.get("matcher").and_then(|m| m.as_str()) == Some(GATE_HOOK_MATCHER)
+            && entry.get("hooks").and_then(|h| h.as_array()).is_some()
+    });
+
+    let mut changed = false;
+    match matcher_entry {
+        Some(entry) => {
+            if let Some(hooks_list) = entry.get_mut("hooks").and_then(|h| h.as_array_mut()) {
+                if !hooks_list
+                    .iter()
+                    .any(|c| c.get("command").and_then(|s| s.as_str()) == Some(GATE_CHECK_COMMAND))
+                {
+                    hooks_list.push(target_hook);
+                    changed = true;
+                }
+            }
+        }
+        None => {
+            event_arr.push(serde_json::json!({
+                "matcher": GATE_HOOK_MATCHER,
+                "hooks": [target_hook]
+            }));
+            changed = true;
+        }
+    }
+
+    if !changed {
+        return Ok(false);
+    }
+
+    if let Some(parent) = settings_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let serialized = serde_json::to_string_pretty(&root)
+        .map_err(|e| CeError::Runtime(format!("failed to serialize settings.json: {e}")))?;
+    write_atomic(settings_path, serialized.as_bytes())?;
+    Ok(true)
+}
+
+/// Surgically removes `ce-ai gate check` hook from `.claude/settings.json`.
+/// If the file becomes empty `{}` as a result, removes the file cleanly.
+pub fn remove_claude_gate_hook(settings_path: &Path) -> Result<bool, CeError> {
+    if !settings_path.exists() {
+        return Ok(false);
+    }
+
+    let content = std::fs::read_to_string(settings_path)?;
+    let Ok(mut root) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return Ok(false);
+    };
+
+    let mut changed = false;
+
+    if let Some(hooks_obj) = root.get_mut("hooks").and_then(|h| h.as_object_mut()) {
+        if let Some(arr) = hooks_obj
+            .get_mut(GATE_HOOK_EVENT)
+            .and_then(|s| s.as_array_mut())
+        {
+            for entry in arr.iter_mut() {
+                if let Some(hooks_list) = entry.get_mut("hooks").and_then(|h| h.as_array_mut()) {
+                    let prev_len = hooks_list.len();
+                    hooks_list.retain(|cmd| {
+                        cmd.get("command").and_then(|c| c.as_str()) != Some(GATE_CHECK_COMMAND)
+                    });
+                    if hooks_list.len() != prev_len {
+                        changed = true;
+                    }
+                }
+            }
+
+            let prev_len = arr.len();
+            arr.retain(|entry| {
+                entry
+                    .get("hooks")
+                    .and_then(|h| h.as_array())
+                    .map(|h| !h.is_empty())
+                    .unwrap_or(false)
+            });
+            if arr.len() != prev_len {
+                changed = true;
+            }
+
+            if arr.is_empty() {
+                hooks_obj.remove(GATE_HOOK_EVENT);
+                changed = true;
+            }
+        }
+
+        if hooks_obj.is_empty() {
+            if let Some(root_obj) = root.as_object_mut() {
+                root_obj.remove("hooks");
+                changed = true;
+            }
+        }
+    }
+
+    if !changed {
+        return Ok(false);
+    }
+
+    if root.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+        let _ = std::fs::remove_file(settings_path);
+        return Ok(true);
+    }
+
+    let serialized = serde_json::to_string_pretty(&root)
+        .map_err(|e| CeError::Runtime(format!("failed to serialize settings.json: {e}")))?;
+    write_atomic(settings_path, serialized.as_bytes())?;
+    Ok(true)
+}
+
 /// Divergence finding between Claude Code's native plugin marketplace
 /// (`~/.claude/plugins/installed_plugins.json`) and ce-ai's managed installation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

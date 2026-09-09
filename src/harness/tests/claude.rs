@@ -396,3 +396,34 @@ fn test_marketplace_divergence_user_scope_and_applicability() {
     assert_eq!(proj_div.ce_version, "compound-engineering-v3.24.0");
     assert_eq!(proj_div.project_path, Some(matching_proj));
 }
+
+#[test]
+fn ensures_and_removes_gate_hook_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let settings_path = tmp.path().join(".claude").join("settings.json");
+
+    assert!(!has_claude_gate_hook(&settings_path));
+
+    // Fresh injection
+    let changed = ensure_claude_gate_hook(&settings_path).unwrap();
+    assert!(changed);
+    assert!(has_claude_gate_hook(&settings_path));
+
+    // Idempotent re-run
+    let changed_again = ensure_claude_gate_hook(&settings_path).unwrap();
+    assert!(!changed_again);
+
+    let content = std::fs::read_to_string(&settings_path).unwrap();
+    let val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(
+        val["hooks"]["PreToolUse"][0]["hooks"][0]["command"],
+        "ce-ai gate check"
+    );
+    assert_eq!(val["hooks"]["PreToolUse"][0]["matcher"], "Write|Edit");
+
+    // Surgical removal cleans up empty file
+    let removed = remove_claude_gate_hook(&settings_path).unwrap();
+    assert!(removed);
+    assert!(!settings_path.exists());
+    assert!(!has_claude_gate_hook(&settings_path));
+}

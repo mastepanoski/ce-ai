@@ -5,6 +5,26 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.49.0] - 2026-09-09
+
+### Added
+- **Spike Observe-Only Write Monitoring for `ce-work` Without Approved OpenSpec (#333):**
+  - **Subcommand `ce-ai gate check` (`src/commands/gate.rs`)**:
+    Added an observe-only gate check command designed to evaluate agent tool writes targeting `src/**` under Stage 4 (`ce-work`). In strictly observe-only mode, `gate check` never blocks writes, never aborts execution, and always exits with code `0`.
+  - **Pure Decision Engine (`evaluate_gate_decision` in `src/commands/gate.rs`)**:
+    Evaluates the declared stage checkpoint from `state.json` (never re-inferring stage from heuristics), checking for approved OpenSpec contract artifacts (`proposal.md`, `spec.md`, `tasks.md`). Returns `would_block`, `pass`, `undetermined`, or `edge_case`.
+  - **Isolated Edge Case Buckets**:
+    Separates ambiguous or transient contexts into distinct edge-case telemetry buckets without conflating them with happy-path decisions:
+    - `mtime_fallback`: feature inferred via filesystem mtime rather than git branch matching.
+    - `worktree_uncommitted`: uncommitted changes detected in `openspec/changes/<feature>/`.
+    - `stale_cycle_guard`: multi-cycle same-branch transition guard task flag.
+  - **Emergency Kill-Switch (`is_gate_kill_switched` in `src/commands/gate.rs`)**:
+    Short-circuits execution before any state or disk inspection when `CE_AI_DISABLE_GATE_CHECK=1`, `CE_AI_GATE_CHECK_DISABLED=1`, or `--disabled` is passed.
+  - **Claude Code `PreToolUse` Hook Auto-Configuration (`src/harness/claude.rs`)**:
+    Configures a thin `PreToolUse` hook in `.claude/settings.json` matching `Write|Edit` executing `ce-ai gate check`. Auto-configured on `ce-ai init-prj` and surgically removed on `ce-ai deinit-prj`.
+  - **Structured Append-Only Telemetry Logging & Aggregation (`src/commands/gate.rs`, `status.rs`, `doctor.rs`)**:
+    Logs non-sensitive event metadata to `<config_dir>/gate-events.jsonl` without logging file contents or diffs. `ce-ai status` and `ce-ai doctor` report aggregated observation counts across all categories.
+
 ## [1.48.1] - 2026-09-09
 
 ### Fixed
