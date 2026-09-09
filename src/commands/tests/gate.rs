@@ -408,3 +408,84 @@ fn test_run_gate_check_workflow_matrix() {
     assert_eq!(stats2.would_block, 1);
     assert_eq!(stats2.pass, 1);
 }
+
+#[test]
+fn test_run_gate_check_stale_cycle_guard_uses_typed_flag_not_display_string() {
+    use crate::commands::gate::{run_gate_check, GateCheckArgs};
+    use crate::commands::Context;
+    use crate::state::state::{State, WorkflowSource, WorkflowStage, WorkflowState};
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let config_dir = dir.path().join(".ce-ai");
+    std::fs::create_dir_all(&config_dir).unwrap();
+    let repo_root = dir.path().join("repo");
+    std::fs::create_dir_all(&repo_root).unwrap();
+
+    let ctx = Context {
+        config_dir: config_dir.clone(),
+        opencode_config_dir: config_dir.join("opencode"),
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let state_path = config_dir.join("state.json");
+    let mut state = State::default();
+
+    // Construct a WorkflowState where new_cycle is true, BUT task does NOT contain
+    // "(nuevo ciclo detectado)" (e.g. customized or localized wording).
+    let wf = WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: "Building new cycle with modified phrasing".to_string(),
+        feature_name: Some("cycle-2-feat".to_string()),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        source: WorkflowSource::Inferred,
+        resolution: None,
+        new_cycle: true,
+    };
+    let key = State::workspace_branch_key(&repo_root, None);
+    state.workflows.insert(key.clone(), wf.clone());
+    state.workflow = Some(wf);
+    state.save(&state_path).unwrap();
+
+    let args_target = GateCheckArgs {
+        tool: Some("Write".to_string()),
+        path: Some("src/lib.rs".to_string()),
+        disabled: false,
+    };
+    run_gate_check(&ctx, &args_target).unwrap();
+
+    let stats = crate::commands::gate::load_gate_stats(&config_dir).unwrap();
+    assert_eq!(stats.total_observed, 1);
+    assert_eq!(
+        stats.stale_cycle_guard, 1,
+        "must detect stale_cycle_guard via typed new_cycle field even when task text is different"
+    );
+    assert_eq!(stats.would_block, 0);
+
+    // Second run with completely different task wording (e.g. English phrase) and new_cycle: true
+    let wf2 = WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: "Implementing task after cycle reset without keywords".to_string(),
+        feature_name: Some("cycle-2-feat".to_string()),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        source: WorkflowSource::Inferred,
+        resolution: None,
+        new_cycle: true,
+    };
+    state.workflows.insert(key, wf2.clone());
+    state.workflow = Some(wf2);
+    state.save(&state_path).unwrap();
+
+    run_gate_check(&ctx, &args_target).unwrap();
+
+    let stats2 = crate::commands::gate::load_gate_stats(&config_dir).unwrap();
+    assert_eq!(stats2.total_observed, 2);
+    assert_eq!(
+        stats2.stale_cycle_guard, 2,
+        "must continue detecting stale_cycle_guard on subsequent writes with arbitrary task wording"
+    );
+    assert_eq!(stats2.would_block, 0);
+}

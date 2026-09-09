@@ -1410,6 +1410,15 @@ pub fn maybe_auto_checkpoint(
             WorkflowSource::Inferred,
             inferred_resolution,
         )?;
+        if is_new_cycle {
+            let key = State::workspace_branch_key(repo_root, branch.as_deref());
+            if let Some(wf) = s.workflows.get_mut(&key) {
+                wf.new_cycle = true;
+            }
+            if let Some(ref mut wf) = s.workflow {
+                wf.new_cycle = true;
+            }
+        }
         Ok(s.current_workflow_for_branch(repo_root, branch.as_deref()))
     })?;
     Ok(Some(updated))

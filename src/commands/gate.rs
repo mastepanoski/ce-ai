@@ -364,7 +364,7 @@ pub fn run_gate_check(ctx: &Context, args: &GateCheckArgs) -> Result<(), CeError
     let (declared_stage, feature_name, resolution, is_new_cycle_task) = if state_path.exists() {
         if let Ok(state) = State::load(&state_path) {
             if let Some(wf) = state.current_workflow_for_branch(&repo_root, branch.as_deref()) {
-                let is_new_cycle = wf.task.contains("(nuevo ciclo detectado)");
+                let is_new_cycle = wf.new_cycle;
                 (Some(wf.stage), wf.feature_name, wf.resolution, is_new_cycle)
             } else {
                 (None, None, None, false)

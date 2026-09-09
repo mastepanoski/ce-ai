@@ -160,6 +160,8 @@ pub struct WorkflowState {
     pub source: WorkflowSource,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resolution: Option<FeatureResolution>,
+    #[serde(default)]
+    pub new_cycle: bool,
 }
 
 /// One tracked file of an adopted skills surface (path relative to the
@@ -399,6 +401,7 @@ impl State {
                     },
                     source: WorkflowSource::Manual,
                     resolution: None,
+                    new_cycle: false,
                 });
             }
         }
@@ -512,6 +515,7 @@ impl State {
             updated_at: chrono::Utc::now().to_rfc3339(),
             source,
             resolution,
+            new_cycle: is_new_cycle,
         };
 
         let key = Self::workspace_branch_key(root, branch);
@@ -571,6 +575,7 @@ impl State {
                     updated_at: chrono::Utc::now().to_rfc3339(),
                     source: WorkflowSource::Manual,
                     resolution: None,
+                    new_cycle: false,
                 }))
         }
     }
