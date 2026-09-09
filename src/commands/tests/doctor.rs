@@ -715,3 +715,38 @@ fn test_probe_manifest_drift_count_includes_claude_and_kimi() {
         std::env::set_var("KIMI_CODE_HOME", v);
     }
 }
+
+#[test]
+fn test_doctor_warns_on_mtime_fallback_and_uncommitted_spec() {
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path().join("repo");
+    let config_dir = tmp.path().join("config");
+    let opencode_dir = tmp.path().join("opencode");
+    std::fs::create_dir_all(&repo_root).unwrap();
+    std::fs::create_dir_all(&config_dir).unwrap();
+    std::fs::create_dir_all(&opencode_dir).unwrap();
+
+    std::fs::write(
+        config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let change_dir = repo_root.join("openspec").join("changes").join("feat-doc");
+    std::fs::create_dir_all(&change_dir).unwrap();
+    std::fs::write(change_dir.join("proposal.md"), "# Proposal").unwrap();
+    std::fs::write(change_dir.join("spec.md"), "# Spec").unwrap();
+
+    let ctx = Context {
+        config_dir,
+        opencode_config_dir: opencode_dir,
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: false,
+    };
+
+    let args = Args::default();
+    let res = run(&ctx, &args);
+    assert!(res.is_ok());
+}

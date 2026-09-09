@@ -551,13 +551,44 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
     }
 
-    // OpenSpec Tasks Desync Probe (Issue #313):
-    // Verifies whether active OpenSpec changes have checkboxes synchronized with real code modifications.
+    // OpenSpec Tasks Desync & Worktree/Resolution Health Probes (Issues #313, #337):
     let repo_root = ctx.repo_root();
-    let current_wf = state.current_workflow_for_branch(&repo_root, None);
-    if let Some(info) =
-        crate::commands::workflow::probe_openspec_context_in(&repo_root, &current_wf)
-    {
+    let branch = crate::commands::workflow::probe_git_branch(&repo_root);
+    let current_wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
+    let openspec_info =
+        crate::commands::workflow::probe_openspec_context_in(&repo_root, &current_wf);
+
+    // Mtime fallback warning (Issue #337 Gap 1)
+    let is_mtime_fallback = current_wf
+        .as_ref()
+        .and_then(|w| w.resolution)
+        .map(|r| r == crate::state::state::FeatureResolution::MtimeFallback)
+        .unwrap_or(false)
+        || openspec_info
+            .as_ref()
+            .and_then(|i| i.resolution)
+            .map(|r| r == crate::state::state::FeatureResolution::MtimeFallback)
+            .unwrap_or(false);
+    if is_mtime_fallback {
+        let feat = openspec_info
+            .as_ref()
+            .map(|i| i.feature.as_str())
+            .or_else(|| current_wf.as_ref().and_then(|w| w.feature_name.as_deref()))
+            .unwrap_or("unknown");
+        println!(
+            "doctor-warn: workflow feature '{feat}' resolved via mtime fallback (unreliable without git branch)"
+        );
+    }
+
+    // Uncommitted OpenSpec spec warning (Issue #337 Gap 2)
+    if let Some(ref info) = openspec_info {
+        if info.is_uncommitted {
+            println!(
+                "doctor-warn: openspec change '{}': esta spec no está commiteada — puede no ser visible en otros worktrees",
+                info.feature
+            );
+        }
+
         let touched_files = crate::commands::workflow::probe_feature_touched_files(&repo_root);
         if let Some(desync) = crate::commands::workflow::reconcile_tasks_with_git(
             &repo_root,

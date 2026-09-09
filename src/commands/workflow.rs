@@ -14,7 +14,7 @@ use crate::error::CeError;
 use crate::opencode::manifest::InstallManifest;
 use crate::opencode::plugins::MANAGED_DIR;
 use crate::state::diff;
-use crate::state::state::{State, WorkflowSource, WorkflowStage, WorkflowState};
+use crate::state::state::{FeatureResolution, State, WorkflowSource, WorkflowStage, WorkflowState};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -168,6 +168,12 @@ pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
             lines.push(format!("active subtask: {}", wf.task));
             if let Some(feat) = &wf.feature_name {
                 lines.push(format!("active feature: {feat}"));
+            }
+            if wf.resolution == Some(FeatureResolution::MtimeFallback) {
+                lines.push(format!(
+                    "! Warning: Active feature '{}' resolved via mtime fallback (unreliable without git branch)",
+                    wf.feature_name.as_deref().unwrap_or("unknown")
+                ));
             }
             lines.push(format!("last updated: {}", wf.updated_at));
         }
@@ -549,6 +555,25 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
     }
 }
 
+pub fn probe_openspec_has_uncommitted(repo_root: &Path, feature: &str) -> bool {
+    let change_rel_path = format!("openspec/changes/{feature}");
+    let mut cmd = std::process::Command::new("git");
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
+        cmd.env_remove(var);
+    }
+    let out = match cmd
+        .args(["status", "--porcelain=v1", "-uall", "--", &change_rel_path])
+        .current_dir(repo_root)
+        .output()
+    {
+        Ok(o) if o.status.success() => o,
+        _ => return false,
+    };
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    !stdout.trim().is_empty()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OpenSpecContextInfo {
     pub feature: String,
@@ -558,6 +583,10 @@ pub struct OpenSpecContextInfo {
     pub has_tasks: bool,
     pub completed_tasks: usize,
     pub total_tasks: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolution: Option<FeatureResolution>,
+    #[serde(default)]
+    pub is_uncommitted: bool,
 }
 
 pub fn probe_openspec_context(wf: &Option<WorkflowState>) -> Option<OpenSpecContextInfo> {
@@ -573,17 +602,18 @@ pub fn probe_openspec_context_in(
         return None;
     }
 
-    let target_feature = if let Some(feat) = wf
-        .as_ref()
-        .and_then(|w| w.feature_name.clone())
-        .filter(|f| !f.trim().is_empty())
-    {
-        feat
-    } else if let Some(branch_feat) = probe_git_branch(repo_root)
+    let (target_feature, resolution) = if let Some(branch_feat) = probe_git_branch(repo_root)
         .map(|b| sanitize_feature_name(&b))
         .filter(|f| openspec_dir.join(f).is_dir())
     {
-        branch_feat
+        (branch_feat, Some(FeatureResolution::Branch))
+    } else if let Some(feat) = wf
+        .as_ref()
+        .and_then(|w| w.feature_name.clone())
+        .filter(|f| !f.trim().is_empty() && openspec_dir.join(f).is_dir())
+    {
+        let res = wf.as_ref().and_then(|w| w.resolution);
+        (feat, res)
     } else {
         // Fallback: find most recently modified directory in openspec/changes/
         let mut entries: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
@@ -600,7 +630,10 @@ pub fn probe_openspec_context_in(
         }
         entries.sort_by_key(|(path, mtime)| (*mtime, path.clone()));
         let (path, _) = entries.pop()?;
-        path.file_name()?.to_string_lossy().to_string()
+        (
+            path.file_name()?.to_string_lossy().to_string(),
+            Some(FeatureResolution::MtimeFallback),
+        )
     };
 
     let change_dir = openspec_dir.join(&target_feature);
@@ -619,6 +652,8 @@ pub fn probe_openspec_context_in(
         (0, 0)
     };
 
+    let is_uncommitted = probe_openspec_has_uncommitted(repo_root, &target_feature);
+
     Some(OpenSpecContextInfo {
         feature: target_feature,
         path: change_dir,
@@ -627,6 +662,8 @@ pub fn probe_openspec_context_in(
         has_tasks,
         completed_tasks,
         total_tasks,
+        resolution,
+        is_uncommitted,
     })
 }
 
@@ -1127,7 +1164,12 @@ pub fn has_committed_solutions_on_branch(repo_root: &Path) -> bool {
 pub fn infer_stage_from_repo(
     repo_root: &Path,
     branch: Option<&str>,
-) -> Option<(WorkflowStage, String, Option<String>)> {
+) -> Option<(
+    WorkflowStage,
+    String,
+    Option<String>,
+    Option<FeatureResolution>,
+)> {
     if is_transitory_git_state(repo_root) {
         return None;
     }
@@ -1136,9 +1178,14 @@ pub fn infer_stage_from_repo(
 
     // 1. Resolve feature candidate from branch or probe
     let candidate = branch.map(sanitize_feature_name);
-    let resolved_feature = candidate
-        .filter(|f| openspec_dir.join(f).is_dir())
-        .or_else(|| probe_openspec_context_in(repo_root, &None).map(|info| info.feature));
+    let (resolved_feature, resolution) =
+        if let Some(feat) = candidate.filter(|f| openspec_dir.join(f).is_dir()) {
+            (Some(feat), Some(FeatureResolution::Branch))
+        } else if let Some(info) = probe_openspec_context_in(repo_root, &None) {
+            (Some(info.feature), info.resolution)
+        } else {
+            (None, None)
+        };
 
     // 2. OpenSpec deduction (Stages 2, 3, 4, 5, 6, 7)
     if let Some(ref feat) = resolved_feature {
@@ -1167,6 +1214,7 @@ pub fn infer_stage_from_repo(
                     WorkflowStage::ExecutionPlan,
                     format!("Execution plan authored for {feat}"),
                     Some(feat.clone()),
+                    resolution,
                 ));
             } else if completed_tasks > 0 && completed_tasks < total_tasks {
                 return Some((
@@ -1175,6 +1223,7 @@ pub fn infer_stage_from_repo(
                         "Implementing tasks ({completed_tasks}/{total_tasks} completed) for {feat}"
                     ),
                     Some(feat.clone()),
+                    resolution,
                 ));
             } else if total_tasks > 0 && completed_tasks == total_tasks {
                 // All tasks completed: check Stage 7 (Ship), Stage 6 (Compound), or Stage 5 (Verify)
@@ -1183,6 +1232,7 @@ pub fn infer_stage_from_repo(
                         WorkflowStage::GitShipping,
                         format!("Shipping changes / pull request for {feat}"),
                         Some(feat.clone()),
+                        resolution,
                     ));
                 }
 
@@ -1197,6 +1247,7 @@ pub fn infer_stage_from_repo(
                         WorkflowStage::KnowledgeCapture,
                         format!("Capturing solution in docs/solutions/ for {feat}"),
                         Some(feat.clone()),
+                        resolution,
                     ));
                 }
 
@@ -1204,6 +1255,7 @@ pub fn infer_stage_from_repo(
                     WorkflowStage::Verification,
                     format!("Verifying test gates for {feat}"),
                     Some(feat.clone()),
+                    resolution,
                 ));
             }
         }
@@ -1213,31 +1265,12 @@ pub fn infer_stage_from_repo(
                 WorkflowStage::OpenSpec,
                 format!("Authoring OpenSpec contract for {feat}"),
                 Some(feat.clone()),
+                resolution,
             ));
         }
     }
 
-    // 3. Direct Entry Bypass for Stage 4 (Work/TDD):
-    // If no OpenSpec, but on fix/* or feat/* branch with dirty files
-    if let Some(b) = branch {
-        let is_work_branch = b.starts_with("fix/")
-            || b.starts_with("feat/")
-            || b.starts_with("fix-")
-            || b.starts_with("feat-");
-        if is_work_branch {
-            let (is_clean, _) = probe_git_dirty_files(repo_root);
-            if !is_clean {
-                let feat_name = sanitize_feature_name(b);
-                return Some((
-                    WorkflowStage::WorkTdd,
-                    format!("Direct entry bugfix / work on {b}"),
-                    Some(feat_name),
-                ));
-            }
-        }
-    }
-
-    // 4. Ideation (Stage 1):
+    // 3. Ideation (Stage 1):
     // docs/ideation/ or docs/brainstorms/*.md exists and no openspec change dir
     let ideation_dir = repo_root.join("docs").join("ideation");
     let brainstorms_dir = repo_root.join("docs").join("brainstorms");
@@ -1255,7 +1288,29 @@ pub fn infer_stage_from_repo(
             WorkflowStage::Ideation,
             "Ideation & brainstorming in progress".to_string(),
             None,
+            None,
         ));
+    }
+
+    // 4. Direct Entry Bypass for Stage 4 (Work/TDD):
+    // If no OpenSpec, but on fix/* or feat/* branch with dirty files
+    if let Some(b) = branch {
+        let is_work_branch = b.starts_with("fix/")
+            || b.starts_with("feat/")
+            || b.starts_with("fix-")
+            || b.starts_with("feat-");
+        if is_work_branch {
+            let (is_clean, _) = probe_git_dirty_files(repo_root);
+            if !is_clean {
+                let feat_name = sanitize_feature_name(b);
+                return Some((
+                    WorkflowStage::WorkTdd,
+                    format!("Direct entry bugfix / work on {b}"),
+                    Some(feat_name),
+                    Some(FeatureResolution::Branch),
+                ));
+            }
+        }
     }
 
     None
@@ -1288,7 +1343,7 @@ pub fn maybe_auto_checkpoint(
     }
 
     let branch = probe_git_branch(repo_root);
-    let (inferred_stage, inferred_task, inferred_feature) =
+    let (inferred_stage, inferred_task, inferred_feature, inferred_resolution) =
         match infer_stage_from_repo(repo_root, branch.as_deref()) {
             Some(inf) => inf,
             None => return Ok(None),
@@ -1300,14 +1355,25 @@ pub fn maybe_auto_checkpoint(
         .map(|wf| wf.stage)
         .unwrap_or(WorkflowStage::Ideation);
 
-    // Monotonic provenance guard: Inferred checkpoints can NEVER regress or clobber a Manual checkpoint at equal or higher stage
-    if let Some(ref wf) = current_wf {
-        if wf.source == WorkflowSource::Manual && inferred_stage.number() <= current_stage.number()
-        {
-            return Ok(None);
+    let is_new_cycle = match (&current_wf, &inferred_feature) {
+        (Some(wf), feat) => {
+            inferred_stage.number() == 1 && wf.feature_name.as_deref() != feat.as_deref()
         }
-        if inferred_stage.number() < current_stage.number() {
-            return Ok(None);
+        _ => false,
+    };
+
+    // Monotonic provenance guard: Inferred checkpoints can NEVER regress or clobber a Manual checkpoint at equal or higher stage,
+    // UNLESS a new cycle is detected (inferred_feature != current_wf.feature_name && inferred_stage.number() == 1)
+    if let Some(ref wf) = current_wf {
+        if !is_new_cycle {
+            if wf.source == WorkflowSource::Manual
+                && inferred_stage.number() <= current_stage.number()
+            {
+                return Ok(None);
+            }
+            if inferred_stage.number() < current_stage.number() {
+                return Ok(None);
+            }
         }
     }
 
@@ -1328,14 +1394,21 @@ pub fn maybe_auto_checkpoint(
         }
     }
 
+    let task_to_record = if is_new_cycle {
+        format!("{inferred_task} (nuevo ciclo detectado)")
+    } else {
+        inferred_task
+    };
+
     let updated = State::atomic_update_workflow(state_path, repo_root, branch.as_deref(), |s| {
-        s.validate_and_set_workflow_for_branch(
+        s.validate_and_set_workflow_for_branch_with_resolution(
             repo_root,
             branch.as_deref(),
             inferred_stage,
-            &inferred_task,
+            &task_to_record,
             inferred_feature,
             WorkflowSource::Inferred,
+            inferred_resolution,
         )?;
         Ok(s.current_workflow_for_branch(repo_root, branch.as_deref()))
     })?;
