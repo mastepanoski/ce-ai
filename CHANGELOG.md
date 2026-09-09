@@ -5,6 +5,23 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.48.0] - 2026-09-08
+
+### Added
+- **Kimi Code Native Plugin Manager Divergence Diagnostic in `doctor`:**
+  - **Native Plugin Discovery (`src/harness/kimi.rs`)**: Implemented `check_kimi_marketplace_divergence` to inspect `<kimi_dir>/plugins/installed.json` (array-shaped native registry), evaluating only *enabled* `compound-engineering` entries and resolving the native version from `<root>/package.json` (fallback `<root>/plugin.json`), strictly read-only with graceful degradation on any missing or malformed file.
+  - **Orphan Managed Tree Detection (`src/harness/kimi.rs`)**: Implemented `check_kimi_orphan_managed_tree`, which reports (non-blocking `doctor-warn:`) when a ce-ai managed tree exists under the Kimi harness dir but is not referenced by `~/.kimi-code/config.toml` `extra_skill_dirs`, rendering the managed skills inactive for Kimi.
+  - **Advisory Health Reporting (`src/commands/doctor.rs`)**: Emits `doctor-info:` divergence notices (native plugin version vs ce-ai managed version, normalized with the shared `normalize_plugin_version`) and the orphan-tree warning without altering `findings` or the exit code.
+
+### Fixed
+- **Empty SHA256 Manifests for Non-OpenCode Harnesses (`sync`):**
+  - **Root Cause (`src/commands/sync.rs`)**: The registration-spec arm rewrote `install-manifest.json` for every table-driven harness (claude, kimi, codex, copilot, cursor, grok, agy, fx) with `files: vec![]` on every sync — discarding all real digests written by `install` and silencing write errors with `let _ =`. OpenCode kept ~395 hashed entries while claude/kimi manifests were empty, permanently blinding drift detection.
+  - **On-Disk Harvest (`src/opencode/manifest.rs`)**: Added `InstallManifest::harvest(managed_dir)`, which records one sorted `{path, sha256}` entry per file physically present in the managed tree (excluding `install-manifest.json` itself). `sync` now rewrites registration-harness manifests with harvested hashes, preserves the prior `installed_at`/`config_mutations`, and propagates write errors instead of ignoring them.
+- **Multi-Harness Drift Detection (`status` / `doctor` / `workflow resume`):**
+  - **`probe_manifest_drift_count` (`src/commands/workflow.rs`)**: Now sums drift actions across the OpenCode, claude, and kimi manifests (resolved via `home_dir_from_ctx` + `HarnessKind::harness_dir`) instead of loading only `ctx.opencode_config_dir`.
+  - **`ce-ai doctor` (`src/commands/doctor.rs`)**: The diff probe additionally checks claude/kimi manifests when present and reports harness-prefixed findings (`diff: claude modified …`); missing manifests degrade silently.
+  - **`ce-ai status` (`src/commands/status.rs`)**: The drift section iterates OpenCode + claude + kimi manifests, printing `drift: <harness>: <kind> <path>` for non-OpenCode drift while keeping the `drift: none` and `drift: unknown (no install manifest)` contracts byte-identical.
+
 ## [1.47.0] - 2026-09-08
 
 ### Added
@@ -857,7 +874,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.48.0] - 2026-09-08
 
 ### Fixed
 - **Models Tab Shows Live Harness Config**: The TUI Models tab now reads assignments from the selected harness's config file (switch scope with ◄/►) instead of stale `state.json` entries — deleting a model from `opencode.json` is immediately reflected (#111).

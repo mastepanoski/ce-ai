@@ -83,3 +83,291 @@ fn replaces_env_map_cleanly_on_re_registration() {
     let config_empty: KimiMcpConfig = serde_json::from_str(&content_empty).unwrap();
     assert!(config_empty.mcp_servers["engram"].env.is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// Native plugin manager divergence & orphan managed tree probes.
+// All fixtures are hermetic (tempfile); the real ~/.kimi-code is never read.
+// ---------------------------------------------------------------------------
+
+fn write_native_installed(kimi_dir: &Path, plugins: serde_json::Value) -> PathBuf {
+    let plugins_dir = kimi_dir.join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+    let file = plugins_dir.join("installed.json");
+    std::fs::write(
+        &file,
+        serde_json::json!({ "version": 1, "plugins": plugins }).to_string(),
+    )
+    .unwrap();
+    file
+}
+
+fn state_with_kimi(version: &str) -> crate::state::state::State {
+    let mut state = crate::state::state::State::default();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "kimi",
+        "scope": "global",
+        "version": version,
+    }));
+    state
+}
+
+#[test]
+fn test_kimi_marketplace_divergence_missing_or_malformed_file() {
+    let tmp = TempDir::new().unwrap();
+    let kimi_dir = tmp.path().join(".kimi-code");
+    let cwd = tmp.path().join("cwd");
+    let state = state_with_kimi("compound-engineering-v3.24.0");
+
+    // 1. Missing plugins directory -> empty
+    let divs = check_kimi_marketplace_divergence(&state, &cwd, &kimi_dir);
+    assert!(divs.is_empty());
+
+    // 2. Malformed JSON -> empty
+    let file = write_native_installed(&kimi_dir, serde_json::json!([]));
+    std::fs::write(&file, "{ corrupted json...").unwrap();
+    let divs = check_kimi_marketplace_divergence(&state, &cwd, &kimi_dir);
+    assert!(divs.is_empty());
+}
+
+#[test]
+fn test_kimi_marketplace_divergence_harness_not_installed() {
+    let tmp = TempDir::new().unwrap();
+    let kimi_dir = tmp.path().join(".kimi-code");
+    let cwd = tmp.path().join("cwd");
+
+    let root = kimi_dir.join("plugins/managed/compound-engineering");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(
+        root.join("package.json"),
+        r#"{"name":"compound-engineering","version":"3.14.3"}"#,
+    )
+    .unwrap();
+    write_native_installed(
+        &kimi_dir,
+        serde_json::json!([
+            { "id": "compound-engineering", "root": root, "enabled": true }
+        ]),
+    );
+
+    // State has opencode, but NOT kimi -> no divergence
+    let mut state = crate::state::state::State::default();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "opencode",
+        "scope": "global",
+        "version": "compound-engineering-v3.24.0",
+    }));
+    let divs = check_kimi_marketplace_divergence(&state, &cwd, &kimi_dir);
+    assert!(divs.is_empty());
+}
+
+#[test]
+fn test_kimi_marketplace_divergence_enabled_plugin_detected() {
+    let tmp = TempDir::new().unwrap();
+    let kimi_dir = tmp.path().join(".kimi-code");
+    let cwd = tmp.path().join("cwd");
+
+    let root = kimi_dir.join("plugins/managed/compound-engineering");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(
+        root.join("package.json"),
+        r#"{"name":"compound-engineering","version":"3.14.3"}"#,
+    )
+    .unwrap();
+    write_native_installed(
+        &kimi_dir,
+        serde_json::json!([
+            { "id": "kimi-datasource", "root": "/other/root", "enabled": true },
+            { "id": "compound-engineering", "root": root, "enabled": true }
+        ]),
+    );
+
+    let state = state_with_kimi("compound-engineering-v3.24.0");
+    let divs = check_kimi_marketplace_divergence(&state, &cwd, &kimi_dir);
+    assert_eq!(divs.len(), 1);
+    assert_eq!(divs[0].plugin_id, "compound-engineering");
+    assert_eq!(divs[0].native_version, "3.14.3");
+    assert_eq!(divs[0].ce_version, "compound-engineering-v3.24.0");
+}
+
+#[test]
+fn test_kimi_marketplace_divergence_disabled_and_equal_versions_ignored() {
+    let tmp = TempDir::new().unwrap();
+    let kimi_dir = tmp.path().join(".kimi-code");
+    let cwd = tmp.path().join("cwd");
+
+    let disabled_root = kimi_dir.join("plugins/managed/compound-engineering");
+    std::fs::create_dir_all(&disabled_root).unwrap();
+    std::fs::write(
+        disabled_root.join("package.json"),
+        r#"{"name":"compound-engineering","version":"3.14.3"}"#,
+    )
+    .unwrap();
+
+    let equal_root = tmp.path().join("equal-root");
+    std::fs::create_dir_all(&equal_root).unwrap();
+    // Version fallback: only plugin.json present, equal after normalization.
+    std::fs::write(equal_root.join("plugin.json"), r#"{"version":"v3.24.0"}"#).unwrap();
+
+    write_native_installed(
+        &kimi_dir,
+        serde_json::json!([
+            { "id": "compound-engineering", "root": disabled_root, "enabled": false },
+            { "id": "compound-engineering", "root": equal_root, "enabled": true }
+        ]),
+    );
+
+    let state = state_with_kimi("compound-engineering-v3.24.0");
+    let divs = check_kimi_marketplace_divergence(&state, &cwd, &kimi_dir);
+    assert!(
+        divs.is_empty(),
+        "disabled entry and normalized-equal entry must not diverge: {divs:?}"
+    );
+}
+
+#[test]
+fn test_kimi_marketplace_divergence_unresolvable_native_version_skipped() {
+    let tmp = TempDir::new().unwrap();
+    let kimi_dir = tmp.path().join(".kimi-code");
+    let cwd = tmp.path().join("cwd");
+
+    let root = kimi_dir.join("plugins/managed/compound-engineering");
+    std::fs::create_dir_all(&root).unwrap(); // no package.json / plugin.json
+    write_native_installed(
+        &kimi_dir,
+        serde_json::json!([
+            { "id": "compound-engineering", "root": root, "enabled": true }
+        ]),
+    );
+
+    let state = state_with_kimi("compound-engineering-v3.24.0");
+    let divs = check_kimi_marketplace_divergence(&state, &cwd, &kimi_dir);
+    assert!(divs.is_empty());
+}
+
+#[test]
+fn test_kimi_marketplace_divergence_workspace_scope_guard() {
+    let tmp = TempDir::new().unwrap();
+    let kimi_dir = tmp.path().join(".kimi-code");
+    let other_project = tmp.path().join("other-project");
+    let cwd = tmp.path().join("cwd");
+
+    let root = kimi_dir.join("plugins/managed/compound-engineering");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("package.json"), r#"{"version":"3.14.3"}"#).unwrap();
+    write_native_installed(
+        &kimi_dir,
+        serde_json::json!([
+            { "id": "compound-engineering", "root": root, "enabled": true }
+        ]),
+    );
+
+    // workspace-scoped kimi entry targeting another project must not apply
+    let mut state = crate::state::state::State::default();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "kimi",
+        "scope": "workspace",
+        "target_dir": other_project,
+        "version": "compound-engineering-v3.24.0",
+    }));
+    let divs = check_kimi_marketplace_divergence(&state, &cwd, &kimi_dir);
+    assert!(divs.is_empty());
+
+    // workspace-scoped entry encompassing cwd applies
+    let workspace = tmp.path().join("workspace");
+    let cwd_in_ws = workspace.join("src");
+    std::fs::create_dir_all(&cwd_in_ws).unwrap();
+    state.installed_harnesses[0]["target_dir"] = serde_json::json!(workspace);
+    let divs = check_kimi_marketplace_divergence(&state, &cwd_in_ws, &kimi_dir);
+    assert_eq!(divs.len(), 1);
+}
+
+#[test]
+fn test_kimi_orphan_managed_tree_matrix() {
+    let tmp = TempDir::new().unwrap();
+    let kimi_dir = tmp.path().join(".kimi-code");
+    let managed_dir = kimi_dir.join("compound-engineering");
+
+    // 1. No managed tree -> None
+    assert!(check_kimi_orphan_managed_tree(&kimi_dir).is_none());
+
+    // 2. Managed tree without the ce-ai manifest marker -> None (not a ce-ai tree)
+    std::fs::create_dir_all(&managed_dir).unwrap();
+    assert!(check_kimi_orphan_managed_tree(&kimi_dir).is_none());
+
+    // 3. ce-ai managed tree + missing config.toml -> orphan
+    std::fs::write(managed_dir.join("install-manifest.json"), "{}").unwrap();
+    let orphan = check_kimi_orphan_managed_tree(&kimi_dir).unwrap();
+    assert_eq!(orphan.managed_dir, managed_dir);
+
+    // 4. config.toml with empty extra_skill_dirs -> orphan
+    std::fs::write(kimi_dir.join("config.toml"), "extra_skill_dirs = []\n").unwrap();
+    assert!(check_kimi_orphan_managed_tree(&kimi_dir).is_some());
+
+    // 5. config.toml referencing the managed dir -> not orphan.
+    //    Serialize via the toml crate: hand-formatting a basic string with
+    //    display() emits unescaped Windows backslashes, which are invalid
+    //    TOML escapes and made this case fail on windows-latest CI.
+    let mut table = toml::Table::new();
+    table.insert(
+        "extra_skill_dirs".to_string(),
+        toml::Value::Array(vec![toml::Value::String(
+            managed_dir.to_string_lossy().into_owned(),
+        )]),
+    );
+    std::fs::write(
+        kimi_dir.join("config.toml"),
+        toml::to_string(&table).unwrap(),
+    )
+    .unwrap();
+    assert!(check_kimi_orphan_managed_tree(&kimi_dir).is_none());
+
+    // 6. Malformed config.toml degrades to orphan warning (not referenced)
+    std::fs::write(kimi_dir.join("config.toml"), "not = [valid toml").unwrap();
+    assert!(check_kimi_orphan_managed_tree(&kimi_dir).is_some());
+}
+
+#[test]
+fn test_kimi_orphan_managed_tree_forward_slash_reference() {
+    let tmp = TempDir::new().unwrap();
+    let kimi_dir = tmp.path().join(".kimi-code");
+    let managed_dir = kimi_dir.join("compound-engineering");
+    std::fs::create_dir_all(&managed_dir).unwrap();
+    std::fs::write(managed_dir.join("install-manifest.json"), "{}").unwrap();
+
+    // Hand-edited configs may use forward slashes regardless of the native
+    // separator; such an entry must count as a reference, not an orphan.
+    let forward_slashed = managed_dir.to_string_lossy().replace('\\', "/");
+    let mut table = toml::Table::new();
+    table.insert(
+        "extra_skill_dirs".to_string(),
+        toml::Value::Array(vec![toml::Value::String(forward_slashed)]),
+    );
+    std::fs::write(
+        kimi_dir.join("config.toml"),
+        toml::to_string(&table).unwrap(),
+    )
+    .unwrap();
+
+    assert!(check_kimi_orphan_managed_tree(&kimi_dir).is_none());
+}
+
+#[test]
+fn test_paths_refer_to_same_normalizes_separators() {
+    // Windows-style input is compared deterministically on every platform:
+    // raw equality fails, canonicalize fails (paths do not exist), so the
+    // separator/case normalization fallback must decide.
+    assert!(paths_refer_to_same(
+        Path::new("C:\\Users\\dev\\.kimi-code\\compound-engineering"),
+        Path::new("C:/Users/dev/.kimi-code/compound-engineering"),
+    ));
+    // Trailing separator must not matter.
+    assert!(paths_refer_to_same(
+        Path::new("/opt/ce/compound-engineering/"),
+        Path::new("/opt/ce/compound-engineering"),
+    ));
+    // Different directories must never match.
+    assert!(!paths_refer_to_same(
+        Path::new("/opt/ce/other"),
+        Path::new("/opt/ce/compound-engineering"),
+    ));
+}

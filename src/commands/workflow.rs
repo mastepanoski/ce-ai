@@ -471,18 +471,39 @@ pub fn probe_git_dirty_files(repo_root: &Path) -> (bool, Vec<String>) {
     (is_clean, modified)
 }
 
-pub fn probe_manifest_drift_count(ctx: &Context) -> usize {
-    let manifest = InstallManifest::load(&ctx.opencode_config_dir);
-    let desired: BTreeMap<String, String> = match manifest {
-        Ok(m) => m.files.into_iter().map(|f| (f.path, f.sha256)).collect(),
-        Err(_) => return 0,
+/// Harnesses beyond OpenCode whose managed-tree manifests participate in
+/// drift detection (`harness-manifest-sha256-coverage`).
+pub(crate) const DRIFT_PROBE_HARNESSES: [crate::harness::HarnessKind; 2] = [
+    crate::harness::HarnessKind::Claude,
+    crate::harness::HarnessKind::Kimi,
+];
+
+/// Diffs one harness's install manifest against its managed tree on disk;
+/// returns the number of drift actions. Zero when the manifest is missing,
+/// malformed, or has no desired files.
+fn manifest_drift_count_for(config_dir: &Path) -> usize {
+    let Ok(manifest) = InstallManifest::load(config_dir) else {
+        return 0;
     };
+    let desired: BTreeMap<String, String> = manifest
+        .files
+        .into_iter()
+        .map(|f| (f.path, f.sha256))
+        .collect();
     if desired.is_empty() {
         return 0;
     }
-    let managed_dir = ctx.opencode_config_dir.join(MANAGED_DIR);
-    let diff_result = diff::diff(&desired, &desired, &managed_dir);
-    diff_result.actions.len()
+    let managed_dir = config_dir.join(MANAGED_DIR);
+    diff::diff(&desired, &desired, &managed_dir).actions.len()
+}
+
+pub fn probe_manifest_drift_count(ctx: &Context) -> usize {
+    let mut total = manifest_drift_count_for(&ctx.opencode_config_dir);
+    let home = crate::harness::home_dir_from_ctx(ctx);
+    for kind in DRIFT_PROBE_HARNESSES {
+        total += manifest_drift_count_for(&kind.harness_dir(&home));
+    }
+    total
 }
 
 pub fn probe_adoption_status(ctx: &Context) -> Option<AdoptionBlockStatus> {

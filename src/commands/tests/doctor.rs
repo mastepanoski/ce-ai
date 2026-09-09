@@ -440,3 +440,278 @@ fn test_doctor_claude_marketplace_divergence_is_non_blocking() {
         res
     );
 }
+
+#[test]
+fn test_doctor_kimi_marketplace_divergence_and_orphan_are_non_blocking() {
+    // Shield against parallel adapter tests that mutate KIMI_CODE_HOME:
+    // hold the harness env lock and force the default (home-derived) paths.
+    let _guard = crate::harness::tests::HARNESS_ENV_LOCK.lock().unwrap();
+    let saved_kimi_home = std::env::var_os("KIMI_CODE_HOME");
+    std::env::remove_var("KIMI_CODE_HOME");
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let kimi_dir = home.join(".kimi-code");
+
+    // Native plugin manager: enabled compound-engineering at 3.14.3.
+    let root = kimi_dir
+        .join("plugins")
+        .join("managed")
+        .join("compound-engineering");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(
+        root.join("package.json"),
+        r#"{"name":"compound-engineering","version":"3.14.3"}"#,
+    )
+    .unwrap();
+    let plugins_dir = kimi_dir.join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+    std::fs::write(
+        plugins_dir.join("installed.json"),
+        serde_json::json!({
+            "version": 1,
+            "plugins": [
+                { "id": "compound-engineering", "root": root, "enabled": true }
+            ]
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    // Orphan ce-ai managed tree (install-manifest marker, unreferenced config.toml).
+    let managed_dir = kimi_dir.join("compound-engineering");
+    std::fs::create_dir_all(&managed_dir).unwrap();
+    std::fs::write(managed_dir.join("install-manifest.json"), "{}").unwrap();
+    std::fs::write(kimi_dir.join("config.toml"), "extra_skill_dirs = []\n").unwrap();
+
+    std::env::set_var("KIMI_CODE_HOME", &kimi_dir);
+
+    let ctx = Context {
+        config_dir: home.join(".ce-ai"),
+        opencode_config_dir: home.join(".config").join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let mut state = State::new();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "kimi",
+        "version": "compound-engineering-v3.24.0",
+        "scope": "global",
+        "installed_at": "2026-08-22T00:00:00Z"
+    }));
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    // Doctor must succeed (exit 0): divergence is doctor-info, orphan tree is doctor-warn.
+    let res = run(&ctx, &Args::default());
+    assert!(
+        res.is_ok(),
+        "doctor should pass with Ok(()), got: {:?}",
+        res
+    );
+
+    if let Some(v) = saved_kimi_home {
+        std::env::set_var("KIMI_CODE_HOME", v);
+    }
+}
+
+#[test]
+fn test_doctor_detects_claude_manifest_drift() {
+    // Shield against parallel adapter tests that mutate CLAUDE_CONFIG_DIR:
+    // hold the harness env lock and force the default (home-derived) paths.
+    let _guard = crate::harness::tests::HARNESS_ENV_LOCK.lock().unwrap();
+    let saved_claude_dir = std::env::var_os("CLAUDE_CONFIG_DIR");
+    std::env::remove_var("CLAUDE_CONFIG_DIR");
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let claude_dir = home.join(".claude");
+
+    let managed = claude_dir.join("compound-engineering");
+    std::fs::create_dir_all(managed.join("plugins")).unwrap();
+    std::fs::write(managed.join("plugins/compound-engineering.js"), b"pristine").unwrap();
+    InstallManifest {
+        version: "compound-engineering-v3.24.0".into(),
+        plugin_name: "compound-engineering".into(),
+        installed_at: "2026-08-22T00:00:00Z".into(),
+        source: serde_json::json!({"kind": "local"}),
+        files: vec![crate::opencode::manifest::ManifestFile {
+            path: "plugins/compound-engineering.js".into(),
+            sha256: crate::state::diff::sha256_hex(b"pristine"),
+        }],
+        config_mutations: vec![],
+    }
+    .write(&claude_dir)
+    .unwrap();
+
+    // External drift: tamper with the managed file after manifest write.
+    std::fs::write(managed.join("plugins/compound-engineering.js"), b"tampered").unwrap();
+
+    let ctx = Context {
+        config_dir: home.join(".ce-ai"),
+        opencode_config_dir: home.join(".config").join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let mut state = State::new();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "claude",
+        "version": "compound-engineering-v3.24.0",
+        "scope": "global",
+        "installed_at": "2026-08-22T00:00:00Z"
+    }));
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    let res = run(&ctx, &Args::default());
+    assert!(
+        res.is_err(),
+        "tampered claude managed file must produce a doctor finding"
+    );
+    let findings = non_opencode_diff_findings(&home);
+    assert!(
+        findings
+            .iter()
+            .any(|f| f == "diff: claude modified plugins/compound-engineering.js"),
+        "expected claude drift finding, got: {findings:?}"
+    );
+
+    if let Some(v) = saved_claude_dir {
+        std::env::set_var("CLAUDE_CONFIG_DIR", v);
+    }
+}
+
+#[test]
+fn test_doctor_ignores_absent_claude_manifest() {
+    // Shield against parallel adapter tests that mutate CLAUDE_CONFIG_DIR:
+    // hold the harness env lock and force the default (home-derived) paths.
+    let _guard = crate::harness::tests::HARNESS_ENV_LOCK.lock().unwrap();
+    let saved_claude_dir = std::env::var_os("CLAUDE_CONFIG_DIR");
+    std::env::remove_var("CLAUDE_CONFIG_DIR");
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let claude_dir = home.join(".claude");
+    // claude dir exists (harness installed) but has NO managed manifest.
+    std::fs::create_dir_all(&claude_dir).unwrap();
+
+    let ctx = Context {
+        config_dir: home.join(".ce-ai"),
+        opencode_config_dir: home.join(".config").join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let mut state = State::new();
+    state.installed_harnesses.push(serde_json::json!({
+        "name": "claude",
+        "version": "compound-engineering-v3.24.0",
+        "scope": "global",
+        "installed_at": "2026-08-22T00:00:00Z"
+    }));
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    // Doctor may report unrelated findings; this test only pins that an
+    // absent claude manifest never yields claude diff findings.
+    let _ = run(&ctx, &Args::default());
+    let findings = non_opencode_diff_findings(&home);
+    assert!(
+        findings.iter().all(|f| !f.contains("diff: claude")),
+        "absent claude manifest must not produce findings, got: {findings:?}"
+    );
+
+    if let Some(v) = saved_claude_dir {
+        std::env::set_var("CLAUDE_CONFIG_DIR", v);
+    }
+}
+
+#[test]
+fn test_probe_manifest_drift_count_includes_claude_and_kimi() {
+    // Shield against parallel adapter tests that mutate CLAUDE_CONFIG_DIR /
+    // KIMI_CODE_HOME: hold the harness env lock and force the default
+    // (home-derived) paths.
+    let _guard = crate::harness::tests::HARNESS_ENV_LOCK.lock().unwrap();
+    let saved_claude_dir = std::env::var_os("CLAUDE_CONFIG_DIR");
+    let saved_kimi_home = std::env::var_os("KIMI_CODE_HOME");
+    std::env::remove_var("CLAUDE_CONFIG_DIR");
+    std::env::remove_var("KIMI_CODE_HOME");
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let claude_dir = home.join(".claude");
+    let kimi_dir = home.join(".kimi-code");
+
+    // claude: one tampered managed file (real manifest entry).
+    let claude_managed = claude_dir.join("compound-engineering");
+    std::fs::create_dir_all(&claude_managed).unwrap();
+    std::fs::write(claude_managed.join("SKILL.md"), b"tampered").unwrap();
+    InstallManifest {
+        version: "v1.0.0".into(),
+        plugin_name: "compound-engineering".into(),
+        installed_at: "2026-08-22T00:00:00Z".into(),
+        source: serde_json::json!({"kind": "local"}),
+        files: vec![crate::opencode::manifest::ManifestFile {
+            path: "SKILL.md".into(),
+            sha256: crate::state::diff::sha256_hex(b"pristine"),
+        }],
+        config_mutations: vec![],
+    }
+    .write(&claude_dir)
+    .unwrap();
+
+    // kimi: empty manifest -> contributes zero (graceful degradation).
+    let kimi_managed = kimi_dir.join("compound-engineering");
+    std::fs::create_dir_all(&kimi_managed).unwrap();
+    InstallManifest {
+        version: "v1.0.0".into(),
+        plugin_name: "compound-engineering".into(),
+        installed_at: "2026-08-22T00:00:00Z".into(),
+        source: serde_json::json!({"kind": "local"}),
+        files: vec![],
+        config_mutations: vec![],
+    }
+    .write(&kimi_dir)
+    .unwrap();
+
+    let ctx = Context {
+        config_dir: home.join(".ce-ai"),
+        opencode_config_dir: home.join(".config").join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let count = crate::commands::workflow::probe_manifest_drift_count(&ctx);
+    assert_eq!(count, 1, "only the tampered claude file counts as drift");
+
+    if let Some(v) = saved_claude_dir {
+        std::env::set_var("CLAUDE_CONFIG_DIR", v);
+    }
+    if let Some(v) = saved_kimi_home {
+        std::env::set_var("KIMI_CODE_HOME", v);
+    }
+}
