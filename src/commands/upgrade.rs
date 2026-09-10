@@ -25,9 +25,24 @@ pub struct Args {
     /// Local CE source tree; bypasses release fetching and the cache.
     #[arg(long)]
     pub source: Option<PathBuf>,
+    /// Also update the ce-ai CLI binary itself to the latest release.
+    #[arg(long)]
+    pub bin: bool,
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
+    if args.bin {
+        crate::commands::self_update::run(
+            ctx,
+            &crate::commands::self_update::Args {
+                check: false,
+                to: None,
+                force: false,
+            },
+        )?;
+        println!();
+    }
+
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load(&state_path)?;
 

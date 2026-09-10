@@ -30,6 +30,12 @@ struct Cli {
 }
 
 fn main() {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            ce_ai::source::binary_release::cleanup_stale_update_files(dir);
+        }
+    }
+
     let cli = Cli::parse();
     let ctx = match Context::resolve(cli.config_dir, cli.dry_run, cli.verbose, cli.quiet) {
         Ok(ctx) => ctx,

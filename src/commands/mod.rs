@@ -11,6 +11,7 @@ pub mod init_prj;
 pub mod install;
 pub mod models;
 pub mod registry;
+pub mod self_update;
 pub mod skills;
 pub mod status;
 pub mod sync;
