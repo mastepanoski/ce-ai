@@ -29,7 +29,7 @@ esac
 
 case "$OS" in
   linux)
-    TARGET="${ARCH_NAME}-unknown-linux-gnu"
+    TARGET="${ARCH_NAME}-unknown-linux-musl"
     ASSET_NAME="ce-ai-${TARGET}.tar.gz"
     ;;
   darwin)

@@ -5,6 +5,15 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.50.1] - 2026-09-10
+
+### Fixed
+- **Static musl Linux Releases for Cross-Distro Compatibility (#343):**
+  - Linux binaries are now built as fully static `*-unknown-linux-musl` targets via `cross` instead of dynamically-linked glibc targets on `ubuntu-latest`. A `-gnu` binary was locked to the build runner's glibc (Ubuntu 24.04 → glibc 2.39), causing `GLIBC_2.39 not found` on older distros (e.g. Debian 12 → glibc 2.36). Static musl links only the Rust/musl code, so the binary runs on any Linux regardless of host glibc.
+  - `.github/workflows/release.yml`: Linux matrix now publishes `ce-ai-x86_64-unknown-linux-musl.tar.gz` and `ce-ai-aarch64-unknown-linux-musl.tar.gz`, built with `cross`.
+  - `scripts/install.sh`: Linux installer fetches the `-musl` asset.
+  - `scripts/release-integrity.sh`: `SHA256SUMS.txt` covers the `-musl` Linux assets.
+
 ## [1.50.0] - 2026-09-09
 
 ### Added

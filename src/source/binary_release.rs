@@ -8,9 +8,9 @@ use crate::state::diff::sha256_hex;
 /// matching `.github/workflows/release.yml`. Returns `None` on unsupported platforms.
 pub fn current_target() -> Option<&'static str> {
     if cfg!(all(target_arch = "x86_64", target_os = "linux")) {
-        Some("x86_64-unknown-linux-gnu")
+        Some("x86_64-unknown-linux-musl")
     } else if cfg!(all(target_arch = "aarch64", target_os = "linux")) {
-        Some("aarch64-unknown-linux-gnu")
+        Some("aarch64-unknown-linux-musl")
     } else if cfg!(all(target_arch = "x86_64", target_os = "macos")) {
         Some("x86_64-apple-darwin")
     } else if cfg!(all(target_arch = "aarch64", target_os = "macos")) {
@@ -503,6 +503,8 @@ pub fn resolve_cli_release_by_tag(
     // Fallback: construct synthesized release asset URLs for known tag
     let version = tag.strip_prefix('v').unwrap_or(tag).to_string();
     let known_targets = [
+        "x86_64-unknown-linux-musl",
+        "aarch64-unknown-linux-musl",
         "x86_64-unknown-linux-gnu",
         "aarch64-unknown-linux-gnu",
         "x86_64-apple-darwin",
@@ -538,17 +540,34 @@ pub fn download_release_asset_and_sums(
 ) -> Result<(Vec<u8>, String), CeError> {
     let expected_asset_name = asset_name_for_target(target);
 
-    let asset_url = release
+    // Fallback: if release.assets doesn't contain the musl asset, check for older gnu asset
+    let fallback_asset_name = if target == "x86_64-unknown-linux-musl" {
+        Some("ce-ai-x86_64-unknown-linux-gnu.tar.gz")
+    } else if target == "aarch64-unknown-linux-musl" {
+        Some("ce-ai-aarch64-unknown-linux-gnu.tar.gz")
+    } else {
+        None
+    };
+
+    let (chosen_asset_name, asset_url) = if let Some(asset) = release
         .assets
         .iter()
         .find(|a| a.name == expected_asset_name)
-        .map(|a| a.download_url.clone())
-        .unwrap_or_else(|| {
+    {
+        (expected_asset_name.clone(), asset.download_url.clone())
+    } else if let Some(fallback) =
+        fallback_asset_name.and_then(|f| release.assets.iter().find(|a| a.name == f))
+    {
+        (fallback.name.clone(), fallback.download_url.clone())
+    } else {
+        (
+            expected_asset_name.clone(),
             format!(
                 "https://github.com/{CLI_REPO}/releases/download/{}/{expected_asset_name}",
                 release.tag
-            )
-        });
+            ),
+        )
+    };
 
     let sums_url = release
         .assets
@@ -571,7 +590,7 @@ pub fn download_release_asset_and_sums(
 
     if !archive_resp.status().is_success() {
         return Err(CeError::Network(format!(
-            "failed to download release asset {expected_asset_name} (HTTP {})",
+            "failed to download release asset {chosen_asset_name} (HTTP {})",
             archive_resp.status()
         )));
     }
@@ -599,9 +618,9 @@ pub fn download_release_asset_and_sums(
         .text()
         .map_err(|e| CeError::Network(format!("failed to read SHA256SUMS.txt: {e}")))?;
 
-    let expected_sha256 = parse_sha256sums(&sums_text, &expected_asset_name).ok_or_else(|| {
+    let expected_sha256 = parse_sha256sums(&sums_text, &chosen_asset_name).ok_or_else(|| {
         CeError::Verification(format!(
-            "asset '{expected_asset_name}' not listed in SHA256SUMS.txt"
+            "asset '{chosen_asset_name}' not listed in SHA256SUMS.txt"
         ))
     })?;
 
