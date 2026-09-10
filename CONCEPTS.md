@@ -80,6 +80,10 @@ A non-blocking, telemetry-only verification mechanism (`ce-ai gate check`) that 
 ### Binary Self-Update Engine
 A native, cryptographic in-tool mechanism (`ce-ai self-update` / `ce-ai upgrade --bin`) that enables `ce-ai` to safely download, verify via `SHA256SUMS.txt` (fail-closed exit code `6`), and atomically replace its running executable across Linux, macOS, and Windows without manual re-installation scripts. On POSIX, it leverages atomic inode directory updates (`rename(2)`) via sibling temporary files; on Windows, it renames the active executable to `.old` (`FILE_SHARE_DELETE`) before atomic swap and registers startup cleanup for leftover files.
 
+### Visibility, Not Control (Harness Integration Principle)
+An architectural boundary governing how `ce-ai` interacts with external AI harnesses that maintain their own native plugin ecosystems (such as Claude Code or Kimi Code). `ce-ai` limits its scope to read-only inspection, diagnostic reporting (`ce-ai doctor`), and version drift visibility, deliberately refraining from mutating or executing updates inside the external harness's private registries or plugin cache directories.
+
+
 
 
 
