@@ -71,6 +71,7 @@ fn probe_openspec_context_detects_features_and_counts_tasks() {
         updated_at: "2026-09-02T00:00:00Z".to_string(),
         source: WorkflowSource::Manual,
         resolution: None,
+        new_cycle: false,
     });
 
     let info = probe_openspec_context_in(repo_root, &wf).expect("must detect feature");
@@ -680,6 +681,7 @@ fn test_maybe_auto_checkpoint_second_cycle_on_same_branch() {
         updated_at: chrono::Utc::now().to_rfc3339(),
         source: WorkflowSource::Manual,
         resolution: Some(FeatureResolution::Branch),
+        new_cycle: false,
     };
     let key = State::workspace_branch_key(&repo_root, None);
     state.workflows.insert(key, init_wf.clone());
@@ -700,6 +702,10 @@ fn test_maybe_auto_checkpoint_second_cycle_on_same_branch() {
     let wf = res.unwrap();
     assert_eq!(wf.stage, WorkflowStage::Ideation);
     assert_eq!(wf.source, WorkflowSource::Inferred);
+    assert!(
+        wf.new_cycle,
+        "new_cycle flag must be set to true on WorkflowState"
+    );
     assert!(
         wf.task.to_lowercase().contains("nuevo ciclo detectado"),
         "task should indicate new cycle detected, got: {}",
