@@ -5,6 +5,26 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.50.0] - 2026-09-09
+
+### Added
+- **Native CLI Binary Self-Update (`ce-ai self-update` and `ce-ai upgrade --bin`) (#341):**
+  - **Dedicated Subcommand `ce-ai self-update` (`src/commands/self_update.rs`)**:
+    Enables in-tool self-updating of the `ce-ai` binary itself across Linux, macOS, and Windows without manual re-piping of `install.sh` or `install.ps1`.
+  - **Dual-Action `ce-ai upgrade --bin` (`src/commands/upgrade.rs`)**:
+    Allows upgrading both the compound-engineering plugin and the CLI executable in a single command.
+  - **Cryptographic SHA256 Integrity Verification (Fail-Closed)**:
+    Parses official `SHA256SUMS.txt` published with GitHub releases, hashes the downloaded archive prior to extraction, and aborts fail-closed with `CeError::Verification` (exit code `6`) upon mismatch.
+  - **Safe Archive Extraction & Zip-Slip Defense (`src/source/binary_release.rs`)**:
+    Validates all entries against path traversal (`..`, absolute paths, drive prefixes) before writing. Safely unpacks `.tar.gz` on Unix and `.zip` on Windows (via `zip` crate with `flate2`).
+  - **Cross-Platform In-Use Binary Replacement**:
+    - **POSIX**: Writes to a temporary sibling file in the same parent directory to prevent cross-device (`EXDEV`) link failures, sets `0o755` permissions, and executes atomic `rename(2)` over the active binary inode.
+    - **Windows**: Renames locked running `ce-ai.exe` to `ce-ai.exe.old` within the same directory (`FILE_SHARE_DELETE`), moves replacement into place, and cleans up old files upon subsequent runs.
+  - **Startup Stale File Cleanup (`src/main.rs`)**:
+    Silently cleans up any `.old` executables or temporary update files in the binary directory upon startup.
+  - **Ergonomic Flags**:
+    Supports `--check` (advisory update check without disk writes), `--dry-run` (previews planned actions), `--to <tag>` (pinned tag upgrade/downgrade), and `--force` (reinstall current version).
+
 ## [1.49.0] - 2026-09-09
 
 ### Added

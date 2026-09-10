@@ -53,7 +53,7 @@ ce-ai doctor
 | `ce-ai upgrade --to <tag>` | Upgrade the plugin to a release tag | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
 | `ce-ai models set/list/profile …` | Assign models per agent slot, snapshot profiles | [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) |
 | `ce-ai uninstall --harness <name>` | Restore pre-install configuration cleanly | [Backup & Uninstall](docs/user-guide/backup-and-uninstall.md) |
-| `ce-ai install --harness all --dry-run` | Preview any mutation before it touches disk | [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) |
+| `ce-ai self-update` | Update ce-ai CLI binary to latest release | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
 
 ## Documentation Map
 

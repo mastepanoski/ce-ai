@@ -9,8 +9,8 @@ use std::path::PathBuf;
 use clap::Subcommand;
 
 use crate::commands::{
-    audit, backups, deinit_prj, doctor, gate, guard, init_prj, install, models, skills, status,
-    sync, tools, uninstall, upgrade, usage, workflow, Context,
+    audit, backups, deinit_prj, doctor, gate, guard, init_prj, install, models, self_update,
+    skills, status, sync, tools, uninstall, upgrade, usage, workflow, Context,
 };
 use crate::error::CeError;
 
@@ -27,6 +27,9 @@ pub enum Commands {
     Sync(sync::Args),
     /// Fetch a newer CE source and sync the installed plugin.
     Upgrade(upgrade::Args),
+    /// Update the ce-ai CLI binary itself to the latest release (or specified tag).
+    #[command(name = "self-update")]
+    SelfUpdate(self_update::Args),
     /// Manage model assignments and named profiles.
     Models(models::Args),
     /// Multi-harness skill registry discovery, prompt resolution, and health diagnostics.
@@ -84,6 +87,7 @@ impl CeCommand for Commands {
             Commands::Install(args) => install::run(ctx, args),
             Commands::Sync(args) => sync::run(ctx, args),
             Commands::Upgrade(args) => upgrade::run(ctx, args),
+            Commands::SelfUpdate(args) => self_update::run(ctx, args),
             Commands::Models(args) => models::run(ctx, args),
             Commands::Skills(args) => skills::run(ctx, args),
             Commands::Status => status::run(ctx),

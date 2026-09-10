@@ -77,6 +77,10 @@ A repo-wide, non-discretionary health probe (`probe_unarchived_completed_changes
 ### Gate Check (Observe-Only Spike)
 A non-blocking, telemetry-only verification mechanism (`ce-ai gate check`) that evaluates agent tool write operations targeting `src/**` under Stage 4 (`ce-work`) against active OpenSpec contracts (`proposal.md`, `spec.md`, `tasks.md`). To avoid developer disruption and false positive lockouts, the spike strictly observes without blocking writes (exit code `0`), inspects only the declared checkpoint stage from `state.json` (never re-inferring stage), isolates edge cases (`mtime_fallback`, `worktree_uncommitted`, `stale_cycle_guard`) into distinct telemetry buckets, provides an immediate kill-switch (`CE_AI_DISABLE_GATE_CHECK=1` or `--disabled`), and aggregates metrics transparently in `status` and `doctor`.
 
+### Binary Self-Update Engine
+A native, cryptographic in-tool mechanism (`ce-ai self-update` / `ce-ai upgrade --bin`) that enables `ce-ai` to safely download, verify via `SHA256SUMS.txt` (fail-closed exit code `6`), and atomically replace its running executable across Linux, macOS, and Windows without manual re-installation scripts. On POSIX, it leverages atomic inode directory updates (`rename(2)`) via sibling temporary files; on Windows, it renames the active executable to `.old` (`FILE_SHARE_DELETE`) before atomic swap and registers startup cleanup for leftover files.
+
+
 
 
 

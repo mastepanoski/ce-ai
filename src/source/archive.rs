@@ -8,7 +8,7 @@ use crate::error::CeError;
 
 /// True when `path` is safe to extract: relative, no parent (`..`)
 /// components, and no Windows drive-letter prefix.
-fn is_safe_relative_path(path: &Path) -> bool {
+pub(crate) fn is_safe_relative_path(path: &Path) -> bool {
     if path.is_absolute() {
         return false;
     }

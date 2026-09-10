@@ -199,3 +199,34 @@ flowchart TD
 | **Data Source** | Currently registered source tree (local or cache). | Queries and downloads latest GitHub Releases. |
 | **TUI Usage** | Press **`[Enter]`** in `Sync & Reconcile` tab. | Press **`[Enter]`** in `Upgrade Release` tab. |
 | **Result** | Files 100% identical to currently installed version. | Files updated to latest official GitHub release tag. |
+
+---
+
+## 3. CLI Binary Self-Update (`ce-ai self-update` & `ce-ai upgrade --bin`)
+
+While `ce-ai upgrade` updates the compound-engineering plugin across harnesses, `ce-ai self-update` updates the `ce-ai` CLI binary itself.
+
+### ⚙️ How It Works:
+1. **Target Detection**: Identifies the host architecture and operating system matching the official release matrix (`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`, `x86_64-pc-windows-msvc`, `aarch64-pc-windows-msvc`).
+2. **Release Resolution**: Queries `mastepanoski/ce-ai` for the latest release (or pinned `--to <tag>`) with unauthenticated web fallback to bypass API rate limits.
+3. **Cryptographic Integrity**: Downloads and verifies `SHA256SUMS.txt`. If the calculated checksum of the downloaded archive mismatches, execution immediately aborts with exit code `6` (`Verification`).
+4. **Safe Extraction**: Inspects archive contents (`.tar.gz` on Unix, `.zip` on Windows) to prevent Zip-Slip path traversal attacks.
+5. **Atomic Replacement**:
+   - **POSIX (Linux/macOS)**: Unpacks to a temporary sibling file and performs an atomic `rename(2)` over the running executable.
+   - **Windows**: Renames the active `ce-ai.exe` to `ce-ai.exe.old`, swaps the new executable in place, and cleans up old files upon restart.
+
+### 📋 Usage Examples:
+```bash
+# Check if a newer CLI binary is available without downloading:
+ce-ai self-update --check
+
+# Upgrade the CLI binary to the latest version:
+ce-ai self-update
+
+# Preview what would be downloaded and replaced:
+ce-ai --dry-run self-update --force
+
+# Upgrade both the plugin and the CLI binary in a single step:
+ce-ai upgrade --bin
+```
+
