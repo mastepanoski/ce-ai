@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "postToolUse": [
+      {
+        "bash": "ce-ai workflow resume --json",
+        "powershell": "ce-ai workflow resume --json",
+        "timeoutSec": 15,
+        "type": "command"
+      }
+    ],
+    "sessionStart": [
+      {
+        "bash": "ce-ai workflow resume --json",
+        "powershell": "ce-ai workflow resume --json",
+        "timeoutSec": 15,
+        "type": "command"
+      }
+    ]
+  },
+  "version": 1
+}

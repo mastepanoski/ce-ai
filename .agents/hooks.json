@@ -1,0 +1,16 @@
+{
+  "compound-engineering": {
+    "PreInvocation": [
+      {
+        "command": "ce-ai workflow resume --pre-invocation",
+        "type": "command"
+      }
+    ],
+    "Stop": [
+      {
+        "command": "ce-ai workflow resume",
+        "type": "command"
+      }
+    ]
+  }
+}
