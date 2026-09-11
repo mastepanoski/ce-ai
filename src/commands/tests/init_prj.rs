@@ -120,8 +120,11 @@ fn test_reconcile_rtk_hooks_if_supported_in_dry_run() {
         verbose: false,
     };
 
-    let res = reconcile_rtk_hooks_if_supported(project_dir, &state, &ctx);
+    let res = reconcile_rtk_hooks_if_supported(project_dir, &state, &ctx, false);
     assert!(res.is_ok());
+    // Dry-run must not write hook artifacts, even for detected harnesses.
+    assert!(!project_dir.join(".claude").join("settings.json").exists());
+    assert!(!project_dir.join(".cursor").join("hooks.json").exists());
 }
 
 #[test]
@@ -147,7 +150,7 @@ fn test_reconcile_rtk_hooks_if_supported_resolves_home_from_ctx() {
 
     assert_eq!(crate::harness::home_dir_from_ctx(&ctx), home_dir);
 
-    let res = reconcile_rtk_hooks_if_supported(&project_dir, &state, &ctx);
+    let res = reconcile_rtk_hooks_if_supported(&project_dir, &state, &ctx, false);
     assert!(res.is_ok());
 
     if crate::harness::rtk::is_rtk_available() {
