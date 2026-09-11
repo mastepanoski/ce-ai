@@ -222,6 +222,11 @@ pub fn run(
             (appended, false)
         };
 
+    // Load the global registry once (read-only in dry-run) so both modes can
+    // consult installed harnesses for reconciliation previews.
+    let global_state_path = ctx.config_dir.join("state.json");
+    let mut state = State::load(&global_state_path)?;
+
     if !ctx.dry_run {
         if !is_already_up_to_date {
             crate::state::write_atomic(&agents_file, new_content.as_bytes())?;
@@ -235,9 +240,6 @@ pub fn run(
         }
 
         // Update state.json registry
-        let global_state_path = ctx.config_dir.join("state.json");
-        let mut state = State::load(&global_state_path)?;
-
         let now = chrono::Utc::now().to_rfc3339();
         let mut entry = ProjectAdoptionEntry {
             path: target_dir.clone(),
@@ -283,6 +285,11 @@ pub fn run(
         }
 
         state.save(&global_state_path)?;
+    } else if !crate::harness::rtk::is_rtk_opted_out(skip_rtk, skip_companions) {
+        // Dry-run preview: RTK reconciliation is dry-run aware and writes nothing.
+        reconcile_rtk_hooks_if_supported(&target_dir, &state, ctx)?;
+    } else if !ctx.quiet {
+        println!("rtk: hook injection skipped (opted out)");
     }
 
     if is_already_up_to_date {
@@ -290,6 +297,18 @@ pub fn run(
             println!(
                 "Project at '{}' is already adopted with up-to-date block (SHA: {}).",
                 target_dir.display(),
+                &body_sha256[..8]
+            );
+        }
+        return Ok(());
+    }
+
+    if ctx.dry_run {
+        if !ctx.quiet {
+            println!(
+                "dry-run: would adopt project at '{}' (tier: {}, block SHA: {})",
+                target_dir.display(),
+                tier_str.to_lowercase(),
                 &body_sha256[..8]
             );
         }

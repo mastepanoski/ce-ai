@@ -1970,6 +1970,105 @@ fn init_prj_and_deinit_prj_roundtrip_fresh_repo() {
 }
 
 #[test]
+fn init_prj_dry_run_does_not_claim_adoption() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("dry-run-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .env_remove("CE_AI_SKIP_RTK")
+        .env_remove("CE_AI_SKIP_COMPANIONS")
+        .args([
+            "--dry-run",
+            "init-prj",
+            prj_dir.to_str().unwrap(),
+            "--tier",
+            "minimal",
+        ])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("dry-run: would adopt project")
+                .and(predicate::str::contains("Adopted project").not()),
+        );
+}
+
+#[test]
+fn init_prj_dry_run_performs_no_writes() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("dry-run-no-writes");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    let baseline = "# Base Project\n";
+    fs::write(&agents_file, baseline).unwrap();
+
+    ceai(&config_dir, &home)
+        .env_remove("CE_AI_SKIP_RTK")
+        .env_remove("CE_AI_SKIP_COMPANIONS")
+        .args([
+            "--dry-run",
+            "init-prj",
+            prj_dir.to_str().unwrap(),
+            "--tier",
+            "minimal",
+        ])
+        .assert()
+        .success();
+
+    assert_eq!(fs::read_to_string(&agents_file).unwrap(), baseline);
+    assert!(!prj_dir.join("CLAUDE.md").exists());
+    assert!(!prj_dir.join(".gitignore").exists());
+    assert!(!prj_dir.join(".claude").exists());
+    assert!(!config_dir.join("state.json").exists());
+    assert_eq!(fs::read_dir(&prj_dir).unwrap().count(), 1);
+}
+
+#[test]
+fn init_prj_dry_run_previews_rtk_hooks_then_opts_out() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("dry-run-rtk-preview");
+    fs::create_dir_all(prj_dir.join(".claude")).unwrap();
+
+    ceai(&config_dir, &home)
+        .env_remove("CE_AI_SKIP_RTK")
+        .env_remove("CE_AI_SKIP_COMPANIONS")
+        .args([
+            "--dry-run",
+            "init-prj",
+            prj_dir.to_str().unwrap(),
+            "--tier",
+            "minimal",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "[dry-run] would configure rtk hook for claude",
+        ));
+
+    ceai(&config_dir, &home)
+        .env_remove("CE_AI_SKIP_RTK")
+        .env_remove("CE_AI_SKIP_COMPANIONS")
+        .args([
+            "--dry-run",
+            "init-prj",
+            prj_dir.to_str().unwrap(),
+            "--tier",
+            "minimal",
+            "--skip-rtk",
+        ])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("rtk: hook injection skipped (opted out)")
+                .and(predicate::str::contains("would configure rtk hook").not()),
+        );
+}
+
+#[test]
 fn init_prj_preserves_preexisting_content_and_crlf() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));

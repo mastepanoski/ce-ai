@@ -122,6 +122,9 @@ fn test_reconcile_rtk_hooks_if_supported_in_dry_run() {
 
     let res = reconcile_rtk_hooks_if_supported(project_dir, &state, &ctx);
     assert!(res.is_ok());
+    // Dry-run must not write hook artifacts, even for detected harnesses.
+    assert!(!project_dir.join(".claude").join("settings.json").exists());
+    assert!(!project_dir.join(".cursor").join("hooks.json").exists());
 }
 
 #[test]
