@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`init-prj --dry-run` Reported Fake Adoption and Hid Hook Actions (#351):**
   - `ce-ai init-prj --dry-run` no longer prints the real success line (`✓ Adopted project ...`); it now prints an explicit `dry-run: would adopt project at '<path>' (tier: <tier>, block SHA: <sha>)` preview.
   - Dry-run now surfaces planned RTK hook configuration (`[dry-run] would configure rtk hook for <harness>`) by invoking the already dry-run-aware reconciliation path, instead of silently skipping it.
-  - Dry-run remains fully non-destructive: zero writes to the target repository, harness config, or `state.json`.
-  - Added CLI regression tests locking in the preview wording, zero-write invariant, and opt-out behavior.
+  - Detection parity: dry-run previews the Claude RTK hook on a fresh project (a real run always creates the `CLAUDE.md` stub), even when `.claude` does not yet exist.
+  - Dry-run remains fully non-destructive: zero writes to the target repository, harness config, or `state.json`, and a corrupt global `state.json` no longer aborts a write-free preview.
+  - Added CLI regression tests locking in the preview wording, zero-write invariant, fresh-project parity, quiet mode, up-to-date reporting, and opt-out behavior.
 
 ## [1.50.1] - 2026-09-10
 

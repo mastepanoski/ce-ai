@@ -2027,12 +2027,14 @@ fn init_prj_dry_run_performs_no_writes() {
 }
 
 #[test]
-fn init_prj_dry_run_previews_rtk_hooks_then_opts_out() {
+fn init_prj_dry_run_previews_rtk_hooks_on_fresh_project() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
     let prj_dir = tmp.path().join("dry-run-rtk-preview");
-    fs::create_dir_all(prj_dir.join(".claude")).unwrap();
+    fs::create_dir_all(&prj_dir).unwrap();
 
+    // Fresh project: no .claude, no CLAUDE.md, no installed harnesses. A real run
+    // creates the CLAUDE.md stub, so the dry-run preview MUST still surface Claude.
     ceai(&config_dir, &home)
         .env_remove("CE_AI_SKIP_RTK")
         .env_remove("CE_AI_SKIP_COMPANIONS")
@@ -2048,6 +2050,19 @@ fn init_prj_dry_run_previews_rtk_hooks_then_opts_out() {
         .stdout(predicate::str::contains(
             "[dry-run] would configure rtk hook for claude",
         ));
+
+    // Still zero writes on either the project or the resolved HOME.
+    assert!(!prj_dir.join("CLAUDE.md").exists());
+    assert!(!prj_dir.join(".claude").join("settings.json").exists());
+    assert!(!home.join(".claude").join("settings.json").exists());
+}
+
+#[test]
+fn init_prj_dry_run_rtk_opt_out_skips_preview() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("dry-run-rtk-optout");
+    fs::create_dir_all(&prj_dir).unwrap();
 
     ceai(&config_dir, &home)
         .env_remove("CE_AI_SKIP_RTK")
@@ -2066,6 +2081,71 @@ fn init_prj_dry_run_previews_rtk_hooks_then_opts_out() {
             predicate::str::contains("rtk: hook injection skipped (opted out)")
                 .and(predicate::str::contains("would configure rtk hook").not()),
         );
+}
+
+#[test]
+fn init_prj_dry_run_quiet_emits_nothing() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("dry-run-quiet");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    // Dry-run under --quiet must emit no ce-ai informational line (adoption
+    // preview, hook preview, or opt-out notice). Real-mode quiet is not asserted
+    // here because the optional external `codegraph` binary writes to stdout
+    // directly, independent of ce-ai's own quiet guards.
+    ceai(&config_dir, &home)
+        .env_remove("CE_AI_SKIP_RTK")
+        .env_remove("CE_AI_SKIP_COMPANIONS")
+        .args([
+            "--quiet",
+            "--dry-run",
+            "init-prj",
+            prj_dir.to_str().unwrap(),
+            "--tier",
+            "minimal",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+}
+
+#[test]
+fn init_prj_dry_run_up_to_date_reports_no_adoption() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("dry-run-up-to-date");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    // Adopt for real first.
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "minimal"])
+        .assert()
+        .success();
+
+    let agents_before = fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap();
+
+    // A dry-run over an up-to-date project reports the already-adopted status and
+    // must NOT claim it would adopt.
+    ceai(&config_dir, &home)
+        .args([
+            "--dry-run",
+            "init-prj",
+            prj_dir.to_str().unwrap(),
+            "--tier",
+            "minimal",
+        ])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("already adopted")
+                .and(predicate::str::contains("dry-run: would adopt project").not()),
+        );
+
+    assert_eq!(
+        fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap(),
+        agents_before
+    );
 }
 
 #[test]
