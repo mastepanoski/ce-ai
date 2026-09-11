@@ -65,6 +65,26 @@ pub enum Action {
         #[arg(long)]
         override_reason: Option<String>,
     },
+    /// Archive completed OpenSpec change packages to openspec/changes/archive/.
+    Archive(ArchiveArgs),
+}
+
+#[derive(clap::Args, Debug, Clone, Default)]
+pub struct ArchiveArgs {
+    /// Target change folder name to archive (defaults to active feature from state.json).
+    pub feature: Option<String>,
+
+    /// Archive all completed change folders detected in openspec/changes/.
+    #[arg(long, default_value_t = false)]
+    pub all: bool,
+
+    /// Preview intended moves and ledger updates without modifying disk or git.
+    #[arg(long, default_value_t = false)]
+    pub dry_run: bool,
+
+    /// Criterion 2 STATUS attestation for features with incomplete tasks.
+    #[arg(long)]
+    pub status: Option<String>,
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
@@ -154,6 +174,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 println!("{line}");
             }
         }
+        Action::Archive(archive_args) => run_archive(ctx, archive_args)?,
     }
     Ok(())
 }
@@ -958,6 +979,398 @@ pub fn probe_unarchived_completed_changes(repo_root: &Path) -> Vec<UnarchivedCha
 
     completed_changes.sort_by(|a, b| a.feature.cmp(&b.feature));
     completed_changes
+}
+
+/// Criterion met for archiving an OpenSpec change package.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArchiveCriterion {
+    Mechanical {
+        completed: usize,
+        total: usize,
+    },
+    StatusAttested {
+        status: String,
+        completed: usize,
+        total: usize,
+    },
+}
+
+/// The result of an archival operation on a feature package.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArchiveOutcome {
+    pub feature: String,
+    pub source_path: PathBuf,
+    pub dest_path: PathBuf,
+    pub criterion: ArchiveCriterion,
+}
+
+/// Validates criteria and moves an OpenSpec change folder to `openspec/changes/archive/`.
+pub fn validate_and_archive_feature(
+    repo_root: &Path,
+    feature: &str,
+    status: Option<&str>,
+    dry_run: bool,
+) -> Result<ArchiveOutcome, CeError> {
+    if feature.is_empty()
+        || feature == "."
+        || feature == ".."
+        || feature.contains('/')
+        || feature.contains('\\')
+    {
+        return Err(CeError::Usage(format!("invalid feature name '{feature}'")));
+    }
+
+    let source_path = repo_root.join("openspec").join("changes").join(feature);
+    if !source_path.is_dir() {
+        return Err(CeError::Usage(format!(
+            "openspec change '{feature}' not found at '{}'",
+            source_path.display()
+        )));
+    }
+
+    let dest_parent = repo_root.join("openspec").join("changes").join("archive");
+    let dest_path = dest_parent.join(feature);
+    if dest_path.exists() {
+        return Err(CeError::State(format!(
+            "cannot archive '{feature}': destination '{}' already exists",
+            dest_path.display()
+        )));
+    }
+
+    let tasks_path = source_path.join("tasks.md");
+    let (completed, total) = if tasks_path.is_file() {
+        count_task_checkboxes(&tasks_path)
+    } else {
+        (0, 0)
+    };
+
+    let criterion = if total > 0 && completed == total {
+        ArchiveCriterion::Mechanical { completed, total }
+    } else if let Some(ref_status) = status {
+        let trimmed = ref_status.trim();
+        if trimmed.is_empty() || trimmed.len() < 5 {
+            return Err(CeError::Usage(
+                "status attestation must be at least 5 characters citing release evidence (Criterion 2)"
+                    .to_string(),
+            ));
+        }
+        ArchiveCriterion::StatusAttested {
+            status: trimmed.to_string(),
+            completed,
+            total,
+        }
+    } else {
+        return Err(CeError::Verification(format!(
+            "openspec change '{feature}' has {} open task(s) ({completed}/{total} completed); complete all tasks (Criterion 1) or supply --status '<evidence>' (Criterion 2)",
+            total.saturating_sub(completed)
+        )));
+    };
+
+    let (is_clean, modified_files) = probe_git_dirty_files(repo_root);
+    if !is_clean {
+        let feature_prefix = format!("openspec/changes/{feature}/");
+        let foreign_modified: Vec<&String> = modified_files
+            .iter()
+            .filter(|f| f.starts_with(&feature_prefix) && !f.ends_with("tasks.md"))
+            .collect();
+        if !foreign_modified.is_empty() {
+            return Err(CeError::Verification(format!(
+                "openspec change '{feature}' contains uncommitted modifications in non-tasks files: {foreign_modified:?}"
+            )));
+        }
+    }
+
+    if !dry_run {
+        // Prepend status to tasks.md if Criterion 2
+        if let ArchiveCriterion::StatusAttested { status: ref st, .. } = &criterion {
+            if tasks_path.is_file() {
+                let current_content = std::fs::read_to_string(&tasks_path).map_err(CeError::Io)?;
+                if !current_content.trim_start().starts_with("> STATUS:") {
+                    let new_content = format!("> STATUS: {st}\n\n{current_content}");
+                    crate::state::write_atomic(&tasks_path, new_content.as_bytes())?;
+                }
+            }
+        }
+
+        std::fs::create_dir_all(&dest_parent).map_err(CeError::Io)?;
+
+        // Try git mv first
+        let git_mv_success = std::process::Command::new("git")
+            .args([
+                "mv",
+                source_path.to_str().unwrap_or_default(),
+                dest_path.to_str().unwrap_or_default(),
+            ])
+            .current_dir(repo_root)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+
+        if !git_mv_success {
+            std::fs::rename(&source_path, &dest_path).map_err(CeError::Io)?;
+            let _ = std::process::Command::new("git")
+                .args(["add", "-A", "openspec/changes"])
+                .current_dir(repo_root)
+                .output();
+        }
+    }
+
+    Ok(ArchiveOutcome {
+        feature: feature.to_string(),
+        source_path,
+        dest_path,
+        criterion,
+    })
+}
+
+/// Updates openspec/changes/archive/README.md with records of archived features.
+pub fn sync_archive_readme_ledger(
+    repo_root: &Path,
+    outcomes: &[ArchiveOutcome],
+    dry_run: bool,
+) -> Result<(), CeError> {
+    if dry_run || outcomes.is_empty() {
+        return Ok(());
+    }
+    let readme_path = repo_root
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join("README.md");
+    if !readme_path.is_file() {
+        return Ok(());
+    }
+
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let entry = if outcomes.len() == 1 {
+        let o = &outcomes[0];
+        match &o.criterion {
+            ArchiveCriterion::Mechanical { completed, total } => {
+                format!(
+                    "- {}: archived ({completed}/{total} tasks) under criterion (1) on {today}.\n",
+                    o.feature
+                )
+            }
+            ArchiveCriterion::StatusAttested {
+                status,
+                completed,
+                total,
+            } => {
+                format!(
+                    "- {}: archived ({completed}/{total} tasks, STATUS: {status}) under criterion (2) on {today}.\n",
+                    o.feature
+                )
+            }
+        }
+    } else {
+        let count = outcomes.len();
+        format!("- {today} sweep: {count} folders archived via 'ce-ai archive --all'.\n")
+    };
+
+    let current = std::fs::read_to_string(&readme_path).map_err(CeError::Io)?;
+    let mut updated = current;
+    if !updated.ends_with('\n') {
+        updated.push('\n');
+    }
+    updated.push_str(&entry);
+
+    crate::state::write_atomic(&readme_path, updated.as_bytes())?;
+    let _ = std::process::Command::new("git")
+        .args(["add", "openspec/changes/archive/README.md"])
+        .current_dir(repo_root)
+        .output();
+
+    Ok(())
+}
+
+/// Reconciles state.json by clearing the active feature pointer if it was archived.
+pub fn reconcile_state_active_feature(
+    ctx: &Context,
+    archived_features: &[String],
+    dry_run: bool,
+) -> Result<(), CeError> {
+    if dry_run || archived_features.is_empty() {
+        return Ok(());
+    }
+
+    let state_path = ctx.config_dir.join("state.json");
+    let mut state = match State::load(&state_path) {
+        Ok(s) => s,
+        Err(_) => return Ok(()),
+    };
+
+    let mut changed = false;
+
+    if let Some(wf) = &mut state.workflow {
+        if let Some(name) = &wf.feature_name {
+            if archived_features.contains(name) {
+                wf.feature_name = None;
+                changed = true;
+            }
+        }
+    }
+
+    for wf in state.workflows.values_mut() {
+        if let Some(name) = &wf.feature_name {
+            if archived_features.contains(name) {
+                wf.feature_name = None;
+                changed = true;
+            }
+        }
+    }
+
+    if changed {
+        state.save(&state_path)?;
+    }
+
+    Ok(())
+}
+
+/// Executes the archive command workflow across single feature or batch mode.
+pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
+    let repo_root = ctx.repo_root();
+    let state_path = ctx.config_dir.join("state.json");
+    let state = State::load(&state_path).ok();
+    let branch = probe_git_branch(&repo_root);
+
+    let mut outcomes = Vec::new();
+
+    if args.all {
+        let unarchived = probe_unarchived_completed_changes(&repo_root);
+        if unarchived.is_empty() {
+            println!("archive: no completed OpenSpec changes pending archival");
+            return Ok(());
+        }
+        for item in &unarchived {
+            match validate_and_archive_feature(
+                &repo_root,
+                &item.feature,
+                args.status.as_deref(),
+                args.dry_run,
+            ) {
+                Ok(outcome) => {
+                    outcomes.push(outcome);
+                }
+                Err(err) => {
+                    eprintln!("warning: skipping '{}': {err}", item.feature);
+                }
+            }
+        }
+        if outcomes.is_empty() {
+            return Err(CeError::Verification(
+                "no features could be archived successfully".to_string(),
+            ));
+        }
+    } else {
+        let target_feature = if let Some(f) = &args.feature {
+            f.clone()
+        } else if let Some(st) = &state {
+            if let Some(wf) = st.current_workflow_for_branch(&repo_root, branch.as_deref()) {
+                if let Some(f) = wf.feature_name {
+                    f
+                } else {
+                    return Err(CeError::Usage(
+                        "no target feature specified and no active feature recorded in state"
+                            .to_string(),
+                    ));
+                }
+            } else {
+                return Err(CeError::Usage(
+                    "no target feature specified and no active workflow recorded in state"
+                        .to_string(),
+                ));
+            }
+        } else {
+            return Err(CeError::Usage(
+                "no target feature specified and no state available".to_string(),
+            ));
+        };
+
+        let outcome = validate_and_archive_feature(
+            &repo_root,
+            &target_feature,
+            args.status.as_deref(),
+            args.dry_run,
+        )?;
+        outcomes.push(outcome);
+    }
+
+    if args.dry_run {
+        println!(
+            "dry-run: would archive {} completed change(s):",
+            outcomes.len()
+        );
+        for o in &outcomes {
+            match &o.criterion {
+                ArchiveCriterion::Mechanical { completed, total } => {
+                    println!(
+                        "  - {} ({}/{} tasks) -> {}",
+                        o.feature,
+                        completed,
+                        total,
+                        o.dest_path.display()
+                    );
+                }
+                ArchiveCriterion::StatusAttested {
+                    status,
+                    completed,
+                    total,
+                } => {
+                    println!(
+                        "  - {} ({}/{} tasks, STATUS: '{}') -> {}",
+                        o.feature,
+                        completed,
+                        total,
+                        status,
+                        o.dest_path.display()
+                    );
+                }
+            }
+        }
+        println!("dry-run: 0 filesystem mutations applied");
+        return Ok(());
+    }
+
+    sync_archive_readme_ledger(&repo_root, &outcomes, false)?;
+
+    let archived_names: Vec<String> = outcomes.iter().map(|o| o.feature.clone()).collect();
+    reconcile_state_active_feature(ctx, &archived_names, false)?;
+
+    if outcomes.len() == 1 {
+        let o = &outcomes[0];
+        match &o.criterion {
+            ArchiveCriterion::Mechanical { completed, total } => {
+                println!(
+                    "archived: '{}' -> {} ({}/{} tasks complete)",
+                    o.feature,
+                    o.dest_path.display(),
+                    completed,
+                    total
+                );
+            }
+            ArchiveCriterion::StatusAttested {
+                status,
+                completed,
+                total,
+            } => {
+                println!(
+                    "archived (Criterion 2 STATUS-attested: '{}'): '{}' -> {} ({}/{} tasks)",
+                    status,
+                    o.feature,
+                    o.dest_path.display(),
+                    completed,
+                    total
+                );
+            }
+        }
+    } else {
+        println!(
+            "archived {} completed OpenSpec change(s) successfully to openspec/changes/archive/",
+            outcomes.len()
+        );
+    }
+
+    Ok(())
 }
 
 /// Match details for an unchecked task that correlates with modified files.

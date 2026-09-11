@@ -1102,3 +1102,225 @@ fn review_receipt_clears_gap_and_goes_stale_after_new_commit() {
         vec![ShipReadinessGap::ReviewReceiptStale]
     );
 }
+
+#[test]
+fn test_archive_feature_criterion_1_success() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+    run_git(repo, &["init", "-b", "main"]);
+
+    let feat_dir = repo.join("openspec").join("changes").join("feat-clean");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    std::fs::write(
+        feat_dir.join("tasks.md"),
+        "# Tasks\n- [x] 1. One\n- [x] 2. Two\n",
+    )
+    .unwrap();
+    run_git(repo, &["add", "."]);
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "add feat-clean",
+        ],
+    );
+
+    let archive_dir = repo.join("openspec").join("changes").join("archive");
+    std::fs::create_dir_all(&archive_dir).unwrap();
+    std::fs::write(
+        archive_dir.join("README.md"),
+        "# Archive\n\nHistorical notes:\n",
+    )
+    .unwrap();
+
+    let outcome = validate_and_archive_feature(repo, "feat-clean", None, false).unwrap();
+    assert_eq!(outcome.feature, "feat-clean");
+    assert!(!feat_dir.exists());
+    assert!(archive_dir.join("feat-clean").join("tasks.md").exists());
+
+    sync_archive_readme_ledger(repo, &[outcome], false).unwrap();
+    let updated_readme = std::fs::read_to_string(archive_dir.join("README.md")).unwrap();
+    assert!(updated_readme.contains("feat-clean: archived (2/2 tasks) under criterion (1)"));
+}
+
+#[test]
+fn test_archive_feature_criterion_2_status_attestation() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+    run_git(repo, &["init", "-b", "main"]);
+
+    let feat_dir = repo
+        .join("openspec")
+        .join("changes")
+        .join("feat-shipped-with-cuts");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    std::fs::write(
+        feat_dir.join("tasks.md"),
+        "# Tasks\n- [x] 1. Shipped\n- [ ] 2. Cut\n",
+    )
+    .unwrap();
+    run_git(repo, &["add", "."]);
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "add feat-cuts",
+        ],
+    );
+
+    // Failing without status
+    let err =
+        validate_and_archive_feature(repo, "feat-shipped-with-cuts", None, false).unwrap_err();
+    assert_eq!(err.exit_code(), 6);
+    assert!(err.to_string().contains("open task(s)"));
+
+    // Succeeding with status
+    let outcome = validate_and_archive_feature(
+        repo,
+        "feat-shipped-with-cuts",
+        Some("Shipped in v1.0.0, PR #10"),
+        false,
+    )
+    .unwrap();
+    assert_eq!(outcome.feature, "feat-shipped-with-cuts");
+
+    let archived_tasks = repo
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join("feat-shipped-with-cuts")
+        .join("tasks.md");
+    let content = std::fs::read_to_string(archived_tasks).unwrap();
+    assert!(content.starts_with("> STATUS: Shipped in v1.0.0, PR #10\n\n"));
+}
+
+#[test]
+fn test_archive_feature_incomplete_tasks_rejected() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+
+    let feat_dir = repo
+        .join("openspec")
+        .join("changes")
+        .join("feat-incomplete");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    std::fs::write(
+        feat_dir.join("tasks.md"),
+        "# Tasks\n- [x] Done\n- [ ] Pending\n",
+    )
+    .unwrap();
+
+    let err = validate_and_archive_feature(repo, "feat-incomplete", None, false).unwrap_err();
+    assert_eq!(err.exit_code(), 6);
+    assert!(err.to_string().contains("open task(s)"));
+}
+
+#[test]
+fn test_archive_feature_collision_prevention() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+
+    let feat_dir = repo.join("openspec").join("changes").join("my-feat");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    std::fs::write(feat_dir.join("tasks.md"), "# Tasks\n- [x] Done\n").unwrap();
+
+    let dest_dir = repo
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join("my-feat");
+    std::fs::create_dir_all(&dest_dir).unwrap();
+
+    let err = validate_and_archive_feature(repo, "my-feat", None, false).unwrap_err();
+    assert_eq!(err.exit_code(), 3);
+    assert!(err.to_string().contains("already exists"));
+}
+
+#[test]
+fn test_archive_feature_dry_run_no_mutations() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+
+    let feat_dir = repo.join("openspec").join("changes").join("dry-feat");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    std::fs::write(feat_dir.join("tasks.md"), "# Tasks\n- [x] Done\n").unwrap();
+
+    let outcome = validate_and_archive_feature(repo, "dry-feat", None, true).unwrap();
+    assert_eq!(outcome.feature, "dry-feat");
+    assert!(feat_dir.exists());
+    assert!(!repo
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join("dry-feat")
+        .exists());
+}
+
+#[test]
+fn test_archive_all_completed_sweep() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+
+    // Feat 1: complete
+    let feat1 = repo.join("openspec").join("changes").join("feat-1");
+    std::fs::create_dir_all(&feat1).unwrap();
+    std::fs::write(feat1.join("tasks.md"), "# Tasks\n- [x] Done\n").unwrap();
+
+    // Feat 2: complete
+    let feat2 = repo.join("openspec").join("changes").join("feat-2");
+    std::fs::create_dir_all(&feat2).unwrap();
+    std::fs::write(feat2.join("tasks.md"), "# Tasks\n- [x] Done\n").unwrap();
+
+    // Feat 3: incomplete
+    let feat3 = repo.join("openspec").join("changes").join("feat-3");
+    std::fs::create_dir_all(&feat3).unwrap();
+    std::fs::write(feat3.join("tasks.md"), "# Tasks\n- [ ] Open\n").unwrap();
+
+    let unarchived = probe_unarchived_completed_changes(repo);
+    assert_eq!(unarchived.len(), 2);
+
+    let mut outcomes = Vec::new();
+    for item in &unarchived {
+        let o = validate_and_archive_feature(repo, &item.feature, None, false).unwrap();
+        outcomes.push(o);
+    }
+    assert_eq!(outcomes.len(), 2);
+    assert!(!feat1.exists());
+    assert!(!feat2.exists());
+    assert!(feat3.exists());
+}
+
+#[test]
+fn test_reconcile_state_active_feature_clearing() {
+    let (_tmp, ctx) = ctx();
+    let state_path = ctx.config_dir.join("state.json");
+    let mut state = State::new();
+    state.workflow = Some(WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: "Doing work".to_string(),
+        feature_name: Some("archived-feat".to_string()),
+        ..WorkflowState::default()
+    });
+    state.save(&state_path).unwrap();
+
+    reconcile_state_active_feature(&ctx, &["other-feat".to_string()], false).unwrap();
+    let reloaded = State::load(&state_path).unwrap();
+    assert_eq!(
+        reloaded.workflow.unwrap().feature_name,
+        Some("archived-feat".to_string())
+    );
+
+    reconcile_state_active_feature(&ctx, &["archived-feat".to_string()], false).unwrap();
+    let reloaded2 = State::load(&state_path).unwrap();
+    assert_eq!(reloaded2.workflow.unwrap().feature_name, None);
+}

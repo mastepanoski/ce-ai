@@ -5,6 +5,18 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.52.0] - 2026-09-11
+
+### Added
+- **OpenSpec Change Archival CLI Command & Ledger Synchronization (`ce-ai archive` / `ce-ai workflow archive`):**
+  - **Unified CLI Surface**: Added `ce-ai archive [feature]` top-level alias and `ce-ai workflow archive [feature]` subcommand, supporting `--all`, `--dry-run`, and `--status "<evidence>"`. When omitted without `--all`, defaults to the current active workflow feature in `state.json`.
+  - **Dual Archival Criteria Support**:
+    - **Criterion 1 (Mechanical 100% Completion)**: Safely archives features where all tasks in `tasks.md` are marked `[x]` / `[X]`.
+    - **Criterion 2 (STATUS-Attested Rescoping)**: Supports archiving features shipped with cut or deferred work by supplying `--status "<evidence>"`, automatically prepending `> STATUS: <evidence>` to `tasks.md`.
+  - **Git-Aware Safe Mover**: Moves `openspec/changes/<feature>` to `openspec/changes/archive/<feature>` via `git mv` with atomic directory rename fallback and git staging. Protects against collisions (exit code `3`) and fails-closed against uncommitted non-spec work (exit code `6`).
+  - **Ledger & State Reconciliation**: Appends sweep entries to `openspec/changes/archive/README.md` and clears active feature references in `state.json`.
+  - **Batch Sweep (`--all`)**: Drains completed changes in a single sweep while skipping incomplete or collision-prone entries.
+
 ## [1.51.0] - 2026-09-11
 
 ### Added

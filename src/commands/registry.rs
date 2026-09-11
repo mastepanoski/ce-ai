@@ -79,6 +79,8 @@ pub enum Commands {
     /// Observe-only gate check for agent tool write monitoring (Spike #333).
     #[command(subcommand)]
     Gate(gate::GateCommands),
+    /// Archive completed OpenSpec change packages to openspec/changes/archive/ (alias for workflow archive).
+    Archive(crate::commands::workflow::ArchiveArgs),
 }
 
 impl CeCommand for Commands {
@@ -97,6 +99,7 @@ impl CeCommand for Commands {
             Commands::Tools(args) => tools::run(ctx, args),
             Commands::Usage(sub) => crate::commands::usage::run(ctx, sub),
             Commands::Workflow(args) => workflow::run(ctx, args),
+            Commands::Archive(args) => workflow::run_archive(ctx, args),
             Commands::Audit(args) => audit::run(ctx, args),
             Commands::InitPrj {
                 path,

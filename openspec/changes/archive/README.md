@@ -29,3 +29,4 @@ Historical notes:
   shipped); evidence sources were live code symbols across harness hooks
   (Codex, Pi, Cursor), generic session-start drift delivery, CodeGraph init
   commands/tests, and pedagogical guardrail commands.
+- 2026-09-11 sweep: 33 folders archived via 'ce-ai archive --all'.
