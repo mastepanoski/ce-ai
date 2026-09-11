@@ -220,8 +220,10 @@ pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
         .current_workflow_for_branch(&repo_root, branch.as_deref())
         .map(|w| w.stage)
         .unwrap_or_default();
-    for gap in repo_state.ship_readiness_gaps(stage) {
-        lines.push(format!("! Warning: {}", gap.describe()));
+    if repo_state.adoption_status.is_some() {
+        for gap in repo_state.ship_readiness_gaps(stage) {
+            lines.push(format!("! Warning: {}", gap.describe()));
+        }
     }
     if let Some(desync) = &repo_state.task_desync {
         let warn = desync.warning_line();
@@ -421,6 +423,8 @@ pub fn resume_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
 pub struct RepoState {
     pub git_branch: Option<String>,
     pub head_sha: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_full_sha: Option<String>,
     pub is_git_clean: bool,
     pub modified_files: Vec<String>,
     pub manifest_drift_count: usize,
@@ -511,15 +515,17 @@ impl RepoState {
             self.commits_ahead,
             self.stage6_artifact_present,
             self.review_receipt.as_ref(),
-            self.head_sha.as_deref(),
+            self.head_full_sha.as_deref(),
             stage,
         )
     }
 }
 
-/// Observe-only ship-readiness block for `workflow resume`. Empty when nothing is ahead.
-pub fn ship_readiness_lines(repo_state: &RepoState, stage: WorkflowStage) -> Vec<String> {
-    if repo_state.commits_ahead == 0 {
+/// Observe-only ship-readiness block for `workflow resume`. Empty when nothing is
+/// ahead or the workspace is not adopted. Gap warnings are emitted by
+/// `status_lines`; this block only reports the signals (no duplicate warnings).
+pub fn ship_readiness_lines(repo_state: &RepoState, _stage: WorkflowStage) -> Vec<String> {
+    if repo_state.commits_ahead == 0 || repo_state.adoption_status.is_none() {
         return Vec::new();
     }
     let mut lines = vec![
@@ -549,10 +555,23 @@ pub fn ship_readiness_lines(repo_state: &RepoState, stage: WorkflowStage) -> Vec
         }
         None => lines.push("  code-review receipt: MISSING".to_string()),
     }
-    for gap in repo_state.ship_readiness_gaps(stage) {
-        lines.push(format!("  ! Warning: {}", gap.describe()));
-    }
     lines
+}
+
+/// Resolves a commit-ish to its full SHA (defaults to HEAD), for stable receipt comparison.
+fn resolve_commit_sha(repo_root: &Path, input: Option<&str>) -> Option<String> {
+    let spec = input.unwrap_or("HEAD");
+    let rev = format!("{spec}^{{commit}}");
+    let out = git_probe(repo_root, &["rev-parse", "--verify", "--quiet", &rev])?;
+    if !out.status.success() {
+        return None;
+    }
+    let sha = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if sha.is_empty() {
+        None
+    } else {
+        Some(sha)
+    }
 }
 
 /// Records a code-review receipt for a branch head and returns confirmation lines.
@@ -563,10 +582,16 @@ pub fn review_receipt_lines(
     head_sha: Option<String>,
     override_reason: Option<String>,
 ) -> Result<Vec<String>, CeError> {
+    let resolved = resolve_commit_sha(repo_root, head_sha.as_deref()).ok_or_else(|| {
+        CeError::Usage(
+            "cannot resolve a commit SHA for the review receipt (pass --head <sha> or run inside a git repo with a HEAD)"
+                .to_string(),
+        )
+    })?;
+
     let state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&state_path)?;
-    let sha = head_sha.unwrap_or_else(|| "unknown".to_string());
-    let receipt = state.record_review_receipt(repo_root, branch, &sha, override_reason);
+    let receipt = state.record_review_receipt(repo_root, branch, &resolved, override_reason);
     if !ctx.dry_run {
         state.save(&state_path)?;
     }
@@ -636,6 +661,11 @@ pub fn probe_git_head_sha(repo_root: &Path) -> Option<String> {
     } else {
         Some(sha)
     }
+}
+
+/// Full 40-char HEAD SHA, used for stable code-review receipt comparison.
+pub fn probe_git_head_full_sha(repo_root: &Path) -> Option<String> {
+    resolve_commit_sha(repo_root, None)
 }
 
 pub fn probe_git_dirty_files(repo_root: &Path) -> (bool, Vec<String>) {
@@ -713,6 +743,7 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
     let repo_root = ctx.repo_root();
     let git_branch = probe_git_branch(&repo_root);
     let head_sha = probe_git_head_sha(&repo_root);
+    let head_full_sha = probe_git_head_full_sha(&repo_root);
     let (is_git_clean, modified_files) = probe_git_dirty_files(&repo_root);
     let manifest_drift_count = probe_manifest_drift_count(ctx);
     let adoption_status = probe_adoption_status(ctx);
@@ -742,6 +773,7 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
     RepoState {
         git_branch,
         head_sha,
+        head_full_sha,
         is_git_clean,
         modified_files,
         manifest_drift_count,
@@ -1052,9 +1084,15 @@ fn git_probe(repo_root: &Path, args: &[&str]) -> Option<std::process::Output> {
     cmd.args(args).current_dir(repo_root).output().ok()
 }
 
-/// Resolves the base ref for branch-relative git diffs: `origin/main`, then `main`.
+/// Resolves the base ref for branch-relative git diffs, trying common defaults.
 pub fn resolve_branch_base(repo_root: &Path) -> Option<String> {
-    for base_ref in ["origin/main", "main"] {
+    for base_ref in [
+        "origin/main",
+        "main",
+        "origin/master",
+        "master",
+        "@{upstream}",
+    ] {
         if let Some(out) = git_probe(repo_root, &["merge-base", "HEAD", base_ref]) {
             if out.status.success() {
                 let base = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -1099,14 +1137,35 @@ pub fn probe_commits_ahead(repo_root: &Path) -> u32 {
     }
 }
 
-/// Whether a Stage 6 learning (`docs/solutions/**.md`) is present on the branch
-/// (committed range or dirty/untracked files).
+/// Whether a Stage 6 learning (`docs/solutions/**.md`) is present on the branch.
+/// Counts files **added/modified** in the committed range (not deletions) and
+/// dirty/untracked files that still exist on disk.
 pub fn probe_stage6_artifact(repo_root: &Path, dirty_files: &[String]) -> bool {
-    let committed = probe_branch_committed_files(repo_root);
-    committed
-        .iter()
-        .chain(dirty_files.iter())
-        .any(|f| f.starts_with("docs/solutions/") && f.ends_with(".md"))
+    let is_solutions_md = |f: &String| f.starts_with("docs/solutions/") && f.ends_with(".md");
+    let committed = probe_branch_added_files(repo_root);
+    committed.iter().any(is_solutions_md)
+        || dirty_files
+            .iter()
+            .any(|f| is_solutions_md(f) && repo_root.join(f).exists())
+}
+
+/// Files added or modified on the branch range (`--diff-filter=ACMR`), excluding deletions/renames-out.
+pub fn probe_branch_added_files(repo_root: &Path) -> Vec<String> {
+    let diff_target = match resolve_branch_base(repo_root) {
+        Some(base) => format!("{base}...HEAD"),
+        None => "HEAD~1...HEAD".to_string(),
+    };
+    let out = match git_probe(
+        repo_root,
+        &["diff", "--name-only", "--diff-filter=ACMR", &diff_target],
+    ) {
+        Some(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
+        _ => return Vec::new(),
+    };
+    out.lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect()
 }
 
 pub fn probe_feature_touched_files(repo_root: &Path) -> Vec<String> {

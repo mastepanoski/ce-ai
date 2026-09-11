@@ -40,6 +40,13 @@ pub fn evaluate_ship_readiness(
 ## Doctor (`src/commands/doctor.rs`)
 - After the existing OpenSpec warnings: when `commits_ahead > 0`, evaluate readiness with the current workflow stage and print one `doctor-warn: ship-readiness: <gap>` per gap. Never pushes to `findings`; exit code unchanged.
 
+## Review hardening (post-`ce-code-review`)
+- **Identity**: receipts store the full 40-char SHA (`resolve_commit_sha` -> `rev-parse --verify <spec>^{commit}`); comparison is full-to-full. Unresolvable `--head` is a Usage error, never a stored `"unknown"`.
+- **Additions vs deletions**: `probe_branch_added_files` uses `--diff-filter=ACMR`; the dirty arm requires the file to still exist on disk. A deletion never satisfies Stage 6.
+- **Base fallback**: `resolve_branch_base` tries `origin/main`, `main`, `origin/master`, `master`, `@{upstream}`; unresolved base omits the block rather than reporting ready.
+- **Scope**: evaluation is gated on adopted workspaces in `ship_readiness_lines`, `status_lines`, and `doctor`.
+- **No duplicate warnings**: `status_lines` owns gap warnings; `ship_readiness_lines` reports signals only.
+
 ## Invariants
 - Observe-only: no command returns a blocking error for gaps; all exit codes unchanged.
 - All state mutations use `write_atomic` via `State::save`.

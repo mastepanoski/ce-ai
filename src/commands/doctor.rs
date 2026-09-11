@@ -619,9 +619,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 
     // Observe-only Ship-readiness probe (Issue #354): Stage 6 + code-review gaps.
-    // Non-fatal: never added to `findings`, exit code unaffected.
+    // Non-fatal: never added to `findings`, exit code unaffected. Only runs for
+    // adopted workspaces to avoid noise on unrelated repositories.
     let commits_ahead = crate::commands::workflow::probe_commits_ahead(&repo_root);
-    if commits_ahead > 0 {
+    if commits_ahead > 0 && state.is_project_adopted(&repo_root) {
         let (_, dirty) = crate::commands::workflow::probe_git_dirty_files(&repo_root);
         let stage6 = crate::commands::workflow::probe_stage6_artifact(&repo_root, &dirty);
         let head_sha = crate::commands::workflow::probe_git_head_sha(&repo_root);
