@@ -230,6 +230,17 @@ pub struct GuardrailState {
     pub updated_at: String,
 }
 
+/// Observe-only ship-readiness receipt: records that a code review ran for a
+/// branch head (issue #354). `override_reason` captures an explicit override
+/// for audit when the receipt is recorded without a review.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ReviewReceipt {
+    pub head_sha: String,
+    pub recorded_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub override_reason: Option<String>,
+}
+
 /// Canonical state file at `~/.ce-ai/state.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
@@ -259,6 +270,8 @@ pub struct State {
     pub guardrail: Option<GuardrailState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_checkpoint: Option<bool>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub review_receipts: BTreeMap<String, ReviewReceipt>,
 }
 fn default_version() -> u32 {
     1
@@ -578,6 +591,34 @@ impl State {
                     new_cycle: false,
                 }))
         }
+    }
+
+    /// Returns the code-review receipt recorded for the given workspace+branch, if any.
+    pub fn review_receipt_for_branch(
+        &self,
+        repo_root: &Path,
+        branch: Option<&str>,
+    ) -> Option<&ReviewReceipt> {
+        let key = Self::workspace_branch_key(repo_root, branch);
+        self.review_receipts.get(&key)
+    }
+
+    /// Records a code-review receipt for the given workspace+branch and returns it.
+    pub fn record_review_receipt(
+        &mut self,
+        repo_root: &Path,
+        branch: Option<&str>,
+        head_sha: &str,
+        override_reason: Option<String>,
+    ) -> ReviewReceipt {
+        let key = Self::workspace_branch_key(repo_root, branch);
+        let receipt = ReviewReceipt {
+            head_sha: head_sha.to_string(),
+            recorded_at: chrono::Utc::now().to_rfc3339(),
+            override_reason,
+        };
+        self.review_receipts.insert(key, receipt.clone());
+        receipt
     }
 
     /// Validates stage transition and updates state for the current working directory.

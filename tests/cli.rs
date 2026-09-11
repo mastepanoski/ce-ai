@@ -1715,6 +1715,30 @@ fn assert_dry_run_zero_mutation(
 }
 
 #[test]
+fn workflow_review_receipt_records_and_dry_run_is_inert() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    ceai(&config_dir, &home)
+        .args(["workflow", "review-receipt"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("code-review receipt recorded")
+                .and(predicate::str::contains("head:")),
+        );
+
+    // Dry-run must not write state.json.
+    let dry_config = tmp.path().join("dry-ce-ai");
+    ceai(&dry_config, &home)
+        .args(["--dry-run", "workflow", "review-receipt"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("dry-run: state.json not written"));
+    assert!(!dry_config.join("state.json").exists());
+}
+
+#[test]
 fn workflow_status_checkpoint_and_resume_subcommands() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));

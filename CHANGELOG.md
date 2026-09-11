@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.51.0] - 2026-09-11
+
+### Added
+- **Observe-only Ship-Readiness Gate — Stage 6 + code review before Stage 7 (#354):**
+  - `ce-ai workflow resume` (and `status`) now reports a `Ship Readiness (observe-only)` block when the current branch has commits ahead of base: commits-ahead count, Stage 6 artifact presence (`docs/solutions/**.md`), and code-review receipt presence/freshness.
+  - **Gap warnings:** missing `docs/solutions` learning (`Stage 6 gap`), missing or stale code-review receipt, and `EarlyStageWithCommits` when the checkpoint stage predates the committed work — reported without re-running earlier stages.
+  - **`ce-ai workflow review-receipt`:** records a head-stamped code-review receipt in `state.json` (keyed by workspace + branch), with `--override-reason` for an audited skip.
+  - **`ce-ai doctor`:** emits non-fatal `doctor-warn: ship-readiness: ...` lines for the same gaps; exit code unaffected.
+  - Strictly observe-only: nothing is blocked. Blocking enforcement remains owned by #334.
+  - Added unit tests for the pure readiness evaluator and git probes, plus CLI and doctor coverage.
+
 ## [1.50.2] - 2026-09-11
 
 ### Fixed

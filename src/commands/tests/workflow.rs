@@ -712,3 +712,393 @@ fn test_maybe_auto_checkpoint_second_cycle_on_same_branch() {
         wf.task
     );
 }
+
+// --- Ship-readiness observe-only gate (Issue #354) ---
+
+fn repo_state_for(
+    commits_ahead: u32,
+    stage6: bool,
+    receipt: Option<ReviewReceipt>,
+    head: Option<&str>,
+) -> RepoState {
+    RepoState {
+        git_branch: Some("feat/x".into()),
+        head_sha: Some("abc1234".into()),
+        head_full_sha: head.map(String::from),
+        is_git_clean: true,
+        modified_files: vec![],
+        manifest_drift_count: 0,
+        adoption_status: Some(AdoptionBlockStatus::Ok),
+        openspec_context: None,
+        task_desync: None,
+        unarchived_completed_changes: vec![],
+        commits_ahead,
+        stage6_artifact_present: stage6,
+        review_receipt: receipt,
+    }
+}
+
+#[test]
+fn ship_readiness_evaluator_truth_table() {
+    use ShipReadinessGap::*;
+    let receipt = ReviewReceipt {
+        head_sha: "abc".into(),
+        recorded_at: "2026-09-11T00:00:00Z".into(),
+        override_reason: None,
+    };
+
+    // Nothing ahead -> no gaps even when everything is missing.
+    assert!(
+        evaluate_ship_readiness(0, false, None, Some("abc"), WorkflowStage::WorkTdd).is_empty()
+    );
+
+    // Everything satisfied at Ship.
+    assert!(evaluate_ship_readiness(
+        2,
+        true,
+        Some(&receipt),
+        Some("abc"),
+        WorkflowStage::GitShipping
+    )
+    .is_empty());
+
+    // Missing Stage 6 artifact.
+    assert_eq!(
+        evaluate_ship_readiness(
+            1,
+            false,
+            Some(&receipt),
+            Some("abc"),
+            WorkflowStage::GitShipping
+        ),
+        vec![Stage6Missing]
+    );
+
+    // Missing receipt.
+    assert_eq!(
+        evaluate_ship_readiness(1, true, None, Some("abc"), WorkflowStage::GitShipping),
+        vec![ReviewReceiptMissing]
+    );
+
+    // Stale receipt (different head).
+    assert_eq!(
+        evaluate_ship_readiness(
+            1,
+            true,
+            Some(&receipt),
+            Some("def"),
+            WorkflowStage::GitShipping
+        ),
+        vec![ReviewReceiptStale]
+    );
+
+    // Early stage while commits are ahead, gap ordering preserved.
+    assert_eq!(
+        evaluate_ship_readiness(1, false, None, Some("abc"), WorkflowStage::WorkTdd),
+        vec![Stage6Missing, ReviewReceiptMissing, EarlyStageWithCommits]
+    );
+}
+
+#[test]
+fn ship_readiness_lines_reports_signals_and_gap_descriptions() {
+    let rs = repo_state_for(3, false, None, Some("abc"));
+    let text = ship_readiness_lines(&rs, WorkflowStage::WorkTdd).join("\n");
+    assert!(text.contains("== [Ship Readiness (observe-only, issue #354)] =="));
+    assert!(text.contains("commits ahead of base: 3"));
+    assert!(text.contains("stage 6 artifact (docs/solutions/): MISSING"));
+    assert!(text.contains("code-review receipt: MISSING"));
+    // The information block must not duplicate the gap warnings (status owns those).
+    assert!(!text.contains("! Warning:"));
+
+    // Not adopted -> no block.
+    let mut not_adopted = repo_state_for(3, false, None, Some("abc"));
+    not_adopted.adoption_status = None;
+    assert!(ship_readiness_lines(&not_adopted, WorkflowStage::WorkTdd).is_empty());
+
+    // Nothing ahead -> no block.
+    let none_ahead = repo_state_for(0, false, None, Some("abc"));
+    assert!(ship_readiness_lines(&none_ahead, WorkflowStage::WorkTdd).is_empty());
+
+    // Gap descriptions are actionable.
+    assert!(ShipReadinessGap::Stage6Missing
+        .describe()
+        .contains("docs/solutions"));
+    assert!(ShipReadinessGap::ReviewReceiptMissing
+        .describe()
+        .contains("review-receipt"));
+    assert!(ShipReadinessGap::ReviewReceiptStale
+        .describe()
+        .contains("stale"));
+    assert!(ShipReadinessGap::EarlyStageWithCommits
+        .describe()
+        .contains("already committed"));
+}
+
+#[test]
+fn review_receipt_lines_records_and_dry_run_writes_nothing() {
+    let (tmp, ctx) = ctx();
+    let repo_root = ctx.repo_root();
+    let branch = probe_git_branch(&repo_root);
+    let head_full = probe_git_head_full_sha(&repo_root).unwrap();
+
+    let lines = review_receipt_lines(&ctx, &repo_root, branch.as_deref(), None, None).unwrap();
+    assert!(lines.join("\n").contains(&format!("head: {head_full}")));
+
+    let state = State::load(&ctx.config_dir.join("state.json")).unwrap();
+    let receipt = state
+        .review_receipt_for_branch(&repo_root, branch.as_deref())
+        .unwrap();
+    assert_eq!(receipt.head_sha, head_full);
+    assert!(receipt.override_reason.is_none());
+
+    // Override reason is persisted verbatim.
+    review_receipt_lines(
+        &ctx,
+        &repo_root,
+        branch.as_deref(),
+        None,
+        Some("skipped for spike".to_string()),
+    )
+    .unwrap();
+    let state = State::load(&ctx.config_dir.join("state.json")).unwrap();
+    let receipt = state
+        .review_receipt_for_branch(&repo_root, branch.as_deref())
+        .unwrap();
+    assert_eq!(
+        receipt.override_reason.as_deref(),
+        Some("skipped for spike")
+    );
+
+    // Dry-run records nothing.
+    let dry_config = tmp.path().join("dry-ce-ai");
+    let dry_ctx = Context::resolve(Some(dry_config.clone()), true, false, true).unwrap();
+    review_receipt_lines(&dry_ctx, &repo_root, branch.as_deref(), None, None).unwrap();
+    assert!(!dry_config.join("state.json").exists());
+}
+
+#[test]
+fn review_receipt_rejects_unresolvable_head() {
+    let (_tmp, ctx) = ctx();
+    let repo_root = ctx.repo_root();
+    let err = review_receipt_lines(
+        &ctx,
+        &repo_root,
+        Some("feat/x"),
+        Some("this-is-not-a-git-object".to_string()),
+        None,
+    )
+    .unwrap_err();
+    assert_eq!(err.exit_code(), 2);
+}
+
+fn run_git(repo: &std::path::Path, args: &[&str]) {
+    let mut cmd = std::process::Command::new("git");
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
+        cmd.env_remove(var);
+    }
+    cmd.args(args).current_dir(repo).output().unwrap();
+}
+
+#[test]
+fn ship_readiness_probes_real_git_commits_and_solutions() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+    run_git(repo, &["init", "-b", "main"]);
+    std::fs::write(repo.join("README.md"), "base\n").unwrap();
+    run_git(repo, &["add", "."]);
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "base",
+        ],
+    );
+
+    run_git(repo, &["checkout", "-b", "feat/x"]);
+    std::fs::write(repo.join("src.rs"), "fn main() {}\n").unwrap();
+    run_git(repo, &["add", "."]);
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "feat",
+        ],
+    );
+
+    assert_eq!(probe_commits_ahead(repo), 1);
+    assert!(!probe_stage6_artifact(repo, &[]));
+    assert_eq!(
+        evaluate_ship_readiness(1, false, None, None, WorkflowStage::Verification),
+        vec![
+            ShipReadinessGap::Stage6Missing,
+            ShipReadinessGap::ReviewReceiptMissing
+        ]
+    );
+
+    // Add a Stage 6 learning and confirm detection.
+    std::fs::create_dir_all(repo.join("docs").join("solutions").join("bugfixes")).unwrap();
+    std::fs::write(
+        repo.join("docs")
+            .join("solutions")
+            .join("bugfixes")
+            .join("x.md"),
+        "# learning\n",
+    )
+    .unwrap();
+    run_git(repo, &["add", "."]);
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "docs",
+        ],
+    );
+    assert!(probe_stage6_artifact(repo, &[]));
+    assert_eq!(probe_commits_ahead(repo), 2);
+}
+
+#[test]
+fn stage6_detection_ignores_deletions() {
+    // A branch whose only docs/solutions change is a deletion must NOT count as
+    // a Stage 6 artifact (else it silently reports "ready").
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+    run_git(repo, &["init", "-b", "main"]);
+    std::fs::create_dir_all(repo.join("docs").join("solutions").join("bugfixes")).unwrap();
+    std::fs::write(
+        repo.join("docs")
+            .join("solutions")
+            .join("bugfixes")
+            .join("a.md"),
+        "# a\n",
+    )
+    .unwrap();
+    run_git(repo, &["add", "."]);
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "base",
+        ],
+    );
+
+    run_git(repo, &["checkout", "-b", "feat/del"]);
+    run_git(repo, &["rm", "docs/solutions/bugfixes/a.md"]);
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "remove",
+        ],
+    );
+
+    assert!(
+        !probe_stage6_artifact(repo, &[]),
+        "a deleted docs/solutions file must not satisfy Stage 6"
+    );
+}
+
+#[test]
+fn review_receipt_clears_gap_and_goes_stale_after_new_commit() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+    run_git(repo, &["init", "-b", "main"]);
+    std::fs::write(repo.join("README.md"), "base\n").unwrap();
+    run_git(repo, &["add", "."]);
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "base",
+        ],
+    );
+    run_git(repo, &["checkout", "-b", "feat/x"]);
+    std::fs::write(repo.join("src.rs"), "fn main() {}\n").unwrap();
+    run_git(repo, &["add", "."]);
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "feat",
+        ],
+    );
+
+    let head_full = probe_git_head_full_sha(repo).unwrap();
+    let mut state = State::default();
+    state.record_review_receipt(repo, Some("feat/x"), &head_full, None);
+    let receipt = state.review_receipt_for_branch(repo, Some("feat/x"));
+    assert_eq!(receipt.unwrap().head_sha, head_full);
+
+    // Matching HEAD + Stage 6 present -> no gaps.
+    assert!(evaluate_ship_readiness(
+        1,
+        true,
+        receipt,
+        Some(&head_full),
+        WorkflowStage::GitShipping
+    )
+    .is_empty());
+
+    // A new commit makes the receipt stale.
+    std::fs::write(repo.join("src2.rs"), "x\n").unwrap();
+    run_git(repo, &["add", "."]);
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "more",
+        ],
+    );
+    let new_head = probe_git_head_full_sha(repo).unwrap();
+    assert_ne!(head_full, new_head);
+    assert_eq!(
+        evaluate_ship_readiness(
+            2,
+            true,
+            state.review_receipt_for_branch(repo, Some("feat/x")),
+            Some(&new_head),
+            WorkflowStage::GitShipping
+        ),
+        vec![ShipReadinessGap::ReviewReceiptStale]
+    );
+}
