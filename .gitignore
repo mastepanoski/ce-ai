@@ -6,3 +6,7 @@
 tui-screenshots/
 *.png
 *.snap.png
+# BEGIN CE-AI MANAGED BLOCK
+.ce-ai/skills-registry.json
+compound-engineering/
+# END CE-AI MANAGED BLOCK

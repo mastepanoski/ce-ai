@@ -187,3 +187,12 @@ Before declaring any task or issue completed, an AI agent MUST satisfy all crite
 - [ ] Containerized Docker E2E gate passes (`make e2e`).
 - [ ] All GitHub Actions CI jobs pass green across Linux, macOS, and Windows.
 - [ ] Definition of Done (DoD) criteria fully satisfied.
+
+<!-- ce-ai:block begin v=4 tier=minimal sha256=ad726d9a497b691cad4562bf17c1c44f3c7e17e6544931e4cacaa508d3f1134f -->
+## 🔄 Compound Engineering Workflow Guidelines
+
+AI agents operating on this codebase should follow structured planning and verification:
+- Validate scope boundaries before making changes.
+- Ensure all unit, integration, and linter tests pass before committing.
+- Document key technical learnings and post-mortem fixes.
+<!-- ce-ai:block end -->
