@@ -29,6 +29,7 @@ fn state_with(slot: &str) -> State {
         skill_surfaces: vec![],
         guardrail: None,
         auto_checkpoint: None,
+        review_receipts: BTreeMap::new(),
     }
 }
 

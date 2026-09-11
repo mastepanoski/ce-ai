@@ -14,7 +14,9 @@ use crate::error::CeError;
 use crate::opencode::manifest::InstallManifest;
 use crate::opencode::plugins::MANAGED_DIR;
 use crate::state::diff;
-use crate::state::state::{FeatureResolution, State, WorkflowSource, WorkflowStage, WorkflowState};
+use crate::state::state::{
+    FeatureResolution, ReviewReceipt, State, WorkflowSource, WorkflowStage, WorkflowState,
+};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -53,6 +55,15 @@ pub enum Action {
         /// Antigravity PreInvocation hook mode (reads stdin, dedupes per conversationId, injects ephemeralMessage).
         #[arg(long)]
         pre_invocation: bool,
+    },
+    /// Record a code-review receipt for the current branch head (observe-only ship gate, issue #354).
+    ReviewReceipt {
+        /// Head SHA to stamp (defaults to the current HEAD).
+        #[arg(long)]
+        head: Option<String>,
+        /// Record an explicit override reason instead of a real review (audited).
+        #[arg(long)]
+        override_reason: Option<String>,
     },
 }
 
@@ -128,6 +139,21 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 }
             }
         }
+        Action::ReviewReceipt {
+            head,
+            override_reason,
+        } => {
+            let head_sha = head.clone().or_else(|| probe_git_head_sha(&repo_root));
+            for line in review_receipt_lines(
+                ctx,
+                &repo_root,
+                branch.as_deref(),
+                head_sha,
+                override_reason.clone(),
+            )? {
+                println!("{line}");
+            }
+        }
     }
     Ok(())
 }
@@ -190,6 +216,13 @@ pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
         ctx,
         &state.current_workflow_for_branch(&repo_root, branch.as_deref()),
     );
+    let stage = state
+        .current_workflow_for_branch(&repo_root, branch.as_deref())
+        .map(|w| w.stage)
+        .unwrap_or_default();
+    for gap in repo_state.ship_readiness_gaps(stage) {
+        lines.push(format!("! Warning: {}", gap.describe()));
+    }
     if let Some(desync) = &repo_state.task_desync {
         let warn = desync.warning_line();
         if !warn.is_empty() {
@@ -374,6 +407,9 @@ pub fn resume_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
         }
     }
 
+    let stage = wf.as_ref().map(|w| w.stage).unwrap_or_default();
+    lines.extend(ship_readiness_lines(&repo_state, stage));
+
     lines.push(String::new());
     lines.push(
         "workflow: re-hydrated context successfully. Proceeding with active task.".to_string(),
@@ -395,6 +431,158 @@ pub struct RepoState {
     pub task_desync: Option<TaskDesyncReport>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub unarchived_completed_changes: Vec<UnarchivedChange>,
+    #[serde(default)]
+    pub commits_ahead: u32,
+    #[serde(default)]
+    pub stage6_artifact_present: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_receipt: Option<ReviewReceipt>,
+}
+
+/// Observe-only ship-readiness gap (issue #354). Nothing here blocks a command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ShipReadinessGap {
+    /// No `docs/solutions/**.md` artifact was added on the branch (Stage 6 missing).
+    Stage6Missing,
+    /// No code-review receipt was recorded for this branch.
+    ReviewReceiptMissing,
+    /// A receipt exists but was recorded for a different HEAD.
+    ReviewReceiptStale,
+    /// Commits are ahead of base while the checkpoint stage is before Verification.
+    EarlyStageWithCommits,
+}
+
+impl ShipReadinessGap {
+    pub fn describe(&self) -> String {
+        match self {
+            ShipReadinessGap::Stage6Missing => {
+                "Stage 6 gap: no docs/solutions artifact on this branch".to_string()
+            }
+            ShipReadinessGap::ReviewReceiptMissing => {
+                "code-review gap: no receipt (run `ce-ai workflow review-receipt` after ce-code-review)"
+                    .to_string()
+            }
+            ShipReadinessGap::ReviewReceiptStale => {
+                "code-review gap: receipt is stale (recorded for a different commit)".to_string()
+            }
+            ShipReadinessGap::EarlyStageWithCommits => {
+                "resume: work already committed — resume at Verify/Ship, do not re-run earlier stages"
+                    .to_string()
+            }
+        }
+    }
+}
+
+/// Pure, deterministic ship-readiness evaluation. Empty when nothing is ahead.
+pub fn evaluate_ship_readiness(
+    commits_ahead: u32,
+    stage6_artifact_present: bool,
+    receipt: Option<&ReviewReceipt>,
+    head_sha: Option<&str>,
+    stage: WorkflowStage,
+) -> Vec<ShipReadinessGap> {
+    if commits_ahead == 0 {
+        return Vec::new();
+    }
+    let mut gaps = Vec::new();
+    if !stage6_artifact_present {
+        gaps.push(ShipReadinessGap::Stage6Missing);
+    }
+    match receipt {
+        None => gaps.push(ShipReadinessGap::ReviewReceiptMissing),
+        Some(r) => {
+            if let Some(current) = head_sha {
+                if !current.is_empty() && r.head_sha != current {
+                    gaps.push(ShipReadinessGap::ReviewReceiptStale);
+                }
+            }
+        }
+    }
+    if stage.number() < WorkflowStage::Verification.number() {
+        gaps.push(ShipReadinessGap::EarlyStageWithCommits);
+    }
+    gaps
+}
+
+impl RepoState {
+    /// Ship-readiness gaps for the current repository state and workflow stage.
+    pub fn ship_readiness_gaps(&self, stage: WorkflowStage) -> Vec<ShipReadinessGap> {
+        evaluate_ship_readiness(
+            self.commits_ahead,
+            self.stage6_artifact_present,
+            self.review_receipt.as_ref(),
+            self.head_sha.as_deref(),
+            stage,
+        )
+    }
+}
+
+/// Observe-only ship-readiness block for `workflow resume`. Empty when nothing is ahead.
+pub fn ship_readiness_lines(repo_state: &RepoState, stage: WorkflowStage) -> Vec<String> {
+    if repo_state.commits_ahead == 0 {
+        return Vec::new();
+    }
+    let mut lines = vec![
+        String::new(),
+        "== [Ship Readiness (observe-only, issue #354)] ==".to_string(),
+        format!("  commits ahead of base: {}", repo_state.commits_ahead),
+        format!(
+            "  stage 6 artifact (docs/solutions/): {}",
+            if repo_state.stage6_artifact_present {
+                "present"
+            } else {
+                "MISSING"
+            }
+        ),
+    ];
+    match &repo_state.review_receipt {
+        Some(r) => {
+            let override_note = r
+                .override_reason
+                .as_ref()
+                .map(|reason| format!(" (override: {reason})"))
+                .unwrap_or_default();
+            lines.push(format!(
+                "  code-review receipt: present @ {}{override_note}",
+                r.head_sha
+            ));
+        }
+        None => lines.push("  code-review receipt: MISSING".to_string()),
+    }
+    for gap in repo_state.ship_readiness_gaps(stage) {
+        lines.push(format!("  ! Warning: {}", gap.describe()));
+    }
+    lines
+}
+
+/// Records a code-review receipt for a branch head and returns confirmation lines.
+pub fn review_receipt_lines(
+    ctx: &Context,
+    repo_root: &Path,
+    branch: Option<&str>,
+    head_sha: Option<String>,
+    override_reason: Option<String>,
+) -> Result<Vec<String>, CeError> {
+    let state_path = ctx.config_dir.join("state.json");
+    let mut state = State::load(&state_path)?;
+    let sha = head_sha.unwrap_or_else(|| "unknown".to_string());
+    let receipt = state.record_review_receipt(repo_root, branch, &sha, override_reason);
+    if !ctx.dry_run {
+        state.save(&state_path)?;
+    }
+
+    let mut lines = vec![
+        "workflow: code-review receipt recorded (observe-only ship gate, issue #354).".to_string(),
+        format!("  branch: {}", branch.unwrap_or("(detached HEAD)")),
+        format!("  head: {}", receipt.head_sha),
+    ];
+    if let Some(reason) = &receipt.override_reason {
+        lines.push(format!("  override reason: {reason}"));
+    }
+    if ctx.dry_run {
+        lines.push("  (dry-run: state.json not written)".to_string());
+    }
+    Ok(lines)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -542,6 +730,15 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
 
     let unarchived_completed_changes = probe_unarchived_completed_changes(&repo_root);
 
+    let commits_ahead = probe_commits_ahead(&repo_root);
+    let stage6_artifact_present = probe_stage6_artifact(&repo_root, &modified_files);
+    let review_receipt = State::load(&ctx.config_dir.join("state.json"))
+        .ok()
+        .and_then(|s| {
+            s.review_receipt_for_branch(&repo_root, git_branch.as_deref())
+                .cloned()
+        });
+
     RepoState {
         git_branch,
         head_sha,
@@ -552,6 +749,9 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
         openspec_context,
         task_desync,
         unarchived_completed_changes,
+        commits_ahead,
+        stage6_artifact_present,
+        review_receipt,
     }
 }
 
@@ -842,37 +1042,39 @@ pub fn extract_paths_from_task_text(text: &str) -> Vec<String> {
     candidates
 }
 
-pub fn probe_branch_committed_files(repo_root: &Path) -> Vec<String> {
-    let merge_base = std::process::Command::new("git")
-        .args(["merge-base", "HEAD", "origin/main"])
-        .current_dir(repo_root)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        .filter(|s| !s.is_empty())
-        .or_else(|| {
-            std::process::Command::new("git")
-                .args(["merge-base", "HEAD", "main"])
-                .current_dir(repo_root)
-                .output()
-                .ok()
-                .filter(|o| o.status.success())
-                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-                .filter(|s| !s.is_empty())
-        });
+/// Runs a git command against `repo_root`, stripping outer hook env vars
+/// (`GIT_DIR` etc.) so temporary-repo fixtures behave under the pre-commit hook.
+fn git_probe(repo_root: &Path, args: &[&str]) -> Option<std::process::Output> {
+    let mut cmd = std::process::Command::new("git");
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
+        cmd.env_remove(var);
+    }
+    cmd.args(args).current_dir(repo_root).output().ok()
+}
 
-    let diff_target = match merge_base {
+/// Resolves the base ref for branch-relative git diffs: `origin/main`, then `main`.
+pub fn resolve_branch_base(repo_root: &Path) -> Option<String> {
+    for base_ref in ["origin/main", "main"] {
+        if let Some(out) = git_probe(repo_root, &["merge-base", "HEAD", base_ref]) {
+            if out.status.success() {
+                let base = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !base.is_empty() {
+                    return Some(base);
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn probe_branch_committed_files(repo_root: &Path) -> Vec<String> {
+    let diff_target = match resolve_branch_base(repo_root) {
         Some(base) => format!("{base}...HEAD"),
         None => "HEAD~1...HEAD".to_string(),
     };
 
-    let out = match std::process::Command::new("git")
-        .args(["diff", "--name-only", &diff_target])
-        .current_dir(repo_root)
-        .output()
-    {
-        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
+    let out = match git_probe(repo_root, &["diff", "--name-only", &diff_target]) {
+        Some(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
         _ => return Vec::new(),
     };
 
@@ -880,6 +1082,31 @@ pub fn probe_branch_committed_files(repo_root: &Path) -> Vec<String> {
         .map(|l| l.trim().to_string())
         .filter(|l| !l.is_empty())
         .collect()
+}
+
+/// Number of commits on HEAD that are not on the resolved base branch.
+pub fn probe_commits_ahead(repo_root: &Path) -> u32 {
+    let Some(base) = resolve_branch_base(repo_root) else {
+        return 0;
+    };
+    let range = format!("{base}..HEAD");
+    match git_probe(repo_root, &["rev-list", "--count", &range]) {
+        Some(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
+            .trim()
+            .parse::<u32>()
+            .unwrap_or(0),
+        _ => 0,
+    }
+}
+
+/// Whether a Stage 6 learning (`docs/solutions/**.md`) is present on the branch
+/// (committed range or dirty/untracked files).
+pub fn probe_stage6_artifact(repo_root: &Path, dirty_files: &[String]) -> bool {
+    let committed = probe_branch_committed_files(repo_root);
+    committed
+        .iter()
+        .chain(dirty_files.iter())
+        .any(|f| f.starts_with("docs/solutions/") && f.ends_with(".md"))
 }
 
 pub fn probe_feature_touched_files(repo_root: &Path) -> Vec<String> {

@@ -797,3 +797,70 @@ fn test_doctor_reports_gate_check_telemetry() {
     let res = run(&ctx, &args);
     assert!(res.is_ok());
 }
+
+#[test]
+fn test_doctor_stays_ok_with_ship_readiness_gaps() {
+    // Issue #354: a workspace with commits ahead but no Stage 6 artifact and no
+    // code-review receipt must emit non-fatal warnings, never fatal findings.
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path().join("repo");
+    let config_dir = tmp.path().join("config");
+    let opencode_dir = tmp.path().join("opencode");
+    std::fs::create_dir_all(&repo_root).unwrap();
+    std::fs::create_dir_all(&config_dir).unwrap();
+    std::fs::create_dir_all(&opencode_dir).unwrap();
+
+    std::fs::write(
+        config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let git = |args: &[&str]| {
+        let mut cmd = std::process::Command::new("git");
+        for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
+            cmd.env_remove(var);
+        }
+        cmd.args(args).current_dir(&repo_root).output().unwrap();
+    };
+    git(&["init", "-b", "main"]);
+    std::fs::write(repo_root.join("README.md"), "base\n").unwrap();
+    git(&["add", "."]);
+    git(&[
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "-m",
+        "base",
+    ]);
+    git(&["checkout", "-b", "feat/foo"]);
+    std::fs::write(repo_root.join("src.rs"), "fn main() {}\n").unwrap();
+    git(&["add", "."]);
+    git(&[
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "-m",
+        "feat",
+    ]);
+
+    let ctx = Context {
+        config_dir,
+        opencode_config_dir: opencode_dir,
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: false,
+    };
+
+    let args = Args::default();
+    let res = run(&ctx, &args);
+    assert!(
+        res.is_ok(),
+        "ship-readiness gaps must remain non-fatal, got: {res:?}"
+    );
+}

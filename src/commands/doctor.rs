@@ -618,6 +618,26 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         );
     }
 
+    // Observe-only Ship-readiness probe (Issue #354): Stage 6 + code-review gaps.
+    // Non-fatal: never added to `findings`, exit code unaffected.
+    let commits_ahead = crate::commands::workflow::probe_commits_ahead(&repo_root);
+    if commits_ahead > 0 {
+        let (_, dirty) = crate::commands::workflow::probe_git_dirty_files(&repo_root);
+        let stage6 = crate::commands::workflow::probe_stage6_artifact(&repo_root, &dirty);
+        let head_sha = crate::commands::workflow::probe_git_head_sha(&repo_root);
+        let receipt = state.review_receipt_for_branch(&repo_root, branch.as_deref());
+        let stage = current_wf.as_ref().map(|w| w.stage).unwrap_or_default();
+        for gap in crate::commands::workflow::evaluate_ship_readiness(
+            commits_ahead,
+            stage6,
+            receipt,
+            head_sha.as_deref(),
+            stage,
+        ) {
+            println!("doctor-warn: ship-readiness: {}", gap.describe());
+        }
+    }
+
     // Gate Check Spike Telemetry Metrics (Issue #333)
     let gate_stats = crate::commands::gate::load_gate_stats(&ctx.config_dir).unwrap_or_default();
     if gate_stats.total_observed > 0 {
