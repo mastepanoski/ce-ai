@@ -7968,3 +7968,350 @@ fn test_gate_check_spike_observe_only_lifecycle() {
             "gate-check: 3 observed (1 would-block, 1 pass, 0 undetermined, 1 edge-case: 0 mtime_fallback, 1 worktree_uncommitted, 0 stale_cycle_guard)",
         ));
 }
+
+#[test]
+fn cli_workflow_archive_single_feature() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    let proj = tmp.path().join("proj");
+    fs::create_dir_all(&proj).unwrap();
+
+    git_cmd()
+        .args(["init", "-q"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    let feat_alpha = proj.join("openspec").join("changes").join("feature-alpha");
+    fs::create_dir_all(&feat_alpha).unwrap();
+    fs::write(feat_alpha.join("proposal.md"), "# Proposal\n").unwrap();
+    fs::write(
+        feat_alpha.join("tasks.md"),
+        "# Tasks\n- [x] 1. First task\n- [x] 2. Second task\n",
+    )
+    .unwrap();
+
+    let archive_dir = proj.join("openspec").join("changes").join("archive");
+    fs::create_dir_all(&archive_dir).unwrap();
+    fs::write(
+        archive_dir.join("README.md"),
+        "# Archived Changes\n\nExisting changes archive.\n",
+    )
+    .unwrap();
+
+    git_cmd()
+        .args(["add", "."])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    git_cmd()
+        .args([
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "Initial spec",
+        ])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["workflow", "archive", "feature-alpha"])
+        .assert()
+        .success()
+        .stdout(
+            predicates::str::contains("archived: 'feature-alpha' -> ")
+                .and(predicates::str::contains("2/2 tasks complete")),
+        );
+
+    assert!(!feat_alpha.exists());
+    let dest = archive_dir.join("feature-alpha");
+    assert!(dest.is_dir());
+    assert!(dest.join("tasks.md").exists());
+    assert!(dest.join("proposal.md").exists());
+
+    let ledger = fs::read_to_string(archive_dir.join("README.md")).unwrap();
+    assert!(ledger.contains("- feature-alpha: archived (2/2 tasks)"));
+}
+
+#[test]
+fn cli_top_level_archive_alias() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    let proj = tmp.path().join("proj");
+    fs::create_dir_all(&proj).unwrap();
+
+    git_cmd()
+        .args(["init", "-q"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    let feat_beta = proj.join("openspec").join("changes").join("feature-beta");
+    fs::create_dir_all(&feat_beta).unwrap();
+    fs::write(feat_beta.join("tasks.md"), "# Tasks\n- [X] 1. Done\n").unwrap();
+
+    git_cmd()
+        .args(["add", "."])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    git_cmd()
+        .args([
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "Initial spec",
+        ])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["archive", "feature-beta"])
+        .assert()
+        .success()
+        .stdout(
+            predicates::str::contains("archived: 'feature-beta' -> ")
+                .and(predicates::str::contains("1/1 tasks complete")),
+        );
+
+    assert!(!feat_beta.exists());
+    let dest = proj
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join("feature-beta");
+    assert!(dest.is_dir());
+    assert!(dest.join("tasks.md").exists());
+}
+
+#[test]
+fn cli_archive_all_batch() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    let proj = tmp.path().join("proj");
+    fs::create_dir_all(&proj).unwrap();
+
+    git_cmd()
+        .args(["init", "-q"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    let archive_dir = proj.join("openspec").join("changes").join("archive");
+    fs::create_dir_all(&archive_dir).unwrap();
+    fs::write(
+        archive_dir.join("README.md"),
+        "# Archived Changes\n\nExisting changes archive.\n",
+    )
+    .unwrap();
+
+    let feat1 = proj.join("openspec").join("changes").join("feat-1");
+    fs::create_dir_all(&feat1).unwrap();
+    fs::write(feat1.join("tasks.md"), "# Tasks\n- [x] 1. One\n").unwrap();
+
+    let feat2 = proj.join("openspec").join("changes").join("feat-2");
+    fs::create_dir_all(&feat2).unwrap();
+    fs::write(
+        feat2.join("tasks.md"),
+        "# Tasks\n- [x] 1. Done\n- [x] 2. Also done\n",
+    )
+    .unwrap();
+
+    let feat3 = proj.join("openspec").join("changes").join("feat-3");
+    fs::create_dir_all(&feat3).unwrap();
+    fs::write(
+        feat3.join("tasks.md"),
+        "# Tasks\n- [x] 1. Done\n- [ ] 2. Still open\n",
+    )
+    .unwrap();
+
+    git_cmd()
+        .args(["add", "."])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    git_cmd()
+        .args([
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "Initial specs",
+        ])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["archive", "--all"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "archived 2 completed OpenSpec change(s) successfully to openspec/changes/archive/",
+        ));
+
+    assert!(!feat1.exists());
+    assert!(!feat2.exists());
+    assert!(feat3.exists());
+
+    assert!(archive_dir.join("feat-1").exists());
+    assert!(archive_dir.join("feat-2").exists());
+    assert!(!archive_dir.join("feat-3").exists());
+
+    let ledger = fs::read_to_string(archive_dir.join("README.md")).unwrap();
+    assert!(ledger.contains("sweep: 2 folders archived via 'ce-ai archive --all'"));
+}
+
+#[test]
+fn cli_archive_dry_run() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    let proj = tmp.path().join("proj");
+    fs::create_dir_all(&proj).unwrap();
+
+    git_cmd()
+        .args(["init", "-q"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    let feat_dry = proj.join("openspec").join("changes").join("feat-dry");
+    fs::create_dir_all(&feat_dry).unwrap();
+    fs::write(feat_dry.join("tasks.md"), "# Tasks\n- [x] All done\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["archive", "feat-dry", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(
+            predicates::str::contains("dry-run: would archive 1 completed change(s):").and(
+                predicates::str::contains("dry-run: 0 filesystem mutations applied"),
+            ),
+        );
+
+    assert!(feat_dry.exists());
+    assert!(!proj
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join("feat-dry")
+        .exists());
+}
+
+#[test]
+fn cli_archive_error_exit_codes() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    let proj = tmp.path().join("proj");
+    fs::create_dir_all(&proj).unwrap();
+
+    git_cmd()
+        .args(["init", "-q"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    // 1. Exit code 2 (Usage): missing feature and missing --all flag
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["archive"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicates::str::contains(
+            "no target feature specified and no active workflow recorded in state",
+        ));
+
+    // Nonexistent feature: Exit code 2 (Usage)
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["archive", "nonexistent-feature"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicates::str::contains(
+            "openspec change 'nonexistent-feature' not found",
+        ));
+
+    // 2. Exit code 6 (Verification): Incomplete tasks without --status
+    let feat_incomp = proj.join("openspec").join("changes").join("feat-incomp");
+    fs::create_dir_all(&feat_incomp).unwrap();
+    fs::write(
+        feat_incomp.join("tasks.md"),
+        "# Tasks\n- [x] Done\n- [ ] Pending\n",
+    )
+    .unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["archive", "feat-incomp"])
+        .assert()
+        .failure()
+        .code(6)
+        .stderr(predicates::str::contains(
+            "complete all tasks (Criterion 1) or supply --status",
+        ));
+
+    // Criterion 2 with status succeeds
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args([
+            "archive",
+            "feat-incomp",
+            "--status",
+            "Shipped in v1.0, PR #42",
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Criterion 2 STATUS-attested"));
+
+    let archived_tasks = proj
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join("feat-incomp")
+        .join("tasks.md");
+    let content = fs::read_to_string(archived_tasks).unwrap();
+    assert!(content.starts_with("> STATUS: Shipped in v1.0, PR #42\n\n"));
+
+    // 3. Exit code 3 (State / Collision): Recreating same change and attempting archive again
+    fs::create_dir_all(&feat_incomp).unwrap();
+    fs::write(feat_incomp.join("tasks.md"), "# Tasks\n- [x] Done\n").unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["archive", "feat-incomp"])
+        .assert()
+        .failure()
+        .code(3)
+        .stderr(predicates::str::contains("already exists"));
+}

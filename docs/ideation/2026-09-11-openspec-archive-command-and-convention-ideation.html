@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ce-ai Ideation: OpenSpec Archive Command vs Manual Convention</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-elevated: #21262d;
+      --surface-card: #1c2128;
+      --border: #30363d;
+      --border-accent: #388bfd;
+      --text: #c9d1d9;
+      --text-bright: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-glow: rgba(56, 139, 253, 0.15);
+      --success: #3fb950;
+      --warning: #d29922;
+      --danger: #f85149;
+      --purple: #bc8cff;
+      --cyan: #39c5cf;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 15px;
+      padding: 32px 20px 80px 20px;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header.doc-header {
+      background: linear-gradient(180deg, var(--surface-card) 0%, var(--surface) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      margin-bottom: 36px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-bottom: 16px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .meta-label {
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+    }
+
+    .meta-value {
+      color: var(--text-bright);
+      font-family: "JetBrains Mono", monospace;
+      font-weight: 500;
+    }
+
+    section {
+      margin-bottom: 40px;
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-bottom: 14px;
+    }
+
+    code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+      background: var(--surface-elevated);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      color: var(--cyan);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .badge-primary { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+    .badge-success { background: rgba(63, 185, 80, 0.15); color: var(--success); border: 1px solid var(--success); }
+    .badge-warning { background: rgba(210, 153, 34, 0.15); color: var(--warning); border: 1px solid var(--warning); }
+    .badge-purple { background: rgba(188, 140, 255, 0.15); color: var(--purple); border: 1px solid var(--purple); }
+    .badge-danger { background: rgba(248, 81, 73, 0.15); color: var(--danger); border: 1px solid var(--danger); }
+
+    .grounding-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 22px;
+      margin-bottom: 24px;
+    }
+
+    .grounding-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    @media (max-width: 768px) {
+      .grounding-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .grounding-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+    }
+
+    .grounding-card h4 {
+      font-size: 13px;
+      color: var(--accent);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .axes-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .axis-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      font-size: 13px;
+    }
+
+    .axis-title {
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .axis-desc {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .jump-nav {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 18px 20px;
+      margin-bottom: 28px;
+    }
+
+    .jump-nav-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .jump-links {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .jump-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text);
+      text-decoration: none;
+      padding: 8px 12px;
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      transition: all 0.15s ease;
+    }
+
+    .jump-link:hover {
+      border-color: var(--border-accent);
+      color: var(--text-bright);
+      transform: translateX(4px);
+    }
+
+    .jump-link-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .idea-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      margin-bottom: 28px;
+      scroll-margin-top: 24px;
+      transition: border-color 0.2s ease;
+    }
+
+    .idea-card:hover {
+      border-color: rgba(88, 166, 255, 0.4);
+    }
+
+    .idea-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .idea-rank {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: "JetBrains Mono", monospace;
+      line-height: 1;
+    }
+
+    .idea-title-block {
+      flex-grow: 1;
+    }
+
+    .idea-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 6px;
+    }
+
+    .field-group {
+      margin-top: 14px;
+    }
+
+    .field-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .field-content {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .basis-box {
+      background: var(--surface-card);
+      border-left: 3px solid var(--cyan);
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      margin-top: 6px;
+      font-size: 13px;
+    }
+
+    .basis-tag {
+      font-weight: 600;
+      font-family: "JetBrains Mono", monospace;
+      color: var(--cyan);
+    }
+
+    .tradeoffs-box {
+      background: rgba(210, 153, 34, 0.08);
+      border-left: 3px solid var(--warning);
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      margin-top: 6px;
+      font-size: 13px;
+      color: #e3b341;
+    }
+
+    .svg-container {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin: 16px 0;
+      display: flex;
+      justify-content: center;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 14px;
+    }
+
+    table.data-table th, table.data-table td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    table.data-table th {
+      background: var(--surface-card);
+      color: var(--text-bright);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    table.data-table tr:nth-child(even) {
+      background: var(--surface-elevated);
+    }
+
+    footer.composition-signal {
+      margin-top: 60px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      font-family: "JetBrains Mono", monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="doc-header">
+      <div class="badge badge-primary" style="margin-bottom: 8px;">ce-ideate discovery report</div>
+      <h1>OpenSpec Change Archival: Command vs Manual Convention</h1>
+      <p class="subtitle">An architectural evaluation of why 33 completed OpenSpec changes lingered unarchived in ce-ai, exploring candidate CLI tooling, safety guarantees, and lifecycle automation.</p>
+      
+      <div class="meta-grid">
+        <div class="meta-item">
+          <span class="meta-label">Date</span>
+          <span class="meta-value"><time datetime="2026-09-11">2026-09-11</time></span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Topic</span>
+          <span class="meta-value">openspec-archive-command-and-convention</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Focus</span>
+          <span class="meta-value">no hay un comando de archive en ce-ai es una convención, evalua</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Mode</span>
+          <span class="meta-value">repo-grounded</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Grounding Context -->
+    <section id="grounding">
+      <h2>1. Grounding Context (Codebase &amp; Historical Trace)</h2>
+      <div class="grounding-box">
+        <p>In <code>ce-ai</code>, the OpenSpec methodology requires changes to be drafted under <code>openspec/changes/&lt;feature&gt;/</code> (with <code>proposal.md</code>, <code>exploration.md</code>, <code>design.md</code>, <code>spec.md</code>, and <code>tasks.md</code>). Upon implementation completion and merging, changes are meant to be moved to <code>openspec/changes/archive/&lt;feature&gt;</code> as an audit trail linking releases to contracts.</p>
+        
+        <div class="grounding-grid">
+          <div class="grounding-card">
+            <h4>Diagnostic Implementation (v1.44.2 / Issue #323)</h4>
+            <p><code>ce-ai</code> implemented <code>probe_unarchived_completed_changes</code> (in <code>src/commands/workflow.rs:923</code>) to detect folders where <code>completed_tasks == total_tasks</code>. It alerts deterministically at Turn-0 session resume and in <code>ce-ai doctor</code>.</p>
+          </div>
+          <div class="grounding-card">
+            <h4>The Deliberate &quot;No-Auto-Mv&quot; Boundary</h4>
+            <p>During Issue #323 design (<code>exploration.md</code>), automated <code>git mv</code> was ruled <em>out-of-scope</em> because <code>ce-ai</code> strives never to mutate git index or filesystem trees without explicit developer request. Archiving was declared an <strong>explicit developer or agent convention</strong>.</p>
+          </div>
+          <div class="grounding-card">
+            <h4>The Empirical Consequence: 33 Lingering Folders</h4>
+            <p>Because no CLI command existed (e.g. <code>ce-ai workflow archive</code>) and archiving required multi-step manual shell commands and markdown table editing in <code>archive/README.md</code>, <strong>33 completed change folders</strong> accumulated in <code>openspec/changes/</code>, generating 33 warnings on every doctor check.</p>
+          </div>
+          <div class="grounding-card">
+            <h4>Dual Completion Criteria in archive/README.md</h4>
+            <p>Archival is governed by two criteria: (1) <strong>Mechanical:</strong> 100% tasks marked <code>[x]</code>, and (2) <strong>STATUS-verified shipped:</strong> <code>tasks.md</code> opened with <code>&gt; STATUS</code> header citing live code symbols or CHANGELOG releases. Currently, only Criterion 1 has machine detection.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Topic Axes -->
+    <section id="axes">
+      <h2>2. Topic Surface Decomposition (Axes)</h2>
+      <div class="axes-list">
+        <div class="axis-item">
+          <div class="axis-title">
+            <span>1. Invocation &amp; Surface Design</span>
+            <span class="badge badge-primary">Surface</span>
+          </div>
+          <p class="axis-desc">Where and how the capability is exposed to humans and agents (dedicated subcommand vs doctor flag vs TUI).</p>
+        </div>
+        <div class="axis-item">
+          <div class="axis-title">
+            <span>2. Archival Mechanics &amp; Git Safety</span>
+            <span class="badge badge-primary">Safety</span>
+          </div>
+          <p class="axis-desc">How physical mutations occur safely without racing active worktrees, dirty files, or causing untracked loss.</p>
+        </div>
+        <div class="axis-item">
+          <div class="axis-title">
+            <span>3. Lifecycle Trigger &amp; Automation Hooks</span>
+            <span class="badge badge-primary">Lifecycle</span>
+          </div>
+          <p class="axis-desc">When archival is proposed or executed (Stage 7 shipping, PR merge, release tagging, or post-merge cleanup).</p>
+        </div>
+        <div class="axis-item">
+          <div class="axis-title">
+            <span>4. Audit Trail &amp; Verification Contract</span>
+            <span class="badge badge-primary">Governance</span>
+          </div>
+          <p class="axis-desc">Validating Criterion 1 (tasks) vs Criterion 2 (STATUS), and syncing <code>archive/README.md</code> triage tables.</p>
+        </div>
+        <div class="axis-item">
+          <div class="axis-title">
+            <span>5. Batch &amp; Multi-Feature Remediation</span>
+            <span class="badge badge-primary">Remediation</span>
+          </div>
+          <p class="axis-desc">How to drain the existing 33-feature backlog smoothly with preview, dry-run, and conflict handling.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Jump Nav -->
+    <section id="jump-nav">
+      <div class="jump-nav">
+        <div class="jump-nav-title">Ranked Ideas Index (7 Survivors)</div>
+        <div class="jump-links">
+          <a href="#idea-1" class="jump-link">
+            <span><strong>1.</strong> Dedicated <code>ce-ai workflow archive [feature]</code> CLI Command</span>
+            <span class="jump-link-meta">
+              <span class="badge badge-primary">Invocation</span>
+              <span>Conf: 95%</span>
+              <span>Cx: Low</span>
+            </span>
+          </a>
+          <a href="#idea-2" class="jump-link">
+            <span><strong>2.</strong> <code>ce-ai doctor --fix</code> Self-Healing Diagnostic Remediation</span>
+            <span class="jump-link-meta">
+              <span class="badge badge-primary">Invocation</span>
+              <span>Conf: 90%</span>
+              <span>Cx: Low</span>
+            </span>
+          </a>
+          <a href="#idea-3" class="jump-link">
+            <span><strong>3.</strong> Two-Tier Archival Engine: Mechanical vs STATUS-Attested (Criterion 2)</span>
+            <span class="jump-link-meta">
+              <span class="badge badge-purple">Governance</span>
+              <span>Conf: 88%</span>
+              <span>Cx: Med</span>
+            </span>
+          </a>
+          <a href="#idea-4" class="jump-link">
+            <span><strong>4.</strong> Atomic Safe-Mover with Git Worktree &amp; Dirty Tree Isolation</span>
+            <span class="jump-link-meta">
+              <span class="badge badge-warning">Safety</span>
+              <span>Conf: 92%</span>
+              <span>Cx: Med</span>
+            </span>
+          </a>
+          <a href="#idea-5" class="jump-link">
+            <span><strong>5.</strong> Stage 7 Shipping &amp; Release Lifecycle Auto-Archival Hook</span>
+            <span class="jump-link-meta">
+              <span class="badge badge-primary">Lifecycle</span>
+              <span>Conf: 85%</span>
+              <span>Cx: Med</span>
+            </span>
+          </a>
+          <a href="#idea-6" class="jump-link">
+            <span><strong>6.</strong> Automated <code>archive/README.md</code> Triage Ledger Sync &amp; CHANGELOG Cross-Referencing</span>
+            <span class="jump-link-meta">
+              <span class="badge badge-purple">Governance</span>
+              <span>Conf: 84%</span>
+              <span>Cx: Low</span>
+            </span>
+          </a>
+          <a href="#idea-7" class="jump-link">
+            <span><strong>7.</strong> Interactive TUI Archival Drawer in Ratatui Dashboard</span>
+            <span class="jump-link-meta">
+              <span class="badge badge-success">Remediation</span>
+              <span>Conf: 80%</span>
+              <span>Cx: Med</span>
+            </span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ranked Ideas -->
+    <section id="ranked-ideas">
+      <h2>3. Ranked Ideas</h2>
+
+      <!-- Idea 1 -->
+      <article class="idea-card" id="idea-1">
+        <div class="idea-header">
+          <div class="idea-rank">#1</div>
+          <div class="idea-title-block">
+            <h3>Dedicated <code>ce-ai workflow archive [feature]</code> CLI Command with <code>--all</code> &amp; <code>--dry-run</code></h3>
+            <div class="idea-badges">
+              <span class="badge badge-primary">Invocation &amp; Surface Design</span>
+              <span class="badge badge-success">Confidence: 95%</span>
+              <span class="badge badge-warning">Complexity: Low</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Description</div>
+          <div class="field-content">
+            Introduce an explicit subcommand under workflow: <code>ce-ai workflow archive [feature]</code> (aliased to <code>ce-ai archive</code>). When executed with a feature name, it verifies task completion (or STATUS header), ensures target destination does not collide, and moves the folder from <code>openspec/changes/&lt;feature&gt;</code> to <code>openspec/changes/archive/&lt;feature&gt;</code> using git-aware moving. Adding <code>--all</code> iterates over all completed folders discovered by <code>probe_unarchived_completed_changes</code>, immediately solving the 33-folder backlog. Includes <code>--dry-run</code> for zero-risk inspection.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Basis (direct)</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:src/commands/workflow.rs:923</span><br>
+            <code>probe_unarchived_completed_changes</code> already implements the exact discovery logic returning <code>Vec&lt;UnarchivedChange&gt;</code> with full task progress. The command simply provides the actionable execution arm that this probe was missing.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Rationale &amp; Why It Matters</div>
+          <div class="field-content">
+            Replaces clumsy manual terminal typing (<code>mkdir -p openspec/changes/archive &amp;&amp; git mv openspec/changes/feat openspec/changes/archive/</code>) with a single deterministic command. Both human engineers and AI agents can invoke it deterministically when directed by doctor.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Tradeoffs &amp; Downsides</div>
+          <div class="tradeoffs-box">
+            Requires developers or agents to remember to run it after feature work unless paired with lifecycle hooks (Idea #5).
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 2 -->
+      <article class="idea-card" id="idea-2">
+        <div class="idea-header">
+          <div class="idea-rank">#2</div>
+          <div class="idea-title-block">
+            <h3><code>ce-ai doctor --fix</code> Self-Healing Diagnostic Remediation</h3>
+            <div class="idea-badges">
+              <span class="badge badge-primary">Invocation &amp; Surface Design</span>
+              <span class="badge badge-success">Confidence: 90%</span>
+              <span class="badge badge-warning">Complexity: Low</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Description</div>
+          <div class="field-content">
+            Add a <code>--fix</code> flag to <code>ce-ai doctor</code> following industry standards like <code>cargo fix</code> or <code>ruff --fix</code>. When doctor discovers completed unarchived OpenSpec changes (lines 613-619), <code>--fix</code> automatically prompts the operator (or automatically executes in non-interactive agent mode with <code>--yes</code>) to archive all verified completed changes safely.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Basis (direct)</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:src/commands/doctor.rs:615-619</span><br>
+            Currently, doctor prints: <code>doctor-warn: openspec change &#39;xxx&#39; is complete (N/N tasks) but not archived — see openspec/changes/archive/README.md</code>. With <code>--fix</code>, doctor bridges diagnosis with immediate remediation without forcing the user to switch commands.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Rationale &amp; Why It Matters</div>
+          <div class="field-content">
+            When users see 33 warnings in <code>ce-ai doctor</code>, their natural reaction is &quot;how do I fix this?&quot;. Allowing <code>ce-ai doctor --fix</code> provides instant cognitive closure and self-healing.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Tradeoffs &amp; Downsides</div>
+          <div class="tradeoffs-box">
+            Mutating filesystem inside <code>doctor</code> requires careful opt-in guards (interactive confirmation or explicit <code>--yes</code>) to prevent unexpected changes during automated CI runs.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 3 -->
+      <article class="idea-card" id="idea-3">
+        <div class="idea-header">
+          <div class="idea-rank">#3</div>
+          <div class="idea-title-block">
+            <h3>Two-Tier Archival Engine: Mechanical vs STATUS-Attested (Criterion 2)</h3>
+            <div class="idea-badges">
+              <span class="badge badge-purple">Audit Trail &amp; Verification Contract</span>
+              <span class="badge badge-success">Confidence: 88%</span>
+              <span class="badge badge-warning">Complexity: Medium</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Description</div>
+          <div class="field-content">
+            Expand the archival engine beyond naive checkbox counting. Support Criterion (2) from <code>archive/README.md</code> via CLI: <code>ce-ai workflow archive &lt;feature&gt; --status &quot;Shipped in v1.45.0, PR #325&quot;</code>. This command automatically writes the formal <code>&gt; STATUS: Shipped in ...</code> markdown callout at the top of <code>tasks.md</code>, declaring residual tasks intentionally unaudited, and archives the folder.
+          </div>
+        </div>
+
+        <!-- Structural Diagram -->
+        <div class="svg-container">
+          <svg width="680" height="150" viewBox="0 0 680 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="10" y="25" width="180" height="100" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+            <text x="100" y="55" fill="#f0f6fc" font-size="13" font-weight="600" text-anchor="middle" font-family="Inter, sans-serif">OpenSpec Folder</text>
+            <text x="100" y="80" fill="#8b949e" font-size="11" text-anchor="middle" font-family="JetBrains Mono, monospace">tasks.md</text>
+            <text x="100" y="100" fill="#39c5cf" font-size="10" text-anchor="middle" font-family="Inter, sans-serif">Active Change State</text>
+
+            <path d="M190 75 H260" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+            <rect x="260" y="10" width="180" height="130" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
+            <text x="350" y="35" fill="#58a6ff" font-size="13" font-weight="600" text-anchor="middle" font-family="Inter, sans-serif">Archival Engine</text>
+            <rect x="275" y="50" width="150" height="32" rx="4" fill="#161b22" stroke="#3fb950"/>
+            <text x="350" y="70" fill="#3fb950" font-size="11" font-weight="600" text-anchor="middle" font-family="Inter, sans-serif">Criterion 1: 100% [x]</text>
+            <rect x="275" y="90" width="150" height="32" rx="4" fill="#161b22" stroke="#bc8cff"/>
+            <text x="350" y="110" fill="#bc8cff" font-size="11" font-weight="600" text-anchor="middle" font-family="Inter, sans-serif">Criterion 2: --status &lt;ref&gt;</text>
+
+            <path d="M440 75 H500" stroke="#58a6ff" stroke-width="2"/>
+
+            <rect x="500" y="25" width="170" height="100" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+            <text x="585" y="55" fill="#f0f6fc" font-size="13" font-weight="600" text-anchor="middle" font-family="Inter, sans-serif">Archive Destination</text>
+            <text x="585" y="80" fill="#8b949e" font-size="11" text-anchor="middle" font-family="JetBrains Mono, monospace">openspec/.../archive/</text>
+            <text x="585" y="100" fill="#3fb950" font-size="10" text-anchor="middle" font-family="Inter, sans-serif">Audit Trail Preserved</text>
+
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 8 5 L 0 9 z" fill="#58a6ff"/>
+              </marker>
+            </defs>
+          </svg>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Basis (direct)</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:openspec/changes/archive/README.md:3-9</span><br>
+            &quot;A folder is archived when either: 1. All tasks checked — mechanical completion; or 2. STATUS-verified shipped — tasks.md opens with a `&gt; STATUS` header citing feature-level ship evidence.&quot;
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Rationale &amp; Why It Matters</div>
+          <div class="field-content">
+            In real-world development, features often ship with minor optional tasks cut or rescoped. Without Criterion 2 tooling, developers are stuck either checking false boxes or leaving folders in limbo forever.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Tradeoffs &amp; Downsides</div>
+          <div class="tradeoffs-box">
+            Requires validating that the supplied status string actually points to a real commit, PR, or CHANGELOG entry to prevent fake attestations.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 4 -->
+      <article class="idea-card" id="idea-4">
+        <div class="idea-header">
+          <div class="idea-rank">#4</div>
+          <div class="idea-title-block">
+            <h3>Atomic Safe-Mover with Git Worktree &amp; Dirty Tree Isolation</h3>
+            <div class="idea-badges">
+              <span class="badge badge-warning">Archival Mechanics &amp; Git Safety</span>
+              <span class="badge badge-success">Confidence: 92%</span>
+              <span class="badge badge-warning">Complexity: Medium</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Description</div>
+          <div class="field-content">
+            Implement a hardened filesystem mover <code>crate::workflow::archive_feature(repo_root, feature)</code> that guarantees zero data loss: (1) asserts destination <code>archive/&lt;feature&gt;</code> does not already exist, (2) verifies the feature folder has no uncommitted git conflicts, (3) uses <code>git mv</code> when git is available and clean, or atomic directory rename + git stage fallback, and (4) arms the operation in <code>ce-ai</code>&#39;s append-only install journal (Issue #331) for rollback recovery if interrupted.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Basis (direct)</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:src/state/journal.rs &amp; src/state/mod.rs (write_atomic)</span><br>
+            Directly addresses the primary risk cited in <code>unarchived-completed-changes-detection/exploration.md</code> (Tradeoff 1): preventing unrequested git staging races and dirty working tree corruption.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Rationale &amp; Why It Matters</div>
+          <div class="field-content">
+            Eliminates the danger that moving files might clobber active unstaged work or break across OS boundaries (e.g. Windows file locking or macOS case-insensitive paths).
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Tradeoffs &amp; Downsides</div>
+          <div class="tradeoffs-box">
+            Slightly more complex implementation than a simple <code>std::fs::rename</code>, but non-negotiable under ISO 27002 and NIST CP-9 invariants.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 5 -->
+      <article class="idea-card" id="idea-5">
+        <div class="idea-header">
+          <div class="idea-rank">#5</div>
+          <div class="idea-title-block">
+            <h3>Stage 7 Shipping &amp; Release Lifecycle Auto-Archival Hook</h3>
+            <div class="idea-badges">
+              <span class="badge badge-primary">Lifecycle Trigger &amp; Automation Hooks</span>
+              <span class="badge badge-success">Confidence: 85%</span>
+              <span class="badge badge-warning">Complexity: Medium</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Description</div>
+          <div class="field-content">
+            Integrate archival directly into Stage 7 of the Compound Engineering flywheel (<code>ce-commit-push-pr</code> skill and <code>AGENTS.md</code> Hard Invariant #10: Post-Merge Cleanup). When an agent creates the shipping PR or runs post-merge branch pruning on <code>main</code>, the active feature is automatically staged into <code>openspec/changes/archive/</code> as part of the release commit.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Basis (direct)</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:AGENTS.md:10 (Post-Merge Cleanup) &amp; AGENTS.md:9 (Mandatory Versioning)</span><br>
+            Rule 10 mandates: &quot;Immediately after merging a PR, switch to main, run git pull, delete merged local branches... and remove turn-created temporary worktrees.&quot; Adding OpenSpec archival to this exact post-merge checklist prevents unarchived folders from ever entering <code>main</code> unarchived.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Rationale &amp; Why It Matters</div>
+          <div class="field-content">
+            Shifts archival from an asynchronous cleanup chore to a synchronous stage of shipping. Features are archived at the exact moment they are delivered, cutting backlog formation at the source.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Tradeoffs &amp; Downsides</div>
+          <div class="tradeoffs-box">
+            If a PR is closed without merging or rejected, premature archival on the feature branch could require restoring the folder.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 6 -->
+      <article class="idea-card" id="idea-6">
+        <div class="idea-header">
+          <div class="idea-rank">#6</div>
+          <div class="idea-title-block">
+            <h3>Automated <code>archive/README.md</code> Triage Ledger Sync &amp; CHANGELOG Cross-Referencing</h3>
+            <div class="idea-badges">
+              <span class="badge badge-purple">Audit Trail &amp; Verification Contract</span>
+              <span class="badge badge-success">Confidence: 84%</span>
+              <span class="badge badge-warning">Complexity: Low</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Description</div>
+          <div class="field-content">
+            Whenever a feature is archived, <code>ce-ai</code> automatically parses the current SemVer version in <code>Cargo.toml</code>, updates the Historical Notes and Triage table in <code>openspec/changes/archive/README.md</code>, and optionally formats a link ready for <code>CHANGELOG.md</code> linking the release notes to the archived spec.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Basis (direct)</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:openspec/changes/archive/README.md:14-32</span><br>
+            Every previous archival sweep (v1.20.1, v1.21.0, v1.44.2) required manual markdown documentation in <code>archive/README.md</code>. Automating this bookkeeping keeps the audit trail synchronized with zero human effort.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Rationale &amp; Why It Matters</div>
+          <div class="field-content">
+            Ensures the archive doesn&#39;t become a graveyard of forgotten files, but remains an active, indexed historical ledger.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Tradeoffs &amp; Downsides</div>
+          <div class="tradeoffs-box">
+            Must parse markdown tables reliably without clobbering manual notes written by human maintainers.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 7 -->
+      <article class="idea-card" id="idea-7">
+        <div class="idea-header">
+          <div class="idea-rank">#7</div>
+          <div class="idea-title-block">
+            <h3>Interactive TUI Archival Drawer in Ratatui Dashboard</h3>
+            <div class="idea-badges">
+              <span class="badge badge-success">Batch &amp; Multi-Feature Remediation</span>
+              <span class="badge badge-success">Confidence: 80%</span>
+              <span class="badge badge-warning">Complexity: Medium</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Description</div>
+          <div class="field-content">
+            Add a dedicated &quot;Archival Ledger&quot; view within <code>ce-ai tui</code> (accessible via the Workflow dashboard tab). The view lists all unarchived completed folders with task counts, git branch origin, and last modified date. Operators can use up/down arrows and <code>Space</code> to select multiple features, then press <code>[a]</code> to execute a batch archive with live progress indicators.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Basis (direct)</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:src/tui.rs &amp; CONCEPTS.md:26</span><br>
+            Leverages ce-ai&#39;s rich interactive Ratatui dashboard, giving human developers visual control over batch triaging without memorizing CLI syntax.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Rationale &amp; Why It Matters</div>
+          <div class="field-content">
+            Provides a high-delight, zero-cognitive-overhead interface for developers who prefer interactive terminal dashboards over raw CLI command strings.
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Tradeoffs &amp; Downsides</div>
+          <div class="tradeoffs-box">
+            Only benefits interactive human users; headless CI and autonomous AI agents require the CLI command (Idea #1) and doctor fix (Idea #2).
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Rejection Summary -->
+    <section id="rejections">
+      <h2>4. Rejection Summary (Considered &amp; Cut)</h2>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 40px;">#</th>
+            <th style="width: 260px;">Idea</th>
+            <th>Reason Rejected / Cut</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>In-Place Archival via Frozen State Metadata</td>
+            <td>Rejected: Violates the established single source of truth in <code>openspec/changes/archive/</code> and breaks directory browsing conventions across harnesses.</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>Git Pre-Commit Archival Interception Hook</td>
+            <td>Rejected: Too intrusive; interrupts iterative developer commits before PR review is even finalized.</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>Changesets-Inspired &quot;Consume on Release&quot; Ceremony</td>
+            <td>Rejected: Conceptually sound but overlaps heavily with Idea #5 (Stage 7 lifecycle hook); absorbed into that unified candidate.</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>Database Migration Lifecycle Model</td>
+            <td>Rejected: Unnecessary conceptual complexity; treating folders as stateful migration items adds overhead without additional safety.</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>Zero-Move Virtual Archive Index (<code>.ce-ai/archive-index.json</code>)</td>
+            <td>Rejected: Creates split state between index file and filesystem reality, defeating <code>git grep</code> and directory transparency.</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>Unconditional Auto-Archive in Background Sync Watcher</td>
+            <td>Rejected: Severe race condition risk with active developer editor saves and multi-worktree checkouts; violates NIST atomic safety principles.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Recommendation -->
+    <section id="recommendation">
+      <h2>5. Synthesis &amp; Recommended Direction</h2>
+      <div class="grounding-box" style="border-left: 4px solid var(--accent);">
+        <p><strong>The Core Root Cause:</strong> The current warning fatigue (33 completed folders lingering unarchived) is the direct consequence of implementing detection in Issue #323 without providing an execution tool. Leaving archival purely to &quot;manual convention&quot; created friction that both humans and AI agents avoid.</p>
+        <p><strong>Recommended Strategy:</strong> Implement a cohesive 3-part solution:</p>
+        <ol style="margin-left: 20px; line-height: 1.8;">
+          <li><strong>Immediate Remediation (Ideas #1 &amp; #2):</strong> Ship <code>ce-ai workflow archive [feature] [--all] [--dry-run]</code> alongside <code>ce-ai doctor --fix</code>. This immediately drains the 33-folder backlog in one safe turn.</li>
+          <li><strong>Hardened Mechanics (Ideas #3 &amp; #4):</strong> Base the archive operation on the journaled Atomic Safe-Mover, adding support for Criterion 2 (<code>--status &lt;ref&gt;</code>) so shipped changes with rescoped tasks can be archived cleanly.</li>
+          <li><strong>Prevention Hook (Idea #5):</strong> Wire archival into Stage 7 shipping and AGENTS.md Rule 10 cleanup so new backlogs never form.</li>
+        </ol>
+      </div>
+    </section>
+
+    <footer class="composition-signal">
+      Composed 2026-09-11 by ce-ideate on <code>ce-ai</code> (mastepanoski/ce-ai) · Artifact: docs/ideation/2026-09-11-openspec-archive-command-and-convention-ideation.html
+    </footer>
+  </div>
+</body>
+</html>

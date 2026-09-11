@@ -83,6 +83,9 @@ A native, cryptographic in-tool mechanism (`ce-ai self-update` / `ce-ai upgrade 
 ### Visibility, Not Control (Harness Integration Principle)
 An architectural boundary governing how `ce-ai` interacts with external AI harnesses that maintain their own native plugin ecosystems (such as Claude Code or Kimi Code). `ce-ai` limits its scope to read-only inspection, diagnostic reporting (`ce-ai doctor`), and version drift visibility, deliberately refraining from mutating or executing updates inside the external harness's private registries or plugin cache directories.
 
+### OpenSpec Change Archival & Safe Mover
+A robust CLI command and automation mechanism (`ce-ai archive` / `ce-ai workflow archive`) that validates completion criteria and safely transfers finished change folders from `openspec/changes/<feature>` into `openspec/changes/archive/<feature>`. It supports dual completion paths (Criterion 1: mechanical 100% task checkbox completion; Criterion 2: STATUS-attested release evidence for rescoped or cut tasks), enforces atomic destination collision rejection and dirty working tree fail-closed guards, synchronizes the audit ledger in `archive/README.md`, and reconciles active feature pointers in `state.json`.
+
 
 
 
