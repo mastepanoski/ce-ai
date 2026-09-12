@@ -43,10 +43,10 @@ Work-unit changed-line estimates total: ~940 LOC (~200 LOC/work-unit policy appl
   - [x] 5.3 In `src/commands/doctor.rs`, emit non-blocking `doctor-warn:` lines with copy-pasteable CLI commands for detected debt items.
   - [x] 5.4 (TDD) Add integration tests in `src/commands/tests/doctor.rs` and `tests/cli.rs` validating doctor output with and without Git substrate.
 
-- [ ] **Work Unit 6: Pedagogical Guide & Documentation Updates** (~150 LOC)
-  - [ ] 6.1 Author `docs/user-guide/doc-hygiene-and-debt-explained.md` in Diátaxis Explanation quadrant for Beginners ("Professor's Walkthrough").
-  - [ ] 6.2 Update `README.md` introducing documentation debt and linking to the new guide in the Documentation Map.
-  - [ ] 6.3 Verify `README.md <= 100` lines constraint (`wc -l README.md`).
-  - [ ] 6.4 Update `CONCEPTS.md` with definitions for `Documentation Technical Debt Diagnostic Engine`, `Substrate Tri-State`, and `Solution Drift Probe`.
-  - [ ] 6.5 Update `CHANGELOG.md` under `[Unreleased]`.
-  - [ ] 6.6 Run full verification gates: `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test`.
+- [x] **Work Unit 6: Pedagogical Guide & Documentation Updates** (~150 LOC)
+  - [x] 6.1 Author `docs/user-guide/doc-hygiene-and-debt-explained.md` in Diátaxis Explanation quadrant for Beginners ("Professor's Walkthrough").
+  - [x] 6.2 Update `README.md` introducing documentation debt and linking to the new guide in the Documentation Map.
+  - [x] 6.3 Verify `README.md <= 100` lines constraint (`wc -l README.md`).
+  - [x] 6.4 Update `CONCEPTS.md` with definitions for `Documentation Technical Debt Diagnostic Engine`, `Substrate Tri-State`, and `Solution Drift Probe`.
+  - [x] 6.5 Update `CHANGELOG.md` under `[Unreleased]`.
+  - [x] 6.6 Run full verification gates: `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test`.
