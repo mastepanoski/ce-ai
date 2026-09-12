@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ce-ai Ideation: Documentation Technical Debt, OpenSpec Lifecycle &amp; Consolidation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-elevated: #21262d;
+      --surface-card: #1c2128;
+      --border: #30363d;
+      --border-accent: #388bfd;
+      --text: #c9d1d9;
+      --text-bright: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-glow: rgba(56, 139, 253, 0.15);
+      --success: #3fb950;
+      --warning: #d29922;
+      --danger: #f85149;
+      --purple: #bc8cff;
+      --cyan: #39c5cf;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 15px;
+      padding: 32px 20px 80px 20px;
+    }
+
+    .container { max-width: 960px; margin: 0 auto; }
+
+    header.doc-header {
+      background: linear-gradient(180deg, var(--surface-card) 0%, var(--surface) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      margin-bottom: 36px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle { color: var(--text-muted); font-size: 15px; margin-bottom: 16px; }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .meta-item { display: flex; flex-direction: column; }
+    .meta-label {
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+    }
+    .meta-value { color: var(--text-bright); font-family: "JetBrains Mono", monospace; font-weight: 500; }
+
+    section { margin-bottom: 40px; }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h3 { font-size: 17px; font-weight: 600; color: var(--text-bright); margin-bottom: 8px; }
+    p { margin-bottom: 14px; }
+
+    code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+      background: var(--surface-elevated);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      color: var(--cyan);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-primary { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+    .badge-success { background: rgba(63, 185, 80, 0.15); color: var(--success); border: 1px solid var(--success); }
+    .badge-warning { background: rgba(210, 153, 34, 0.15); color: var(--warning); border: 1px solid var(--warning); }
+    .badge-purple { background: rgba(188, 140, 255, 0.15); color: var(--purple); border: 1px solid var(--purple); }
+    .badge-danger { background: rgba(248, 81, 73, 0.15); color: var(--danger); border: 1px solid var(--danger); }
+
+    .grounding-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 22px;
+      margin-bottom: 24px;
+    }
+
+    .grounding-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    @media (max-width: 768px) {
+      .grounding-grid { grid-template-columns: 1fr; }
+    }
+
+    .grounding-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+    }
+
+    .grounding-card h4 {
+      font-size: 13px;
+      color: var(--accent);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .axes-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .axis-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      font-size: 13px;
+    }
+
+    .axis-title {
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .axis-desc { color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+
+    .jump-nav {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 18px 20px;
+      margin-bottom: 28px;
+    }
+
+    .jump-nav-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .jump-links { display: flex; flex-direction: column; gap: 8px; }
+
+    .jump-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text);
+      text-decoration: none;
+      padding: 8px 12px;
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      transition: all 0.15s ease;
+    }
+
+    .jump-link:hover {
+      border-color: var(--border-accent);
+      color: var(--text-bright);
+      transform: translateX(4px);
+    }
+
+    .jump-link-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+
+    .idea-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .idea-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .idea-title-wrap { display: flex; flex-direction: column; gap: 4px; }
+    .idea-rank { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; }
+    .idea-title { font-size: 18px; font-weight: 700; color: var(--text-bright); }
+    .idea-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+    .idea-field { margin-bottom: 14px; font-size: 14px; }
+    .idea-field-label {
+      font-weight: 600;
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .basis-box {
+      background: var(--surface-card);
+      border-left: 3px solid var(--cyan);
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      margin-top: 6px;
+      font-size: 13px;
+    }
+    .basis-tag { font-weight: 600; font-family: "JetBrains Mono", monospace; color: var(--cyan); }
+
+    .tradeoffs-box {
+      background: rgba(210, 153, 34, 0.08);
+      border-left: 3px solid var(--warning);
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      margin-top: 6px;
+      font-size: 13px;
+      color: #e3b341;
+    }
+
+    .svg-container {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin: 16px 0;
+      display: flex;
+      justify-content: center;
+    }
+
+    table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 14px; }
+    table.data-table th, table.data-table td { border: 1px solid var(--border); padding: 10px 12px; text-align: left; }
+    table.data-table th {
+      background: var(--surface-card);
+      color: var(--text-bright);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    table.data-table tr:nth-child(even) { background: var(--surface-elevated); }
+
+    footer.composition-signal {
+      margin-top: 60px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      font-family: "JetBrains Mono", monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="doc-header">
+      <div class="badge badge-primary" style="margin-bottom: 8px;">ce-ideate discovery report</div>
+      <h1>Documentation Debt, OpenSpec Lifecycle &amp; Consolidation</h1>
+      <p class="subtitle">Architectural ideation on detecting documentation rot in <code>ce-ai doctor</code>, automating OpenSpec task reconciliation/archival, compacting historical archives, and maintaining living specifications across adopted projects.</p>
+      
+      <div class="meta-grid">
+        <div class="meta-item">
+          <span class="meta-label">Date</span>
+          <span class="meta-value"><time datetime="2026-09-12">2026-09-12</time></span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Topic</span>
+          <span class="meta-value">docs-debt-consolidation-and-doctor</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Focus</span>
+          <span class="meta-value">doctor detection, openspec consolidation, stale solutions &amp; archive lifecycle</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Mode</span>
+          <span class="meta-value">repo-grounded</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Grounding Context -->
+    <section id="grounding">
+      <h2>1. Grounding Context (Codebase Reality &amp; Documentation Debt)</h2>
+      <div class="grounding-box">
+        <p>In Compound Engineering, documentation is not an afterthought; it is the system's flight recorder and executable contract. However, as projects iterate, documentation naturally accumulates technical debt across four concrete surfaces:</p>
+        
+        <div class="grounding-grid">
+          <div class="grounding-card">
+            <h4><span style="color: var(--danger);">●</span> Ghost Active OpenSpecs</h4>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
+              In <code>ce-ai</code> right now, 3 completed features linger in <code>openspec/changes/</code>:
+              <code>harness-manifest-sha256-coverage</code>, <code>doctor-kimi-marketplace-divergence</code>, and <code>linux-musl-static-release</code>.
+            </p>
+            <p style="font-size: 12px; color: var(--text-muted);">
+              <strong>Root cause:</strong> All major tasks were checked <code>[x]</code>, but subtasks (e.g. <code>[ ] 1.1</code>) or post-merge verification tasks (<code>[ ] 3.7 Release tag</code>) were left unchecked. Current <code>probe_unarchived_completed_changes</code> requires <code>completed == total</code>, so these are completely ignored.
+            </p>
+          </div>
+
+          <div class="grounding-card">
+            <h4><span style="color: var(--warning);">●</span> Archive Sprawl (108 Folders, 540 Files)</h4>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
+              <code>openspec/changes/archive/</code> contains <strong>108 subdirectories</strong> and over 540 Markdown files. Total markdown count across <code>docs/</code> and <code>openspec/</code> is <strong>730 files</strong>!
+            </p>
+            <p style="font-size: 12px; color: var(--text-muted);">
+              <strong>Impact:</strong> Agent tools (<code>find_by_name</code>, <code>grep_search</code>) are flooded with stale delta proposals from months ago (e.g. <code>v0_5_0_roadmap</code>), consuming token context and diluting focus.
+            </p>
+          </div>
+
+          <div class="grounding-card">
+            <h4><span style="color: var(--cyan);">●</span> Solution Library Drift (72 Files)</h4>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
+              <code>docs/solutions/</code> holds 72 files. Over time, refactorings rename or remove structs and CLI commands.
+            </p>
+            <p style="font-size: 12px; color: var(--text-muted);">
+              <strong>Impact:</strong> Solutions cite dead file paths and obsolete patterns. AI agents searching past learnings discover superseded workarounds and hallucinate dead APIs.
+            </p>
+          </div>
+
+          <div class="grounding-card">
+            <h4><span style="color: var(--purple);">●</span> Cross-Project Governance</h4>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
+              This technical debt is not unique to <code>ce-ai</code>; it emerges in <em>any</em> project adopted via <code>ce-ai init-prj</code>.
+            </p>
+            <p style="font-size: 12px; color: var(--text-muted);">
+              <strong>Opportunity:</strong> <code>ce-ai doctor</code> already inspects adopted workspaces. Adding doc hygiene probes gives every adopted project automated health auditing and compaction workflows.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Topic Axes -->
+    <section id="axes">
+      <h2>2. Topic Surface Decomposition</h2>
+      <p style="color: var(--text-muted); font-size: 14px;">The problem space is decomposed into four orthogonal axes covering detection, consolidation, hygiene, and governance:</p>
+      
+      <div class="axes-list">
+        <div class="axis-item">
+          <div class="axis-title">
+            <span>Axis 1: OpenSpec Lifecycle</span>
+            <code>doctor:openspec-lifecycle</code>
+          </div>
+          <div class="axis-desc">Detecting subtask desync, git-merged features, stale pending specs, and automating mark-and-archive in <code>doctor</code>.</div>
+        </div>
+
+        <div class="axis-item">
+          <div class="axis-title">
+            <span>Axis 2: Archive Consolidation</span>
+            <code>archive:consolidation</code>
+          </div>
+          <div class="axis-desc">Rolling up 100+ historical folders into milestone digests, generational compaction, and promoting deltas to living specs.</div>
+        </div>
+
+        <div class="axis-item">
+          <div class="axis-title">
+            <span>Axis 3: Solution Drift &amp; Lint</span>
+            <code>solutions:drift-and-lint</code>
+          </div>
+          <div class="axis-desc">Auditing dead file paths, broken symbols, YAML frontmatter errors, and clustering overlapping solutions.</div>
+        </div>
+
+        <div class="axis-item">
+          <div class="axis-title">
+            <span>Axis 4: Adoption Governance</span>
+            <code>governance:adoption-hygiene</code>
+          </div>
+          <div class="axis-desc">Providing configurable thresholds in <code>.ce-ai.json</code>, Turn-0 RepoState visibility, and CI quality gates across adopted repos.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ranked Ideas -->
+    <section id="ranked-ideas">
+      <h2>3. Ranked Candidate Ideas</h2>
+      <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Top 7 survivor directions selected through adversarial verification against codebase grounding, ranked by leverage and expected value:</p>
+
+      <!-- Jump Nav -->
+      <div class="jump-nav">
+        <div class="jump-nav-title">Quick Index — Ranked Ideas</div>
+        <div class="jump-links">
+          <a href="#idea-1" class="jump-link">
+            <span><strong>1.</strong> Git-Aware OpenSpec Desync &amp; Auto-Archival in Doctor</span>
+            <div class="jump-link-meta">
+              <span class="badge badge-primary">doctor:openspec-lifecycle</span>
+              <span class="badge badge-success">High Conf</span>
+              <span class="badge badge-purple">Med Cx</span>
+            </div>
+          </a>
+          <a href="#idea-2" class="jump-link">
+            <span><strong>2.</strong> Stale Pending OpenSpec Decay Watchdog with Inactivity Timers</span>
+            <div class="jump-link-meta">
+              <span class="badge badge-primary">doctor:openspec-lifecycle</span>
+              <span class="badge badge-success">High Conf</span>
+              <span class="badge badge-success">Low Cx</span>
+            </div>
+          </a>
+          <a href="#idea-3" class="jump-link">
+            <span><strong>3.</strong> Generational Archive Compaction &amp; Milestone Rollups (<code>ce-ai archive compact</code>)</span>
+            <div class="jump-link-meta">
+              <span class="badge badge-purple">archive:consolidation</span>
+              <span class="badge badge-success">High Conf</span>
+              <span class="badge badge-purple">Med Cx</span>
+            </div>
+          </a>
+          <a href="#idea-4" class="jump-link">
+            <span><strong>4.</strong> Living System Specifications Promotion (<code>openspec/specs/</code> vs Delta Specs)</span>
+            <div class="jump-link-meta">
+              <span class="badge badge-purple">archive:consolidation</span>
+              <span class="badge badge-success">High Conf</span>
+              <span class="badge badge-purple">Med Cx</span>
+            </div>
+          </a>
+          <a href="#idea-5" class="jump-link">
+            <span><strong>5.</strong> Solution Library Drift Probe: Dead Link &amp; Symbol Rot Detection</span>
+            <div class="jump-link-meta">
+              <span class="badge badge-warning">solutions:drift-and-lint</span>
+              <span class="badge badge-success">High Conf</span>
+              <span class="badge badge-success">Low Cx</span>
+            </div>
+          </a>
+          <a href="#idea-6" class="jump-link">
+            <span><strong>6.</strong> Automated Solution Refresh &amp; Deduplication Workflow (<code>ce-ai doc refresh</code>)</span>
+            <div class="jump-link-meta">
+              <span class="badge badge-warning">solutions:drift-and-lint</span>
+              <span class="badge badge-warning">Med Conf</span>
+              <span class="badge badge-purple">Med Cx</span>
+            </div>
+          </a>
+          <a href="#idea-7" class="jump-link">
+            <span><strong>7.</strong> Project-Wide Doc Debt Engine with Turn-0 RepoState Visibility</span>
+            <div class="jump-link-meta">
+              <span class="badge badge-cyan">governance:adoption-hygiene</span>
+              <span class="badge badge-success">High Conf</span>
+              <span class="badge badge-success">Low Cx</span>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <!-- Idea 1 -->
+      <div class="idea-card" id="idea-1">
+        <div class="idea-header">
+          <div class="idea-title-wrap">
+            <span class="idea-rank">Rank 1 · Top Leverage</span>
+            <h3 class="idea-title">Git-Aware OpenSpec Desync &amp; Auto-Archival in Doctor</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="badge badge-primary">doctor:openspec-lifecycle</span>
+            <span class="badge badge-success">Confidence: 95%</span>
+            <span class="badge badge-purple">Complexity: Medium</span>
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Description</div>
+          <p>
+            Upgrade <code>probe_unarchived_completed_changes</code> in <code>src/commands/workflow.rs</code> to detect "pseudo-incomplete" OpenSpec changes. Currently, if parent tasks (<code>- [x] Task 1</code>) are completed but subtasks (<code>- [ ] 1.1</code>) were left unchecked, or if all implementation tasks are checked while an external release step was unchecked, the probe completely ignores them. The new probe checks:
+          </p>
+          <ul style="margin-left: 20px; margin-bottom: 12px; font-size: 14px;">
+            <li><strong>Parent-Task Completion:</strong> 100% of top-level tasks marked <code>[x]</code> even if nested subtasks are <code>[ ]</code>.</li>
+            <li><strong>Git Merged State:</strong> Check if git commits referencing <code>openspec/changes/&lt;feature&gt;</code> have already landed on the default branch (<code>main</code>).</li>
+          </ul>
+          <p>
+            <code>doctor</code> surfaces: <code>doctor-warn: openspec change 'X' code is merged on main with Y/Z tasks checked; run 'ce-ai archive X --auto-mark'</code> or provides an interactive triage option in <code>ce-ai doctor --fix</code>.
+          </p>
+        </div>
+
+        <div class="svg-container">
+          <svg width="680" height="130" viewBox="0 0 680 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="10" y="20" width="170" height="85" rx="8" fill="#1c2128" stroke="#30363d" stroke-width="1.5"/>
+            <text x="95" y="45" fill="#f0f6fc" font-size="12" font-weight="600" text-anchor="middle">OpenSpec Change</text>
+            <text x="95" y="65" fill="#e3b341" font-size="11" text-anchor="middle">Parent: [x] Subtask: [ ]</text>
+            <text x="95" y="85" fill="#8b949e" font-size="10" text-anchor="middle">PR merged in git</text>
+
+            <path d="M190 62 H250" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+            <rect x="260" y="20" width="170" height="85" rx="8" fill="#1c2128" stroke="#58a6ff" stroke-width="1.5"/>
+            <text x="345" y="45" fill="#58a6ff" font-size="12" font-weight="600" text-anchor="middle">Doctor Probe</text>
+            <text x="345" y="65" fill="#f0f6fc" font-size="11" text-anchor="middle">Detects Git Landing</text>
+            <text x="345" y="85" fill="#39c5cf" font-size="10" text-anchor="middle">Identifies Desync</text>
+
+            <path d="M440 62 H500" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow)"/>
+
+            <rect x="510" y="20" width="160" height="85" rx="8" fill="#1c2128" stroke="#3fb950" stroke-width="1.5"/>
+            <text x="590" y="45" fill="#3fb950" font-size="12" font-weight="600" text-anchor="middle">Safe Archival</text>
+            <text x="590" y="65" fill="#f0f6fc" font-size="11" text-anchor="middle">Auto-mark / Attest</text>
+            <text x="590" y="85" fill="#8b949e" font-size="10" text-anchor="middle">Clean Working Tree</text>
+
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 8 5 L 0 9 z" fill="#58a6ff"/>
+              </marker>
+            </defs>
+          </svg>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Grounding Basis</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:</span> <code>openspec/changes/doctor-kimi-marketplace-divergence/tasks.md:5-30</code> (tasks 1-5 checked <code>[x]</code>, subtasks <code>[ ]</code>) and <code>src/commands/workflow.rs:975</code> (strict <code>completed == total</code> check). Exactly models why 3 merged PRs are stranded in <code>ce-ai</code> right now.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Why It Matters</div>
+          <p>Instantly resolves the exact friction experienced in everyday compound engineering. Developers frequently merge PRs after checking main tasks without meticulously checking every atomic subtask line, causing finished work to linger in <code>openspec/changes/</code> forever.</p>
+        </div>
+
+        <div class="tradeoffs-box">
+          <strong>Tradeoffs:</strong> Must ensure git inspection is read-only and fast (&lt;10ms), relying on <code>git log -n 1 -- &lt;path&gt;</code> or branch comparison without executing heavy network calls.
+        </div>
+      </div>
+
+      <!-- Idea 2 -->
+      <div class="idea-card" id="idea-2">
+        <div class="idea-header">
+          <div class="idea-title-wrap">
+            <span class="idea-rank">Rank 2</span>
+            <h3 class="idea-title">Stale Pending OpenSpec Decay Watchdog with Inactivity Timers</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="badge badge-primary">doctor:openspec-lifecycle</span>
+            <span class="badge badge-success">Confidence: 90%</span>
+            <span class="badge badge-success">Complexity: Low</span>
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Description</div>
+          <p>
+            An OpenSpec change that sits in <code>openspec/changes/</code> with 0% or partial task completion and zero Git activity for more than 14-30 days represents dormant technical debt (abandoned experiments, forgotten features, or duplicate ideations).
+          </p>
+          <p>
+            <code>ce-ai doctor</code> introduces a <strong>Stale Pending Change Probe</strong>:
+          </p>
+          <ul style="margin-left: 20px; margin-bottom: 12px; font-size: 14px;">
+            <li>Inspects last commit date touching <code>openspec/changes/&lt;feature&gt;/</code> or filesystem <code>mtime</code> fallback.</li>
+            <li>If age exceeds configurable threshold (default: 21 days) and no active feature branch exists:</li>
+            <li>Emits: <code>doctor-warn: openspec change '&lt;feature&gt;' has been pending for 34 days with no git commits (progress: 1/5) — resume implementation, cancel/shelve, or archive with '--status "superseded/abandoned"'</code>.</li>
+          </ul>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Grounding Basis</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:</span> <code>openspec/changes/linux-musl-static-release/</code> has been sitting in <code>openspec/changes/</code> untouched since release v1.50.1 while the codebase progressed to v1.53.0 with zero warning from <code>doctor</code>.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Why It Matters</div>
+          <p>Eliminates invisible specification rot. Without this probe, developers start specs that get superseded by quick fixes or priority pivots, and they linger silently for months.</p>
+        </div>
+
+        <div class="tradeoffs-box">
+          <strong>Tradeoffs:</strong> Must allow setting custom thresholds in <code>.ce-ai.json</code> or marking a change as <code>[WIP: Long-term]</code> to prevent nagging on intentionally prolonged refactors.
+        </div>
+      </div>
+
+      <!-- Idea 3 -->
+      <div class="idea-card" id="idea-3">
+        <div class="idea-header">
+          <div class="idea-title-wrap">
+            <span class="idea-rank">Rank 3 · Structural Hygiene</span>
+            <h3 class="idea-title">Generational Archive Compaction &amp; Milestone Rollups (<code>ce-ai archive compact</code>)</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="badge badge-purple">archive:consolidation</span>
+            <span class="badge badge-success">Confidence: 95%</span>
+            <span class="badge badge-purple">Complexity: Medium</span>
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Description</div>
+          <p>
+            Implements a generational lifecycle for archived specifications. Currently, <code>ce-ai</code> has 108 separate subdirectories in <code>openspec/changes/archive/</code> containing ~540 markdown files.
+          </p>
+          <p>
+            The compaction command <code>ce-ai archive compact [--before &lt;date&gt;|--milestone &lt;tag&gt;]</code>:
+          </p>
+          <ul style="margin-left: 20px; margin-bottom: 12px; font-size: 14px;">
+            <li><strong>Rollup Digest:</strong> Groups older archives (e.g. &gt;60 days or matching a release range like <code>v0.5..v1.20</code>) into a single consolidated milestone summary file: <code>openspec/changes/archive/milestones/2026-Q1.md</code> containing a structured table of features, proposals, release PR links, and final specs.</li>
+            <li><strong>Raw Asset Pruning or Tarball Packaging:</strong> Packages raw exploratory drafts (<code>exploration.md</code>, <code>tasks.md</code>) into a compressed archive tarball (<code>archive-2026-Q1.tar.gz</code>) or removes the scaffolding while preserving the final contract.</li>
+            <li><strong>Doctor Warning:</strong> <code>doctor</code> warns when uncompacted archive directories exceed a threshold (e.g. <code>doctor-info: archive has 108 packages (&gt;30 threshold); run 'ce-ai archive compact'</code>).</li>
+          </ul>
+        </div>
+
+        <div class="svg-container">
+          <svg width="680" height="130" viewBox="0 0 680 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="10" y="20" width="180" height="85" rx="8" fill="#1c2128" stroke="#f85149" stroke-width="1.5"/>
+            <text x="100" y="45" fill="#f85149" font-size="12" font-weight="600" text-anchor="middle">Archive Sprawl</text>
+            <text x="100" y="65" fill="#f0f6fc" font-size="11" text-anchor="middle">108 Directories</text>
+            <text x="100" y="85" fill="#8b949e" font-size="10" text-anchor="middle">540 Markdown Files</text>
+
+            <path d="M200 62 H260" stroke="#bc8cff" stroke-width="2" marker-end="url(#arrow2)"/>
+
+            <rect x="270" y="20" width="180" height="85" rx="8" fill="#1c2128" stroke="#bc8cff" stroke-width="1.5"/>
+            <text x="360" y="45" fill="#bc8cff" font-size="12" font-weight="600" text-anchor="middle">ce-ai archive compact</text>
+            <text x="360" y="65" fill="#f0f6fc" font-size="11" text-anchor="middle">Generational Rollup</text>
+            <text x="360" y="85" fill="#39c5cf" font-size="10" text-anchor="middle">Quarterly / Milestone</text>
+
+            <path d="M460 62 H520" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow2)"/>
+
+            <rect x="530" y="20" width="140" height="85" rx="8" fill="#1c2128" stroke="#3fb950" stroke-width="1.5"/>
+            <text x="600" y="45" fill="#3fb950" font-size="12" font-weight="600" text-anchor="middle">Lean Archive</text>
+            <text x="600" y="65" fill="#f0f6fc" font-size="11" text-anchor="middle">1 Consolidated Doc</text>
+            <text x="600" y="85" fill="#8b949e" font-size="10" text-anchor="middle">90% Fewer Files</text>
+
+            <defs>
+              <marker id="arrow2" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 8 5 L 0 9 z" fill="#bc8cff"/>
+              </marker>
+            </defs>
+          </svg>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Grounding Basis</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:</span> <code>openspec/changes/archive/</code> (108 folders on disk) and <span class="basis-tag">external:</span> Generational Garbage Collection (Eden vs Survivor vs Tenured) and RFC/ADR compaction conventions.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Why It Matters</div>
+          <p>Directly saves hundreds of files from clogging agent token context, Git tree blobs, and file searches. Preserves 100% auditability while restoring repository lightness.</p>
+        </div>
+
+        <div class="tradeoffs-box">
+          <strong>Tradeoffs:</strong> Compaction modifies historical file layout in git; must update links in <code>archive/README.md</code> and ensure historical PRs can still trace their compacted specs.
+        </div>
+      </div>
+
+      <!-- Idea 4 -->
+      <div class="idea-card" id="idea-4">
+        <div class="idea-header">
+          <div class="idea-title-wrap">
+            <span class="idea-rank">Rank 4 · Conceptual Maturity</span>
+            <h3 class="idea-title">Living System Specifications Promotion (<code>openspec/specs/</code> vs Delta Specs)</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="badge badge-purple">archive:consolidation</span>
+            <span class="badge badge-success">Confidence: 90%</span>
+            <span class="badge badge-purple">Complexity: Medium</span>
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Description</div>
+          <p>
+            Reframe OpenSpec changes as <em>delta flight recorders</em> rather than permanent destinations. In OpenSpec methodology, <code>openspec/changes/&lt;feature&gt;/</code> describes <em>what is changing</em>, while <code>openspec/specs/&lt;domain&gt;.md</code> describes <em>what the system is today</em>.
+          </p>
+          <p>
+            When a change is finished and archived:
+          </p>
+          <ul style="margin-left: 20px; margin-bottom: 12px; font-size: 14px;">
+            <li>The delta requirements in <code>spec.md</code> are promoted into the corresponding domain specification under <code>openspec/specs/</code> (e.g. <code>specs/harnesses.md</code>, <code>specs/doctor.md</code>).</li>
+            <li>The change folder itself is archived and can later be compacted or pruned with zero risk of knowledge loss, because the authoritative specification lives in <code>specs/</code>.</li>
+            <li><code>ce-ai doctor</code> audits if active changes are missing target domain mappings.</li>
+          </ul>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Grounding Basis</div>
+          <div class="basis-box">
+            <span class="basis-tag">external:</span> The OpenSpec specification standard explicitly defines <code>specs/</code> as the durable living system specification and <code>changes/</code> as transient deltas. In <code>ce-ai</code> today, <code>specs/</code> is currently unused, forcing all knowledge to sit in 108 delta folders.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Why It Matters</div>
+          <p>Transitions the codebase from an archaeology site of past PRs into a coherent, navigable living architecture. AI agents orient to 5-10 domain specs instead of wading through 100 historical change proposals.</p>
+        </div>
+
+        <div class="tradeoffs-box">
+          <strong>Tradeoffs:</strong> Requires establishing standard domain spec files for the repository and defining a promotion protocol during archival.
+        </div>
+      </div>
+
+      <!-- Idea 5 -->
+      <div class="idea-card" id="idea-5">
+        <div class="idea-header">
+          <div class="idea-title-wrap">
+            <span class="idea-rank">Rank 5 · Agent Accuracy</span>
+            <h3 class="idea-title">Solution Library Drift Probe: Dead Link &amp; Symbol Rot Detection</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="badge badge-warning">solutions:drift-and-lint</span>
+            <span class="badge badge-success">Confidence: 95%</span>
+            <span class="badge badge-success">Complexity: Low</span>
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Description</div>
+          <p>
+            Add a dedicated <strong>Solution Health Probe</strong> to <code>ce-ai doctor</code> that audits all files in <code>docs/solutions/**/*.md</code>:
+          </p>
+          <ul style="margin-left: 20px; margin-bottom: 12px; font-size: 14px;">
+            <li><strong>Path Existence Check:</strong> Scans for backticked paths and markdown links (e.g. <code>src/harness/kimi.rs</code>, <code>components: [commands::workflow]</code>). If a cited file does not exist in the working tree, emit: <code>doctor-warn: solution 'architecture/xyz.md' references non-existent path 'src/old.rs' (refactored or deleted)</code>.</li>
+            <li><strong>Frontmatter Schema Lint:</strong> Validates that YAML frontmatter contains required fields (<code>title</code>, <code>module</code>/<code>category</code>, <code>problem_type</code>, <code>tags</code>, <code>applies_when</code>) so search agents like <code>learnings-researcher</code> index them reliably.</li>
+            <li><strong>Deprecation Suggestions:</strong> If more than 50% of cited paths in a solution are dead, doctor suggests marking the solution as deprecated: <code>status: deprecated</code>.</li>
+          </ul>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Grounding Basis</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:</span> <code>docs/solutions/</code> (72 files) and <code>docs/solutions/architecture/openspec-archive-command-and-ledger-synchronization.md:13-14</code> (cites components and files). Code refactors frequently invalidate past solution snippets without notice.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Why It Matters</div>
+          <p>Directly prevents AI coding agents from hallucinating obsolete APIs and reproducing bugs that were fixed months ago. Keeps the team's institutional memory empirically grounded in current source code.</p>
+        </div>
+
+        <div class="tradeoffs-box">
+          <strong>Tradeoffs:</strong> Must ignore external URLs or historical changelog references; only paths matching repo patterns (<code>src/**</code>, <code>tests/**</code>) should be validated.
+        </div>
+      </div>
+
+      <!-- Idea 6 -->
+      <div class="idea-card" id="idea-6">
+        <div class="idea-header">
+          <div class="idea-title-wrap">
+            <span class="idea-rank">Rank 6</span>
+            <h3 class="idea-title">Automated Solution Refresh &amp; Deduplication Workflow (<code>ce-ai doc refresh</code>)</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="badge badge-warning">solutions:drift-and-lint</span>
+            <span class="badge badge-warning">Confidence: 80%</span>
+            <span class="badge badge-purple">Complexity: Medium</span>
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Description</div>
+          <p>
+            Bridge the existing <code>ce-compound-refresh</code> agent skill with native CLI diagnostics. Over time, multiple solutions accumulate covering similar topics (e.g. 5 solutions on harness adapters, 4 on test isolation).
+          </p>
+          <p>
+            Introduce <code>ce-ai doc refresh [--cluster]</code>:
+          </p>
+          <ul style="margin-left: 20px; margin-bottom: 12px; font-size: 14px;">
+            <li>Analyzes tags, modules, and content overlap across <code>docs/solutions/</code>.</li>
+            <li>Identifies clusters of 3+ solutions addressing the same subsystem.</li>
+            <li>Generates an audit report outlining overlapping advice and suggests running the <code>/ce-compound-refresh</code> skill to merge fragmented troubleshooting notes into a single durable architectural reference.</li>
+          </ul>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Grounding Basis</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:</span> <code>docs/solutions/</code> contains overlapping topics in <code>architecture/</code> and <code>workflow-issues/</code>, and <span class="basis-tag">external:</span> the <code>ce-compound-refresh</code> skill already exists in the Compound Engineering plugin but lacks an automated discovery trigger.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Why It Matters</div>
+          <p>Practices true Compound Engineering: rather than letting documentation fragment into 200 tiny notes, the system continuously refactors knowledge into dense, high-leverage principles.</p>
+        </div>
+
+        <div class="tradeoffs-box">
+          <strong>Tradeoffs:</strong> Automated merging of prose is subjective; the CLI should diagnose and cluster, while delegating the actual editorial synthesis to the agent skill.
+        </div>
+      </div>
+
+      <!-- Idea 7 -->
+      <div class="idea-card" id="idea-7">
+        <div class="idea-header">
+          <div class="idea-title-wrap">
+            <span class="idea-rank">Rank 7 · Universal Applicability</span>
+            <h3 class="idea-title">Project-Wide Doc Debt Engine with Turn-0 RepoState Visibility</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="badge badge-cyan">governance:adoption-hygiene</span>
+            <span class="badge badge-success">Confidence: 95%</span>
+            <span class="badge badge-success">Complexity: Low</span>
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Description</div>
+          <p>
+            Make documentation debt a first-class citizen in the <strong>Zero-Step Drift Recovery</strong> architecture. Any repository adopted via <code>ce-ai init-prj</code> runs <code>ce-ai workflow resume</code> at the start of every session (Turn-0).
+          </p>
+          <p>
+            Features:
+          </p>
+          <ul style="margin-left: 20px; margin-bottom: 12px; font-size: 14px;">
+            <li><strong>Turn-0 Summary Banner:</strong> Appends a compact doc hygiene line to <code>RepoState</code>: <code>doc debt: 3 unarchived specs (code merged), 1 stale spec (34d), 2 dead solution links</code>.</li>
+            <li><strong>Configurable Thresholds in <code>.ce-ai.json</code>:</strong>
+              <pre style="background: var(--surface-elevated); padding: 8px 12px; border-radius: 6px; font-size: 12px; margin: 6px 0; border: 1px solid var(--border);"><code>{
+  "doc_hygiene": {
+    "stale_spec_days": 21,
+    "archive_compaction_threshold": 30,
+    "check_solution_paths": true
+  }
+}</code></pre>
+            </li>
+            <li><strong>Adopted Project Parity:</strong> Probes automatically run in any adopted client workspace, ensuring client repositories maintain the exact same hygiene guarantees as <code>ce-ai</code> itself.</li>
+          </ul>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Grounding Basis</div>
+          <div class="basis-box">
+            <span class="basis-tag">direct:</span> <code>CONCEPTS.md:53</code> (Zero-Step Drift Recovery) and <code>src/commands/init_prj.rs</code>.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Why It Matters</div>
+          <p>Solves the user's primary prompt: <em>"eso pasa en cualquier proyecto manejado con ce-ai también... habría que hacer que doctor vaya detectando eso si es posible"</em>. Bridges `doctor` diagnostics and Turn-0 session delivery into a cohesive governance shield.</p>
+        </div>
+
+        <div class="tradeoffs-box">
+          <strong>Tradeoffs:</strong> Keep Turn-0 execution strictly under 15ms so developer start time remains instantaneous.
+        </div>
+      </div>
+    </section>
+
+    <!-- Rejection Summary -->
+    <section id="rejections">
+      <h2>4. Rejection Summary (Adversarial Critique &amp; Filtered Options)</h2>
+      <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">
+        To maintain high signal, 21 candidate ideas were critiqued and eliminated during Phase 3 filtering. Key rejections with explicit rationales:
+      </p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Candidate Move</th>
+            <th>Frame / Origin</th>
+            <th>Primary Axis</th>
+            <th>Rejection Rationale</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Autonomous Silent Archival &amp; Auto-Checking</strong></td>
+            <td>Constraint-Flipping</td>
+            <td><code>doctor:openspec-lifecycle</code></td>
+            <td><strong>Violates State Determinism:</strong> Automatically ticking checkboxes and moving folders without user approval risks masking genuinely abandoned or broken tasks. Doctor must advise and offer <code>--fix</code>, not mutate silently.</td>
+          </tr>
+          <tr>
+            <td><strong>Hard CI Failure on Any Doc Rot (Exit 6)</strong></td>
+            <td>Assumption-Breaking</td>
+            <td><code>governance:adoption-hygiene</code></td>
+            <td><strong>Excessive Friction:</strong> Blocking builds because an archived spec is older than 60 days or a solution has a dead path halts emergency hotfixes. Better offered as an opt-in flag (<code>ce-ai doctor --strict-docs</code>).</td>
+          </tr>
+          <tr>
+            <td><strong>Orphan Git Branch / Zero-Disk Archives</strong></td>
+            <td>Constraint-Flipping</td>
+            <td><code>archive:consolidation</code></td>
+            <td><strong>DX Degradation:</strong> Storing archives exclusively on a separate branch or git tags breaks ordinary GitHub code search, web UI browsing, and local IDE grep navigation. Generational compaction achieves 90% of benefits with zero DX penalty.</td>
+          </tr>
+          <tr>
+            <td><strong>Git Hook Auto-Archival on Commit</strong></td>
+            <td>Inversion/Automation</td>
+            <td><code>governance:adoption-hygiene</code></td>
+            <td><strong>Fragile Integration:</strong> Client repositories often have custom git hook managers (Husky, lefthook) or complex rebase workflows where git hooks can fail or cause merge conflicts. Doctor probes are vastly safer.</td>
+          </tr>
+          <tr>
+            <td><strong>Full AST Semantic Verification of Design.md</strong></td>
+            <td>Assumption-Breaking</td>
+            <td><code>doctor:openspec-lifecycle</code></td>
+            <td><strong>Too Expensive &amp; Brittle:</strong> Parsing arbitrary prose in <code>design.md</code> to map against Rust AST requires language-specific compiler frontends and fails on non-Rust adopted projects. Git commit &amp; file existence heuristics provide 95% of the value at 1% of the complexity.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer class="composition-signal">
+      Composed 2026-09-12T16:00:00Z by ce-ideate · repo-grounded · <a href="#grounding" style="color: var(--accent); text-decoration: none;">docs-debt-consolidation-and-doctor</a>
+    </footer>
+  </div>
+</body>
+</html>
