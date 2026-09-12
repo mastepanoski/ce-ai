@@ -799,6 +799,116 @@ fn test_doctor_reports_gate_check_telemetry() {
 }
 
 #[test]
+fn test_doctor_reports_gate_check_telemetry_with_blocked() {
+    use crate::commands::gate::{log_gate_event, GateDecision, GateEventRecord};
+
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path().join("repo");
+    let config_dir = tmp.path().join("config");
+    let opencode_dir = tmp.path().join("opencode");
+    std::fs::create_dir_all(&repo_root).unwrap();
+    std::fs::create_dir_all(&config_dir).unwrap();
+    std::fs::create_dir_all(&opencode_dir).unwrap();
+
+    std::fs::write(
+        config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let record = GateEventRecord {
+        timestamp: "2026-09-09T12:00:00Z".to_string(),
+        harness: "claude".to_string(),
+        tool: "Write".to_string(),
+        path: "src/main.rs".to_string(),
+        workspace: repo_root.display().to_string(),
+        branch: Some("feat/foo".to_string()),
+        stage: Some(4),
+        feature: Some("foo".to_string()),
+        decision: GateDecision::Blocked,
+        edge_case: None,
+        reason: "missing proposal.md, spec.md".to_string(),
+    };
+    log_gate_event(&config_dir, &record).unwrap();
+
+    let ctx = Context {
+        config_dir,
+        opencode_config_dir: opencode_dir,
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: false,
+    };
+
+    let args = Args::default();
+    let res = run(&ctx, &args);
+    assert!(res.is_ok());
+}
+
+#[test]
+fn test_doctor_surfaces_blocked_gate_receipt() {
+    use crate::state::state::{
+        GateDecision, GateReceipt, WorkflowSource, WorkflowStage, WorkflowState,
+    };
+
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path().join("repo");
+    let config_dir = tmp.path().join("config");
+    let opencode_dir = tmp.path().join("opencode");
+    std::fs::create_dir_all(&repo_root).unwrap();
+    std::fs::create_dir_all(&config_dir).unwrap();
+    std::fs::create_dir_all(&opencode_dir).unwrap();
+
+    std::fs::write(
+        config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let mut state = State::new();
+    let wf = WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: "ce-work".to_string(),
+        feature_name: Some("test-feat".to_string()),
+        updated_at: "2026-09-12T00:00:00Z".to_string(),
+        source: WorkflowSource::default(),
+        resolution: None,
+        new_cycle: false,
+    };
+    state
+        .workflows
+        .insert(State::workspace_branch_key(&repo_root, None), wf);
+    state.gate_receipts.insert(
+        "test-feat".to_string(),
+        GateReceipt {
+            timestamp: "2026-09-12T00:00:00Z".to_string(),
+            feature: "test-feat".to_string(),
+            target_path: "src/foo.rs".to_string(),
+            decision: GateDecision::Blocked,
+            stage: Some(4),
+            entry_point: None,
+            tier: "full".to_string(),
+            missing_artifacts: vec!["proposal.md".to_string(), "spec.md".to_string()],
+            reason: "blocked".to_string(),
+        },
+    );
+    state.save(&config_dir.join("state.json")).unwrap();
+
+    let ctx = Context {
+        config_dir,
+        opencode_config_dir: opencode_dir,
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: false,
+    };
+
+    let args = Args::default();
+    let res = run(&ctx, &args);
+    assert!(res.is_ok());
+}
+
+#[test]
 fn test_doctor_stays_ok_with_ship_readiness_gaps() {
     // Issue #354: a workspace with commits ahead but no Stage 6 artifact and no
     // code-review receipt must emit non-fatal warnings, never fatal findings.

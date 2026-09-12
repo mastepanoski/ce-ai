@@ -872,6 +872,11 @@ pub fn probe_openspec_context_in(
         let mut entries: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
         if let Ok(read) = std::fs::read_dir(&openspec_dir) {
             for entry in read.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if name_str == "archive" || name_str.starts_with('.') {
+                    continue;
+                }
                 if entry.path().is_dir() {
                     let mtime = entry
                         .metadata()

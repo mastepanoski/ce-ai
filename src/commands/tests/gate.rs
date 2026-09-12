@@ -197,6 +197,216 @@ fn test_pure_decision_engine_edge_cases_isolated() {
 }
 
 #[test]
+fn test_evaluate_gate_policy_matrix_exemptions_and_enforcement() {
+    use crate::commands::gate::evaluate_gate_policy;
+    use crate::state::state::{AdoptionTier, GateMode};
+
+    // 1. Enforce mode blocks Stage 4 with missing artifacts and returns missing list
+    let (decision, edge, missing, reason) = evaluate_gate_policy(
+        Some(WorkflowStage::WorkTdd),
+        Some("blocked-feat"),
+        Some(FeatureResolution::Branch),
+        false,
+        false,
+        AdoptionTier::Full,
+        Some("ce-work"),
+        false, // missing proposal
+        true,
+        false, // missing tasks
+        GateMode::Enforce,
+    );
+    assert_eq!(decision, GateDecision::Blocked);
+    assert_eq!(edge, None);
+    assert_eq!(missing, vec!["proposal.md", "tasks.md"]);
+    assert!(reason.contains("Stage 4 (ce-work) active for 'blocked-feat'"));
+
+    // 2. Observe mode returns WouldBlock for same scenario
+    let (decision, edge, missing, _) = evaluate_gate_policy(
+        Some(WorkflowStage::WorkTdd),
+        Some("observe-feat"),
+        Some(FeatureResolution::Branch),
+        false,
+        false,
+        AdoptionTier::Full,
+        Some("ce-work"),
+        false,
+        true,
+        false,
+        GateMode::Observe,
+    );
+    assert_eq!(decision, GateDecision::WouldBlock);
+    assert_eq!(edge, None);
+    assert_eq!(missing, vec!["proposal.md", "tasks.md"]);
+
+    // 3. Direct Entry Point: ce-debug exempt from OpenSpec requirement
+    for entry in [
+        "ce-debug",
+        "ce-debug: fix auth race condition",
+        "DEBUG: crash on start",
+    ] {
+        let (decision, edge, missing, reason) = evaluate_gate_policy(
+            Some(WorkflowStage::WorkTdd),
+            Some("debug-feat"),
+            Some(FeatureResolution::Branch),
+            false,
+            false,
+            AdoptionTier::Full,
+            Some(entry),
+            false, // no proposal
+            false, // no spec
+            false, // no tasks
+            GateMode::Enforce,
+        );
+        assert_eq!(decision, GateDecision::Pass);
+        assert_eq!(edge, None);
+        assert!(missing.is_empty());
+        assert!(reason.contains("ce-debug direct entry point permits bug fix writes"));
+    }
+
+    // 4. AdoptionTier::Minimal exempt from full OpenSpec requirement
+    let (decision, edge, missing, reason) = evaluate_gate_policy(
+        Some(WorkflowStage::WorkTdd),
+        Some("minimal-feat"),
+        Some(FeatureResolution::Branch),
+        false,
+        false,
+        AdoptionTier::Minimal,
+        Some("ce-work"),
+        false, // no proposal
+        false, // no spec
+        false, // no tasks
+        GateMode::Enforce,
+    );
+    assert_eq!(decision, GateDecision::Pass);
+    assert_eq!(edge, None);
+    assert!(missing.is_empty());
+    assert!(reason.contains("project tier minimal permits writes without full OpenSpec"));
+
+    // 5. Stage != 4 passes regardless of missing artifacts
+    let (decision, edge, missing, _) = evaluate_gate_policy(
+        Some(WorkflowStage::ExecutionPlan),
+        Some("plan-feat"),
+        Some(FeatureResolution::Branch),
+        false,
+        false,
+        AdoptionTier::Full,
+        Some("ce-plan"),
+        false,
+        false,
+        false,
+        GateMode::Enforce,
+    );
+    assert_eq!(decision, GateDecision::Pass);
+    assert_eq!(edge, None);
+    assert!(missing.is_empty());
+
+    // 6. Edge cases never block, even in enforce mode with missing artifacts
+    let (decision, edge, missing, _) = evaluate_gate_policy(
+        Some(WorkflowStage::WorkTdd),
+        Some("edge-feat"),
+        Some(FeatureResolution::MtimeFallback),
+        false,
+        false,
+        AdoptionTier::Full,
+        Some("ce-work"),
+        false,
+        false,
+        false,
+        GateMode::Enforce,
+    );
+    assert_eq!(decision, GateDecision::EdgeCase);
+    assert_eq!(edge, Some(GateEdgeCase::MtimeFallback));
+    assert!(missing.is_empty());
+}
+
+#[test]
+fn test_format_blocked_remediation_message() {
+    use crate::commands::gate::format_blocked_remediation_message;
+
+    let missing = vec![
+        "proposal.md".to_string(),
+        "spec.md".to_string(),
+        "tasks.md".to_string(),
+    ];
+    let msg = format_blocked_remediation_message(
+        "src/commands/foo.rs",
+        "Stage 4 (WorkTdd)",
+        "awesome-feature",
+        &missing,
+    );
+
+    assert!(msg.contains("ce-ai gate check: Write blocked on 'src/commands/foo.rs'"));
+    assert!(msg.contains("Active Stage: Stage 4 (WorkTdd) for feature 'awesome-feature'"));
+    assert!(msg.contains("✖ proposal.md — Missing problem statement, boundaries & risk evaluation"));
+    assert!(msg.contains("✖ spec.md — Missing formal WHEN/THEN requirements & acceptance criteria"));
+    assert!(msg.contains("✖ tasks.md — Missing implementation checklist with ~200 LOC work units"));
+    assert!(msg
+        .contains("Run `/ce-plan` or create missing files in `openspec/changes/awesome-feature/`"));
+    assert!(msg.contains("ce-ai workflow checkpoint --stage 4 --task \"ce-debug: <issue>\""));
+    assert!(msg.contains("CE_AI_DISABLE_GATE_CHECK=1"));
+}
+
+#[test]
+fn test_write_gate_receipt_atomic_and_state_persistence() {
+    use crate::commands::gate::{write_gate_receipt, GateReceipt};
+    use crate::commands::Context;
+    use crate::state::state::{GateDecision, State};
+    use tempfile::tempdir;
+
+    let tmp_home = tempdir().unwrap();
+    let tmp_repo = tempdir().unwrap();
+    let config_dir = tmp_home.path().join(".ce-ai");
+    std::fs::create_dir_all(&config_dir).unwrap();
+
+    let state = State::new();
+    state.save(&config_dir.join("state.json")).unwrap();
+
+    let change_dir = tmp_repo
+        .path()
+        .join("openspec")
+        .join("changes")
+        .join("test-feature");
+    std::fs::create_dir_all(&change_dir).unwrap();
+
+    let ctx = Context {
+        config_dir: config_dir.clone(),
+        opencode_config_dir: tmp_home.path().join(".config/opencode"),
+        workspace_root: Some(tmp_repo.path().to_path_buf()),
+        dry_run: false,
+        verbose: false,
+        quiet: false,
+    };
+
+    let receipt = GateReceipt {
+        timestamp: "2026-09-11T22:30:00Z".to_string(),
+        feature: "test-feature".to_string(),
+        target_path: "src/main.rs".to_string(),
+        decision: GateDecision::Blocked,
+        stage: Some(4),
+        entry_point: Some("ce-work".to_string()),
+        tier: "full".to_string(),
+        missing_artifacts: vec!["tasks.md".to_string()],
+        reason: "missing tasks.md".to_string(),
+    };
+
+    write_gate_receipt(&ctx, tmp_repo.path(), &receipt).unwrap();
+
+    // 1. Verify .validation.json was written to openspec/changes/test-feature/.validation.json
+    let validation_path = change_dir.join(".validation.json");
+    assert!(validation_path.is_file());
+    let val_content = std::fs::read_to_string(&validation_path).unwrap();
+    assert!(val_content.contains(r#""decision": "blocked""#));
+    assert!(val_content.contains(r#""target_path": "src/main.rs""#));
+
+    // 2. Verify state.json was updated with gate_receipts
+    let state_reloaded = State::load(&config_dir.join("state.json")).unwrap();
+    assert_eq!(state_reloaded.gate_receipts.len(), 1);
+    let stored = state_reloaded.gate_receipts.get("test-feature").unwrap();
+    assert_eq!(stored.decision, GateDecision::Blocked);
+    assert_eq!(stored.missing_artifacts, vec!["tasks.md"]);
+}
+
+#[test]
 fn test_parse_tool_and_path_from_json_payload() {
     use crate::commands::gate::parse_tool_call_json;
 
@@ -347,6 +557,7 @@ fn test_run_gate_check_workflow_matrix() {
         tool: Some("Write".to_string()),
         path: Some("src/main.rs".to_string()),
         disabled: true,
+        ..Default::default()
     };
     run_gate_check(&ctx, &args_disabled).unwrap();
     assert!(!crate::commands::gate::gate_events_log_path(&config_dir).exists());
@@ -356,11 +567,12 @@ fn test_run_gate_check_workflow_matrix() {
         tool: Some("Write".to_string()),
         path: Some("README.md".to_string()),
         disabled: false,
+        ..Default::default()
     };
     run_gate_check(&ctx, &args_non_target).unwrap();
     assert!(!crate::commands::gate::gate_events_log_path(&config_dir).exists());
 
-    // 3. Stage 4 without OpenSpec artifacts -> WouldBlock
+    // 3. Stage 4 without OpenSpec artifacts -> WouldBlock (in observe mode)
     let state_path = config_dir.join("state.json");
     let mut state = State::default();
     for s in [
@@ -384,7 +596,8 @@ fn test_run_gate_check_workflow_matrix() {
     let args_target = GateCheckArgs {
         tool: Some("Write".to_string()),
         path: Some("src/lib.rs".to_string()),
-        disabled: false,
+        mode: Some("observe".to_string()),
+        ..Default::default()
     };
     run_gate_check(&ctx, &args_target).unwrap();
 
@@ -454,6 +667,7 @@ fn test_run_gate_check_stale_cycle_guard_uses_typed_flag_not_display_string() {
         tool: Some("Write".to_string()),
         path: Some("src/lib.rs".to_string()),
         disabled: false,
+        ..Default::default()
     };
     run_gate_check(&ctx, &args_target).unwrap();
 
@@ -488,4 +702,254 @@ fn test_run_gate_check_stale_cycle_guard_uses_typed_flag_not_display_string() {
         "must continue detecting stale_cycle_guard on subsequent writes with arbitrary task wording"
     );
     assert_eq!(stats2.would_block, 0);
+}
+
+#[test]
+fn test_run_gate_check_blocking_enforcement_and_receipt_creation() {
+    use crate::commands::gate::{run_gate_check, GateCheckArgs, GateDecision};
+    use crate::commands::Context;
+    use crate::error::CeError;
+    use crate::state::state::{State, WorkflowSource, WorkflowStage, WorkflowState};
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let config_dir = dir.path().join(".ce-ai");
+    std::fs::create_dir_all(&config_dir).unwrap();
+    let repo_root = dir.path().join("repo");
+    std::fs::create_dir_all(&repo_root).unwrap();
+
+    let ctx = Context {
+        config_dir: config_dir.clone(),
+        opencode_config_dir: config_dir.join("opencode"),
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let state_path = config_dir.join("state.json");
+    let mut state = State::default();
+
+    // Stage 4 active with feature 'missing-contract', but no OpenSpec files created
+    let wf = WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: "Implementing core logic without specs".to_string(),
+        feature_name: Some("missing-contract".to_string()),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        source: WorkflowSource::Manual,
+        resolution: None,
+        new_cycle: false,
+    };
+    let key = State::workspace_branch_key(&repo_root, None);
+    state.workflows.insert(key, wf.clone());
+    state.workflow = Some(wf);
+    state.save(&state_path).unwrap();
+
+    let args = GateCheckArgs {
+        tool: Some("Write".to_string()),
+        path: Some("src/commands/new_feat.rs".to_string()),
+        mode: Some("enforce".to_string()),
+        entry_point: None,
+        disabled: false,
+    };
+
+    // Must return CeError::Usage which maps to Exit Code 2
+    let res = run_gate_check(&ctx, &args);
+    assert!(res.is_err());
+    match res.unwrap_err() {
+        CeError::Usage(msg) => {
+            assert_eq!(CeError::Usage(msg.clone()).exit_code(), 2);
+            assert!(msg.contains("write blocked on 'src/commands/new_feat.rs'"));
+            assert!(msg.contains("missing required OpenSpec contract artifacts"));
+        }
+        other => panic!("expected CeError::Usage (exit code 2), got {other:?}"),
+    }
+
+    // Telemetry logged as blocked
+    let stats = crate::commands::gate::load_gate_stats(&config_dir).unwrap();
+    assert_eq!(stats.total_observed, 1);
+    assert_eq!(stats.blocked, 1);
+    assert_eq!(stats.would_block, 0);
+
+    // Gate receipt recorded in state.json
+    let state_reloaded = State::load(&state_path).unwrap();
+    assert_eq!(state_reloaded.gate_receipts.len(), 1);
+    let receipt = state_reloaded
+        .gate_receipts
+        .get("missing-contract")
+        .expect("receipt must exist");
+    assert_eq!(receipt.decision, GateDecision::Blocked);
+    assert_eq!(receipt.target_path, "src/commands/new_feat.rs");
+    assert!(receipt
+        .missing_artifacts
+        .contains(&"proposal.md".to_string()));
+    assert!(receipt.missing_artifacts.contains(&"spec.md".to_string()));
+    assert!(receipt.missing_artifacts.contains(&"tasks.md".to_string()));
+}
+
+#[test]
+fn test_run_gate_check_observe_mode_does_not_block() {
+    use crate::commands::gate::{run_gate_check, GateCheckArgs, GateDecision};
+    use crate::commands::Context;
+    use crate::state::state::{State, WorkflowSource, WorkflowStage, WorkflowState};
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let config_dir = dir.path().join(".ce-ai");
+    std::fs::create_dir_all(&config_dir).unwrap();
+    let repo_root = dir.path().join("repo");
+    std::fs::create_dir_all(&repo_root).unwrap();
+
+    let ctx = Context {
+        config_dir: config_dir.clone(),
+        opencode_config_dir: config_dir.join("opencode"),
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let state_path = config_dir.join("state.json");
+    let mut state = State::default();
+
+    let wf = WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: "Writing code in observe mode".to_string(),
+        feature_name: Some("observe-feature".to_string()),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        source: WorkflowSource::Manual,
+        resolution: None,
+        new_cycle: false,
+    };
+    let key = State::workspace_branch_key(&repo_root, None);
+    state.workflows.insert(key, wf.clone());
+    state.workflow = Some(wf);
+    state.save(&state_path).unwrap();
+
+    let args = GateCheckArgs {
+        tool: Some("Write".to_string()),
+        path: Some("src/observe.rs".to_string()),
+        mode: Some("observe".to_string()),
+        entry_point: None,
+        disabled: false,
+    };
+
+    // In observe mode, returns Ok(()) without blocking
+    let res = run_gate_check(&ctx, &args);
+    assert!(res.is_ok());
+
+    let stats = crate::commands::gate::load_gate_stats(&config_dir).unwrap();
+    assert_eq!(stats.total_observed, 1);
+    assert_eq!(stats.blocked, 0);
+    assert_eq!(stats.would_block, 1);
+
+    let state_reloaded = State::load(&state_path).unwrap();
+    let receipt = state_reloaded
+        .gate_receipts
+        .get("observe-feature")
+        .expect("receipt must exist");
+    assert_eq!(receipt.decision, GateDecision::WouldBlock);
+}
+
+#[test]
+fn test_run_gate_check_ce_debug_and_tier_minimal_exemptions_pass() {
+    use crate::commands::gate::{run_gate_check, GateCheckArgs, GateDecision};
+    use crate::commands::Context;
+    use crate::state::state::{
+        AdoptionTier, ProjectAdoptionEntry, State, WorkflowSource, WorkflowStage, WorkflowState,
+    };
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let config_dir = dir.path().join(".ce-ai");
+    std::fs::create_dir_all(&config_dir).unwrap();
+    let repo_root = dir.path().join("repo");
+    std::fs::create_dir_all(&repo_root).unwrap();
+
+    let ctx = Context {
+        config_dir: config_dir.clone(),
+        opencode_config_dir: config_dir.join("opencode"),
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let state_path = config_dir.join("state.json");
+    let mut state = State::default();
+
+    // 1. ce-debug task text permits write in Stage 4 without OpenSpec contract
+    let wf_debug = WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: "ce-debug: fix null pointer in auth handler".to_string(),
+        feature_name: Some("debug-fix".to_string()),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        source: WorkflowSource::Manual,
+        resolution: None,
+        new_cycle: false,
+    };
+    let key = State::workspace_branch_key(&repo_root, None);
+    state.workflows.insert(key.clone(), wf_debug.clone());
+    state.workflow = Some(wf_debug);
+    state.save(&state_path).unwrap();
+
+    let args_debug = GateCheckArgs {
+        tool: Some("Edit".to_string()),
+        path: Some("src/auth.rs".to_string()),
+        mode: Some("enforce".to_string()),
+        entry_point: None,
+        disabled: false,
+    };
+    assert!(run_gate_check(&ctx, &args_debug).is_ok());
+
+    let stats1 = crate::commands::gate::load_gate_stats(&config_dir).unwrap();
+    assert_eq!(stats1.pass, 1);
+    assert_eq!(stats1.blocked, 0);
+
+    // 2. Project adopted with AdoptionTier::Minimal permits write in Stage 4 without OpenSpec
+    state.projects.push(ProjectAdoptionEntry {
+        path: repo_root.clone(),
+        file: "AGENTS.md".to_string(),
+        tier: AdoptionTier::Minimal,
+        block_version: 1,
+        block_sha256: "dummy".to_string(),
+        created_file: false,
+        adopted_at: "2026-09-01T00:00:00Z".to_string(),
+    });
+    let wf_minimal = WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: "Ordinary work in minimal project".to_string(),
+        feature_name: Some("minimal-work".to_string()),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        source: WorkflowSource::Manual,
+        resolution: None,
+        new_cycle: false,
+    };
+    state.workflows.insert(key, wf_minimal.clone());
+    state.workflow = Some(wf_minimal);
+    state.save(&state_path).unwrap();
+
+    let args_minimal = GateCheckArgs {
+        tool: Some("Write".to_string()),
+        path: Some("src/minimal.rs".to_string()),
+        mode: Some("enforce".to_string()),
+        entry_point: None,
+        disabled: false,
+    };
+    assert!(run_gate_check(&ctx, &args_minimal).is_ok());
+
+    let stats2 = crate::commands::gate::load_gate_stats(&config_dir).unwrap();
+    assert_eq!(stats2.pass, 2);
+    assert_eq!(stats2.blocked, 0);
+
+    // Verify receipt in state
+    let state_reloaded = State::load(&state_path).unwrap();
+    assert_eq!(
+        state_reloaded
+            .gate_receipts
+            .get("minimal-work")
+            .unwrap()
+            .decision,
+        GateDecision::Pass
+    );
 }

@@ -234,15 +234,21 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
         );
     }
 
-    // Gate Check Spike Telemetry Metrics (Issue #333)
+    // Gate Check Telemetry Metrics (Issue #333, #334)
     let gate_stats = crate::commands::gate::load_gate_stats(&ctx.config_dir).unwrap_or_default();
     if gate_stats.total_observed > 0 {
         let edge_total = gate_stats.mtime_fallback
             + gate_stats.worktree_uncommitted
             + gate_stats.stale_cycle_guard;
+        let blocked_part = if gate_stats.blocked > 0 {
+            format!("{} blocked, ", gate_stats.blocked)
+        } else {
+            String::new()
+        };
         println!(
-            "gate-check: {} observed ({} would-block, {} pass, {} undetermined, {} edge-case: {} mtime_fallback, {} worktree_uncommitted, {} stale_cycle_guard)",
+            "gate-check: {} observed ({}{} would-block, {} pass, {} undetermined, {} edge-case: {} mtime_fallback, {} worktree_uncommitted, {} stale_cycle_guard)",
             gate_stats.total_observed,
+            blocked_part,
             gate_stats.would_block,
             gate_stats.pass,
             gate_stats.undetermined,
@@ -251,6 +257,24 @@ pub fn run(ctx: &Context) -> Result<(), CeError> {
             gate_stats.worktree_uncommitted,
             gate_stats.stale_cycle_guard,
         );
+    }
+
+    if let Ok(state) = State::load(&ctx.config_dir.join("state.json")) {
+        let branch = crate::commands::workflow::probe_git_branch(&ctx.repo_root());
+        if let Some(wf) = state.current_workflow_for_branch(&ctx.repo_root(), branch.as_deref()) {
+            if let Some(ref feat) = wf.feature_name {
+                if let Some(receipt) = state.gate_receipts.get(feat) {
+                    if receipt.decision == crate::state::state::GateDecision::Blocked {
+                        println!(
+                            "gate-warn: write blocked on '{}' for feature '{}' (missing: {})",
+                            receipt.target_path,
+                            receipt.feature,
+                            receipt.missing_artifacts.join(", ")
+                        );
+                    }
+                }
+            }
+        }
     }
 
     Ok(())
