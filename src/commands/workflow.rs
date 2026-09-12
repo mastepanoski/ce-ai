@@ -15,7 +15,8 @@ use crate::opencode::manifest::InstallManifest;
 use crate::opencode::plugins::MANAGED_DIR;
 use crate::state::diff;
 use crate::state::state::{
-    FeatureResolution, ReviewReceipt, State, WorkflowSource, WorkflowStage, WorkflowState,
+    DocHygieneConfig, FeatureResolution, ReviewReceipt, State, WorkflowSource, WorkflowStage,
+    WorkflowState,
 };
 
 #[derive(clap::Args)]
@@ -258,6 +259,11 @@ pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
             "! Warning: {count} OpenSpec change(s) complete but not archived — run 'ce-ai doctor' for details"
         ));
     }
+    if let Some(debt) = &repo_state.doc_debt {
+        if debt.has_debt() {
+            lines.push(format!("! Warning: {}", debt.summary_line()));
+        }
+    }
 
     Ok(lines)
 }
@@ -318,6 +324,11 @@ pub fn checkpoint_lines(
         lines.push(format!(
             "! Warning: {count} OpenSpec change(s) complete but not archived — run 'ce-ai doctor' for details"
         ));
+    }
+    if let Some(debt) = &repo_state.doc_debt {
+        if debt.has_debt() {
+            lines.push(format!("! Warning: {}", debt.summary_line()));
+        }
     }
 
     Ok(lines)
@@ -408,6 +419,9 @@ pub fn resume_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
             "  openspec ledger: ! {count} change(s) complete but not archived — run 'ce-ai doctor' for details"
         ));
     }
+    if let Some(debt) = &repo_state.doc_debt {
+        lines.push(format!("  {}", debt.summary_line()));
+    }
 
     if let Some(info) = &repo_state.openspec_context {
         lines.push(String::new());
@@ -462,6 +476,8 @@ pub struct RepoState {
     pub stage6_artifact_present: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub review_receipt: Option<ReviewReceipt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doc_debt: Option<DocDebtReport>,
 }
 
 /// Observe-only ship-readiness gap (issue #354). Nothing here blocks a command.
@@ -638,6 +654,179 @@ pub struct UnarchivedChange {
     pub total_tasks: usize,
 }
 
+/// Tri-state indicator for diagnostic probes.
+///
+/// In a non-git directory or when the necessary substrate is unavailable,
+/// probes return `Unknown` rather than silently reporting `Clean`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(tag = "status", content = "data", rename_all = "lowercase")]
+pub enum ProbeStatus<T> {
+    #[default]
+    Clean,
+    Debt(T),
+    Unknown,
+}
+
+impl<T> ProbeStatus<T> {
+    pub fn is_debt(&self) -> bool {
+        matches!(self, Self::Debt(_))
+    }
+
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown)
+    }
+
+    pub fn is_clean(&self) -> bool {
+        matches!(self, Self::Clean)
+    }
+
+    pub fn as_debt(&self) -> Option<&T> {
+        match self {
+            Self::Debt(d) => Some(d),
+            _ => None,
+        }
+    }
+}
+
+/// A detected desynchronization between an OpenSpec change and git/release state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OpenSpecDesyncFinding {
+    pub feature: String,
+    pub completed_tasks: usize,
+    pub total_tasks: usize,
+    pub reason: DesyncReason,
+}
+
+/// Root cause of an OpenSpec change desynchronization.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DesyncReason {
+    ParentTasksCompleteSubtasksOpen,
+    CodeMergedToMain,
+    ReleaseVersionSurpassed(String),
+}
+
+/// A pending OpenSpec change that has been inactive beyond the configured threshold.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StalePendingFinding {
+    pub feature: String,
+    pub days_inactive: u32,
+    pub completed_tasks: usize,
+    pub total_tasks: usize,
+    pub source: InactivitySource,
+}
+
+/// Source used to determine inactivity timestamp.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InactivitySource {
+    GitCommitDate,
+    FilesystemMtime,
+}
+
+/// A drift finding in the `docs/solutions/` knowledge library.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SolutionDriftFinding {
+    pub solution_path: String,
+    pub dead_paths: Vec<String>,
+    pub missing_frontmatter_fields: Vec<String>,
+}
+
+/// Umbrella report aggregating documentation technical debt findings across probes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DocDebtReport {
+    pub git_available: bool,
+    pub openspec_desync: ProbeStatus<Vec<OpenSpecDesyncFinding>>,
+    pub stale_pending: ProbeStatus<Vec<StalePendingFinding>>,
+    pub solution_drift: ProbeStatus<Vec<SolutionDriftFinding>>,
+}
+
+impl DocDebtReport {
+    pub fn has_debt(&self) -> bool {
+        self.openspec_desync.is_debt()
+            || self.stale_pending.is_debt()
+            || self.solution_drift.is_debt()
+    }
+
+    pub fn summary_line(&self) -> String {
+        if !self.has_debt() {
+            if self.git_available {
+                return "doc debt: clean".to_string();
+            } else {
+                return "doc debt: clean [git: n/a]".to_string();
+            }
+        }
+
+        let mut parts = Vec::new();
+
+        if let ProbeStatus::Debt(desync) = &self.openspec_desync {
+            let count = desync.len();
+            let all_subtasks_open = desync
+                .iter()
+                .all(|d| matches!(d.reason, DesyncReason::ParentTasksCompleteSubtasksOpen));
+            let label = if all_subtasks_open {
+                format!("{count} unarchived (open subtasks)")
+            } else {
+                format!("{count} unarchived (code merged)")
+            };
+            parts.push(label);
+        }
+
+        if let ProbeStatus::Debt(stale) = &self.stale_pending {
+            let count = stale.len();
+            let max_days = stale.iter().map(|s| s.days_inactive).max().unwrap_or(0);
+            let spec_word = if count == 1 { "spec" } else { "specs" };
+            if self.git_available {
+                parts.push(format!("{count} stale {spec_word} ({max_days}d)"));
+            } else {
+                parts.push(format!("{count} stale {spec_word} [git: n/a]"));
+            }
+        }
+
+        if let ProbeStatus::Debt(drift) = &self.solution_drift {
+            let dead_count: usize = drift.iter().map(|d| d.dead_paths.len()).sum();
+            let fm_count: usize = drift
+                .iter()
+                .filter(|d| !d.missing_frontmatter_fields.is_empty())
+                .count();
+
+            if dead_count > 0 {
+                let link_word = if dead_count == 1 {
+                    "dead solution link"
+                } else {
+                    "dead solution links"
+                };
+                parts.push(format!("{dead_count} {link_word}"));
+            }
+            if fm_count > 0 {
+                let fm_word = if fm_count == 1 {
+                    "solution missing frontmatter"
+                } else {
+                    "solutions missing frontmatter"
+                };
+                parts.push(format!("{fm_count} {fm_word}"));
+            }
+        }
+
+        if !self.git_available && !parts.iter().any(|p| p.contains("[git: n/a]")) {
+            parts.push("[git: n/a]".to_string());
+        }
+
+        format!("doc debt: {}", parts.join(", "))
+    }
+}
+
+impl Default for DocDebtReport {
+    fn default() -> Self {
+        Self {
+            git_available: true,
+            openspec_desync: ProbeStatus::Clean,
+            stale_pending: ProbeStatus::Clean,
+            solution_drift: ProbeStatus::Clean,
+        }
+    }
+}
+
 pub fn probe_git_branch(repo_root: &Path) -> Option<String> {
     if let Ok(out) = std::process::Command::new("git")
         .args(["symbolic-ref", "--short", "HEAD"])
@@ -791,6 +980,17 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
                 .cloned()
         });
 
+    let doc_hygiene_cfg =
+        State::load_with_workspace_overrides(&ctx.config_dir.join("state.json"), Some(&repo_root))
+            .ok()
+            .map(|s| s.doc_hygiene())
+            .unwrap_or_default();
+    let doc_debt = Some(probe_doc_debt(
+        &repo_root,
+        git_branch.as_deref(),
+        &doc_hygiene_cfg,
+    ));
+
     RepoState {
         git_branch,
         head_sha,
@@ -805,6 +1005,7 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
         commits_ahead,
         stage6_artifact_present,
         review_receipt,
+        doc_debt,
     }
 }
 
@@ -925,23 +1126,30 @@ pub fn probe_openspec_context_in(
     })
 }
 
-/// Parses a tasks.md file and returns (completed_tasks, total_tasks).
-/// Gracefully returns (0, 0) if the file cannot be read or does not exist.
-pub fn count_task_checkboxes(tasks_path: &Path) -> (usize, usize) {
+/// Parses tasks content string and returns (completed_tasks, total_tasks).
+pub fn count_task_checkboxes_content(content: &str) -> (usize, usize) {
     let mut completed_tasks = 0;
     let mut total_tasks = 0;
-    if let Ok(content) = std::fs::read_to_string(tasks_path) {
-        for line in content.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]") {
-                completed_tasks += 1;
-                total_tasks += 1;
-            } else if trimmed.starts_with("- [ ]") {
-                total_tasks += 1;
-            }
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]") {
+            completed_tasks += 1;
+            total_tasks += 1;
+        } else if trimmed.starts_with("- [ ]") {
+            total_tasks += 1;
         }
     }
     (completed_tasks, total_tasks)
+}
+
+/// Parses a tasks.md file and returns (completed_tasks, total_tasks).
+/// Gracefully returns (0, 0) if the file cannot be read or does not exist.
+pub fn count_task_checkboxes(tasks_path: &Path) -> (usize, usize) {
+    if let Ok(content) = std::fs::read_to_string(tasks_path) {
+        count_task_checkboxes_content(&content)
+    } else {
+        (0, 0)
+    }
 }
 
 /// Scans openspec/changes/ across the entire repository for completed features that have not been moved to archive/.
@@ -984,6 +1192,558 @@ pub fn probe_unarchived_completed_changes(repo_root: &Path) -> Vec<UnarchivedCha
 
     completed_changes.sort_by(|a, b| a.feature.cmp(&b.feature));
     completed_changes
+}
+
+/// Inspects tasks content to determine whether all top-level (parent) tasks are completed
+/// while one or more subtasks remain uncompleted.
+pub fn is_parent_tasks_complete_subtasks_open_content(content: &str) -> bool {
+    let mut parent_total = 0;
+    let mut parent_completed = 0;
+    let mut has_open_subtask = false;
+
+    for line in content.lines() {
+        if line.starts_with("- [") || line.starts_with("* [") {
+            let rest = &line[2..];
+            if rest.starts_with("[x]") || rest.starts_with("[X]") {
+                parent_total += 1;
+                parent_completed += 1;
+            } else if rest.starts_with("[ ]") {
+                parent_total += 1;
+            }
+        } else {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("- [ ]") || trimmed.starts_with("* [ ]") {
+                has_open_subtask = true;
+            }
+        }
+    }
+
+    parent_total > 0 && parent_completed == parent_total && has_open_subtask
+}
+
+/// Inspects tasks.md to determine whether all top-level (parent) tasks are completed
+/// while one or more subtasks remain uncompleted.
+pub fn is_parent_tasks_complete_subtasks_open(tasks_path: &Path) -> bool {
+    if let Ok(content) = std::fs::read_to_string(tasks_path) {
+        is_parent_tasks_complete_subtasks_open_content(&content)
+    } else {
+        false
+    }
+}
+
+/// Helper to parse a 3-part SemVer token (stripping leading 'v' and boundary punctuation).
+fn parse_semver_token(token: &str) -> Option<(String, (u32, u32, u32))> {
+    let clean = token.trim_matches(|c: char| !c.is_alphanumeric() && c != '.');
+    let version_str = clean.strip_prefix('v').unwrap_or(clean);
+    let parts: Vec<&str> = version_str.split('.').collect();
+    if parts.len() == 3 {
+        if let (Ok(maj), Ok(min), Ok(patch)) = (
+            parts[0].parse::<u32>(),
+            parts[1].parse::<u32>(),
+            parts[2].parse::<u32>(),
+        ) {
+            return Some((version_str.to_string(), (maj, min, patch)));
+        }
+    }
+    None
+}
+
+/// Extracts the version declared in the repository's `Cargo.toml`.
+pub fn extract_cargo_version(repo_root: &Path) -> Option<(u32, u32, u32)> {
+    let cargo_path = repo_root.join("Cargo.toml");
+    let content = std::fs::read_to_string(cargo_path).ok()?;
+    let mut in_package = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed == "[package]" {
+            in_package = true;
+        } else if trimmed.starts_with('[') {
+            in_package = false;
+        } else if in_package && trimmed.starts_with("version") {
+            if let Some(val) = trimmed.split('=').nth(1) {
+                let clean = val.trim().trim_matches('"').trim_matches('\'');
+                if let Some((_, ver)) = parse_semver_token(clean) {
+                    return Some(ver);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Extracts any release version cited in tasks.md (e.g. "bump version to 1.50.1" or "Release tag v1.50.1").
+pub fn extract_cited_version(tasks_content: &str) -> Option<(String, (u32, u32, u32))> {
+    let mut highest: Option<(String, (u32, u32, u32))> = None;
+    for line in tasks_content.lines() {
+        let lower = line.to_lowercase();
+        if lower.contains("version")
+            || lower.contains("release")
+            || lower.contains("tag")
+            || lower.contains("bump")
+        {
+            for word in line.split_whitespace() {
+                if let Some((v_str, v_tuple)) = parse_semver_token(word) {
+                    match &highest {
+                        Some((_, cur_tuple)) if &v_tuple > cur_tuple => {
+                            highest = Some((v_str, v_tuple));
+                        }
+                        None => {
+                            highest = Some((v_str, v_tuple));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+    highest
+}
+
+/// Checks whether git history on the base branch contains commits referencing the feature.
+fn check_feature_merged_to_main(repo_root: &Path, feature: &str) -> bool {
+    for target in ["origin/main", "main", "origin/master", "master"] {
+        if let Some(out) = git_probe(
+            repo_root,
+            &["log", target, "-n", "100", "--grep", feature, "--format=%H"],
+        ) {
+            if out.status.success() {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                if !stdout.trim().is_empty() {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Probes documentation technical debt across OpenSpec synchronization, pending inactivity, and solution library drift.
+pub fn probe_doc_debt(
+    repo_root: &Path,
+    git_branch: Option<&str>,
+    config: &DocHygieneConfig,
+) -> DocDebtReport {
+    let git_available = git_branch.is_some()
+        || repo_root.join(".git").exists()
+        || git_probe(repo_root, &["rev-parse", "--git-dir"])
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+
+    let openspec_desync = probe_openspec_desync(repo_root, git_available);
+    let stale_pending =
+        probe_stale_pending_openspecs(repo_root, config.stale_spec_days, git_available);
+    let solution_drift = probe_solution_drift(repo_root, config);
+
+    DocDebtReport {
+        git_available,
+        openspec_desync,
+        stale_pending,
+        solution_drift,
+    }
+}
+
+/// Probe 1: Scans `openspec/changes/` for desynchronized changes where tasks remain unchecked
+/// but top-level parent tasks are complete, code was merged to main, or the cited version was surpassed.
+pub fn probe_openspec_desync(
+    repo_root: &Path,
+    git_available: bool,
+) -> ProbeStatus<Vec<OpenSpecDesyncFinding>> {
+    let openspec_dir = repo_root.join("openspec").join("changes");
+    let entries = match std::fs::read_dir(&openspec_dir) {
+        Ok(read) => read,
+        Err(_) => {
+            return if git_available {
+                ProbeStatus::Clean
+            } else {
+                ProbeStatus::Unknown
+            };
+        }
+    };
+
+    let mut findings = Vec::new();
+    let cargo_version = extract_cargo_version(repo_root);
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let dir_name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(name) => name,
+            None => continue,
+        };
+        if dir_name == "archive" || dir_name.starts_with('.') {
+            continue;
+        }
+
+        let tasks_path = path.join("tasks.md");
+        let content = match std::fs::read_to_string(&tasks_path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let (completed, total) = count_task_checkboxes_content(&content);
+        if total == 0 || completed == total {
+            continue;
+        }
+
+        // 1. Parent tasks complete with subtasks open
+        if is_parent_tasks_complete_subtasks_open_content(&content) {
+            findings.push(OpenSpecDesyncFinding {
+                feature: dir_name.to_string(),
+                completed_tasks: completed,
+                total_tasks: total,
+                reason: DesyncReason::ParentTasksCompleteSubtasksOpen,
+            });
+            continue;
+        }
+
+        // 2. Git commits merged to main/HEAD (only when git is available)
+        if git_available && check_feature_merged_to_main(repo_root, dir_name) {
+            findings.push(OpenSpecDesyncFinding {
+                feature: dir_name.to_string(),
+                completed_tasks: completed,
+                total_tasks: total,
+                reason: DesyncReason::CodeMergedToMain,
+            });
+            continue;
+        }
+
+        // 3. Cited version surpassed in Cargo.toml
+        if let Some(c_ver) = cargo_version {
+            if let Some((cited_str, cited_ver)) = extract_cited_version(&content) {
+                if cited_ver < c_ver {
+                    findings.push(OpenSpecDesyncFinding {
+                        feature: dir_name.to_string(),
+                        completed_tasks: completed,
+                        total_tasks: total,
+                        reason: DesyncReason::ReleaseVersionSurpassed(cited_str),
+                    });
+                }
+            }
+        }
+    }
+
+    findings.sort_by(|a, b| a.feature.cmp(&b.feature));
+
+    if !findings.is_empty() {
+        ProbeStatus::Debt(findings)
+    } else if git_available {
+        ProbeStatus::Clean
+    } else {
+        ProbeStatus::Unknown
+    }
+}
+
+/// Probe 2: Scans `openspec/changes/` for pending changes whose last activity exceeds `stale_days`.
+/// Uses git commit timestamps when git is available; falls back to filesystem mtime in No-Git environments.
+pub fn probe_stale_pending_openspecs(
+    repo_root: &Path,
+    stale_days: u32,
+    git_available: bool,
+) -> ProbeStatus<Vec<StalePendingFinding>> {
+    let openspec_dir = repo_root.join("openspec").join("changes");
+    let entries = match std::fs::read_dir(&openspec_dir) {
+        Ok(read) => read,
+        Err(_) => return ProbeStatus::Clean,
+    };
+
+    let mut findings = Vec::new();
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let dir_name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(name) => name,
+            None => continue,
+        };
+        if dir_name == "archive" || dir_name.starts_with('.') {
+            continue;
+        }
+
+        let tasks_path = path.join("tasks.md");
+        if !tasks_path.is_file() {
+            continue;
+        }
+
+        let (completed, total) = count_task_checkboxes(&tasks_path);
+        if total == 0 || completed == total {
+            continue;
+        }
+
+        let mut days_inactive = 0;
+        let mut source = InactivitySource::FilesystemMtime;
+
+        if git_available {
+            let change_rel = format!("openspec/changes/{dir_name}");
+            if let Some(out) =
+                git_probe(repo_root, &["log", "-1", "--format=%ct", "--", &change_rel])
+            {
+                if out.status.success() {
+                    let ts_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                    if let Ok(ts) = ts_str.parse::<i64>() {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs() as i64;
+                        if now > ts {
+                            days_inactive = ((now - ts) / 86400) as u32;
+                            source = InactivitySource::GitCommitDate;
+                        }
+                    }
+                }
+            }
+        }
+
+        if source != InactivitySource::GitCommitDate {
+            source = InactivitySource::FilesystemMtime;
+            if let Ok(metadata) = std::fs::metadata(&tasks_path) {
+                if let Ok(mtime) = metadata.modified() {
+                    let now = std::time::SystemTime::now();
+                    if let Ok(duration) = now.duration_since(mtime) {
+                        days_inactive = (duration.as_secs() / 86400) as u32;
+                    }
+                }
+            }
+        }
+
+        if days_inactive >= stale_days {
+            findings.push(StalePendingFinding {
+                feature: dir_name.to_string(),
+                days_inactive,
+                completed_tasks: completed,
+                total_tasks: total,
+                source,
+            });
+        }
+    }
+
+    findings.sort_by(|a, b| a.feature.cmp(&b.feature));
+
+    if !findings.is_empty() {
+        ProbeStatus::Debt(findings)
+    } else {
+        ProbeStatus::Clean
+    }
+}
+
+/// Probe 5: Scans `docs/solutions/` for dead code references and missing YAML frontmatter fields.
+pub fn probe_solution_drift(
+    repo_root: &Path,
+    config: &DocHygieneConfig,
+) -> ProbeStatus<Vec<SolutionDriftFinding>> {
+    if !config.check_solution_paths && !config.require_solution_frontmatter {
+        return ProbeStatus::Clean;
+    }
+
+    let solutions_dir = repo_root.join("docs").join("solutions");
+    if !solutions_dir.is_dir() {
+        return ProbeStatus::Clean;
+    }
+
+    let mut solution_files = Vec::new();
+    collect_solution_files(&solutions_dir, &mut solution_files);
+    solution_files.sort();
+
+    let mut findings = Vec::new();
+
+    for file_path in solution_files {
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let rel_solution_path = file_path
+            .strip_prefix(repo_root)
+            .unwrap_or(&file_path)
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        let missing_frontmatter_fields = if config.require_solution_frontmatter {
+            check_solution_frontmatter(&content)
+        } else {
+            Vec::new()
+        };
+
+        let dead_paths = if config.check_solution_paths {
+            check_solution_dead_paths(repo_root, &content)
+        } else {
+            Vec::new()
+        };
+
+        if !missing_frontmatter_fields.is_empty() || !dead_paths.is_empty() {
+            findings.push(SolutionDriftFinding {
+                solution_path: rel_solution_path,
+                dead_paths,
+                missing_frontmatter_fields,
+            });
+        }
+    }
+
+    findings.sort_by(|a, b| a.solution_path.cmp(&b.solution_path));
+
+    if !findings.is_empty() {
+        ProbeStatus::Debt(findings)
+    } else {
+        ProbeStatus::Clean
+    }
+}
+
+fn collect_solution_files(dir: &Path, files: &mut Vec<PathBuf>) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_solution_files(&path, files);
+            } else if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("md") {
+                files.push(path);
+            }
+        }
+    }
+}
+
+fn extract_yaml_frontmatter(content: &str) -> Option<Vec<&str>> {
+    let mut lines = content.trim_start().lines();
+    let first = lines.next()?.trim();
+    if first != "---" {
+        return None;
+    }
+    let mut header = Vec::new();
+    for line in lines {
+        if line.trim() == "---" {
+            return Some(header);
+        }
+        header.push(line);
+    }
+    None
+}
+
+fn check_solution_frontmatter(content: &str) -> Vec<String> {
+    let mut missing = Vec::new();
+    let header_lines = match extract_yaml_frontmatter(content) {
+        Some(lines) => lines,
+        None => {
+            return vec![
+                "title".into(),
+                "category".into(),
+                "problem_type".into(),
+                "tags".into(),
+                "applies_when".into(),
+            ];
+        }
+    };
+
+    let mut has_title = false;
+    let mut has_category_or_module = false;
+    let mut has_problem_type = false;
+    let mut has_tags = false;
+    let mut has_applies_when = false;
+
+    for line in header_lines {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if !line.starts_with(' ') && !line.starts_with('\t') {
+            if let Some((k, _)) = trimmed.split_once(':') {
+                let key = k.trim().to_lowercase();
+                match key.as_str() {
+                    "title" => has_title = true,
+                    "category" | "module" => has_category_or_module = true,
+                    "problem_type" => has_problem_type = true,
+                    "tags" => has_tags = true,
+                    "applies_when" => has_applies_when = true,
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    if !has_title {
+        missing.push("title".into());
+    }
+    if !has_category_or_module {
+        missing.push("category".into());
+    }
+    if !has_problem_type {
+        missing.push("problem_type".into());
+    }
+    if !has_tags {
+        missing.push("tags".into());
+    }
+    if !has_applies_when {
+        missing.push("applies_when".into());
+    }
+
+    missing
+}
+
+fn clean_code_path(token: &str) -> Option<&str> {
+    let trimmed = token.trim();
+    if trimmed.contains('*') || trimmed.contains('<') || trimmed.contains('>') {
+        return None;
+    }
+    if !trimmed.starts_with("src/") && !trimmed.starts_with("tests/") {
+        return None;
+    }
+
+    let path_no_anchor = trimmed.split_once('#').map_or(trimmed, |(base, _)| base);
+    let candidate = match path_no_anchor.split_once(':') {
+        Some((base, suffix))
+            if suffix
+                .chars()
+                .all(|c| c.is_ascii_digit() || c == '-' || c == ',') =>
+        {
+            base
+        }
+        _ => path_no_anchor,
+    };
+
+    if candidate.ends_with(".rs") {
+        Some(candidate)
+    } else {
+        None
+    }
+}
+
+fn check_solution_dead_paths(repo_root: &Path, content: &str) -> Vec<String> {
+    let mut dead = Vec::new();
+    let mut in_code_block = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            continue;
+        }
+        if in_code_block {
+            continue;
+        }
+
+        let mut start = None;
+        for (i, c) in line.char_indices() {
+            if c == '`' {
+                if let Some(s) = start {
+                    let token = &line[s + 1..i];
+                    if let Some(cleaned) = clean_code_path(token) {
+                        let target = repo_root.join(cleaned);
+                        if !target.exists() {
+                            dead.push(cleaned.to_string());
+                        }
+                    }
+                    start = None;
+                } else {
+                    start = Some(i);
+                }
+            }
+        }
+    }
+
+    dead.sort();
+    dead.dedup();
+    dead
 }
 
 /// Criterion met for archiving an OpenSpec change package.

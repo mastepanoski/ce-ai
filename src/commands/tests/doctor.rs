@@ -974,3 +974,61 @@ fn test_doctor_stays_ok_with_ship_readiness_gaps() {
         "ship-readiness gaps must remain non-fatal, got: {res:?}"
     );
 }
+
+#[test]
+fn test_doctor_emits_doc_debt_warnings_non_fatal() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    // 1. Create OpenSpec change with desync
+    let feat_dir = root
+        .join("openspec")
+        .join("changes")
+        .join("stranded-change");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    std::fs::write(
+        feat_dir.join("tasks.md"),
+        "- [x] 1. Parent complete\n  - [ ] 1.1 Open subtask\n",
+    )
+    .unwrap();
+
+    // 2. Create solution with dead path and missing frontmatter
+    let sol_dir = root.join("docs").join("solutions").join("architecture");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+    let broken_sol = r#"---
+title: "Solution with Dead Path"
+category: "architecture"
+problem_type: "design"
+tags:
+  - doc
+---
+References `src/ghost_module.rs`.
+"#;
+    std::fs::write(sol_dir.join("old.md"), broken_sol).unwrap();
+
+    let ctx = Context {
+        config_dir: root.join("config"),
+        opencode_config_dir: root.join("opencode"),
+        workspace_root: Some(root.to_path_buf()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+    let state = State::new();
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let args = Args::default();
+    let res = run(&ctx, &args);
+    assert!(
+        res.is_ok(),
+        "doctor must exit 0 with doc debt warnings, got: {res:?}"
+    );
+}

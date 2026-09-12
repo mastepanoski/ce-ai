@@ -1,6 +1,6 @@
 # `ce-ai` — Compound Engineering CLI Orchestrator & Workflow FSM Engine
 
-`ce-ai` is a fast, safe Rust CLI for orchestrating the **[Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin)** across 10 native AI agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `fx`) plus custom fallback mode. It governs the **7-stage Compound Engineering Flywheel** via a stage-gated FSM whose bookkeeping (stage transitions, checkpoint recording) is deterministic — agent execution itself is probabilistic — with workspace scope isolation, atomic POSIX disk writes, and FSM-validated workflow checkpoints (recording is opt-in).
+`ce-ai` is a fast, safe Rust CLI for orchestrating the **[Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin)** across 10 native AI agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `fx`) plus custom fallback mode. It governs the **7-stage Compound Engineering Flywheel** via a stage-gated FSM (deterministic bookkeeping, atomic disk writes, automated documentation debt diagnostics, and validated checkpoints).
 
 > [!NOTE]
 > `ce-ai` orchestrates distributions of the open-source **[Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin)** — a suite of specialized skills, roles, and workflow guidelines for AI coding assistants.
@@ -62,6 +62,7 @@ ce-ai doctor
 | 🌱 [Getting Started](docs/user-guide/getting-started.md) | **Absolute beginner** | Tutorial — zero to your first slash command, no assumed knowledge |
 | 🚀 [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) | **Beginner** | Tutorial — greenfield setup, first feature, bug fix, resumption |
 | 🎓 [Compound Workflow Explained](docs/user-guide/compound-engineering-workflow-explained.md) | **Beginner** | Explanation — strategy to code, 6-level hierarchy, OpenSpec vs Brainstorm |
+| 🎓 [Documentation Debt & Hygiene](docs/user-guide/doc-hygiene-and-debt-explained.md) | **Beginner** | Explanation — preventing AI hallucinations by catching stranded OpenSpecs and solution drift |
 | 📁 [Project Adoption Guide](docs/user-guide/project-adoption-guide.md) | Both | How-to — non-destructive AGENTS.md adoption, de-init, tiers |
 | 🎓 [Harnesses, Loops & Context Masterclass](docs/user-guide/harnesses-loops-and-context-masterclass.md) | **Beginner** | Explanation — what a harness is, MCP sidecars, token economics |
 | 🎓 [Determinism & ce-ai Explained](docs/user-guide/determinism-explained.md) | **Beginner** | Explanation — what ce-ai guarantees, why LLM execution cannot be deterministic |

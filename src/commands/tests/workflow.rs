@@ -747,6 +747,7 @@ fn repo_state_for(
         commits_ahead,
         stage6_artifact_present: stage6,
         review_receipt: receipt,
+        doc_debt: None,
     }
 }
 
@@ -1335,4 +1336,769 @@ fn test_reconcile_state_active_feature_clearing() {
     reconcile_state_active_feature(&ctx, &["archived-feat".to_string()], false).unwrap();
     let reloaded2 = State::load(&state_path).unwrap();
     assert_eq!(reloaded2.workflow.unwrap().feature_name, None);
+}
+
+#[test]
+fn test_doc_debt_probe_status_tri_state_behavior() {
+    let clean: ProbeStatus<Vec<String>> = ProbeStatus::Clean;
+    assert!(clean.is_clean());
+    assert!(!clean.is_debt());
+    assert!(!clean.is_unknown());
+    assert_eq!(clean.as_debt(), None);
+
+    let debt: ProbeStatus<Vec<String>> = ProbeStatus::Debt(vec!["finding-1".into()]);
+    assert!(!debt.is_clean());
+    assert!(debt.is_debt());
+    assert!(!debt.is_unknown());
+    assert_eq!(debt.as_debt(), Some(&vec!["finding-1".into()]));
+
+    let unknown: ProbeStatus<Vec<String>> = ProbeStatus::Unknown;
+    assert!(!unknown.is_clean());
+    assert!(!unknown.is_debt());
+    assert!(unknown.is_unknown());
+    assert_eq!(unknown.as_debt(), None);
+}
+
+#[test]
+fn test_doc_debt_serialization_round_trip() {
+    // 1. Clean
+    let clean: ProbeStatus<Vec<OpenSpecDesyncFinding>> = ProbeStatus::Clean;
+    let json_clean = serde_json::to_string(&clean).unwrap();
+    assert_eq!(json_clean, r#"{"status":"clean"}"#);
+    let parsed_clean: ProbeStatus<Vec<OpenSpecDesyncFinding>> =
+        serde_json::from_str(&json_clean).unwrap();
+    assert_eq!(clean, parsed_clean);
+
+    // 2. Unknown
+    let unknown: ProbeStatus<Vec<OpenSpecDesyncFinding>> = ProbeStatus::Unknown;
+    let json_unknown = serde_json::to_string(&unknown).unwrap();
+    assert_eq!(json_unknown, r#"{"status":"unknown"}"#);
+    let parsed_unknown: ProbeStatus<Vec<OpenSpecDesyncFinding>> =
+        serde_json::from_str(&json_unknown).unwrap();
+    assert_eq!(unknown, parsed_unknown);
+
+    // 3. Debt with findings
+    let debt: ProbeStatus<Vec<OpenSpecDesyncFinding>> = ProbeStatus::Debt(vec![
+        OpenSpecDesyncFinding {
+            feature: "feat-a".to_string(),
+            completed_tasks: 5,
+            total_tasks: 20,
+            reason: DesyncReason::ParentTasksCompleteSubtasksOpen,
+        },
+        OpenSpecDesyncFinding {
+            feature: "feat-b".to_string(),
+            completed_tasks: 2,
+            total_tasks: 5,
+            reason: DesyncReason::CodeMergedToMain,
+        },
+        OpenSpecDesyncFinding {
+            feature: "feat-c".to_string(),
+            completed_tasks: 1,
+            total_tasks: 3,
+            reason: DesyncReason::ReleaseVersionSurpassed("1.23.0".to_string()),
+        },
+    ]);
+    let json_debt = serde_json::to_string(&debt).unwrap();
+    let parsed_debt: ProbeStatus<Vec<OpenSpecDesyncFinding>> =
+        serde_json::from_str(&json_debt).unwrap();
+    assert_eq!(debt, parsed_debt);
+}
+
+#[test]
+fn test_doc_debt_report_and_has_debt() {
+    let mut report = DocDebtReport::default();
+    assert!(report.git_available);
+    assert!(!report.has_debt());
+
+    report.stale_pending = ProbeStatus::Debt(vec![StalePendingFinding {
+        feature: "old-spec".into(),
+        days_inactive: 42,
+        completed_tasks: 3,
+        total_tasks: 8,
+        source: InactivitySource::GitCommitDate,
+    }]);
+    assert!(report.has_debt());
+
+    report.solution_drift = ProbeStatus::Debt(vec![SolutionDriftFinding {
+        solution_path: "docs/solutions/test.md".into(),
+        dead_paths: vec!["src/missing.rs".into()],
+        missing_frontmatter_fields: vec!["applies_when".into()],
+    }]);
+    assert!(report.has_debt());
+
+    // Round trip report
+    let serialized = serde_json::to_string(&report).unwrap();
+    let reloaded: DocDebtReport = serde_json::from_str(&serialized).unwrap();
+    assert_eq!(report, reloaded);
+}
+
+#[test]
+fn test_doc_debt_no_git_unknown_tri_state() {
+    // When Git is unavailable, git-dependent probes return Unknown, NOT Clean.
+    let report = DocDebtReport {
+        git_available: false,
+        openspec_desync: ProbeStatus::Unknown,
+        stale_pending: ProbeStatus::Clean,
+        solution_drift: ProbeStatus::Clean,
+    };
+
+    assert!(!report.git_available);
+    assert!(report.openspec_desync.is_unknown());
+    assert!(!report.openspec_desync.is_clean());
+    assert!(!report.openspec_desync.is_debt());
+    assert!(!report.has_debt());
+}
+
+#[test]
+fn test_repo_state_doc_debt_serialization_backwards_compatibility() {
+    // JSON without doc_debt should deserialize cleanly with doc_debt = None
+    let json_without_doc_debt = r#"{
+        "git_branch": "main",
+        "head_sha": "1234567",
+        "is_git_clean": true,
+        "modified_files": [],
+        "manifest_drift_count": 0,
+        "adoption_status": null
+    }"#;
+    let repo_state: RepoState = serde_json::from_str(json_without_doc_debt).unwrap();
+    assert_eq!(repo_state.doc_debt, None);
+
+    // RepoState with doc_debt serializes and deserializes
+    let mut repo_state_with_debt = repo_state.clone();
+    repo_state_with_debt.doc_debt = Some(DocDebtReport::default());
+    let serialized = serde_json::to_string(&repo_state_with_debt).unwrap();
+    let deserialized: RepoState = serde_json::from_str(&serialized).unwrap();
+    assert_eq!(repo_state_with_debt, deserialized);
+    assert_eq!(deserialized.doc_debt, Some(DocDebtReport::default()));
+}
+
+#[test]
+fn test_probe_openspec_desync_parent_tasks_complete_subtasks_open() {
+    let tmp = TempDir::new().unwrap();
+    let feat_dir = tmp
+        .path()
+        .join("openspec")
+        .join("changes")
+        .join("doctor-kimi-marketplace-divergence");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    let tasks_content = r#"
+# Tasks: Detect Kimi Divergence
+- [x] **Task 1: Core divergence models**
+  - [ ] 1.1 Define structs
+  - [ ] 1.2 Implement check
+- [x] **Task 2: Unit testing matrix**
+  - [ ] 2.1 Missing file resilience
+"#;
+    std::fs::write(feat_dir.join("tasks.md"), tasks_content).unwrap();
+
+    let res = probe_openspec_desync(tmp.path(), true);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        let f = &findings[0];
+        assert_eq!(f.feature, "doctor-kimi-marketplace-divergence");
+        assert_eq!(f.completed_tasks, 2);
+        assert_eq!(f.total_tasks, 5);
+        assert_eq!(f.reason, DesyncReason::ParentTasksCompleteSubtasksOpen);
+    } else {
+        panic!("expected Debt finding");
+    }
+}
+
+#[test]
+fn test_probe_openspec_desync_release_version_surpassed() {
+    let tmp = TempDir::new().unwrap();
+    std::fs::write(
+        tmp.path().join("Cargo.toml"),
+        r#"[package]
+name = "ce-ai"
+version = "1.53.0"
+"#,
+    )
+    .unwrap();
+
+    let feat_dir = tmp
+        .path()
+        .join("openspec")
+        .join("changes")
+        .join("linux-musl-static-release");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    let tasks_content = r#"
+# Tasks: Static Musl Linux Releases
+## Phase 1
+- [x] 1.1 Cargo.toml: bump version to (1.50.1)
+- [ ] 3.7 Release tag v1.50.1 builds both assets
+"#;
+    std::fs::write(feat_dir.join("tasks.md"), tasks_content).unwrap();
+
+    let res = probe_openspec_desync(tmp.path(), true);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        let f = &findings[0];
+        assert_eq!(f.feature, "linux-musl-static-release");
+        assert_eq!(f.completed_tasks, 1);
+        assert_eq!(f.total_tasks, 2);
+        assert_eq!(
+            f.reason,
+            DesyncReason::ReleaseVersionSurpassed("1.50.1".into())
+        );
+    } else {
+        panic!("expected Debt finding");
+    }
+}
+
+#[test]
+fn test_probe_openspec_desync_code_merged_to_main() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+
+    // Initialize git repository
+    let mut cmd = std::process::Command::new("git");
+    cmd.args(["init", "-b", "main"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    let mut cfg = std::process::Command::new("git");
+    cfg.args(["config", "user.name", "Test"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    let mut cfg2 = std::process::Command::new("git");
+    cfg2.args(["config", "user.email", "test@test.com"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+
+    // Commit on main that mentions the feature
+    std::fs::write(repo.join("file.txt"), "hello").unwrap();
+    let mut add = std::process::Command::new("git");
+    add.args(["add", "file.txt"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    let mut commit = std::process::Command::new("git");
+    commit
+        .args([
+            "commit",
+            "-m",
+            "fix: merged feature-harness-manifest into main",
+        ])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+
+    // Create incomplete feature tasks.md
+    let feat_dir = repo
+        .join("openspec")
+        .join("changes")
+        .join("feature-harness-manifest");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    let tasks_content = r#"
+# Tasks
+- [x] Task 1
+- [ ] Task 2
+"#;
+    std::fs::write(feat_dir.join("tasks.md"), tasks_content).unwrap();
+
+    let res = probe_openspec_desync(repo, true);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        let f = &findings[0];
+        assert_eq!(f.feature, "feature-harness-manifest");
+        assert_eq!(f.reason, DesyncReason::CodeMergedToMain);
+    } else {
+        panic!("expected Debt finding with CodeMergedToMain");
+    }
+}
+
+#[test]
+fn test_probe_openspec_desync_no_git_unknown() {
+    let tmp = TempDir::new().unwrap();
+    let feat_dir = tmp
+        .path()
+        .join("openspec")
+        .join("changes")
+        .join("pending-feature");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    let tasks_content = r#"
+# Tasks
+- [x] Task 1
+- [ ] Task 2
+"#;
+    std::fs::write(feat_dir.join("tasks.md"), tasks_content).unwrap();
+
+    // In a non-git directory (git_available = false), an incomplete feature with unverified git status returns Unknown
+    let res = probe_openspec_desync(tmp.path(), false);
+    assert!(res.is_unknown());
+    assert!(!res.is_clean());
+    assert!(!res.is_debt());
+}
+
+#[test]
+fn test_probe_stale_pending_openspecs_mtime() {
+    let tmp = TempDir::new().unwrap();
+    let changes_dir = tmp.path().join("openspec").join("changes");
+
+    // 1. Fresh feature (created just now)
+    let fresh_dir = changes_dir.join("fresh-feature");
+    std::fs::create_dir_all(&fresh_dir).unwrap();
+    std::fs::write(fresh_dir.join("tasks.md"), "- [x] 1\n- [ ] 2\n").unwrap();
+
+    // 2. Stale feature (mtime 35 days ago)
+    let stale_dir = changes_dir.join("stale-feature");
+    std::fs::create_dir_all(&stale_dir).unwrap();
+    let stale_tasks = stale_dir.join("tasks.md");
+    std::fs::write(&stale_tasks, "- [x] 1\n- [ ] 2\n").unwrap();
+
+    let f = std::fs::File::options()
+        .write(true)
+        .open(&stale_tasks)
+        .unwrap();
+    let past = std::time::SystemTime::now() - std::time::Duration::from_secs(35 * 86400);
+    let times = std::fs::FileTimes::new().set_modified(past);
+    f.set_times(times).unwrap();
+    drop(f);
+
+    let res = probe_stale_pending_openspecs(tmp.path(), 21, false);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        let f = &findings[0];
+        assert_eq!(f.feature, "stale-feature");
+        assert!(f.days_inactive >= 34);
+        assert_eq!(f.source, InactivitySource::FilesystemMtime);
+    } else {
+        panic!("expected Debt finding for stale feature");
+    }
+}
+
+#[test]
+fn test_probe_stale_pending_openspecs_git_commit_date() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    let init_out = std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(root)
+        .output();
+    if init_out.is_err() || !init_out.unwrap().status.success() {
+        return;
+    }
+
+    let _ = std::process::Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(root)
+        .output();
+    let _ = std::process::Command::new("git")
+        .args(["config", "user.email", "test@example.com"])
+        .current_dir(root)
+        .output();
+
+    let changes_dir = root.join("openspec").join("changes");
+    let stale_dir = changes_dir.join("git-stale-feat");
+    std::fs::create_dir_all(&stale_dir).unwrap();
+    std::fs::write(stale_dir.join("tasks.md"), "- [x] 1\n- [ ] 2\n").unwrap();
+
+    let _ = std::process::Command::new("git")
+        .args(["add", "."])
+        .current_dir(root)
+        .output();
+
+    let commit_out = std::process::Command::new("git")
+        .args(["commit", "-m", "init stale feature"])
+        .env("GIT_COMMITTER_DATE", "2026-01-01T00:00:00Z")
+        .env("GIT_AUTHOR_DATE", "2026-01-01T00:00:00Z")
+        .current_dir(root)
+        .output();
+
+    if commit_out.is_err() || !commit_out.unwrap().status.success() {
+        return;
+    }
+
+    let res = probe_stale_pending_openspecs(root, 21, true);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].feature, "git-stale-feat");
+        assert_eq!(findings[0].source, InactivitySource::GitCommitDate);
+        assert!(findings[0].days_inactive > 30);
+    } else {
+        panic!("expected Debt finding with GitCommitDate");
+    }
+}
+
+#[test]
+fn test_probe_openspec_desync_on_live_ce_ai_repo() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let res = probe_openspec_desync(repo_root, true);
+    // Smoke check: live repository scan succeeds and returns a valid status without panic
+    assert!(matches!(res, ProbeStatus::Debt(_) | ProbeStatus::Clean));
+}
+
+#[test]
+fn test_probe_solution_drift_clean() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    // Create a valid source file
+    let src_dir = root.join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}\n").unwrap();
+
+    // Create a clean solution file
+    let sol_dir = root.join("docs").join("solutions").join("architecture");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+    let clean_md = r#"---
+title: "Clean Architecture Pattern"
+category: "architecture"
+problem_type: "design"
+tags:
+  - workflow
+  - state
+applies_when: "When designing clean state transitions"
+---
+
+# Clean Architecture
+
+This architecture references `src/main.rs` which exists on disk.
+"#;
+    std::fs::write(sol_dir.join("clean.md"), clean_md).unwrap();
+
+    let config = DocHygieneConfig::default();
+    let res = probe_solution_drift(root, &config);
+    assert_eq!(res, ProbeStatus::Clean);
+}
+
+#[test]
+fn test_probe_solution_drift_dead_paths() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    let src_dir = root.join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}\n").unwrap();
+
+    let sol_dir = root.join("docs").join("solutions").join("bugfixes");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+    let broken_paths_md = r#"---
+title: "Legacy Bug Fix"
+category: "bugfixes"
+problem_type: "bug"
+tags:
+  - fix
+applies_when: "When fixing a broken path"
+---
+
+# Fix Details
+
+References `src/main.rs` (valid) but also `src/commands/missing.rs:168`,
+`src/commands/missing.rs` (duplicate mention), and `tests/dead_suite.rs#L12-L20`.
+Also ignores placeholders like `src/harness/<vendor>.rs` and `src/**`.
+"#;
+    std::fs::write(sol_dir.join("broken.md"), broken_paths_md).unwrap();
+
+    let config = DocHygieneConfig::default();
+    let res = probe_solution_drift(root, &config);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        let finding = &findings[0];
+        assert_eq!(finding.solution_path, "docs/solutions/bugfixes/broken.md");
+        assert_eq!(
+            finding.dead_paths,
+            vec![
+                "src/commands/missing.rs".to_string(),
+                "tests/dead_suite.rs".to_string(),
+            ]
+        );
+        assert!(finding.missing_frontmatter_fields.is_empty());
+    } else {
+        panic!("expected Debt finding");
+    }
+}
+
+#[test]
+fn test_probe_solution_drift_missing_frontmatter() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    let sol_dir = root.join("docs").join("solutions").join("architecture");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+    let partial_fm_md = r#"---
+title: "Partial Frontmatter"
+tags:
+  - incomplete
+---
+
+# Notes
+No dead paths referenced.
+"#;
+    std::fs::write(sol_dir.join("partial.md"), partial_fm_md).unwrap();
+
+    let config = DocHygieneConfig::default();
+    let res = probe_solution_drift(root, &config);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        let finding = &findings[0];
+        assert_eq!(
+            finding.solution_path,
+            "docs/solutions/architecture/partial.md"
+        );
+        assert!(finding.dead_paths.is_empty());
+        assert_eq!(
+            finding.missing_frontmatter_fields,
+            vec![
+                "category".to_string(),
+                "problem_type".to_string(),
+                "applies_when".to_string(),
+            ]
+        );
+    } else {
+        panic!("expected Debt finding");
+    }
+}
+
+#[test]
+fn test_probe_solution_drift_no_frontmatter_and_module_alias() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    let sol_dir = root.join("docs").join("solutions");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+
+    // 1. Solution using `module:` instead of `category:`
+    let module_md = r#"---
+title: "Module Alias"
+module: "core"
+problem_type: "architecture"
+tags:
+  - alias
+applies_when: "When using module key"
+---
+# Content
+"#;
+    std::fs::write(sol_dir.join("with_module.md"), module_md).unwrap();
+
+    // 2. Solution with no frontmatter at all
+    let no_fm_md = "# Pure Markdown\n\nNo frontmatter block at all.\n";
+    std::fs::write(sol_dir.join("no_fm.md"), no_fm_md).unwrap();
+
+    let config = DocHygieneConfig::default();
+    let res = probe_solution_drift(root, &config);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        // `with_module.md` should have no findings
+        assert_eq!(findings.len(), 1);
+        let finding = &findings[0];
+        assert_eq!(finding.solution_path, "docs/solutions/no_fm.md");
+        assert_eq!(
+            finding.missing_frontmatter_fields,
+            vec![
+                "title".to_string(),
+                "category".to_string(),
+                "problem_type".to_string(),
+                "tags".to_string(),
+                "applies_when".to_string(),
+            ]
+        );
+    } else {
+        panic!("expected Debt finding");
+    }
+}
+
+#[test]
+fn test_probe_solution_drift_config_toggles() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    let sol_dir = root.join("docs").join("solutions");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+
+    // Contains both missing frontmatter and dead path
+    let broken_md = r#"---
+title: "Incomplete"
+---
+
+References `src/missing_code.rs`.
+"#;
+    std::fs::write(sol_dir.join("broken.md"), broken_md).unwrap();
+
+    // Disable frontmatter requirement
+    let no_fm_check = DocHygieneConfig {
+        stale_spec_days: 21,
+        check_solution_paths: true,
+        require_solution_frontmatter: false,
+    };
+    let res = probe_solution_drift(root, &no_fm_check);
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].dead_paths, vec!["src/missing_code.rs"]);
+        assert!(findings[0].missing_frontmatter_fields.is_empty());
+    } else {
+        panic!("expected Debt finding for dead path");
+    }
+
+    // Disable path check
+    let no_path_check = DocHygieneConfig {
+        stale_spec_days: 21,
+        check_solution_paths: false,
+        require_solution_frontmatter: true,
+    };
+    let res = probe_solution_drift(root, &no_path_check);
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].dead_paths.is_empty());
+        assert!(!findings[0].missing_frontmatter_fields.is_empty());
+    } else {
+        panic!("expected Debt finding for frontmatter");
+    }
+
+    // Disable both
+    let disable_both = DocHygieneConfig {
+        stale_spec_days: 21,
+        check_solution_paths: false,
+        require_solution_frontmatter: false,
+    };
+    let res = probe_solution_drift(root, &disable_both);
+    assert_eq!(res, ProbeStatus::Clean);
+}
+
+#[test]
+fn test_probe_solution_drift_nonexistent_dir() {
+    let tmp = TempDir::new().unwrap();
+    let config = DocHygieneConfig::default();
+    let res = probe_solution_drift(tmp.path(), &config);
+    assert_eq!(res, ProbeStatus::Clean);
+}
+
+#[test]
+fn test_probe_solution_drift_on_live_ce_ai_repo() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let config = DocHygieneConfig::default();
+    let res = probe_solution_drift(repo_root, &config);
+    // Smoke check: live repository scan succeeds and returns a valid status without panic
+    assert!(matches!(res, ProbeStatus::Debt(_) | ProbeStatus::Clean));
+}
+
+#[test]
+fn test_doc_debt_report_summary_line_formatting() {
+    // 1. Clean with Git
+    let report_clean_git = DocDebtReport {
+        git_available: true,
+        openspec_desync: ProbeStatus::Clean,
+        stale_pending: ProbeStatus::Clean,
+        solution_drift: ProbeStatus::Clean,
+    };
+    assert_eq!(report_clean_git.summary_line(), "doc debt: clean");
+
+    // 2. Clean without Git
+    let report_clean_no_git = DocDebtReport {
+        git_available: false,
+        openspec_desync: ProbeStatus::Unknown,
+        stale_pending: ProbeStatus::Clean,
+        solution_drift: ProbeStatus::Clean,
+    };
+    assert_eq!(
+        report_clean_no_git.summary_line(),
+        "doc debt: clean [git: n/a]"
+    );
+
+    // 3. Findings with Git
+    let report_findings_git = DocDebtReport {
+        git_available: true,
+        openspec_desync: ProbeStatus::Debt(vec![
+            OpenSpecDesyncFinding {
+                feature: "feat-a".into(),
+                completed_tasks: 5,
+                total_tasks: 20,
+                reason: DesyncReason::ParentTasksCompleteSubtasksOpen,
+            },
+            OpenSpecDesyncFinding {
+                feature: "feat-b".into(),
+                completed_tasks: 2,
+                total_tasks: 5,
+                reason: DesyncReason::CodeMergedToMain,
+            },
+        ]),
+        stale_pending: ProbeStatus::Debt(vec![StalePendingFinding {
+            feature: "feat-c".into(),
+            days_inactive: 34,
+            completed_tasks: 9,
+            total_tasks: 10,
+            source: InactivitySource::GitCommitDate,
+        }]),
+        solution_drift: ProbeStatus::Debt(vec![SolutionDriftFinding {
+            solution_path: "docs/solutions/architecture/old.md".into(),
+            dead_paths: vec!["src/old_a.rs".into(), "src/old_b.rs".into()],
+            missing_frontmatter_fields: vec![],
+        }]),
+    };
+    assert_eq!(
+        report_findings_git.summary_line(),
+        "doc debt: 2 unarchived (code merged), 1 stale spec (34d), 2 dead solution links"
+    );
+
+    // 4. Findings without Git
+    let report_findings_no_git = DocDebtReport {
+        git_available: false,
+        openspec_desync: ProbeStatus::Unknown,
+        stale_pending: ProbeStatus::Debt(vec![StalePendingFinding {
+            feature: "feat-c".into(),
+            days_inactive: 34,
+            completed_tasks: 9,
+            total_tasks: 10,
+            source: InactivitySource::FilesystemMtime,
+        }]),
+        solution_drift: ProbeStatus::Debt(vec![SolutionDriftFinding {
+            solution_path: "docs/solutions/architecture/old.md".into(),
+            dead_paths: vec!["src/old_a.rs".into(), "src/old_b.rs".into()],
+            missing_frontmatter_fields: vec![],
+        }]),
+    };
+    assert_eq!(
+        report_findings_no_git.summary_line(),
+        "doc debt: 1 stale spec [git: n/a], 2 dead solution links"
+    );
+}
+
+#[test]
+fn test_probe_doc_debt_coordination_and_repo_state() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    let changes_dir = root.join("openspec").join("changes");
+    std::fs::create_dir_all(&changes_dir).unwrap();
+    let feat_dir = changes_dir.join("my-feat");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    std::fs::write(
+        feat_dir.join("tasks.md"),
+        "- [x] 1 Parent\n  - [ ] 1.1 Child\n",
+    )
+    .unwrap();
+
+    let config = DocHygieneConfig::default();
+    let report = probe_doc_debt(root, None, &config);
+    assert!(!report.git_available);
+    assert!(report.has_debt());
+
+    let ctx = Context {
+        config_dir: root.join("config"),
+        opencode_config_dir: root.join("opencode"),
+        workspace_root: Some(root.to_path_buf()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    let state = State::new();
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    let repo_state = probe_repo_state(&ctx, &None);
+    assert!(repo_state.doc_debt.is_some());
+    let debt = repo_state.doc_debt.unwrap();
+    assert!(debt.has_debt());
+    assert!(debt.summary_line().contains("1 unarchived (open subtasks)"));
 }

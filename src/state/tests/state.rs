@@ -32,6 +32,7 @@ fn state_with(slot: &str) -> State {
         review_receipts: BTreeMap::new(),
         gate_mode: None,
         gate_receipts: BTreeMap::new(),
+        doc_hygiene: None,
     }
 }
 
@@ -862,4 +863,80 @@ fn gate_mode_and_gate_receipts_serialization_and_state_roundtrip() {
         state_restored.gate_receipts.get("auth-flow"),
         Some(&receipt)
     );
+}
+
+#[test]
+fn test_doc_hygiene_config_defaults_and_serde() {
+    use crate::state::state::DocHygieneConfig;
+
+    let default_cfg = DocHygieneConfig::default();
+    assert_eq!(default_cfg.stale_spec_days, 21);
+    assert!(default_cfg.check_solution_paths);
+    assert!(default_cfg.require_solution_frontmatter);
+
+    // Deserializing empty JSON object should yield defaults
+    let empty_json = "{}";
+    let deserialized: DocHygieneConfig = serde_json::from_str(empty_json).unwrap();
+    assert_eq!(deserialized, default_cfg);
+
+    // Partial JSON override preserves omitted defaults
+    let partial_json = r#"{"stale_spec_days": 14}"#;
+    let partial_cfg: DocHygieneConfig = serde_json::from_str(partial_json).unwrap();
+    assert_eq!(partial_cfg.stale_spec_days, 14);
+    assert!(partial_cfg.check_solution_paths);
+    assert!(partial_cfg.require_solution_frontmatter);
+
+    // Explicit bool override
+    let bool_override_json = r#"{"check_solution_paths": false}"#;
+    let bool_cfg: DocHygieneConfig = serde_json::from_str(bool_override_json).unwrap();
+    assert_eq!(bool_cfg.stale_spec_days, 21);
+    assert!(!bool_cfg.check_solution_paths);
+    assert!(bool_cfg.require_solution_frontmatter);
+}
+
+#[test]
+fn test_doc_hygiene_workspace_overrides_precedence() {
+    use crate::state::state::DocHygieneConfig;
+
+    let dir = tempdir().unwrap();
+    let global_path = dir.path().join("global_state.json");
+    let ws_dir = dir.path().join("workspace");
+    std::fs::create_dir_all(&ws_dir).unwrap();
+    let local_path = ws_dir.join(".ce-ai.json");
+
+    let mut global = State::new();
+    global.doc_hygiene = Some(DocHygieneConfig::default());
+    global.save(&global_path).unwrap();
+
+    let mut local = State::new();
+    local.doc_hygiene = Some(DocHygieneConfig {
+        stale_spec_days: 7,
+        check_solution_paths: false,
+        require_solution_frontmatter: true,
+    });
+    local.save(&local_path).unwrap();
+
+    let loaded = State::load_with_workspace_overrides(&global_path, Some(&ws_dir)).unwrap();
+    let effective = loaded.doc_hygiene();
+    assert_eq!(effective.stale_spec_days, 7);
+    assert!(!effective.check_solution_paths);
+    assert!(effective.require_solution_frontmatter);
+}
+
+#[test]
+fn test_doc_hygiene_helper_fallback() {
+    use crate::state::state::DocHygieneConfig;
+
+    let state_without = State::new();
+    assert_eq!(state_without.doc_hygiene, None);
+    assert_eq!(state_without.doc_hygiene(), DocHygieneConfig::default());
+
+    let mut state_with = State::new();
+    state_with.doc_hygiene = Some(DocHygieneConfig {
+        stale_spec_days: 45,
+        check_solution_paths: true,
+        require_solution_frontmatter: false,
+    });
+    assert_eq!(state_with.doc_hygiene().stale_spec_days, 45);
+    assert!(!state_with.doc_hygiene().require_solution_frontmatter);
 }

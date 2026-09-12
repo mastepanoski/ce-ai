@@ -86,8 +86,11 @@ An architectural boundary governing how `ce-ai` interacts with external AI harne
 ### OpenSpec Change Archival & Safe Mover
 A robust CLI command and automation mechanism (`ce-ai archive` / `ce-ai workflow archive`) that validates completion criteria and safely transfers finished change folders from `openspec/changes/<feature>` into `openspec/changes/archive/<feature>`. It supports dual completion paths (Criterion 1: mechanical 100% task checkbox completion; Criterion 2: STATUS-attested release evidence for rescoped or cut tasks), enforces atomic destination collision rejection and dirty working tree fail-closed guards, synchronizes the audit ledger in `archive/README.md`, and reconciles active feature pointers in `state.json`.
 
+### Documentation Technical Debt Diagnostic Engine
+A modular diagnostic subsystem (`probe_doc_debt` in `src/commands/workflow.rs`) that continuously scans repository documentation artifacts across three structural probes: stranded OpenSpecs desynchronized from Git branches, stale pending changes untouched past configurable thresholds, and solution library drift (`docs/solutions/` missing required metadata or referencing nonexistent code files). Results are synthesized into an actionable Turn-0 summary line on workflow resumption and non-blocking warnings with remediation guidance in `ce-ai doctor`.
 
+### Substrate Tri-State
+A truth-preserving diagnostic state pattern (`ProbeStatus::Clean`, `ProbeStatus::Debt(findings)`, or `ProbeStatus::Unknown`) used across substrate-dependent probes. When an underlying infrastructure dependency (such as `git`) is unavailable or fails, probes explicitly report `Unknown` (e.g. `[git: n/a]`) rather than falsely asserting `Clean`, preventing silent false negatives in constrained or containerized execution environments.
 
-
-
-
+### Solution Drift Probe
+A repository health probe (`probe_solution_drift`) that audits historical solution documents under `docs/solutions/`. It validates required YAML frontmatter fields (`title`, `category`/`module`, `problem_type`, `tags`, `applies_when`), extracts referenced source files (`src/**/*.rs`, `tests/**/*.rs`), strips line numbers and anchors, and tests file existence on disk, preventing AI agents from ingesting stale or misleading codebase context during cognitive retrieval.

@@ -312,6 +312,35 @@ pub struct GateReceipt {
     pub reason: String,
 }
 
+/// Workspace-level configuration for documentation technical debt hygiene.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DocHygieneConfig {
+    #[serde(default = "default_stale_spec_days")]
+    pub stale_spec_days: u32,
+    #[serde(default = "default_true")]
+    pub check_solution_paths: bool,
+    #[serde(default = "default_true")]
+    pub require_solution_frontmatter: bool,
+}
+
+fn default_stale_spec_days() -> u32 {
+    21
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for DocHygieneConfig {
+    fn default() -> Self {
+        Self {
+            stale_spec_days: default_stale_spec_days(),
+            check_solution_paths: default_true(),
+            require_solution_frontmatter: default_true(),
+        }
+    }
+}
+
 /// Canonical state file at `~/.ce-ai/state.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
@@ -347,6 +376,8 @@ pub struct State {
     pub gate_mode: Option<GateMode>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub gate_receipts: BTreeMap<String, GateReceipt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doc_hygiene: Option<DocHygieneConfig>,
 }
 fn default_version() -> u32 {
     1
@@ -727,6 +758,14 @@ impl State {
         if local_state.latest_release_tag.is_some() {
             self.latest_release_tag = local_state.latest_release_tag;
         }
+        if local_state.doc_hygiene.is_some() {
+            self.doc_hygiene = local_state.doc_hygiene;
+        }
+    }
+
+    /// Returns the effective documentation hygiene configuration, falling back to defaults if not set.
+    pub fn doc_hygiene(&self) -> DocHygieneConfig {
+        self.doc_hygiene.unwrap_or_default()
     }
 
     /// Loads global state and applies local `.ce-ai.json` overrides if present.
