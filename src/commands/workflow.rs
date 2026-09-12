@@ -462,6 +462,8 @@ pub struct RepoState {
     pub stage6_artifact_present: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub review_receipt: Option<ReviewReceipt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doc_debt: Option<DocDebtReport>,
 }
 
 /// Observe-only ship-readiness gap (issue #354). Nothing here blocks a command.
@@ -638,6 +640,112 @@ pub struct UnarchivedChange {
     pub total_tasks: usize,
 }
 
+/// Tri-state indicator for diagnostic probes.
+///
+/// In a non-git directory or when the necessary substrate is unavailable,
+/// probes return `Unknown` rather than silently reporting `Clean`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(tag = "status", content = "data", rename_all = "lowercase")]
+pub enum ProbeStatus<T> {
+    #[default]
+    Clean,
+    Debt(T),
+    Unknown,
+}
+
+impl<T> ProbeStatus<T> {
+    pub fn is_debt(&self) -> bool {
+        matches!(self, Self::Debt(_))
+    }
+
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown)
+    }
+
+    pub fn is_clean(&self) -> bool {
+        matches!(self, Self::Clean)
+    }
+
+    pub fn as_debt(&self) -> Option<&T> {
+        match self {
+            Self::Debt(d) => Some(d),
+            _ => None,
+        }
+    }
+}
+
+/// A detected desynchronization between an OpenSpec change and git/release state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OpenSpecDesyncFinding {
+    pub feature: String,
+    pub completed_tasks: usize,
+    pub total_tasks: usize,
+    pub reason: DesyncReason,
+}
+
+/// Root cause of an OpenSpec change desynchronization.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DesyncReason {
+    ParentTasksCompleteSubtasksOpen,
+    CodeMergedToMain,
+    ReleaseVersionSurpassed(String),
+}
+
+/// A pending OpenSpec change that has been inactive beyond the configured threshold.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StalePendingFinding {
+    pub feature: String,
+    pub days_inactive: u32,
+    pub completed_tasks: usize,
+    pub total_tasks: usize,
+    pub source: InactivitySource,
+}
+
+/// Source used to determine inactivity timestamp.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InactivitySource {
+    GitCommitDate,
+    FilesystemMtime,
+}
+
+/// A drift finding in the `docs/solutions/` knowledge library.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SolutionDriftFinding {
+    pub solution_path: String,
+    pub dead_paths: Vec<String>,
+    pub missing_frontmatter_fields: Vec<String>,
+}
+
+/// Umbrella report aggregating documentation technical debt findings across probes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DocDebtReport {
+    pub git_available: bool,
+    pub openspec_desync: ProbeStatus<Vec<OpenSpecDesyncFinding>>,
+    pub stale_pending: ProbeStatus<Vec<StalePendingFinding>>,
+    pub solution_drift: ProbeStatus<Vec<SolutionDriftFinding>>,
+}
+
+impl DocDebtReport {
+    pub fn has_debt(&self) -> bool {
+        self.openspec_desync.is_debt()
+            || self.stale_pending.is_debt()
+            || self.solution_drift.is_debt()
+    }
+}
+
+impl Default for DocDebtReport {
+    fn default() -> Self {
+        Self {
+            git_available: true,
+            openspec_desync: ProbeStatus::Clean,
+            stale_pending: ProbeStatus::Clean,
+            solution_drift: ProbeStatus::Clean,
+        }
+    }
+}
+
 pub fn probe_git_branch(repo_root: &Path) -> Option<String> {
     if let Ok(out) = std::process::Command::new("git")
         .args(["symbolic-ref", "--short", "HEAD"])
@@ -805,6 +913,7 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
         commits_ahead,
         stage6_artifact_present,
         review_receipt,
+        doc_debt: None,
     }
 }
 

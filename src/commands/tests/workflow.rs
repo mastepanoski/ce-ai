@@ -747,6 +747,7 @@ fn repo_state_for(
         commits_ahead,
         stage6_artifact_present: stage6,
         review_receipt: receipt,
+        doc_debt: None,
     }
 }
 
@@ -1335,4 +1336,138 @@ fn test_reconcile_state_active_feature_clearing() {
     reconcile_state_active_feature(&ctx, &["archived-feat".to_string()], false).unwrap();
     let reloaded2 = State::load(&state_path).unwrap();
     assert_eq!(reloaded2.workflow.unwrap().feature_name, None);
+}
+
+#[test]
+fn test_doc_debt_probe_status_tri_state_behavior() {
+    let clean: ProbeStatus<Vec<String>> = ProbeStatus::Clean;
+    assert!(clean.is_clean());
+    assert!(!clean.is_debt());
+    assert!(!clean.is_unknown());
+    assert_eq!(clean.as_debt(), None);
+
+    let debt: ProbeStatus<Vec<String>> = ProbeStatus::Debt(vec!["finding-1".into()]);
+    assert!(!debt.is_clean());
+    assert!(debt.is_debt());
+    assert!(!debt.is_unknown());
+    assert_eq!(debt.as_debt(), Some(&vec!["finding-1".into()]));
+
+    let unknown: ProbeStatus<Vec<String>> = ProbeStatus::Unknown;
+    assert!(!unknown.is_clean());
+    assert!(!unknown.is_debt());
+    assert!(unknown.is_unknown());
+    assert_eq!(unknown.as_debt(), None);
+}
+
+#[test]
+fn test_doc_debt_serialization_round_trip() {
+    // 1. Clean
+    let clean: ProbeStatus<Vec<OpenSpecDesyncFinding>> = ProbeStatus::Clean;
+    let json_clean = serde_json::to_string(&clean).unwrap();
+    assert_eq!(json_clean, r#"{"status":"clean"}"#);
+    let parsed_clean: ProbeStatus<Vec<OpenSpecDesyncFinding>> =
+        serde_json::from_str(&json_clean).unwrap();
+    assert_eq!(clean, parsed_clean);
+
+    // 2. Unknown
+    let unknown: ProbeStatus<Vec<OpenSpecDesyncFinding>> = ProbeStatus::Unknown;
+    let json_unknown = serde_json::to_string(&unknown).unwrap();
+    assert_eq!(json_unknown, r#"{"status":"unknown"}"#);
+    let parsed_unknown: ProbeStatus<Vec<OpenSpecDesyncFinding>> =
+        serde_json::from_str(&json_unknown).unwrap();
+    assert_eq!(unknown, parsed_unknown);
+
+    // 3. Debt with findings
+    let debt: ProbeStatus<Vec<OpenSpecDesyncFinding>> = ProbeStatus::Debt(vec![
+        OpenSpecDesyncFinding {
+            feature: "feat-a".to_string(),
+            completed_tasks: 5,
+            total_tasks: 20,
+            reason: DesyncReason::ParentTasksCompleteSubtasksOpen,
+        },
+        OpenSpecDesyncFinding {
+            feature: "feat-b".to_string(),
+            completed_tasks: 2,
+            total_tasks: 5,
+            reason: DesyncReason::CodeMergedToMain,
+        },
+        OpenSpecDesyncFinding {
+            feature: "feat-c".to_string(),
+            completed_tasks: 1,
+            total_tasks: 3,
+            reason: DesyncReason::ReleaseVersionSurpassed("1.23.0".to_string()),
+        },
+    ]);
+    let json_debt = serde_json::to_string(&debt).unwrap();
+    let parsed_debt: ProbeStatus<Vec<OpenSpecDesyncFinding>> =
+        serde_json::from_str(&json_debt).unwrap();
+    assert_eq!(debt, parsed_debt);
+}
+
+#[test]
+fn test_doc_debt_report_and_has_debt() {
+    let mut report = DocDebtReport::default();
+    assert!(report.git_available);
+    assert!(!report.has_debt());
+
+    report.stale_pending = ProbeStatus::Debt(vec![StalePendingFinding {
+        feature: "old-spec".into(),
+        days_inactive: 42,
+        completed_tasks: 3,
+        total_tasks: 8,
+        source: InactivitySource::GitCommitDate,
+    }]);
+    assert!(report.has_debt());
+
+    report.solution_drift = ProbeStatus::Debt(vec![SolutionDriftFinding {
+        solution_path: "docs/solutions/test.md".into(),
+        dead_paths: vec!["src/missing.rs".into()],
+        missing_frontmatter_fields: vec!["applies_when".into()],
+    }]);
+    assert!(report.has_debt());
+
+    // Round trip report
+    let serialized = serde_json::to_string(&report).unwrap();
+    let reloaded: DocDebtReport = serde_json::from_str(&serialized).unwrap();
+    assert_eq!(report, reloaded);
+}
+
+#[test]
+fn test_doc_debt_no_git_unknown_tri_state() {
+    // When Git is unavailable, git-dependent probes return Unknown, NOT Clean.
+    let report = DocDebtReport {
+        git_available: false,
+        openspec_desync: ProbeStatus::Unknown,
+        stale_pending: ProbeStatus::Clean,
+        solution_drift: ProbeStatus::Clean,
+    };
+
+    assert!(!report.git_available);
+    assert!(report.openspec_desync.is_unknown());
+    assert!(!report.openspec_desync.is_clean());
+    assert!(!report.openspec_desync.is_debt());
+    assert!(!report.has_debt());
+}
+
+#[test]
+fn test_repo_state_doc_debt_serialization_backwards_compatibility() {
+    // JSON without doc_debt should deserialize cleanly with doc_debt = None
+    let json_without_doc_debt = r#"{
+        "git_branch": "main",
+        "head_sha": "1234567",
+        "is_git_clean": true,
+        "modified_files": [],
+        "manifest_drift_count": 0,
+        "adoption_status": null
+    }"#;
+    let repo_state: RepoState = serde_json::from_str(json_without_doc_debt).unwrap();
+    assert_eq!(repo_state.doc_debt, None);
+
+    // RepoState with doc_debt serializes and deserializes
+    let mut repo_state_with_debt = repo_state.clone();
+    repo_state_with_debt.doc_debt = Some(DocDebtReport::default());
+    let serialized = serde_json::to_string(&repo_state_with_debt).unwrap();
+    let deserialized: RepoState = serde_json::from_str(&serialized).unwrap();
+    assert_eq!(repo_state_with_debt, deserialized);
+    assert_eq!(deserialized.doc_debt, Some(DocDebtReport::default()));
 }
