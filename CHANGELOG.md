@@ -5,6 +5,31 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.53.0] - 2026-09-12
+
+### Added
+- **Blocking Gate Check & Structured Validation Receipt for Unvetted Writes (#334):**
+  - **Exit Code 2 Blocking Enforcement**: Converted `ce-ai gate check` from an observe-only spike into an active, mechanical enforcement gate. Tool write operations (`Write`, `Edit`) targeting `src/**` in Stage 4 (`ce-work`) without formal OpenSpec contract artifacts (`proposal.md`, `spec.md`, `tasks.md`) are rejected with Exit Code `2` (`CeError::Usage`) and an actionable remediation diagnostic displayed in the Claude Code model context.
+  - **Zero False-Positive Policy Matrix**:
+    - **`ce-debug` Exemption**: Emergency bug fix tasks (`--entry-point ce-debug` or task description matching `ce-debug` / `debug`) permit `src/**` writes without upfront OpenSpec specifications.
+    - **Adoption Tier Exemption**: Repositories adopted with `--tier minimal` bypass full OpenSpec artifact requirements.
+    - **Path Filtering**: Non-`src/**` target files (`docs/**`, `openspec/**`, `README.md`, configurations) are never blocked.
+    - **Edge Case Isolation**: States flagged as `mtime_fallback`, `worktree_uncommitted`, or `stale_cycle_guard` remain non-blocking (advisory only).
+  - **Structured Validation Receipts**:
+    - Generates `GateReceipt` record with execution timestamp, feature name, target path, decision, stage, tier, missing artifacts, and reason.
+    - Persists receipt atomically to `openspec/changes/<feature>/.validation.json` and updates `state.gate_receipts` in `state.json`.
+    - Appends evaluation event to `~/.ce-ai/gate-events.jsonl` with `decision: "blocked"`.
+  - **Doctor & Status Observability Integration**:
+    - `ce-ai status` and `ce-ai doctor` report blocked write counts in telemetry metrics.
+    - `ce-ai status` surfaces active blocked write warnings (`gate-warn:`), while `ce-ai doctor` surfaces non-fatal advisory findings (`doctor-warn: gate-check:`).
+  - **Configurable Modes & Emergency Kill-Switch**:
+    - Supports `--mode enforce` (default) and `--mode observe` via CLI flag, `state.gate_mode`, or `CE_AI_GATE_MODE` env var.
+    - Immediate zero-I/O bypass via `CE_AI_DISABLE_GATE_CHECK=1` or `--disabled`.
+
+### Fixed
+- **Archive Directory Exclusion in Mtime Fallback Resolution**:
+  - `probe_openspec_context_in` in `src/commands/workflow.rs` now filters out directories named `archive` and any directories starting with `.`, preventing completed changes in `openspec/changes/archive/` from being falsely identified as active features.
+
 ## [1.52.0] - 2026-09-11
 
 ### Added

@@ -7891,14 +7891,53 @@ fn test_gate_check_spike_observe_only_lifecycle() {
             .success();
     }
 
+    // Default enforce mode: Stage 4 write without OpenSpec contract is actively blocked (exit code 2)
     ceai(&config_dir, &home)
         .current_dir(&proj)
         .args(["gate", "check", "--tool", "Write", "--path", "src/lib.rs"])
         .assert()
-        .success();
+        .code(2)
+        .stderr(predicate::str::contains("Write blocked on 'src/lib.rs'"));
 
     let logs = fs::read_to_string(&events_file).unwrap();
-    assert!(logs.contains("\"decision\":\"would_block\""));
+    assert!(logs.contains("\"decision\":\"blocked\""));
+
+    // Verify ce-ai status and doctor surface blocked write warning immediately
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "gate-warn: write blocked on 'src/lib.rs' for feature 'gate-test'",
+        ));
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains(
+            "doctor-warn: gate-check: write blocked on 'src/lib.rs' for feature 'gate-test'",
+        ));
+
+    // Explicit observe mode: Stage 4 write without OpenSpec logs would_block and exits 0
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args([
+            "gate",
+            "check",
+            "--tool",
+            "Write",
+            "--path",
+            "src/lib.rs",
+            "--mode",
+            "observe",
+        ])
+        .assert()
+        .success();
+
+    let logs_obs = fs::read_to_string(&events_file).unwrap();
+    assert!(logs_obs.contains("\"decision\":\"would_block\""));
 
     // 4. Stage 4 write with complete OpenSpec contract -> logs pass, exit 0
     let spec_dir = proj.join("openspec").join("changes").join("gate-test");
@@ -7956,16 +7995,16 @@ fn test_gate_check_spike_observe_only_lifecycle() {
         .arg("status")
         .assert()
         .success()
-        .stdout(predicates::str::contains(
-            "gate-check: 3 observed (1 would-block, 1 pass, 0 undetermined, 1 edge-case: 0 mtime_fallback, 1 worktree_uncommitted, 0 stale_cycle_guard)",
+        .stdout(predicate::str::contains(
+            "gate-check: 4 observed (1 blocked, 1 would-block, 1 pass, 0 undetermined, 1 edge-case: 0 mtime_fallback, 1 worktree_uncommitted, 0 stale_cycle_guard)",
         ));
 
     ceai(&config_dir, &home)
         .current_dir(&proj)
         .arg("doctor")
         .assert()
-        .stdout(predicates::str::contains(
-            "gate-check: 3 observed (1 would-block, 1 pass, 0 undetermined, 1 edge-case: 0 mtime_fallback, 1 worktree_uncommitted, 0 stale_cycle_guard)",
+        .stdout(predicate::str::contains(
+            "gate-check: 4 observed (1 blocked, 1 would-block, 1 pass, 0 undetermined, 1 edge-case: 0 mtime_fallback, 1 worktree_uncommitted, 0 stale_cycle_guard)",
         ));
 }
 

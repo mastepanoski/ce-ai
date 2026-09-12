@@ -86,6 +86,18 @@ fn probe_openspec_context_detects_features_and_counts_tasks() {
     let fallback_info =
         probe_openspec_context_in(repo_root, &None).expect("must fallback to directory");
     assert_eq!(fallback_info.feature, "my-feature");
+
+    // Test that archive/ and dot-directories are ignored in mtime fallback (WU1.1)
+    let archive_dir = repo_root.join("openspec").join("changes").join("archive");
+    std::fs::create_dir_all(&archive_dir).unwrap();
+    std::fs::write(archive_dir.join("archived-task.md"), "# Archived").unwrap();
+
+    let dot_dir = repo_root.join("openspec").join("changes").join(".stale");
+    std::fs::create_dir_all(&dot_dir).unwrap();
+
+    let fallback_ignoring_archive =
+        probe_openspec_context_in(repo_root, &None).expect("must still resolve real feature");
+    assert_eq!(fallback_ignoring_archive.feature, "my-feature");
 }
 
 #[test]

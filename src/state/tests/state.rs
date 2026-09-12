@@ -30,6 +30,8 @@ fn state_with(slot: &str) -> State {
         guardrail: None,
         auto_checkpoint: None,
         review_receipts: BTreeMap::new(),
+        gate_mode: None,
+        gate_receipts: BTreeMap::new(),
     }
 }
 
@@ -817,4 +819,47 @@ fn inferred_checkpoint_cannot_regress_previous_inferred_checkpoint() {
         .unwrap();
     assert_eq!(wf_after_manual.stage, WorkflowStage::ExecutionPlan);
     assert_eq!(wf_after_manual.source, WorkflowSource::Manual);
+}
+
+#[test]
+fn gate_mode_and_gate_receipts_serialization_and_state_roundtrip() {
+    use crate::state::state::{GateDecision, GateMode, GateReceipt};
+
+    let receipt = GateReceipt {
+        timestamp: "2026-09-11T22:00:00Z".to_string(),
+        feature: "auth-flow".to_string(),
+        target_path: "src/auth.rs".to_string(),
+        decision: GateDecision::Blocked,
+        stage: Some(4),
+        entry_point: Some("ce-work".to_string()),
+        tier: "full".to_string(),
+        missing_artifacts: vec!["proposal.md".to_string(), "tasks.md".to_string()],
+        reason: "Stage 4 without OpenSpec".to_string(),
+    };
+
+    let serialized = serde_json::to_string(&receipt).unwrap();
+    assert!(serialized.contains(r#""decision":"blocked""#));
+    assert!(serialized.contains(r#""feature":"auth-flow""#));
+
+    let deserialized: GateReceipt = serde_json::from_str(&serialized).unwrap();
+    assert_eq!(deserialized.decision, GateDecision::Blocked);
+    assert_eq!(deserialized.missing_artifacts.len(), 2);
+
+    let mut state = State::new();
+    assert_eq!(state.gate_mode, None);
+    assert!(state.gate_receipts.is_empty());
+
+    state.gate_mode = Some(GateMode::Enforce);
+    state
+        .gate_receipts
+        .insert("auth-flow".to_string(), receipt.clone());
+
+    let state_json = serde_json::to_string(&state).unwrap();
+    let state_restored: State = serde_json::from_str(&state_json).unwrap();
+    assert_eq!(state_restored.gate_mode, Some(GateMode::Enforce));
+    assert_eq!(state_restored.gate_receipts.len(), 1);
+    assert_eq!(
+        state_restored.gate_receipts.get("auth-flow"),
+        Some(&receipt)
+    );
 }

@@ -241,6 +241,77 @@ pub struct ReviewReceipt {
     pub override_reason: Option<String>,
 }
 
+/// The primary decision outcome of a gate check (Issue #333, #334).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GateDecision {
+    /// Stage 4 (`ce-work`) write actively blocked due to missing OpenSpec contract artifacts in enforce mode.
+    Blocked,
+    /// Stage 4 (`ce-work`) write with missing OpenSpec contract artifacts (in observe mode).
+    WouldBlock,
+    /// Authorized write (complete OpenSpec contract, ce-debug, tier minimal, non-Stage 4, or non-target path).
+    Pass,
+    /// Ambiguous, corrupt, or unadopted checkpoint state.
+    Undetermined,
+    /// Environmental or lifecycle anomaly isolated from the happy path.
+    EdgeCase,
+}
+
+impl GateDecision {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            GateDecision::Blocked => "blocked",
+            GateDecision::WouldBlock => "would_block",
+            GateDecision::Pass => "pass",
+            GateDecision::Undetermined => "undetermined",
+            GateDecision::EdgeCase => "edge_case",
+        }
+    }
+}
+
+/// Evaluation mode for gate checks: blocking (enforce) vs advisory (observe).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum GateMode {
+    #[default]
+    Enforce,
+    Observe,
+}
+
+impl GateMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            GateMode::Enforce => "enforce",
+            GateMode::Observe => "observe",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_lowercase().as_str() {
+            "enforce" | "blocking" => Some(GateMode::Enforce),
+            "observe" | "advisory" => Some(GateMode::Observe),
+            _ => None,
+        }
+    }
+}
+
+/// Structured record of a gate validation outcome (Issue #334).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GateReceipt {
+    pub timestamp: String,
+    pub feature: String,
+    pub target_path: String,
+    pub decision: GateDecision,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stage: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry_point: Option<String>,
+    pub tier: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub missing_artifacts: Vec<String>,
+    pub reason: String,
+}
+
 /// Canonical state file at `~/.ce-ai/state.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
@@ -272,6 +343,10 @@ pub struct State {
     pub auto_checkpoint: Option<bool>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub review_receipts: BTreeMap<String, ReviewReceipt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gate_mode: Option<GateMode>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub gate_receipts: BTreeMap<String, GateReceipt>,
 }
 fn default_version() -> u32 {
     1
