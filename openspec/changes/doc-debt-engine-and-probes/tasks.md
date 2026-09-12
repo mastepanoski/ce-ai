@@ -10,11 +10,11 @@ Work-unit changed-line estimates total: ~940 LOC (~200 LOC/work-unit policy appl
   - [x] 1.5 Implement serde serialization/deserialization for all new types.
   - [x] 1.6 (TDD) In `src/commands/tests/workflow.rs`, add unit tests validating tri-state serialization round-trip and `Unknown` handling when Git is absent.
 
-- [ ] **Work Unit 2: Workspace Config Overrides in `src/state/state.rs` & `src/state/ports.rs`** (~110 LOC)
-  - [ ] 2.1 Define `DocHygieneConfig` struct with `stale_spec_days`, `check_solution_paths`, and `require_solution_frontmatter`.
-  - [ ] 2.2 Add `pub doc_hygiene: Option<DocHygieneConfig>` to `State`.
-  - [ ] 2.3 Update `State::merge_overrides` to merge `doc_hygiene` from workspace `.ce-ai.json`.
-  - [ ] 2.4 (TDD) In `src/state/tests/state.rs`, add unit tests verifying `.ce-ai.json` overrides merge cleanly and default values apply when omitted.
+- [x] **Work Unit 2: Workspace Config Overrides in `src/state/state.rs` & `src/state/ports.rs`** (~110 LOC)
+  - [x] 2.1 Define `DocHygieneConfig` struct with `stale_spec_days`, `check_solution_paths`, and `require_solution_frontmatter`.
+  - [x] 2.2 Add `pub doc_hygiene: Option<DocHygieneConfig>` to `State`.
+  - [x] 2.3 Update `State::merge_overrides` to merge `doc_hygiene` from workspace `.ce-ai.json`.
+  - [x] 2.4 (TDD) In `src/state/tests/state.rs`, add unit tests verifying `.ce-ai.json` overrides merge cleanly and default values apply when omitted.
 
 - [ ] **Work Unit 3: Probe 1 (Git-Aware Desync) & Probe 2 (Stale Inactivity Watchdog)** (~190 LOC)
   - [ ] 3.1 Implement `probe_openspec_desync(repo_root: &Path, git_available: bool) -> ProbeStatus<Vec<OpenSpecDesyncFinding>>`.

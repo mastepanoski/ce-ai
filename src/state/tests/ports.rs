@@ -63,12 +63,19 @@ fn in_memory_state_store_handles_workspace_overrides() {
 
     let mut local_state = State::new();
     local_state.set_model_assignment("ce-plan", "anthropic", "claude-3-7-sonnet");
+    local_state.doc_hygiene = Some(crate::state::state::DocHygieneConfig {
+        stale_spec_days: 10,
+        check_solution_paths: true,
+        require_solution_frontmatter: false,
+    });
     store.insert(&ws_override_path, local_state);
 
     let merged = store
         .load_with_workspace_overrides(&global_path, Some(&ws_root))
         .unwrap();
     assert_eq!(merged.model_assignments["ce-plan"].provider_id, "anthropic");
+    assert_eq!(merged.doc_hygiene().stale_spec_days, 10);
+    assert!(!merged.doc_hygiene().require_solution_frontmatter);
 }
 
 #[test]
