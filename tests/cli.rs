@@ -1227,6 +1227,55 @@ fn doctor_clean_install_reports_ok() {
 }
 
 #[test]
+fn doctor_reports_documentation_debt_advisories_and_exits_zero() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    let repo = tmp.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+
+    // 1. OpenSpec change with complete parent tasks and open subtasks
+    let change_dir = repo.join("openspec").join("changes").join("stranded-pr");
+    std::fs::create_dir_all(&change_dir).unwrap();
+    std::fs::write(
+        change_dir.join("tasks.md"),
+        "- [x] 1. Parent complete\n  - [ ] 1.1 Open subtask\n",
+    )
+    .unwrap();
+
+    // 2. Solution referencing dead file path and missing applies_when
+    let sol_dir = repo.join("docs").join("solutions").join("architecture");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+    let broken_sol = r#"---
+title: "Old Architecture"
+category: "architecture"
+problem_type: "design"
+tags:
+  - legacy
+---
+References `src/deleted.rs`.
+"#;
+    std::fs::write(sol_dir.join("old.md"), broken_sol).unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&repo)
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "doctor-warn: openspec change 'stranded-pr' is complete with open subtasks (progress: 1/2) — run 'ce-ai archive stranded-pr --auto-mark'",
+        ))
+        .stdout(predicate::str::contains(
+            "doctor-warn: solution 'architecture/old.md' references non-existent path 'src/deleted.rs'",
+        ))
+        .stdout(predicate::str::contains(
+            "doctor-warn: solution 'architecture/old.md' missing required YAML frontmatter: applies_when",
+        ));
+}
+
+#[test]
 fn doctor_detects_claude_marketplace_divergence_advisory() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));

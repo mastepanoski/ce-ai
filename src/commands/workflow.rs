@@ -259,6 +259,11 @@ pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
             "! Warning: {count} OpenSpec change(s) complete but not archived — run 'ce-ai doctor' for details"
         ));
     }
+    if let Some(debt) = &repo_state.doc_debt {
+        if debt.has_debt() {
+            lines.push(format!("! Warning: {}", debt.summary_line()));
+        }
+    }
 
     Ok(lines)
 }
@@ -319,6 +324,11 @@ pub fn checkpoint_lines(
         lines.push(format!(
             "! Warning: {count} OpenSpec change(s) complete but not archived — run 'ce-ai doctor' for details"
         ));
+    }
+    if let Some(debt) = &repo_state.doc_debt {
+        if debt.has_debt() {
+            lines.push(format!("! Warning: {}", debt.summary_line()));
+        }
     }
 
     Ok(lines)
@@ -408,6 +418,9 @@ pub fn resume_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
         lines.push(format!(
             "  openspec ledger: ! {count} change(s) complete but not archived — run 'ce-ai doctor' for details"
         ));
+    }
+    if let Some(debt) = &repo_state.doc_debt {
+        lines.push(format!("  {}", debt.summary_line()));
     }
 
     if let Some(info) = &repo_state.openspec_context {
@@ -734,6 +747,70 @@ impl DocDebtReport {
             || self.stale_pending.is_debt()
             || self.solution_drift.is_debt()
     }
+
+    pub fn summary_line(&self) -> String {
+        if !self.has_debt() {
+            if self.git_available {
+                return "doc debt: clean".to_string();
+            } else {
+                return "doc debt: clean [git: n/a]".to_string();
+            }
+        }
+
+        let mut parts = Vec::new();
+
+        if let ProbeStatus::Debt(desync) = &self.openspec_desync {
+            let count = desync.len();
+            let label = if count == 1 {
+                "1 unarchived (code merged)".to_string()
+            } else {
+                format!("{count} unarchived (code merged)")
+            };
+            parts.push(label);
+        }
+
+        if let ProbeStatus::Debt(stale) = &self.stale_pending {
+            let count = stale.len();
+            let max_days = stale.iter().map(|s| s.days_inactive).max().unwrap_or(0);
+            let spec_word = if count == 1 { "spec" } else { "specs" };
+            if self.git_available {
+                parts.push(format!("{count} stale {spec_word} ({max_days}d)"));
+            } else {
+                parts.push(format!("{count} stale {spec_word} [git: n/a]"));
+            }
+        }
+
+        if let ProbeStatus::Debt(drift) = &self.solution_drift {
+            let dead_count: usize = drift.iter().map(|d| d.dead_paths.len()).sum();
+            let fm_count: usize = drift
+                .iter()
+                .filter(|d| !d.missing_frontmatter_fields.is_empty())
+                .count();
+
+            if dead_count > 0 {
+                let link_word = if dead_count == 1 {
+                    "dead solution link"
+                } else {
+                    "dead solution links"
+                };
+                parts.push(format!("{dead_count} {link_word}"));
+            }
+            if fm_count > 0 {
+                let fm_word = if fm_count == 1 {
+                    "solution missing frontmatter"
+                } else {
+                    "solutions missing frontmatter"
+                };
+                parts.push(format!("{fm_count} {fm_word}"));
+            }
+        }
+
+        if !self.git_available && !parts.iter().any(|p| p.contains("[git: n/a]")) {
+            parts.push("[git: n/a]".to_string());
+        }
+
+        format!("doc debt: {}", parts.join(", "))
+    }
 }
 
 impl Default for DocDebtReport {
@@ -900,6 +977,17 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
                 .cloned()
         });
 
+    let doc_hygiene_cfg =
+        State::load_with_workspace_overrides(&ctx.config_dir.join("state.json"), Some(&repo_root))
+            .ok()
+            .map(|s| s.doc_hygiene())
+            .unwrap_or_default();
+    let doc_debt = Some(probe_doc_debt(
+        &repo_root,
+        git_branch.as_deref(),
+        &doc_hygiene_cfg,
+    ));
+
     RepoState {
         git_branch,
         head_sha,
@@ -914,7 +1002,7 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
         commits_ahead,
         stage6_artifact_present,
         review_receipt,
-        doc_debt: None,
+        doc_debt,
     }
 }
 
@@ -1234,6 +1322,31 @@ fn check_feature_merged_to_main(repo_root: &Path, feature: &str) -> bool {
         }
     }
     false
+}
+
+/// Probes documentation technical debt across OpenSpec synchronization, pending inactivity, and solution library drift.
+pub fn probe_doc_debt(
+    repo_root: &Path,
+    git_branch: Option<&str>,
+    config: &DocHygieneConfig,
+) -> DocDebtReport {
+    let git_available = git_branch.is_some()
+        || repo_root.join(".git").exists()
+        || git_probe(repo_root, &["rev-parse", "--git-dir"])
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+
+    let openspec_desync = probe_openspec_desync(repo_root, git_available);
+    let stale_pending =
+        probe_stale_pending_openspecs(repo_root, config.stale_spec_days, git_available);
+    let solution_drift = probe_solution_drift(repo_root, config);
+
+    DocDebtReport {
+        git_available,
+        openspec_desync,
+        stale_pending,
+        solution_drift,
+    }
 }
 
 /// Probe 1: Scans `openspec/changes/` for desynchronized changes where tasks remain unchecked

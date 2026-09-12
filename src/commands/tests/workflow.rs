@@ -1942,3 +1942,123 @@ fn test_probe_solution_drift_on_live_ce_ai_repo() {
         panic!("expected debt on live repo");
     }
 }
+
+#[test]
+fn test_doc_debt_report_summary_line_formatting() {
+    // 1. Clean with Git
+    let report_clean_git = DocDebtReport {
+        git_available: true,
+        openspec_desync: ProbeStatus::Clean,
+        stale_pending: ProbeStatus::Clean,
+        solution_drift: ProbeStatus::Clean,
+    };
+    assert_eq!(report_clean_git.summary_line(), "doc debt: clean");
+
+    // 2. Clean without Git
+    let report_clean_no_git = DocDebtReport {
+        git_available: false,
+        openspec_desync: ProbeStatus::Unknown,
+        stale_pending: ProbeStatus::Clean,
+        solution_drift: ProbeStatus::Clean,
+    };
+    assert_eq!(
+        report_clean_no_git.summary_line(),
+        "doc debt: clean [git: n/a]"
+    );
+
+    // 3. Findings with Git
+    let report_findings_git = DocDebtReport {
+        git_available: true,
+        openspec_desync: ProbeStatus::Debt(vec![
+            OpenSpecDesyncFinding {
+                feature: "feat-a".into(),
+                completed_tasks: 5,
+                total_tasks: 20,
+                reason: DesyncReason::ParentTasksCompleteSubtasksOpen,
+            },
+            OpenSpecDesyncFinding {
+                feature: "feat-b".into(),
+                completed_tasks: 2,
+                total_tasks: 5,
+                reason: DesyncReason::CodeMergedToMain,
+            },
+        ]),
+        stale_pending: ProbeStatus::Debt(vec![StalePendingFinding {
+            feature: "feat-c".into(),
+            days_inactive: 34,
+            completed_tasks: 9,
+            total_tasks: 10,
+            source: InactivitySource::GitCommitDate,
+        }]),
+        solution_drift: ProbeStatus::Debt(vec![SolutionDriftFinding {
+            solution_path: "docs/solutions/architecture/old.md".into(),
+            dead_paths: vec!["src/old_a.rs".into(), "src/old_b.rs".into()],
+            missing_frontmatter_fields: vec![],
+        }]),
+    };
+    assert_eq!(
+        report_findings_git.summary_line(),
+        "doc debt: 2 unarchived (code merged), 1 stale spec (34d), 2 dead solution links"
+    );
+
+    // 4. Findings without Git
+    let report_findings_no_git = DocDebtReport {
+        git_available: false,
+        openspec_desync: ProbeStatus::Unknown,
+        stale_pending: ProbeStatus::Debt(vec![StalePendingFinding {
+            feature: "feat-c".into(),
+            days_inactive: 34,
+            completed_tasks: 9,
+            total_tasks: 10,
+            source: InactivitySource::FilesystemMtime,
+        }]),
+        solution_drift: ProbeStatus::Debt(vec![SolutionDriftFinding {
+            solution_path: "docs/solutions/architecture/old.md".into(),
+            dead_paths: vec!["src/old_a.rs".into(), "src/old_b.rs".into()],
+            missing_frontmatter_fields: vec![],
+        }]),
+    };
+    assert_eq!(
+        report_findings_no_git.summary_line(),
+        "doc debt: 1 stale spec [git: n/a], 2 dead solution links"
+    );
+}
+
+#[test]
+fn test_probe_doc_debt_coordination_and_repo_state() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    let changes_dir = root.join("openspec").join("changes");
+    std::fs::create_dir_all(&changes_dir).unwrap();
+    let feat_dir = changes_dir.join("my-feat");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    std::fs::write(
+        feat_dir.join("tasks.md"),
+        "- [x] 1 Parent\n  - [ ] 1.1 Child\n",
+    )
+    .unwrap();
+
+    let config = DocHygieneConfig::default();
+    let report = probe_doc_debt(root, None, &config);
+    assert!(!report.git_available);
+    assert!(report.has_debt());
+
+    let ctx = Context {
+        config_dir: root.join("config"),
+        opencode_config_dir: root.join("opencode"),
+        workspace_root: Some(root.to_path_buf()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    let state = State::new();
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    let repo_state = probe_repo_state(&ctx, &None);
+    assert!(repo_state.doc_debt.is_some());
+    let debt = repo_state.doc_debt.unwrap();
+    assert!(debt.has_debt());
+    assert!(debt.summary_line().contains("1 unarchived (code merged)"));
+}

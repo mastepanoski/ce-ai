@@ -618,6 +618,71 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         );
     }
 
+    // Documentation Technical Debt Diagnostic Engine & Probes (doc-debt-engine-and-probes)
+    let doc_hygiene_cfg = state.doc_hygiene();
+    let doc_debt =
+        crate::commands::workflow::probe_doc_debt(&repo_root, branch.as_deref(), &doc_hygiene_cfg);
+
+    if let crate::commands::workflow::ProbeStatus::Debt(desync_findings) = &doc_debt.openspec_desync
+    {
+        for f in desync_findings {
+            match f.reason {
+                crate::commands::workflow::DesyncReason::ParentTasksCompleteSubtasksOpen => {
+                    println!(
+                        "doctor-warn: openspec change '{}' is complete with open subtasks (progress: {}/{}) — run 'ce-ai archive {} --auto-mark' or 'ce-ai archive {} --status \"...\"'",
+                        f.feature, f.completed_tasks, f.total_tasks, f.feature, f.feature
+                    );
+                }
+                crate::commands::workflow::DesyncReason::CodeMergedToMain => {
+                    println!(
+                        "doctor-warn: openspec change '{}' has code merged to main (progress: {}/{}) — run 'ce-ai archive {} --auto-mark' or 'ce-ai archive {} --status \"...\"'",
+                        f.feature, f.completed_tasks, f.total_tasks, f.feature, f.feature
+                    );
+                }
+                crate::commands::workflow::DesyncReason::ReleaseVersionSurpassed(_) => {
+                    println!(
+                        "doctor-warn: openspec change '{}' cited release version is surpassed in Cargo.toml (progress: {}/{}) — run 'ce-ai archive {} --auto-mark' or 'ce-ai archive {} --status \"...\"'",
+                        f.feature, f.completed_tasks, f.total_tasks, f.feature, f.feature
+                    );
+                }
+            }
+        }
+    }
+
+    if let crate::commands::workflow::ProbeStatus::Debt(stale_findings) = &doc_debt.stale_pending {
+        for f in stale_findings {
+            let git_msg = match f.source {
+                crate::commands::workflow::InactivitySource::GitCommitDate => "with no git commits",
+                crate::commands::workflow::InactivitySource::FilesystemMtime => "with no activity",
+            };
+            println!(
+                "doctor-warn: openspec change '{}' has been pending for {} days {} (progress: {}/{}) — resume, shelve, or archive with '--status \"superseded\"'",
+                f.feature, f.days_inactive, git_msg, f.completed_tasks, f.total_tasks
+            );
+        }
+    }
+
+    if let crate::commands::workflow::ProbeStatus::Debt(drift_findings) = &doc_debt.solution_drift {
+        for f in drift_findings {
+            let display_path = f
+                .solution_path
+                .strip_prefix("docs/solutions/")
+                .unwrap_or(&f.solution_path);
+            for dead_path in &f.dead_paths {
+                println!(
+                    "doctor-warn: solution '{}' references non-existent path '{}'",
+                    display_path, dead_path
+                );
+            }
+            for field in &f.missing_frontmatter_fields {
+                println!(
+                    "doctor-warn: solution '{}' missing required YAML frontmatter: {}",
+                    display_path, field
+                );
+            }
+        }
+    }
+
     // Observe-only Ship-readiness probe (Issue #354): Stage 6 + code-review gaps.
     // Non-fatal: never added to `findings`, exit code unaffected. Only runs for
     // adopted workspaces to avoid noise on unrelated repositories.

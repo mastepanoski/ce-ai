@@ -37,11 +37,11 @@ Work-unit changed-line estimates total: ~940 LOC (~200 LOC/work-unit policy appl
     - Missing YAML frontmatter fields detection.
     - Clean solutions directory returning `ProbeStatus::Clean`.
 
-- [ ] **Work Unit 5: Turn-0 Delivery & Doctor Integration** (~180 LOC)
-  - [ ] 5.1 Implement `probe_doc_debt` coordinating all three probes and wire into `probe_repo_state`.
-  - [ ] 5.2 Format single-line Turn-0 summary in `workflow resume` and `workflow status` with `[git: n/a]` fallback.
-  - [ ] 5.3 In `src/commands/doctor.rs`, emit non-blocking `doctor-warn:` lines with copy-pasteable CLI commands for detected debt items.
-  - [ ] 5.4 (TDD) Add integration tests in `src/commands/tests/doctor.rs` and `tests/cli.rs` validating doctor output with and without Git substrate.
+- [x] **Work Unit 5: Turn-0 Delivery & Doctor Integration** (~180 LOC)
+  - [x] 5.1 Implement `probe_doc_debt` coordinating all three probes and wire into `probe_repo_state`.
+  - [x] 5.2 Format single-line Turn-0 summary in `workflow resume` and `workflow status` with `[git: n/a]` fallback.
+  - [x] 5.3 In `src/commands/doctor.rs`, emit non-blocking `doctor-warn:` lines with copy-pasteable CLI commands for detected debt items.
+  - [x] 5.4 (TDD) Add integration tests in `src/commands/tests/doctor.rs` and `tests/cli.rs` validating doctor output with and without Git substrate.
 
 - [ ] **Work Unit 6: Pedagogical Guide & Documentation Updates** (~150 LOC)
   - [ ] 6.1 Author `docs/user-guide/doc-hygiene-and-debt-explained.md` in Diátaxis Explanation quadrant for Beginners ("Professor's Walkthrough").
