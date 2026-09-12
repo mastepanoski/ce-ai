@@ -32,3 +32,4 @@ Historical notes:
 - 2026-09-11 sweep: 33 folders archived via 'ce-ai archive --all'.
 - openspec-archive-command: archived (15/15 tasks) under criterion (1) on 2026-09-11.
 - blocking-gate-check: archived (24/24 tasks) under criterion (1) on 2026-09-12.
+- doc-debt-engine-and-probes: archived (31/31 tasks) under criterion (1) on 2026-09-12.
