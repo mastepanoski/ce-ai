@@ -9,10 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Documentation Technical Debt Diagnostic Engine & Probes:**
   - **Diagnostic Subsystem (`probe_doc_debt`)**: Evaluates repository documentation debt across three structural probes: stranded OpenSpecs desynchronized from Git branches, stale pending changes untouched past configurable thresholds, and solution library drift (`docs/solutions/` missing metadata or referencing nonexistent files).
-  - **Substrate Tri-State Reporting**: Implemented `ProbeStatus::Clean`, `ProbeStatus::Drift(count)`, and `ProbeStatus::Unknown` (`[git: n/a]`), preventing silent false negatives when Git is unavailable.
+  - **Substrate Tri-State Reporting**: Implemented `ProbeStatus::Clean`, `ProbeStatus::Debt(findings)`, and `ProbeStatus::Unknown` (`[git: n/a]`), preventing silent false negatives when Git is unavailable.
   - **Turn-0 Summary Delivery**: Compact `doc debt:` summary line rendered in `ce-ai workflow resume`, `workflow status`, and `workflow checkpoint`.
   - **Doctor Health Diagnostics**: Non-blocking `doctor-warn:` advisories in `ce-ai doctor` with actionable copy-pasteable CLI remediation commands.
-  - **Workspace Configuration Overrides**: Support for `doc_hygiene` in `.ce-ai.json` allowing per-repo configuration of `stale_days` (default 30), `orphan_days` (default 14), and probe toggles (`enable_openspec_desync_probe`, `enable_stale_pending_openspec_probe`, `enable_solution_drift_probe`).
+  - **Workspace Configuration Overrides**: Support for `doc_hygiene` in `.ce-ai.json` allowing per-repo configuration of `stale_spec_days` (default 21), `check_solution_paths` (default true), and `require_solution_frontmatter` (default true).
   - **Pedagogical Guide**: Added `docs/user-guide/doc-hygiene-and-debt-explained.md` (Diátaxis Explanation quadrant) walking newcomers through documentation debt, AI cognitive drift, and automated remediation.
 
 ## [1.53.0] - 2026-09-12

@@ -761,8 +761,11 @@ impl DocDebtReport {
 
         if let ProbeStatus::Debt(desync) = &self.openspec_desync {
             let count = desync.len();
-            let label = if count == 1 {
-                "1 unarchived (code merged)".to_string()
+            let all_subtasks_open = desync
+                .iter()
+                .all(|d| matches!(d.reason, DesyncReason::ParentTasksCompleteSubtasksOpen));
+            let label = if all_subtasks_open {
+                format!("{count} unarchived (open subtasks)")
             } else {
                 format!("{count} unarchived (code merged)")
             };
@@ -1123,23 +1126,30 @@ pub fn probe_openspec_context_in(
     })
 }
 
-/// Parses a tasks.md file and returns (completed_tasks, total_tasks).
-/// Gracefully returns (0, 0) if the file cannot be read or does not exist.
-pub fn count_task_checkboxes(tasks_path: &Path) -> (usize, usize) {
+/// Parses tasks content string and returns (completed_tasks, total_tasks).
+pub fn count_task_checkboxes_content(content: &str) -> (usize, usize) {
     let mut completed_tasks = 0;
     let mut total_tasks = 0;
-    if let Ok(content) = std::fs::read_to_string(tasks_path) {
-        for line in content.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]") {
-                completed_tasks += 1;
-                total_tasks += 1;
-            } else if trimmed.starts_with("- [ ]") {
-                total_tasks += 1;
-            }
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]") {
+            completed_tasks += 1;
+            total_tasks += 1;
+        } else if trimmed.starts_with("- [ ]") {
+            total_tasks += 1;
         }
     }
     (completed_tasks, total_tasks)
+}
+
+/// Parses a tasks.md file and returns (completed_tasks, total_tasks).
+/// Gracefully returns (0, 0) if the file cannot be read or does not exist.
+pub fn count_task_checkboxes(tasks_path: &Path) -> (usize, usize) {
+    if let Ok(content) = std::fs::read_to_string(tasks_path) {
+        count_task_checkboxes_content(&content)
+    } else {
+        (0, 0)
+    }
 }
 
 /// Scans openspec/changes/ across the entire repository for completed features that have not been moved to archive/.
@@ -1184,14 +1194,9 @@ pub fn probe_unarchived_completed_changes(repo_root: &Path) -> Vec<UnarchivedCha
     completed_changes
 }
 
-/// Inspects tasks.md to determine whether all top-level (parent) tasks are completed
+/// Inspects tasks content to determine whether all top-level (parent) tasks are completed
 /// while one or more subtasks remain uncompleted.
-pub fn is_parent_tasks_complete_subtasks_open(tasks_path: &Path) -> bool {
-    let content = match std::fs::read_to_string(tasks_path) {
-        Ok(c) => c,
-        Err(_) => return false,
-    };
-
+pub fn is_parent_tasks_complete_subtasks_open_content(content: &str) -> bool {
     let mut parent_total = 0;
     let mut parent_completed = 0;
     let mut has_open_subtask = false;
@@ -1214,6 +1219,16 @@ pub fn is_parent_tasks_complete_subtasks_open(tasks_path: &Path) -> bool {
     }
 
     parent_total > 0 && parent_completed == parent_total && has_open_subtask
+}
+
+/// Inspects tasks.md to determine whether all top-level (parent) tasks are completed
+/// while one or more subtasks remain uncompleted.
+pub fn is_parent_tasks_complete_subtasks_open(tasks_path: &Path) -> bool {
+    if let Ok(content) = std::fs::read_to_string(tasks_path) {
+        is_parent_tasks_complete_subtasks_open_content(&content)
+    } else {
+        false
+    }
 }
 
 /// Helper to parse a 3-part SemVer token (stripping leading 'v' and boundary punctuation).
@@ -1247,15 +1262,8 @@ pub fn extract_cargo_version(repo_root: &Path) -> Option<(u32, u32, u32)> {
         } else if in_package && trimmed.starts_with("version") {
             if let Some(val) = trimmed.split('=').nth(1) {
                 let clean = val.trim().trim_matches('"').trim_matches('\'');
-                let parts: Vec<&str> = clean.split('.').collect();
-                if parts.len() == 3 {
-                    if let (Ok(maj), Ok(min), Ok(patch)) = (
-                        parts[0].parse::<u32>(),
-                        parts[1].parse::<u32>(),
-                        parts[2].parse::<u32>(),
-                    ) {
-                        return Some((maj, min, patch));
-                    }
+                if let Some((_, ver)) = parse_semver_token(clean) {
+                    return Some(ver);
                 }
             }
         }
@@ -1302,21 +1310,6 @@ fn check_feature_merged_to_main(repo_root: &Path, feature: &str) -> bool {
                 let stdout = String::from_utf8_lossy(&out.stdout);
                 if !stdout.trim().is_empty() {
                     return true;
-                }
-            }
-        }
-    }
-    if let Some(branch) = probe_git_branch(repo_root) {
-        if branch == "main" || branch == "master" {
-            if let Some(out) = git_probe(
-                repo_root,
-                &["log", "HEAD", "-n", "100", "--grep", feature, "--format=%H"],
-            ) {
-                if out.status.success() {
-                    let stdout = String::from_utf8_lossy(&out.stdout);
-                    if !stdout.trim().is_empty() {
-                        return true;
-                    }
                 }
             }
         }
@@ -1379,22 +1372,23 @@ pub fn probe_openspec_desync(
             Some(name) => name,
             None => continue,
         };
-        if dir_name == "archive" {
+        if dir_name == "archive" || dir_name.starts_with('.') {
             continue;
         }
 
         let tasks_path = path.join("tasks.md");
-        if !tasks_path.is_file() {
-            continue;
-        }
+        let content = match std::fs::read_to_string(&tasks_path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
 
-        let (completed, total) = count_task_checkboxes(&tasks_path);
+        let (completed, total) = count_task_checkboxes_content(&content);
         if total == 0 || completed == total {
             continue;
         }
 
         // 1. Parent tasks complete with subtasks open
-        if is_parent_tasks_complete_subtasks_open(&tasks_path) {
+        if is_parent_tasks_complete_subtasks_open_content(&content) {
             findings.push(OpenSpecDesyncFinding {
                 feature: dir_name.to_string(),
                 completed_tasks: completed,
@@ -1417,16 +1411,14 @@ pub fn probe_openspec_desync(
 
         // 3. Cited version surpassed in Cargo.toml
         if let Some(c_ver) = cargo_version {
-            if let Ok(content) = std::fs::read_to_string(&tasks_path) {
-                if let Some((cited_str, cited_ver)) = extract_cited_version(&content) {
-                    if cited_ver < c_ver {
-                        findings.push(OpenSpecDesyncFinding {
-                            feature: dir_name.to_string(),
-                            completed_tasks: completed,
-                            total_tasks: total,
-                            reason: DesyncReason::ReleaseVersionSurpassed(cited_str),
-                        });
-                    }
+            if let Some((cited_str, cited_ver)) = extract_cited_version(&content) {
+                if cited_ver < c_ver {
+                    findings.push(OpenSpecDesyncFinding {
+                        feature: dir_name.to_string(),
+                        completed_tasks: completed,
+                        total_tasks: total,
+                        reason: DesyncReason::ReleaseVersionSurpassed(cited_str),
+                    });
                 }
             }
         }
@@ -1467,7 +1459,7 @@ pub fn probe_stale_pending_openspecs(
             Some(name) => name,
             None => continue,
         };
-        if dir_name == "archive" {
+        if dir_name == "archive" || dir_name.starts_with('.') {
             continue;
         }
 
@@ -1565,8 +1557,9 @@ pub fn probe_solution_drift(
 
         let rel_solution_path = file_path
             .strip_prefix(repo_root)
-            .map(|p| p.to_string_lossy().replace('\\', "/"))
-            .unwrap_or_else(|_| file_path.to_string_lossy().to_string());
+            .unwrap_or(&file_path)
+            .to_string_lossy()
+            .replace('\\', "/");
 
         let missing_frontmatter_fields = if config.require_solution_frontmatter {
             check_solution_frontmatter(&content)
@@ -1687,7 +1680,7 @@ fn check_solution_frontmatter(content: &str) -> Vec<String> {
     missing
 }
 
-fn clean_code_path(token: &str) -> Option<String> {
+fn clean_code_path(token: &str) -> Option<&str> {
     let trimmed = token.trim();
     if trimmed.contains('*') || trimmed.contains('<') || trimmed.contains('>') {
         return None;
@@ -1696,27 +1689,20 @@ fn clean_code_path(token: &str) -> Option<String> {
         return None;
     }
 
-    let path_no_anchor = if let Some((base, _)) = trimmed.split_once('#') {
-        base
-    } else {
-        trimmed
-    };
-
-    let candidate = if let Some((base, suffix)) = path_no_anchor.split_once(':') {
-        if suffix
-            .chars()
-            .all(|c| c.is_ascii_digit() || c == '-' || c == ',')
+    let path_no_anchor = trimmed.split_once('#').map_or(trimmed, |(base, _)| base);
+    let candidate = match path_no_anchor.split_once(':') {
+        Some((base, suffix))
+            if suffix
+                .chars()
+                .all(|c| c.is_ascii_digit() || c == '-' || c == ',') =>
         {
             base
-        } else {
-            path_no_anchor
         }
-    } else {
-        path_no_anchor
+        _ => path_no_anchor,
     };
 
     if candidate.ends_with(".rs") {
-        Some(candidate.to_string())
+        Some(candidate)
     } else {
         None
     }
@@ -1742,9 +1728,9 @@ fn check_solution_dead_paths(repo_root: &Path, content: &str) -> Vec<String> {
                 if let Some(s) = start {
                     let token = &line[s + 1..i];
                     if let Some(cleaned) = clean_code_path(token) {
-                        let target = repo_root.join(&cleaned);
+                        let target = repo_root.join(cleaned);
                         if !target.exists() {
-                            dead.push(cleaned);
+                            dead.push(cleaned.to_string());
                         }
                     }
                     start = None;

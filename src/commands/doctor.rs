@@ -626,26 +626,21 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     if let crate::commands::workflow::ProbeStatus::Debt(desync_findings) = &doc_debt.openspec_desync
     {
         for f in desync_findings {
-            match f.reason {
+            let reason_msg = match f.reason {
                 crate::commands::workflow::DesyncReason::ParentTasksCompleteSubtasksOpen => {
-                    println!(
-                        "doctor-warn: openspec change '{}' is complete with open subtasks (progress: {}/{}) — run 'ce-ai archive {} --auto-mark' or 'ce-ai archive {} --status \"...\"'",
-                        f.feature, f.completed_tasks, f.total_tasks, f.feature, f.feature
-                    );
+                    "is complete with open subtasks"
                 }
                 crate::commands::workflow::DesyncReason::CodeMergedToMain => {
-                    println!(
-                        "doctor-warn: openspec change '{}' has code merged to main (progress: {}/{}) — run 'ce-ai archive {} --auto-mark' or 'ce-ai archive {} --status \"...\"'",
-                        f.feature, f.completed_tasks, f.total_tasks, f.feature, f.feature
-                    );
+                    "has code merged to main"
                 }
                 crate::commands::workflow::DesyncReason::ReleaseVersionSurpassed(_) => {
-                    println!(
-                        "doctor-warn: openspec change '{}' cited release version is surpassed in Cargo.toml (progress: {}/{}) — run 'ce-ai archive {} --auto-mark' or 'ce-ai archive {} --status \"...\"'",
-                        f.feature, f.completed_tasks, f.total_tasks, f.feature, f.feature
-                    );
+                    "cited release version is surpassed in Cargo.toml"
                 }
-            }
+            };
+            println!(
+                "doctor-warn: openspec change '{}' {} (progress: {}/{}) — run 'ce-ai archive {} --auto-mark' or 'ce-ai archive {} --status \"...\"'",
+                f.feature, reason_msg, f.completed_tasks, f.total_tasks, f.feature, f.feature
+            );
         }
     }
 

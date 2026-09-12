@@ -313,7 +313,7 @@ pub struct GateReceipt {
 }
 
 /// Workspace-level configuration for documentation technical debt hygiene.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DocHygieneConfig {
     #[serde(default = "default_stale_spec_days")]
     pub stale_spec_days: u32,
@@ -765,7 +765,7 @@ impl State {
 
     /// Returns the effective documentation hygiene configuration, falling back to defaults if not set.
     pub fn doc_hygiene(&self) -> DocHygieneConfig {
-        self.doc_hygiene.clone().unwrap_or_default()
+        self.doc_hygiene.unwrap_or_default()
     }
 
     /// Loads global state and applies local `.ce-ai.json` overrides if present.

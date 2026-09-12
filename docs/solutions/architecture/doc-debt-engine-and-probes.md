@@ -55,7 +55,7 @@ When `git` is unavailable, git-dependent probes return `ProbeStatus::Unknown`. T
 - **Probe 2: Stale Pending OpenSpecs Watchdog (`probe_stale_pending_openspecs`)**:
   - Evaluates days elapsed since the last git commit touching each change folder.
   - Falls back gracefully to directory file `mtime` when git history is inaccessible.
-  - Compares against configurable staleness thresholds (default: 30 days), explicitly ignoring `archive/` and hidden directories.
+  - Compares against configurable staleness thresholds (default: 21 days), explicitly ignoring `archive/` and hidden directories.
 
 - **Probe 5: Solution Library Drift & Linter (`probe_solution_drift`)**:
   - Traverses `docs/solutions/**/*.md`.
