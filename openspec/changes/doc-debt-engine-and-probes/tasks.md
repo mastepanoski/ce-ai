@@ -16,14 +16,14 @@ Work-unit changed-line estimates total: ~940 LOC (~200 LOC/work-unit policy appl
   - [x] 2.3 Update `State::merge_overrides` to merge `doc_hygiene` from workspace `.ce-ai.json`.
   - [x] 2.4 (TDD) In `src/state/tests/state.rs`, add unit tests verifying `.ce-ai.json` overrides merge cleanly and default values apply when omitted.
 
-- [ ] **Work Unit 3: Probe 1 (Git-Aware Desync) & Probe 2 (Stale Inactivity Watchdog)** (~190 LOC)
-  - [ ] 3.1 Implement `probe_openspec_desync(repo_root: &Path, git_available: bool) -> ProbeStatus<Vec<OpenSpecDesyncFinding>>`.
+- [x] **Work Unit 3: Probe 1 (Git-Aware Desync) & Probe 2 (Stale Inactivity Watchdog)** (~190 LOC)
+  - [x] 3.1 Implement `probe_openspec_desync(repo_root: &Path, git_available: bool) -> ProbeStatus<Vec<OpenSpecDesyncFinding>>`.
     - Check parent tasks complete with subtasks open.
     - Inspect git commits landed on HEAD/main.
     - Check if cited version in tasks.md is surpassed in Cargo.toml.
-  - [ ] 3.2 Implement `probe_stale_pending_openspecs(repo_root: &Path, stale_days: u32, git_available: bool) -> ProbeStatus<Vec<StalePendingFinding>>`.
+  - [x] 3.2 Implement `probe_stale_pending_openspecs(repo_root: &Path, stale_days: u32, git_available: bool) -> ProbeStatus<Vec<StalePendingFinding>>`.
     - Compute elapsed days via git commit timestamp, falling back to mtime in No-Git environments.
-  - [ ] 3.3 (TDD) In `src/commands/tests/workflow.rs`, add unit tests covering:
+  - [x] 3.3 (TDD) In `src/commands/tests/workflow.rs`, add unit tests covering:
     - Stranded changes fixture (`doctor-kimi-marketplace-divergence` shape).
     - Stale pending change fixture with simulated mtime/git commit age.
     - No-Git fixture returning `Unknown` for git-dependent checks.

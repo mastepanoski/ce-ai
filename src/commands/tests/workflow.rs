@@ -1471,3 +1471,220 @@ fn test_repo_state_doc_debt_serialization_backwards_compatibility() {
     assert_eq!(repo_state_with_debt, deserialized);
     assert_eq!(deserialized.doc_debt, Some(DocDebtReport::default()));
 }
+
+#[test]
+fn test_probe_openspec_desync_parent_tasks_complete_subtasks_open() {
+    let tmp = TempDir::new().unwrap();
+    let feat_dir = tmp
+        .path()
+        .join("openspec")
+        .join("changes")
+        .join("doctor-kimi-marketplace-divergence");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    let tasks_content = r#"
+# Tasks: Detect Kimi Divergence
+- [x] **Task 1: Core divergence models**
+  - [ ] 1.1 Define structs
+  - [ ] 1.2 Implement check
+- [x] **Task 2: Unit testing matrix**
+  - [ ] 2.1 Missing file resilience
+"#;
+    std::fs::write(feat_dir.join("tasks.md"), tasks_content).unwrap();
+
+    let res = probe_openspec_desync(tmp.path(), true);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        let f = &findings[0];
+        assert_eq!(f.feature, "doctor-kimi-marketplace-divergence");
+        assert_eq!(f.completed_tasks, 2);
+        assert_eq!(f.total_tasks, 5);
+        assert_eq!(f.reason, DesyncReason::ParentTasksCompleteSubtasksOpen);
+    } else {
+        panic!("expected Debt finding");
+    }
+}
+
+#[test]
+fn test_probe_openspec_desync_release_version_surpassed() {
+    let tmp = TempDir::new().unwrap();
+    std::fs::write(
+        tmp.path().join("Cargo.toml"),
+        r#"[package]
+name = "ce-ai"
+version = "1.53.0"
+"#,
+    )
+    .unwrap();
+
+    let feat_dir = tmp
+        .path()
+        .join("openspec")
+        .join("changes")
+        .join("linux-musl-static-release");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    let tasks_content = r#"
+# Tasks: Static Musl Linux Releases
+## Phase 1
+- [x] 1.1 Cargo.toml: bump version to (1.50.1)
+- [ ] 3.7 Release tag v1.50.1 builds both assets
+"#;
+    std::fs::write(feat_dir.join("tasks.md"), tasks_content).unwrap();
+
+    let res = probe_openspec_desync(tmp.path(), true);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        let f = &findings[0];
+        assert_eq!(f.feature, "linux-musl-static-release");
+        assert_eq!(f.completed_tasks, 1);
+        assert_eq!(f.total_tasks, 2);
+        assert_eq!(
+            f.reason,
+            DesyncReason::ReleaseVersionSurpassed("1.50.1".into())
+        );
+    } else {
+        panic!("expected Debt finding");
+    }
+}
+
+#[test]
+fn test_probe_openspec_desync_code_merged_to_main() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+
+    // Initialize git repository
+    let mut cmd = std::process::Command::new("git");
+    cmd.args(["init", "-b", "main"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    let mut cfg = std::process::Command::new("git");
+    cfg.args(["config", "user.name", "Test"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    let mut cfg2 = std::process::Command::new("git");
+    cfg2.args(["config", "user.email", "test@test.com"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+
+    // Commit on main that mentions the feature
+    std::fs::write(repo.join("file.txt"), "hello").unwrap();
+    let mut add = std::process::Command::new("git");
+    add.args(["add", "file.txt"])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    let mut commit = std::process::Command::new("git");
+    commit
+        .args([
+            "commit",
+            "-m",
+            "fix: merged feature-harness-manifest into main",
+        ])
+        .current_dir(repo)
+        .output()
+        .unwrap();
+
+    // Create incomplete feature tasks.md
+    let feat_dir = repo
+        .join("openspec")
+        .join("changes")
+        .join("feature-harness-manifest");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    let tasks_content = r#"
+# Tasks
+- [x] Task 1
+- [ ] Task 2
+"#;
+    std::fs::write(feat_dir.join("tasks.md"), tasks_content).unwrap();
+
+    let res = probe_openspec_desync(repo, true);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        let f = &findings[0];
+        assert_eq!(f.feature, "feature-harness-manifest");
+        assert_eq!(f.reason, DesyncReason::CodeMergedToMain);
+    } else {
+        panic!("expected Debt finding with CodeMergedToMain");
+    }
+}
+
+#[test]
+fn test_probe_openspec_desync_no_git_unknown() {
+    let tmp = TempDir::new().unwrap();
+    let feat_dir = tmp
+        .path()
+        .join("openspec")
+        .join("changes")
+        .join("pending-feature");
+    std::fs::create_dir_all(&feat_dir).unwrap();
+    let tasks_content = r#"
+# Tasks
+- [x] Task 1
+- [ ] Task 2
+"#;
+    std::fs::write(feat_dir.join("tasks.md"), tasks_content).unwrap();
+
+    // In a non-git directory (git_available = false), an incomplete feature with unverified git status returns Unknown
+    let res = probe_openspec_desync(tmp.path(), false);
+    assert!(res.is_unknown());
+    assert!(!res.is_clean());
+    assert!(!res.is_debt());
+}
+
+#[test]
+fn test_probe_stale_pending_openspecs_mtime() {
+    let tmp = TempDir::new().unwrap();
+    let changes_dir = tmp.path().join("openspec").join("changes");
+
+    // 1. Fresh feature (created just now)
+    let fresh_dir = changes_dir.join("fresh-feature");
+    std::fs::create_dir_all(&fresh_dir).unwrap();
+    std::fs::write(fresh_dir.join("tasks.md"), "- [x] 1\n- [ ] 2\n").unwrap();
+
+    // 2. Stale feature (mtime 35 days ago)
+    let stale_dir = changes_dir.join("stale-feature");
+    std::fs::create_dir_all(&stale_dir).unwrap();
+    let stale_tasks = stale_dir.join("tasks.md");
+    std::fs::write(&stale_tasks, "- [x] 1\n- [ ] 2\n").unwrap();
+
+    let f = std::fs::File::options()
+        .write(true)
+        .open(&stale_tasks)
+        .unwrap();
+    let past = std::time::SystemTime::now() - std::time::Duration::from_secs(35 * 86400);
+    let times = std::fs::FileTimes::new().set_modified(past);
+    f.set_times(times).unwrap();
+    drop(f);
+
+    let res = probe_stale_pending_openspecs(tmp.path(), 21, false);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        let f = &findings[0];
+        assert_eq!(f.feature, "stale-feature");
+        assert!(f.days_inactive >= 34);
+        assert_eq!(f.source, InactivitySource::FilesystemMtime);
+    } else {
+        panic!("expected Debt finding for stale feature");
+    }
+}
+
+#[test]
+fn test_probe_openspec_desync_on_live_ce_ai_repo() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let res = probe_openspec_desync(repo_root, true);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        let features: Vec<&str> = findings.iter().map(|f| f.feature.as_str()).collect();
+        assert!(features.contains(&"doctor-kimi-marketplace-divergence"));
+        assert!(features.contains(&"linux-musl-static-release"));
+        assert!(features.contains(&"harness-manifest-sha256-coverage"));
+    } else {
+        panic!("expected debt on live repo");
+    }
+}
