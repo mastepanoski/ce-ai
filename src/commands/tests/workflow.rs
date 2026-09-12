@@ -1688,3 +1688,257 @@ fn test_probe_openspec_desync_on_live_ce_ai_repo() {
         panic!("expected debt on live repo");
     }
 }
+
+#[test]
+fn test_probe_solution_drift_clean() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    // Create a valid source file
+    let src_dir = root.join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}\n").unwrap();
+
+    // Create a clean solution file
+    let sol_dir = root.join("docs").join("solutions").join("architecture");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+    let clean_md = r#"---
+title: "Clean Architecture Pattern"
+category: "architecture"
+problem_type: "design"
+tags:
+  - workflow
+  - state
+applies_when: "When designing clean state transitions"
+---
+
+# Clean Architecture
+
+This architecture references `src/main.rs` which exists on disk.
+"#;
+    std::fs::write(sol_dir.join("clean.md"), clean_md).unwrap();
+
+    let config = DocHygieneConfig::default();
+    let res = probe_solution_drift(root, &config);
+    assert_eq!(res, ProbeStatus::Clean);
+}
+
+#[test]
+fn test_probe_solution_drift_dead_paths() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    let src_dir = root.join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}\n").unwrap();
+
+    let sol_dir = root.join("docs").join("solutions").join("bugfixes");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+    let broken_paths_md = r#"---
+title: "Legacy Bug Fix"
+category: "bugfixes"
+problem_type: "bug"
+tags:
+  - fix
+applies_when: "When fixing a broken path"
+---
+
+# Fix Details
+
+References `src/main.rs` (valid) but also `src/commands/missing.rs:168`,
+`src/commands/missing.rs` (duplicate mention), and `tests/dead_suite.rs#L12-L20`.
+Also ignores placeholders like `src/harness/<vendor>.rs` and `src/**`.
+"#;
+    std::fs::write(sol_dir.join("broken.md"), broken_paths_md).unwrap();
+
+    let config = DocHygieneConfig::default();
+    let res = probe_solution_drift(root, &config);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        let finding = &findings[0];
+        assert_eq!(finding.solution_path, "docs/solutions/bugfixes/broken.md");
+        assert_eq!(
+            finding.dead_paths,
+            vec![
+                "src/commands/missing.rs".to_string(),
+                "tests/dead_suite.rs".to_string(),
+            ]
+        );
+        assert!(finding.missing_frontmatter_fields.is_empty());
+    } else {
+        panic!("expected Debt finding");
+    }
+}
+
+#[test]
+fn test_probe_solution_drift_missing_frontmatter() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    let sol_dir = root.join("docs").join("solutions").join("architecture");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+    let partial_fm_md = r#"---
+title: "Partial Frontmatter"
+tags:
+  - incomplete
+---
+
+# Notes
+No dead paths referenced.
+"#;
+    std::fs::write(sol_dir.join("partial.md"), partial_fm_md).unwrap();
+
+    let config = DocHygieneConfig::default();
+    let res = probe_solution_drift(root, &config);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        let finding = &findings[0];
+        assert_eq!(
+            finding.solution_path,
+            "docs/solutions/architecture/partial.md"
+        );
+        assert!(finding.dead_paths.is_empty());
+        assert_eq!(
+            finding.missing_frontmatter_fields,
+            vec![
+                "category".to_string(),
+                "problem_type".to_string(),
+                "applies_when".to_string(),
+            ]
+        );
+    } else {
+        panic!("expected Debt finding");
+    }
+}
+
+#[test]
+fn test_probe_solution_drift_no_frontmatter_and_module_alias() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    let sol_dir = root.join("docs").join("solutions");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+
+    // 1. Solution using `module:` instead of `category:`
+    let module_md = r#"---
+title: "Module Alias"
+module: "core"
+problem_type: "architecture"
+tags:
+  - alias
+applies_when: "When using module key"
+---
+# Content
+"#;
+    std::fs::write(sol_dir.join("with_module.md"), module_md).unwrap();
+
+    // 2. Solution with no frontmatter at all
+    let no_fm_md = "# Pure Markdown\n\nNo frontmatter block at all.\n";
+    std::fs::write(sol_dir.join("no_fm.md"), no_fm_md).unwrap();
+
+    let config = DocHygieneConfig::default();
+    let res = probe_solution_drift(root, &config);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        // `with_module.md` should have no findings
+        assert_eq!(findings.len(), 1);
+        let finding = &findings[0];
+        assert_eq!(finding.solution_path, "docs/solutions/no_fm.md");
+        assert_eq!(
+            finding.missing_frontmatter_fields,
+            vec![
+                "title".to_string(),
+                "category".to_string(),
+                "problem_type".to_string(),
+                "tags".to_string(),
+                "applies_when".to_string(),
+            ]
+        );
+    } else {
+        panic!("expected Debt finding");
+    }
+}
+
+#[test]
+fn test_probe_solution_drift_config_toggles() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    let sol_dir = root.join("docs").join("solutions");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+
+    // Contains both missing frontmatter and dead path
+    let broken_md = r#"---
+title: "Incomplete"
+---
+
+References `src/missing_code.rs`.
+"#;
+    std::fs::write(sol_dir.join("broken.md"), broken_md).unwrap();
+
+    // Disable frontmatter requirement
+    let no_fm_check = DocHygieneConfig {
+        stale_spec_days: 21,
+        check_solution_paths: true,
+        require_solution_frontmatter: false,
+    };
+    let res = probe_solution_drift(root, &no_fm_check);
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].dead_paths, vec!["src/missing_code.rs"]);
+        assert!(findings[0].missing_frontmatter_fields.is_empty());
+    } else {
+        panic!("expected Debt finding for dead path");
+    }
+
+    // Disable path check
+    let no_path_check = DocHygieneConfig {
+        stale_spec_days: 21,
+        check_solution_paths: false,
+        require_solution_frontmatter: true,
+    };
+    let res = probe_solution_drift(root, &no_path_check);
+    if let ProbeStatus::Debt(findings) = res {
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].dead_paths.is_empty());
+        assert!(!findings[0].missing_frontmatter_fields.is_empty());
+    } else {
+        panic!("expected Debt finding for frontmatter");
+    }
+
+    // Disable both
+    let disable_both = DocHygieneConfig {
+        stale_spec_days: 21,
+        check_solution_paths: false,
+        require_solution_frontmatter: false,
+    };
+    let res = probe_solution_drift(root, &disable_both);
+    assert_eq!(res, ProbeStatus::Clean);
+}
+
+#[test]
+fn test_probe_solution_drift_nonexistent_dir() {
+    let tmp = TempDir::new().unwrap();
+    let config = DocHygieneConfig::default();
+    let res = probe_solution_drift(tmp.path(), &config);
+    assert_eq!(res, ProbeStatus::Clean);
+}
+
+#[test]
+fn test_probe_solution_drift_on_live_ce_ai_repo() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let config = DocHygieneConfig::default();
+    let res = probe_solution_drift(repo_root, &config);
+    assert!(res.is_debt());
+    if let ProbeStatus::Debt(findings) = res {
+        assert!(!findings.is_empty());
+        let has_tui_finding = findings
+            .iter()
+            .any(|f| f.dead_paths.contains(&"src/tui.rs".to_string()));
+        assert!(has_tui_finding);
+    } else {
+        panic!("expected debt on live repo");
+    }
+}

@@ -28,11 +28,11 @@ Work-unit changed-line estimates total: ~940 LOC (~200 LOC/work-unit policy appl
     - Stale pending change fixture with simulated mtime/git commit age.
     - No-Git fixture returning `Unknown` for git-dependent checks.
 
-- [ ] **Work Unit 4: Probe 5 (Solution Library Drift & YAML Linter)** (~150 LOC)
-  - [ ] 4.1 Implement `probe_solution_drift(repo_root: &Path, config: &DocHygieneConfig) -> ProbeStatus<Vec<SolutionDriftFinding>>`.
+- [x] **Work Unit 4: Probe 5 (Solution Library Drift & YAML Linter)** (~150 LOC)
+  - [x] 4.1 Implement `probe_solution_drift(repo_root: &Path, config: &DocHygieneConfig) -> ProbeStatus<Vec<SolutionDriftFinding>>`.
     - Extract backticked paths (`src/**/*.rs`, `tests/**/*.rs`) and verify existence.
     - Validate YAML frontmatter keys (`title`, `category`/`module`, `problem_type`, `tags`, `applies_when`).
-  - [ ] 4.2 (TDD) In `src/commands/tests/workflow.rs`, add unit tests covering:
+  - [x] 4.2 (TDD) In `src/commands/tests/workflow.rs`, add unit tests covering:
     - Dead file path in solution detection.
     - Missing YAML frontmatter fields detection.
     - Clean solutions directory returning `ProbeStatus::Clean`.

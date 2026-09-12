@@ -15,7 +15,8 @@ use crate::opencode::manifest::InstallManifest;
 use crate::opencode::plugins::MANAGED_DIR;
 use crate::state::diff;
 use crate::state::state::{
-    FeatureResolution, ReviewReceipt, State, WorkflowSource, WorkflowStage, WorkflowState,
+    DocHygieneConfig, FeatureResolution, ReviewReceipt, State, WorkflowSource, WorkflowStage,
+    WorkflowState,
 };
 
 #[derive(clap::Args)]
@@ -1421,6 +1422,229 @@ pub fn probe_stale_pending_openspecs(
     } else {
         ProbeStatus::Clean
     }
+}
+
+/// Probe 5: Scans `docs/solutions/` for dead code references and missing YAML frontmatter fields.
+pub fn probe_solution_drift(
+    repo_root: &Path,
+    config: &DocHygieneConfig,
+) -> ProbeStatus<Vec<SolutionDriftFinding>> {
+    if !config.check_solution_paths && !config.require_solution_frontmatter {
+        return ProbeStatus::Clean;
+    }
+
+    let solutions_dir = repo_root.join("docs").join("solutions");
+    if !solutions_dir.is_dir() {
+        return ProbeStatus::Clean;
+    }
+
+    let mut solution_files = Vec::new();
+    collect_solution_files(&solutions_dir, &mut solution_files);
+    solution_files.sort();
+
+    let mut findings = Vec::new();
+
+    for file_path in solution_files {
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let rel_solution_path = file_path
+            .strip_prefix(repo_root)
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_else(|_| file_path.to_string_lossy().to_string());
+
+        let missing_frontmatter_fields = if config.require_solution_frontmatter {
+            check_solution_frontmatter(&content)
+        } else {
+            Vec::new()
+        };
+
+        let dead_paths = if config.check_solution_paths {
+            check_solution_dead_paths(repo_root, &content)
+        } else {
+            Vec::new()
+        };
+
+        if !missing_frontmatter_fields.is_empty() || !dead_paths.is_empty() {
+            findings.push(SolutionDriftFinding {
+                solution_path: rel_solution_path,
+                dead_paths,
+                missing_frontmatter_fields,
+            });
+        }
+    }
+
+    findings.sort_by(|a, b| a.solution_path.cmp(&b.solution_path));
+
+    if !findings.is_empty() {
+        ProbeStatus::Debt(findings)
+    } else {
+        ProbeStatus::Clean
+    }
+}
+
+fn collect_solution_files(dir: &Path, files: &mut Vec<PathBuf>) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_solution_files(&path, files);
+            } else if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("md") {
+                files.push(path);
+            }
+        }
+    }
+}
+
+fn extract_yaml_frontmatter(content: &str) -> Option<Vec<&str>> {
+    let mut lines = content.trim_start().lines();
+    let first = lines.next()?.trim();
+    if first != "---" {
+        return None;
+    }
+    let mut header = Vec::new();
+    for line in lines {
+        if line.trim() == "---" {
+            return Some(header);
+        }
+        header.push(line);
+    }
+    None
+}
+
+fn check_solution_frontmatter(content: &str) -> Vec<String> {
+    let mut missing = Vec::new();
+    let header_lines = match extract_yaml_frontmatter(content) {
+        Some(lines) => lines,
+        None => {
+            return vec![
+                "title".into(),
+                "category".into(),
+                "problem_type".into(),
+                "tags".into(),
+                "applies_when".into(),
+            ];
+        }
+    };
+
+    let mut has_title = false;
+    let mut has_category_or_module = false;
+    let mut has_problem_type = false;
+    let mut has_tags = false;
+    let mut has_applies_when = false;
+
+    for line in header_lines {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if !line.starts_with(' ') && !line.starts_with('\t') {
+            if let Some((k, _)) = trimmed.split_once(':') {
+                let key = k.trim().to_lowercase();
+                match key.as_str() {
+                    "title" => has_title = true,
+                    "category" | "module" => has_category_or_module = true,
+                    "problem_type" => has_problem_type = true,
+                    "tags" => has_tags = true,
+                    "applies_when" => has_applies_when = true,
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    if !has_title {
+        missing.push("title".into());
+    }
+    if !has_category_or_module {
+        missing.push("category".into());
+    }
+    if !has_problem_type {
+        missing.push("problem_type".into());
+    }
+    if !has_tags {
+        missing.push("tags".into());
+    }
+    if !has_applies_when {
+        missing.push("applies_when".into());
+    }
+
+    missing
+}
+
+fn clean_code_path(token: &str) -> Option<String> {
+    let trimmed = token.trim();
+    if trimmed.contains('*') || trimmed.contains('<') || trimmed.contains('>') {
+        return None;
+    }
+    if !trimmed.starts_with("src/") && !trimmed.starts_with("tests/") {
+        return None;
+    }
+
+    let path_no_anchor = if let Some((base, _)) = trimmed.split_once('#') {
+        base
+    } else {
+        trimmed
+    };
+
+    let candidate = if let Some((base, suffix)) = path_no_anchor.split_once(':') {
+        if suffix
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '-' || c == ',')
+        {
+            base
+        } else {
+            path_no_anchor
+        }
+    } else {
+        path_no_anchor
+    };
+
+    if candidate.ends_with(".rs") {
+        Some(candidate.to_string())
+    } else {
+        None
+    }
+}
+
+fn check_solution_dead_paths(repo_root: &Path, content: &str) -> Vec<String> {
+    let mut dead = Vec::new();
+    let mut in_code_block = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            continue;
+        }
+        if in_code_block {
+            continue;
+        }
+
+        let mut start = None;
+        for (i, c) in line.char_indices() {
+            if c == '`' {
+                if let Some(s) = start {
+                    let token = &line[s + 1..i];
+                    if let Some(cleaned) = clean_code_path(token) {
+                        let target = repo_root.join(&cleaned);
+                        if !target.exists() {
+                            dead.push(cleaned);
+                        }
+                    }
+                    start = None;
+                } else {
+                    start = Some(i);
+                }
+            }
+        }
+    }
+
+    dead.sort();
+    dead.dedup();
+    dead
 }
 
 /// Criterion met for archiving an OpenSpec change package.
