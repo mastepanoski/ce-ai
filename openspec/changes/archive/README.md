@@ -40,3 +40,4 @@ Historical notes:
 - blocking-gate-check: archived (24/24 tasks) under criterion (1) on 2026-09-12.
 - doc-debt-engine-and-probes: archived (31/31 tasks) under criterion (1) on 2026-09-12.
 - archive-compaction: archived (33/33 tasks) under criterion (1) on 2026-09-13.
+- 2026-09-13 sweep: 3 folders archived via 'ce-ai archive --all'.

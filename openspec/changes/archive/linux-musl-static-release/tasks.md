@@ -17,4 +17,4 @@
 - [x] 3.4 `cargo fmt --check` passes.
 - [x] 3.5 `cargo clippy --all-targets --all-features -- -D warnings` passes.
 - [x] 3.6 `cargo test` passes.
-- [ ] 3.7 Release tag v1.50.1 builds both `-musl` assets and `release-integrity.sh` emits SHA256SUMS.txt covering them (verified in CI on a real tag).
+- [x] 3.7 Release tag v1.50.1 builds both `-musl` assets and `release-integrity.sh` emits SHA256SUMS.txt covering them (verified in CI on a real tag).
