@@ -4,6 +4,19 @@ All notable changes to `ce-ai` will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.55.0] - 2026-09-12
+
+### Added
+- **Generational Archive Compaction & Milestone Rollups (`ce-ai archive compact` / `ce-ai workflow archive compact`):**
+  - **Archive Compaction Subcommand (`ce-ai archive compact`)**: Consolidates aged, loose OpenSpec packages in `openspec/changes/archive/` into structured quarterly or custom milestone rollups.
+  - **Milestone Rollup Generation**: Writes `openspec/changes/archive/milestones/<milestone>.md` with structured feature catalogs, problem statements, acceptance criteria, and task completion metrics.
+  - **Compressed Raw Scaffolding Tarballs**: Packages raw feature directories into `openspec/changes/archive/milestones/archive-<milestone>.tar.gz` with verified entry integrity, followed by safe pruning of loose directories.
+  - **CLI Flags**: Supports `--before <YYYY-MM-DD>`, `--milestone <name>`, `--threshold <N>`, `--dry-run`, `--no-tarball`, and `--keep-loose`.
+  - **Archive Ledger Synchronization**: Updates `openspec/changes/archive/README.md` with an active `## Compacted Milestones` ledger table linking to rollups and tarballs.
+  - **Doctor Health Probe (`probe_archive_compaction`)**: Emits non-blocking `doctor-warn:` advisories when loose archive directories exceed `archive_compaction_threshold` (default: 30) in `.ce-ai.json`.
+  - **Turn-0 Summary Integration**: Surfaces uncompacted archive counts in `DocDebtReport` and `summary_line`.
+
 ## [1.54.0] - 2026-09-12
 
 ### Added

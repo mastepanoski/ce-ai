@@ -873,6 +873,7 @@ fn test_doc_hygiene_config_defaults_and_serde() {
     assert_eq!(default_cfg.stale_spec_days, 21);
     assert!(default_cfg.check_solution_paths);
     assert!(default_cfg.require_solution_frontmatter);
+    assert_eq!(default_cfg.archive_compaction_threshold, 30);
 
     // Deserializing empty JSON object should yield defaults
     let empty_json = "{}";
@@ -880,11 +881,12 @@ fn test_doc_hygiene_config_defaults_and_serde() {
     assert_eq!(deserialized, default_cfg);
 
     // Partial JSON override preserves omitted defaults
-    let partial_json = r#"{"stale_spec_days": 14}"#;
+    let partial_json = r#"{"stale_spec_days": 14, "archive_compaction_threshold": 50}"#;
     let partial_cfg: DocHygieneConfig = serde_json::from_str(partial_json).unwrap();
     assert_eq!(partial_cfg.stale_spec_days, 14);
     assert!(partial_cfg.check_solution_paths);
     assert!(partial_cfg.require_solution_frontmatter);
+    assert_eq!(partial_cfg.archive_compaction_threshold, 50);
 
     // Explicit bool override
     let bool_override_json = r#"{"check_solution_paths": false}"#;
@@ -892,6 +894,7 @@ fn test_doc_hygiene_config_defaults_and_serde() {
     assert_eq!(bool_cfg.stale_spec_days, 21);
     assert!(!bool_cfg.check_solution_paths);
     assert!(bool_cfg.require_solution_frontmatter);
+    assert_eq!(bool_cfg.archive_compaction_threshold, 30);
 }
 
 #[test]
@@ -913,6 +916,7 @@ fn test_doc_hygiene_workspace_overrides_precedence() {
         stale_spec_days: 7,
         check_solution_paths: false,
         require_solution_frontmatter: true,
+        archive_compaction_threshold: 40,
     });
     local.save(&local_path).unwrap();
 
@@ -921,6 +925,7 @@ fn test_doc_hygiene_workspace_overrides_precedence() {
     assert_eq!(effective.stale_spec_days, 7);
     assert!(!effective.check_solution_paths);
     assert!(effective.require_solution_frontmatter);
+    assert_eq!(effective.archive_compaction_threshold, 40);
 }
 
 #[test]
@@ -936,7 +941,9 @@ fn test_doc_hygiene_helper_fallback() {
         stale_spec_days: 45,
         check_solution_paths: true,
         require_solution_frontmatter: false,
+        archive_compaction_threshold: 15,
     });
     assert_eq!(state_with.doc_hygiene().stale_spec_days, 45);
     assert!(!state_with.doc_hygiene().require_solution_frontmatter);
+    assert_eq!(state_with.doc_hygiene().archive_compaction_threshold, 15);
 }

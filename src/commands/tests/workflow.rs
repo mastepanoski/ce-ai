@@ -1440,6 +1440,7 @@ fn test_doc_debt_no_git_unknown_tri_state() {
         openspec_desync: ProbeStatus::Unknown,
         stale_pending: ProbeStatus::Clean,
         solution_drift: ProbeStatus::Clean,
+        archive_compaction: ProbeStatus::Clean,
     };
 
     assert!(!report.git_available);
@@ -1931,6 +1932,7 @@ References `src/missing_code.rs`.
         stale_spec_days: 21,
         check_solution_paths: true,
         require_solution_frontmatter: false,
+        archive_compaction_threshold: 30,
     };
     let res = probe_solution_drift(root, &no_fm_check);
     if let ProbeStatus::Debt(findings) = res {
@@ -1946,6 +1948,7 @@ References `src/missing_code.rs`.
         stale_spec_days: 21,
         check_solution_paths: false,
         require_solution_frontmatter: true,
+        archive_compaction_threshold: 30,
     };
     let res = probe_solution_drift(root, &no_path_check);
     if let ProbeStatus::Debt(findings) = res {
@@ -1961,6 +1964,7 @@ References `src/missing_code.rs`.
         stale_spec_days: 21,
         check_solution_paths: false,
         require_solution_frontmatter: false,
+        archive_compaction_threshold: 30,
     };
     let res = probe_solution_drift(root, &disable_both);
     assert_eq!(res, ProbeStatus::Clean);
@@ -1991,6 +1995,7 @@ fn test_doc_debt_report_summary_line_formatting() {
         openspec_desync: ProbeStatus::Clean,
         stale_pending: ProbeStatus::Clean,
         solution_drift: ProbeStatus::Clean,
+        archive_compaction: ProbeStatus::Clean,
     };
     assert_eq!(report_clean_git.summary_line(), "doc debt: clean");
 
@@ -2000,6 +2005,7 @@ fn test_doc_debt_report_summary_line_formatting() {
         openspec_desync: ProbeStatus::Unknown,
         stale_pending: ProbeStatus::Clean,
         solution_drift: ProbeStatus::Clean,
+        archive_compaction: ProbeStatus::Clean,
     };
     assert_eq!(
         report_clean_no_git.summary_line(),
@@ -2035,6 +2041,7 @@ fn test_doc_debt_report_summary_line_formatting() {
             dead_paths: vec!["src/old_a.rs".into(), "src/old_b.rs".into()],
             missing_frontmatter_fields: vec![],
         }]),
+        archive_compaction: ProbeStatus::Clean,
     };
     assert_eq!(
         report_findings_git.summary_line(),
@@ -2057,10 +2064,15 @@ fn test_doc_debt_report_summary_line_formatting() {
             dead_paths: vec!["src/old_a.rs".into(), "src/old_b.rs".into()],
             missing_frontmatter_fields: vec![],
         }]),
+        archive_compaction: ProbeStatus::Debt(ArchiveCompactionFinding {
+            uncompacted_count: 45,
+            threshold: 30,
+            oldest_package: Some("legacy-pkg".into()),
+        }),
     };
     assert_eq!(
         report_findings_no_git.summary_line(),
-        "doc debt: 1 stale spec [git: n/a], 2 dead solution links"
+        "doc debt: 1 stale spec [git: n/a], 2 dead solution links, 45 uncompacted archive pkgs (>30 threshold)"
     );
 }
 

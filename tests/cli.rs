@@ -8403,3 +8403,113 @@ fn cli_archive_error_exit_codes() {
         .code(3)
         .stderr(predicates::str::contains("already exists"));
 }
+
+#[test]
+fn test_cli_archive_compact_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let config_dir = tmp.path().join("config");
+    let proj = tmp.path().join("project");
+    fs::create_dir_all(&proj).unwrap();
+
+    let archive_dir = proj.join("openspec").join("changes").join("archive");
+    fs::create_dir_all(&archive_dir).unwrap();
+    fs::write(
+        archive_dir.join("README.md"),
+        "# OpenSpec Archive\n\n## Triage\n",
+    )
+    .unwrap();
+
+    // Create 2 packages from 2026-Q1 and 1 package from 2026-Q3
+    let p1 = archive_dir.join("2026-02-10-feat-old-1");
+    fs::create_dir_all(&p1).unwrap();
+    fs::write(
+        p1.join("proposal.md"),
+        "# Proposal\n## Problem Statement\nFix legacy issue 1\n",
+    )
+    .unwrap();
+    fs::write(
+        p1.join("spec.md"),
+        "# Specification\n- **WHEN** ran **THEN** passes\n",
+    )
+    .unwrap();
+    fs::write(p1.join("tasks.md"), "- [x] 1. Task\n").unwrap();
+
+    let p2 = archive_dir.join("2026-03-15-feat-old-2");
+    fs::create_dir_all(&p2).unwrap();
+    fs::write(
+        p2.join("proposal.md"),
+        "# Proposal\n## Problem Statement\nFix legacy issue 2\n",
+    )
+    .unwrap();
+    fs::write(
+        p2.join("spec.md"),
+        "# Specification\n- **WHEN** ran **THEN** passes\n",
+    )
+    .unwrap();
+    fs::write(p2.join("tasks.md"), "- [x] 1. Task\n").unwrap();
+
+    let p3 = archive_dir.join("2026-08-20-feat-recent");
+    fs::create_dir_all(&p3).unwrap();
+    fs::write(
+        p3.join("proposal.md"),
+        "# Proposal\n## Problem Statement\nRecent work\n",
+    )
+    .unwrap();
+    fs::write(
+        p3.join("spec.md"),
+        "# Specification\n- **WHEN** ran **THEN** passes\n",
+    )
+    .unwrap();
+    fs::write(p3.join("tasks.md"), "- [x] 1. Task\n").unwrap();
+
+    // 1. Dry run with --before 2026-06-01: leaves disk unmodified
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["archive", "compact", "--before", "2026-06-01", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "dry-run: would compact 2 package(s) into 1 milestone rollup(s)",
+        ))
+        .stdout(predicates::str::contains("Milestone '2026-Q1'"));
+
+    assert!(p1.exists());
+    assert!(p2.exists());
+    assert!(p3.exists());
+    assert!(!archive_dir.join("milestones").exists());
+
+    // 2. Real execution with ce-ai archive compact --before 2026-06-01
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["archive", "compact", "--before", "2026-06-01"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "compacted 2 package(s) into milestone '2026-Q1'",
+        ));
+
+    // p1 and p2 should be pruned, p3 remains loose
+    assert!(!p1.exists());
+    assert!(!p2.exists());
+    assert!(p3.exists());
+
+    let milestones_dir = archive_dir.join("milestones");
+    assert!(milestones_dir.join("2026-Q1.md").exists());
+    assert!(milestones_dir.join("archive-2026-Q1.tar.gz").exists());
+
+    let readme = fs::read_to_string(archive_dir.join("README.md")).unwrap();
+    assert!(readme.contains("## Compacted Milestones"));
+    assert!(readme.contains("2026-Q1"));
+
+    // 3. Workflow alias parity: ce-ai workflow archive compact --dry-run
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["workflow", "archive", "compact", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "dry-run: would compact 1 package(s) into 1 milestone rollup(s)",
+        ))
+        .stdout(predicates::str::contains("Milestone '2026-Q3'"));
+}

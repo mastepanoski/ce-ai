@@ -19,6 +19,11 @@ use crate::state::state::{
     WorkflowState,
 };
 
+pub use crate::commands::archive_compact::{
+    probe_archive_compaction, run_archive_compact, ArchiveCompactionFinding, ArchiveSubcommand,
+    CompactArgs, CompactionCandidate,
+};
+
 #[derive(clap::Args)]
 pub struct Args {
     #[command(subcommand)]
@@ -72,6 +77,10 @@ pub enum Action {
 
 #[derive(clap::Args, Debug, Clone, Default)]
 pub struct ArchiveArgs {
+    /// Subcommand for archive operations (e.g. `compact`).
+    #[command(subcommand)]
+    pub subcommand: Option<ArchiveSubcommand>,
+
     /// Target change folder name to archive (defaults to active feature from state.json).
     pub feature: Option<String>,
 
@@ -739,6 +748,7 @@ pub struct DocDebtReport {
     pub openspec_desync: ProbeStatus<Vec<OpenSpecDesyncFinding>>,
     pub stale_pending: ProbeStatus<Vec<StalePendingFinding>>,
     pub solution_drift: ProbeStatus<Vec<SolutionDriftFinding>>,
+    pub archive_compaction: ProbeStatus<ArchiveCompactionFinding>,
 }
 
 impl DocDebtReport {
@@ -746,6 +756,7 @@ impl DocDebtReport {
         self.openspec_desync.is_debt()
             || self.stale_pending.is_debt()
             || self.solution_drift.is_debt()
+            || self.archive_compaction.is_debt()
     }
 
     pub fn summary_line(&self) -> String {
@@ -808,6 +819,13 @@ impl DocDebtReport {
             }
         }
 
+        if let ProbeStatus::Debt(compact) = &self.archive_compaction {
+            parts.push(format!(
+                "{} uncompacted archive pkgs (>{} threshold)",
+                compact.uncompacted_count, compact.threshold
+            ));
+        }
+
         if !self.git_available && !parts.iter().any(|p| p.contains("[git: n/a]")) {
             parts.push("[git: n/a]".to_string());
         }
@@ -823,6 +841,7 @@ impl Default for DocDebtReport {
             openspec_desync: ProbeStatus::Clean,
             stale_pending: ProbeStatus::Clean,
             solution_drift: ProbeStatus::Clean,
+            archive_compaction: ProbeStatus::Clean,
         }
     }
 }
@@ -1333,12 +1352,14 @@ pub fn probe_doc_debt(
     let stale_pending =
         probe_stale_pending_openspecs(repo_root, config.stale_spec_days, git_available);
     let solution_drift = probe_solution_drift(repo_root, config);
+    let archive_compaction = probe_archive_compaction(repo_root, config);
 
     DocDebtReport {
         git_available,
         openspec_desync,
         stale_pending,
         solution_drift,
+        archive_compaction,
     }
 }
 
@@ -1993,6 +2014,10 @@ pub fn reconcile_state_active_feature(
 
 /// Executes the archive command workflow across single feature or batch mode.
 pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
+    if let Some(ArchiveSubcommand::Compact(compact_args)) = &args.subcommand {
+        return run_archive_compact(ctx, compact_args);
+    }
+
     let repo_root = ctx.repo_root();
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load(&state_path).ok();
@@ -2254,7 +2279,7 @@ pub fn extract_paths_from_task_text(text: &str) -> Vec<String> {
 
 /// Runs a git command against `repo_root`, stripping outer hook env vars
 /// (`GIT_DIR` etc.) so temporary-repo fixtures behave under the pre-commit hook.
-fn git_probe(repo_root: &Path, args: &[&str]) -> Option<std::process::Output> {
+pub(crate) fn git_probe(repo_root: &Path, args: &[&str]) -> Option<std::process::Output> {
     let mut cmd = std::process::Command::new("git");
     for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
         cmd.env_remove(var);

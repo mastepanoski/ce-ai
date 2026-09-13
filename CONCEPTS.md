@@ -94,3 +94,10 @@ A truth-preserving diagnostic state pattern (`ProbeStatus::Clean`, `ProbeStatus:
 
 ### Solution Drift Probe
 A repository health probe (`probe_solution_drift`) that audits historical solution documents under `docs/solutions/`. It validates required YAML frontmatter fields (`title`, `category`/`module`, `problem_type`, `tags`, `applies_when`), extracts referenced source files (`src/**/*.rs`, `tests/**/*.rs`), strips line numbers and anchors, and tests file existence on disk, preventing AI agents from ingesting stale or misleading codebase context during cognitive retrieval.
+
+### Generational Archive Compaction
+A retention and repository hygiene mechanism (`ce-ai archive compact` / `ce-ai workflow archive compact`) that consolidates aged, loose OpenSpec change packages in `openspec/changes/archive/` into structured milestone rollup documents and compressed `.tar.gz` raw archives. By transitioning historical specifications from loose directories into compressed generational archives, it prevents archive sprawl, reduces repository inode noise, and prevents broad codebase searches from overwhelming AI context windows with obsolete exploratory drafting while preserving 100% auditability and verification integrity.
+
+### Milestone Rollup
+A synthesized, human- and machine-readable markdown digest (`openspec/changes/archive/milestones/<milestone>.md`) produced during archive compaction. It catalogs historical features by quarter or named milestone, providing structured executive summaries, task progress ratios, problem statements, and key acceptance criteria, linked directly to the companion compressed raw archive tarball and registered in `openspec/changes/archive/README.md`.
+
