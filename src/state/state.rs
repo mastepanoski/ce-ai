@@ -321,6 +321,8 @@ pub struct DocHygieneConfig {
     pub check_solution_paths: bool,
     #[serde(default = "default_true")]
     pub require_solution_frontmatter: bool,
+    #[serde(default = "default_archive_compaction_threshold")]
+    pub archive_compaction_threshold: u32,
 }
 
 fn default_stale_spec_days() -> u32 {
@@ -331,12 +333,17 @@ fn default_true() -> bool {
     true
 }
 
+fn default_archive_compaction_threshold() -> u32 {
+    30
+}
+
 impl Default for DocHygieneConfig {
     fn default() -> Self {
         Self {
             stale_spec_days: default_stale_spec_days(),
             check_solution_paths: default_true(),
             require_solution_frontmatter: default_true(),
+            archive_compaction_threshold: default_archive_compaction_threshold(),
         }
     }
 }

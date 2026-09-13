@@ -1032,3 +1032,51 @@ References `src/ghost_module.rs`.
         "doctor must exit 0 with doc debt warnings, got: {res:?}"
     );
 }
+
+#[test]
+fn test_doctor_warns_on_archive_compaction_threshold() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    // Create 3 archive packages with threshold = 2
+    let archive_dir = root.join("openspec").join("changes").join("archive");
+    std::fs::create_dir_all(&archive_dir).unwrap();
+    for i in 1..=3 {
+        let pkg = archive_dir.join(format!("2026-08-0{i}-pkg-{i}"));
+        std::fs::create_dir_all(&pkg).unwrap();
+        std::fs::write(pkg.join("tasks.md"), "- [x] 1. Done\n").unwrap();
+    }
+
+    let ctx = Context {
+        config_dir: root.join("config"),
+        opencode_config_dir: root.join("opencode"),
+        workspace_root: Some(root.to_path_buf()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+
+    let mut state = State::new();
+    state.doc_hygiene = Some(crate::state::state::DocHygieneConfig {
+        stale_spec_days: 21,
+        check_solution_paths: true,
+        require_solution_frontmatter: true,
+        archive_compaction_threshold: 2,
+    });
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    let args = Args::default();
+    let res = run(&ctx, &args);
+    assert!(
+        res.is_ok(),
+        "doctor must exit 0 with compaction warning, got: {res:?}"
+    );
+}

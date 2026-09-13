@@ -678,6 +678,15 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         }
     }
 
+    if let crate::commands::workflow::ProbeStatus::Debt(compact_finding) =
+        &doc_debt.archive_compaction
+    {
+        println!(
+            "doctor-warn: archive has {} uncompacted packages (>{} threshold); run 'ce-ai archive compact' to roll up aged changes into milestone summaries",
+            compact_finding.uncompacted_count, compact_finding.threshold
+        );
+    }
+
     // Observe-only Ship-readiness probe (Issue #354): Stage 6 + code-review gaps.
     // Non-fatal: never added to `findings`, exit code unaffected. Only runs for
     // adopted workspaces to avoid noise on unrelated repositories.

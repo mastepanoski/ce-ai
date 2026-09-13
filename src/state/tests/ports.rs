@@ -67,6 +67,7 @@ fn in_memory_state_store_handles_workspace_overrides() {
         stale_spec_days: 10,
         check_solution_paths: true,
         require_solution_frontmatter: false,
+        archive_compaction_threshold: 25,
     });
     store.insert(&ws_override_path, local_state);
 

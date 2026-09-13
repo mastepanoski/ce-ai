@@ -1,6 +1,7 @@
 //! CLI subcommands: install, sync, upgrade, models, status, uninstall, doctor.
 
 pub mod adopt;
+pub mod archive_compact;
 pub mod audit;
 pub mod backups;
 pub mod deinit_prj;
