@@ -11,6 +11,12 @@ Completed change folders live here. A folder is archived when **either**:
 Folders must never be deleted: they are the audit trail linking shipped
 releases to their frozen contracts.
 
+## Compacted Milestones
+
+| Milestone | Changes Compacted | Rollup Summary | Raw Archive |
+| :--- | :--- | :--- | :--- |
+| 2026-Q3 | 110 | [milestones/2026-Q3.md](milestones/2026-Q3.md) | [milestones/archive-2026-Q3.tar.gz](milestones/archive-2026-Q3.tar.gz) |
+
 ## Triage — active folders with open tasks
 
 | Folder | Open boxes | Next action |
