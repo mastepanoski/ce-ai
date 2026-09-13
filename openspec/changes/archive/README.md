@@ -33,3 +33,4 @@ Historical notes:
 - openspec-archive-command: archived (15/15 tasks) under criterion (1) on 2026-09-11.
 - blocking-gate-check: archived (24/24 tasks) under criterion (1) on 2026-09-12.
 - doc-debt-engine-and-probes: archived (31/31 tasks) under criterion (1) on 2026-09-12.
+- archive-compaction: archived (33/33 tasks) under criterion (1) on 2026-09-13.
