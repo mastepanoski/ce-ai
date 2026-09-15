@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use clap::Subcommand;
 
 use crate::commands::{
-    audit, backups, deinit_prj, doctor, gate, guard, init_prj, install, models, self_update,
+    audit, backups, deinit_prj, doc, doctor, gate, guard, init_prj, install, models, self_update,
     skills, status, sync, tools, uninstall, upgrade, usage, workflow, Context,
 };
 use crate::error::CeError;
@@ -83,6 +83,8 @@ pub enum Commands {
     Archive(crate::commands::workflow::ArchiveArgs),
     /// Manage living system specifications in openspec/specs/.
     Spec(crate::commands::spec::SpecArgs),
+    /// Solution library clustering, deduplication, and refresh engine.
+    Doc(doc::DocArgs),
 }
 
 impl CeCommand for Commands {
@@ -116,6 +118,7 @@ impl CeCommand for Commands {
                 gate::GateCommands::Check(args) => gate::run_gate_check(ctx, args),
             },
             Commands::Spec(args) => crate::commands::spec::run_spec(ctx, args),
+            Commands::Doc(args) => doc::run_doc(ctx, args),
         }
     }
 }

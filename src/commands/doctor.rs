@@ -693,6 +693,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         println!("doctor-warn: {warn}");
     }
 
+    // Solution Library Cluster Consolidation Health Probe (solution-refresh-and-deduplication)
+    let cluster_warnings = crate::commands::doc::probe_solution_clusters(&repo_root);
+    for warn in &cluster_warnings {
+        println!("doctor-info: {warn}");
+    }
+
     // Observe-only Ship-readiness probe (Issue #354): Stage 6 + code-review gaps.
     // Non-fatal: never added to `findings`, exit code unaffected. Only runs for
     // adopted workspaces to avoid noise on unrelated repositories.
