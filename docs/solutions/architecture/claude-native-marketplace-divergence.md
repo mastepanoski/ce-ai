@@ -12,6 +12,7 @@ components:
   - harness::claude
   - commands::doctor
 applies_when: "Diagnosing why updates to compound-engineering via ce-ai upgrade do not take effect in Claude Code, or inspecting native plugin marketplace version differences across scopes"
+problem_type: architectural_refactor
 ---
 
 # Detecting Divergence Between Claude Code Native Plugin Marketplace and ce-ai

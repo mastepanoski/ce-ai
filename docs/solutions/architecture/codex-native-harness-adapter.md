@@ -2,6 +2,8 @@
 module: src/harness/codex.rs
 tags: codex, toml, native-adapter, harness, mcp-servers
 problem_type: architectural_expansion
+title: "Codex Native Harness Adapter"
+applies_when: "When prior to Issue #175, ce-ai lacked native support for OpenAI Codex CLI (~/.codex/config.toml)."
 ---
 
 # Solution: Codex Native Harness Adapter

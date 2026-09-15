@@ -20,6 +20,7 @@ components:
   - commands::audit
   - commands::doctor
 applies_when: "Configuring CLI compression pre-processors, auditing agent environment hooks, or addressing stdout filtering issues"
+problem_type: architectural_refactor
 ---
 
 # RTK Hook Auto-Configuration, Opt-Out Lifecycle, and Silent Output Mitigation

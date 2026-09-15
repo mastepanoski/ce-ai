@@ -4,6 +4,7 @@ category: "architecture"
 tags: ["fx", "vercel-labs", "harness-adapter", "audit", "mcp-json"]
 date: "2026-08-24"
 problem_type: "audit_refinements"
+applies_when: "When the cross-adapter audit suite identified four specific audit findings for Vercel Labs' fx native harness adapter:."
 ---
 
 # Vercel Labs fx Adapter Audit Refinements

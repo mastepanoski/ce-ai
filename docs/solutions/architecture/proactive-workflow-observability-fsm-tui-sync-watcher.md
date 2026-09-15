@@ -14,6 +14,7 @@ components:
   - sync
   - workflow
 applies_when: "Adding workflow observability, live progress gauges in TUI, extended companion health diagnostics, or real-time sync watchers to ce-ai"
+problem_type: architectural_refactor
 ---
 
 # Proactive Workflow Observability: TUI FSM Dashboard, Extended Doctor Health, and Real-Time Sync Watcher
@@ -28,8 +29,8 @@ Release v0.6.0 introduces **Proactive Workflow Observability**, transforming `ce
 
 ## Guidance & Architecture Patterns
 
-### 1. Interactive TUI Workflow Dashboard (`src/tui.rs`)
-- **Pattern**: Add a dedicated `🎮 Workflow (FSM)` tab to `MenuTab` in `src/tui.rs`.
+### 1. Interactive TUI Workflow Dashboard (`src/tui/app.rs`)
+- **Pattern**: Add a dedicated `🎮 Workflow (FSM)` tab to `MenuTab` in `src/tui/app.rs`.
 - **Behavior**: Reads `state.json` on each render pass to display:
   - The active 7-stage Flywheel stage (`Ideation`, `OpenSpec`, `Plan`, `Work`, `Verify`, `Compound`, `Ship`).
   - Active subtask string and latest progress checkpoint timestamp.
@@ -67,7 +68,7 @@ Release v0.6.0 introduces **Proactive Workflow Observability**, transforming `ce
 
 ## Examples & Code Snippets
 
-### TUI Workflow Tab Match Arm (`src/tui.rs`):
+### TUI Workflow Tab Match Arm (`src/tui/app.rs`):
 ```rust
 MenuTab::Workflow => {
     let mut lines = vec![

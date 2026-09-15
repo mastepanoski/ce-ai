@@ -2,6 +2,8 @@
 module: test-architecture
 tags: [tests, refactor, separation-of-concerns, file-layout, path-attribute]
 problem_type: architecture
+title: "Separation of Test Code from Functional Code Across Source Files"
+applies_when: "When encountering issues related to separation of test code from functional code across source files in architecture."
 ---
 
 # Separation of Test Code from Functional Code Across Source Files
@@ -18,7 +20,7 @@ Extracted all inline `mod tests` blocks into dedicated sibling test files under 
 mod tests;
 ```
 
-For directory entrypoints (`mod.rs`), test files were mapped to `tests/mod_tests.rs`:
+For directory entrypoints (`mod.rs`), test files were mapped to sub-module tests (e.g. `src/harness/tests/mod_tests.rs`):
 
 ```rust
 #[cfg(test)]

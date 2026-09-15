@@ -8,6 +8,8 @@ tags:
   - compaction
   - repostate
 problem_type: architecture
+title: "OpenCode Native Plugin Lifecycle Hook & Compaction Drift Delivery"
+applies_when: "When encountering issues related to opencode native plugin lifecycle hook & compaction drift delivery in architecture."
 ---
 
 # OpenCode Native Plugin Lifecycle Hook & Compaction Drift Delivery

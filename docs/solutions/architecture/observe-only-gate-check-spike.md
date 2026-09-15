@@ -19,6 +19,7 @@ components:
   - commands::status
   - commands::doctor
 applies_when: "Auditing or observing agent tool execution compliance against OpenSpec workflow stages without blocking developer execution"
+problem_type: architectural_refactor
 ---
 
 # Observe-Only Gate Check Spike: Measuring Agent Tool Writes in ce-work Without OpenSpec

@@ -11,6 +11,7 @@ tags:
   - "size-budget"
   - "release"
   - "gh-cli"
+applies_when: "When shipping large PRs through branch protection, size-budget gates, and GitHub release pipelines."
 ---
 
 # Shipping through ce-ai's protected-main and PR-size gates

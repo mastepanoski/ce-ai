@@ -20,6 +20,7 @@ components:
   - commands::sync
   - commands::doctor
 applies_when: "Resolving reasoning skills, resolving sequential-thinking, diagnosing unconfigured companion suggestions, or enforcing No-MCP harness parity"
+problem_type: architectural_refactor
 ---
 
 # Canonical Sequential-Thinking Skill Integration & Zero-Daemon Cognitive Invariant

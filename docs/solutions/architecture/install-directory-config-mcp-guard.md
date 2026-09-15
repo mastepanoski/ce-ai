@@ -14,6 +14,7 @@ components:
   - commands::install
   - commands::sync
 applies_when: "Investigating why 'install --harness all' fails with 'Is a directory (os error 21)', debugging companion MCP registration aborts, or understanding config file vs directory path validation in harness adapters"
+problem_type: architectural_refactor
 ---
 
 # Companion MCP Registration Directory Guard & Contextual Error Wrapping

@@ -14,6 +14,7 @@ components:
   - commands::workflow
   - commands::doctor
 applies_when: "Investigating why workflow FSM remains stuck at Stage 3 or Stage 4 despite completed code, diagnosing tasks.md checkbox desync, or understanding git diff reconciliation with OpenSpec checklists"
+problem_type: architectural_refactor
 ---
 
 # OpenSpec Tasks Checkbox Desync Reconciliation & Non-Blocking Warnings

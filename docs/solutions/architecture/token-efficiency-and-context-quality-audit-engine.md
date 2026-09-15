@@ -2,6 +2,8 @@
 module: src/commands/audit.rs
 tags: [audit, token-efficiency, context-quality, multi-harness, capability-detectors]
 problem_type: architecture
+title: "Multi-Harness Token-Efficiency & Context-Quality Audit Engine"
+applies_when: "When encountering issues related to multi-harness token-efficiency & context-quality audit engine in architecture."
 ---
 
 # Multi-Harness Token-Efficiency & Context-Quality Audit Engine

@@ -2,6 +2,8 @@
 module: harness
 tags: [copilot, harness, adapter, json, mcp, rules, github]
 problem_type: architectural_refactor
+title: "Copilot Native Harness Adapter (& Audit Refinements)"
+applies_when: "When previously, ce-ai treated GitHub Copilot CLI as a generic JSON harness at ~/.config/copilot/copilot.json."
 ---
 
 # Solution: Copilot Native Harness Adapter (Issue #177 & Audit Refinements)

@@ -2,6 +2,8 @@
 module: governance
 tags: [governance, security-review, prompt-gates, mechanical-enforcement, fork-prs, code-review]
 problem_type: process
+title: "Sensitive Surface Fork PR Review: Prompt-Based Guidelines vs. Mechanical Enforcement"
+applies_when: "When encountering issues related to sensitive surface fork pr review: prompt-based guidelines vs. mechanical enforcement in security."
 ---
 
 # Sensitive Surface Fork PR Review: Prompt-Based Guidelines vs. Mechanical Enforcement

@@ -2,6 +2,8 @@
 module: harness::kimi
 tags: [kimi, hooks, session-start, zero-step, negative-finding, global-only-config]
 problem_type: architecture
+title: "Kimi Code CLI Turn-0 Drift Delivery Evaluation"
+applies_when: "When encountering issues related to kimi code cli turn-0 drift delivery evaluation in architecture."
 ---
 
 # Kimi Code CLI Turn-0 Drift Delivery Evaluation

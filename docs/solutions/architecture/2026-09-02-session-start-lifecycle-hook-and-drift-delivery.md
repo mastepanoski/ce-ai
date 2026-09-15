@@ -2,6 +2,8 @@
 module: harness
 tags: [hooks, session-start, claude-code, repo-state, workflow-resume, adoption-block, v4]
 problem_type: architecture
+title: "Guaranteed Turn-0 Drift Delivery via Native Lifecycle Hooks & Enforced Directives"
+applies_when: "When encountering issues related to guaranteed turn-0 drift delivery via native lifecycle hooks & enforced directives in architecture."
 ---
 
 # Guaranteed Turn-0 Drift Delivery via Native Lifecycle Hooks & Enforced Directives

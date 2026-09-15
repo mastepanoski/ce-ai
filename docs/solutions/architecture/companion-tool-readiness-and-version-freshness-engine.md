@@ -2,6 +2,8 @@
 module: src/source/tools_registry.rs
 tags: [companion-tools, version-freshness, doctor, tools-status, semver, offline-resilience]
 problem_type: architecture
+title: "Companion-Tool Readiness & Version Freshness Engine"
+applies_when: "When encountering issues related to companion-tool readiness & version freshness engine in architecture."
 ---
 
 # Companion-Tool Readiness & Version Freshness Engine

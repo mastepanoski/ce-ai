@@ -2,6 +2,8 @@
 module: src/harness/claude.rs
 tags: [harness, claude, claude-code, mcp, skills]
 problem_type: architecture
+title: "Claude Code Native Harness Adapter Implementation"
+applies_when: "When encountering issues related to claude code native harness adapter implementation in architecture."
 ---
 
 # Claude Code Native Harness Adapter Implementation

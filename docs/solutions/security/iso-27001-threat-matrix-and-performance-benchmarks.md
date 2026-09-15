@@ -15,6 +15,7 @@ tags:
   - "security"
   - "benchmarks"
   - "hardening"
+applies_when: "When verifying path traversal rejection or sub-50ms execution bounds for state diffing and hash calculation."
 ---
 
 # Solution: ISO 27001 Threat Matrix Audit Suite & Performance Benchmarks (Release v0.9.0)

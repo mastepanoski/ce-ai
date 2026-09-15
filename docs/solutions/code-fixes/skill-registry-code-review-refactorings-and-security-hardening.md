@@ -13,6 +13,8 @@ symptoms:
   - "Overly permissive R3 authorized security root boundaries"
 root_cause: "Unscoped directory scanning, direct byte offset string slicing, unstripped YAML array brackets, and broad authorized root paths"
 resolution_type: "code_fix"
+tags: [code-fixes, skill, registry, code, review]
+applies_when: "When encountering issues related to skill registry engine code review refactorings & security boundary hardening (release v1.4.1) in code-fixes."
 ---
 
 # Skill Registry Engine Code Review Refactorings & Security Boundary Hardening (Release v1.4.1)

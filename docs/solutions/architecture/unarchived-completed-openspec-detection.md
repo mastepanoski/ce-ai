@@ -13,6 +13,7 @@ components:
   - commands::workflow
   - commands::doctor
 applies_when: "Preventing completed OpenSpec changes from lingering unarchived in openspec/changes/, ensuring repo-wide task ledger cleanliness, or architecting non-discretionary Turn-0 health probes"
+problem_type: architectural_refactor
 ---
 
 # Deterministic Detection of Unarchived Completed OpenSpec Changes

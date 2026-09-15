@@ -1,7 +1,7 @@
 ---
 title: Backup Listing and Point-in-Time Config Restore Architecture
 date: 2026-08-21
-category: docs/solutions
+category: architecture
 module: state/backups
 problem_type: architecture_pattern
 component: tooling
@@ -13,6 +13,7 @@ tags:
   - atomic-writes
   - ratatui-tui
   - clap-cli
+applies_when: "When encountering issues related to backup listing and point-in-time config restore architecture in architecture."
 ---
 
 # Backup Listing and Point-in-Time Config Restore Architecture
@@ -32,7 +33,7 @@ The recovery engine implements snapshot listing and targeted restoration with th
 - Subcommands `ce-ai backups list` and `ce-ai backups restore <target_id>` accept a target harness filter flag `-t, --harness <name>`.
 - Using `-t` (short for target harness) avoids flag collision with Clap's standard `-h, --help` option, ensuring clean user experience across shells.
 
-### 3. Interactive TUI Backup Dashboard (`src/tui.rs`)
+### 3. Interactive TUI Backup Dashboard (`src/tui/app.rs`)
 - A dedicated `MenuTab::Backups` panel renders an ASCII table of historical backups sorted newest-first.
 - Users can switch harness targets using `◄`/`►` or `h`/`l` keys, navigate snapshots with `Up`/`Down` arrows, and trigger point-in-time restoration instantly via `[Enter]` or `r`.
 

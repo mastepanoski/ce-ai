@@ -15,6 +15,7 @@ components:
   - engram::mcp
   - engram::store
 applies_when: "Investigating why FSM stage or tasks progress banners appear to persist across sessions despite updated tasks.md, diagnosing apparent memory-to-FSM feedback loops, or evaluating third-party agent memory prompt re-hydration"
+problem_type: architectural_refactor
 ---
 
 # Engram Memory Context Echo & LLM Behavioral Feedback Loop Risk

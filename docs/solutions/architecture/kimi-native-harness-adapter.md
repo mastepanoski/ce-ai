@@ -2,6 +2,8 @@
 module: harness
 tags: [kimi, harness, adapter, json, mcp, rules, moonshot]
 problem_type: architectural_refactor
+title: "Kimi Code CLI Native Harness Adapter"
+applies_when: "When previously, ce-ai treated Kimi Code CLI (kimi) as a generic JSON harness at ~/.kimi/config.json."
 ---
 
 # Solution: Kimi Code CLI Native Harness Adapter (Issue #178)

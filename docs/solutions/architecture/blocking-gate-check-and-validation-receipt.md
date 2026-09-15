@@ -19,6 +19,7 @@ components:
   - commands::status
   - commands::doctor
 applies_when: "Enforcing OpenSpec contract presence during Stage 4 (ce-work) agent writes or auditing validation receipts"
+problem_type: architectural_refactor
 ---
 
 # Blocking Gate Check & Structured Validation Receipt for Unvetted Writes

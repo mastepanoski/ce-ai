@@ -3,6 +3,8 @@ module: workflow
 tags: [workflow, repo-state, drift-recovery, skill-state, arxiv-2608-26263v2, arxiv-2603-29919, sha256, openspec, evaluation-framework]
 problem_type: architecture
 last_updated: 2026-09-09
+title: "Zero-Step Environment Drift Recovery via Live `RepoState` Sync"
+applies_when: "When encountering issues related to zero-step environment drift recovery via live `repostate` sync in architecture."
 ---
 
 # Zero-Step Environment Drift Recovery via Live `RepoState` Sync

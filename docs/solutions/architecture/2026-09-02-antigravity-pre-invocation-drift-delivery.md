@@ -2,6 +2,8 @@
 module: harness::agy
 tags: [antigravity, agy, hooks, pre-invocation, session-deduplication, ephemeralMessage, zero-step, drift-recovery]
 problem_type: architecture
+title: "Google Antigravity PreInvocation Hook & Turn-0 Drift Delivery"
+applies_when: "When encountering issues related to google antigravity preinvocation hook & turn-0 drift delivery in architecture."
 ---
 
 # Google Antigravity PreInvocation Hook & Turn-0 Drift Delivery

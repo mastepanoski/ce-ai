@@ -16,6 +16,8 @@ tags:
   - http-redirect
   - windows-ci
   - installer-script
+title: "Fix PowerShell 5.1 Tokenizer Corruption and Cross-Domain HTTP 302 Download Failures in Windows Installer"
+applies_when: "When encountering issues related to fix powershell 5.1 tokenizer corruption and cross-domain http 302 download failures in windows installer in build."
 ---
 
 # Fix PowerShell 5.1 Tokenizer Corruption and Cross-Domain HTTP 302 Download Failures in Windows Installer

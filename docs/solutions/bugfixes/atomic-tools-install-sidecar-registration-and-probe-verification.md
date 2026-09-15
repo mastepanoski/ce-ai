@@ -2,6 +2,8 @@
 module: src/commands/tools.rs
 tags: [tools, sidecar-registration, mcpServers, atomic-write, health-probe]
 problem_type: bugfix
+title: "Atomic Tools Install Sidecar Registration and Post-Probe Verification"
+applies_when: "When encountering issues related to atomic tools install sidecar registration and post-probe verification in bugfixes."
 ---
 
 # Atomic Tools Install Sidecar Registration and Post-Probe Verification

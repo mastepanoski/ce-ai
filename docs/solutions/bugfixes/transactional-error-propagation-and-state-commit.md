@@ -5,6 +5,7 @@ module: "src/commands/"
 tags: ["transactional", "error-handling", "bugfix", "state-commit"]
 problem_type: "bug"
 severity: "P1"
+applies_when: "When encountering issues related to transactional error propagation & state commit integrity in bugfixes."
 ---
 
 # Transactional Error Propagation & State Commit Integrity

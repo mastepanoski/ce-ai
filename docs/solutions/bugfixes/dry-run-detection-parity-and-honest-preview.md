@@ -5,6 +5,7 @@ module: "src/commands/"
 tags: ["dry-run", "preview", "detection-parity", "bugfix", "init-prj"]
 problem_type: "bug"
 severity: "P2"
+applies_when: "When ce-ai init-prj --dry-run does not faithfully preview actions, hooks, or detections."
 ---
 
 # Dry-Run Detection Parity & Honest Preview Output

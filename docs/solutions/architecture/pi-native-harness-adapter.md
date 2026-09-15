@@ -2,6 +2,8 @@
 module: harness
 tags: [pi, harness, adapter, skills, agend_md, no_mcp]
 problem_type: architectural_feature
+title: "Pi Native Harness Adapter"
+applies_when: "When ce-ai's previous stub for Mario Zechner's pi coding agent assumed a fictional ~/.pi/config.json file with OpenCode-style schema."
 ---
 
 # Solution: Pi Native Harness Adapter

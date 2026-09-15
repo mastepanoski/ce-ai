@@ -2,6 +2,8 @@
 module: distribution
 tags: [distribution, musl, glibc, static-linking, ci-blindspot, self-update, cross-platform]
 problem_type: distribution
+title: "Glibc/Musl Toolchain Portability Blind Spot & Self-Update Fallback"
+applies_when: "When encountering issues related to glibc/musl toolchain portability blind spot & self-update fallback in distribution."
 ---
 
 # Glibc/Musl Toolchain Portability Blind Spot & Self-Update Fallback

@@ -2,6 +2,8 @@
 module: src/harness/cursor.rs
 tags: [harness, cursor, mcp, mdc, adapter]
 problem_type: architecture
+title: "Cursor Native Harness Adapter Implementation"
+applies_when: "When encountering issues related to cursor native harness adapter implementation in architecture."
 ---
 
 # Cursor Native Harness Adapter Implementation
