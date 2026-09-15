@@ -18,6 +18,7 @@ components:
   - opencode::plugins
   - source::tools_registry
 applies_when: "Configuring MCP companion servers, adding native or custom harnesses, or auditing tools discovery"
+problem_type: architectural_refactor
 ---
 
 # Engram and CodeGraph Companion Registration Parity across OpenCode, Custom, Deepseek, and Pi

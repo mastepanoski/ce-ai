@@ -2,6 +2,8 @@
 module: harness
 tags: [harness, release, docs, audit, deepseek]
 problem_type: architecture
+title: "Multi-Harness Reconciliation, DeepSeek De-scope & Release Hardening"
+applies_when: "When encountering issues related to multi-harness reconciliation, deepseek de-scope & release hardening in architecture."
 ---
 
 # Solution: Multi-Harness Reconciliation, DeepSeek De-scope & Release Hardening

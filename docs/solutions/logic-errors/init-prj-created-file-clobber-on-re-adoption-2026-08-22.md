@@ -20,6 +20,7 @@ tags:
   - state-json
   - idempotency
   - project-adoption
+applies_when: "When ce-ai init-prj upgrade re-runs silently corrupted adoption state."
 ---
 
 # init-prj re-adoption clobbered created_file, breaking deinit-prj cleanup

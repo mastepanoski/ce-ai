@@ -5,6 +5,7 @@ module: "src/commands/"
 tags: ["observe-only", "gate", "signal-integrity", "git-diff", "sha-identity", "architecture"]
 problem_type: "bug"
 severity: "P2"
+applies_when: "When encountering issues related to observe-only gate signal integrity in architecture."
 ---
 
 # Observe-Only Gate Signal Integrity

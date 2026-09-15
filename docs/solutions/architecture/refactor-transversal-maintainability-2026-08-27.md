@@ -2,6 +2,8 @@
 module: transversal
 tags: [strategy, factory, ports-adapters, tui, error-hardening, clippy]
 problem_type: architecture
+title: "Refactor Transversal de Mantenibilidad"
+applies_when: "When encountering issues related to refactor transversal de mantenibilidad in architecture."
 ---
 
 # Refactor Transversal de Mantenibilidad
@@ -9,7 +11,7 @@ problem_type: architecture
 ## Problem
 A medida que `ce-ai` creció para soportar 11 harnesses y 15 subcomandos CLI, se identificaron varios cuellos de botella arquitectónicos en el codebase (~16.5k líneas):
 1. **Dispatch monolítico if-else/match:** `src/main.rs` y `src/commands/tools.rs` duplicaban bloques de coincidencia manual por cada harness para registro MCP (~40 líneas repetidas × 8).
-2. **Monolito de TUI:** `src/tui.rs` concentraba 1.791 líneas de rendering, bucle de eventos, estado y builders de argumentos en un solo archivo sin separación de responsabilidades.
+2. **Monolito de TUI:** `src/tui/` concentraba 1.791 líneas de rendering, bucle de eventos, estado y builders de argumentos en un solo archivo sin separación de responsabilidades.
 3. **Acoplamiento a I/O del Sistema de Archivos:** Las capas `state` y `opencode` realizaban operaciones de lectura y escritura directa sobre disco, obligando a usar `tempdir` en todos los tests de unidad e impidiendo testing hermético en memoria.
 4. **Residuos de Unwrap en Producción:** Existían llamadas directas a `.unwrap()` y `.expect()` en código de producción que podían generar panics no controlados.
 
@@ -25,7 +27,7 @@ Se ejecutó un refactor incremental guiado por el plan transversal en 6 unidades
    - Colapsados 7 bloques duplicados `if *_installed` en `tools::install_tool` a un único bucle sobre `state.installed_harnesses`.
 
 3. **U3 — Descomposición Modular de TUI (`src/tui/`):**
-   - El archivo `src/tui.rs` de 1.791 líneas se dividió en 6 submódulos con responsabilidades acotadas:
+   - El archivo `src/tui/` (antes `tui.rs`) de 1.791 líneas se dividió en 6 submódulos con responsabilidades acotadas:
      - `app.rs`: Estado de la aplicación y workflow (`App`).
      - `handlers.rs`: Ejecución de comandos CLI y builders de texto.
      - `render.rs`: Widgets y layout con Ratatui (`ui`, modales, paneles).

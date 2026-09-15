@@ -21,6 +21,7 @@ tags:
   - status-probe
   - doctor-probe
   - tui-shortcut
+title: "Project Adoption Engine: Non-Destructive Multi-Harness Governance"
 ---
 
 # Project Adoption Engine: Non-Destructive Multi-Harness Governance

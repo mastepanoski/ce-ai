@@ -5,6 +5,7 @@ module: "src/harness/mod.rs"
 tags: ["harness", "isolation", "bugfix", "multi-harness"]
 problem_type: "bug"
 severity: "P0"
+applies_when: "When installing, updating, or syncing non-OpenCode harnesses where assets might leak into the OpenCode directory."
 ---
 
 # Native Per-Harness Directory Resolution & Artifact Leakage Containment

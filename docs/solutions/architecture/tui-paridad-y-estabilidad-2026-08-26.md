@@ -1,7 +1,9 @@
 ---
-module: src/tui.rs
+module: src/tui/app.rs
 tags: [tui, ratatui, harness-parity, headless, zen, e2e, raw-mode]
 problem_type: architecture
+title: "TUI Paridad 9→15 y Estabilidad Input/Modal/TTY"
+applies_when: "When extending TUI tab parity, modal dialog scrolling, TTY guards, or raw-mode terminal handling."
 ---
 
 # TUI Paridad 9→15 y Estabilidad Input/Modal/TTY
@@ -10,7 +12,7 @@ problem_type: architecture
 El TUI ofrecía 9 tabs funcionales (`MenuTab::all` 10 con `Exit`) pero el CLI expone 15 subcomandos (`src/main.rs:44`). `every_tui_spawned_vector_satisfies_its_cli_contract` pinneaba solo 5 vectores, dando 8/8 verde falso. `Upgrade` renderizaba selector de harness que `run_upgrade_cmd` ignoraba (mentira UI). Picker y modal colisionaban (`Esc` cerraba modal antes que picker), modal sin scroll truncaba `doctor`/`skills list`, atajos `j/k` movían tabs aunque el foco estaba en lista, `stdin.is_terminal()` fallaba en pipes/CI, y `disable_raw_mode` no se restauraba si `run_app` paniqueaba. Faltaban screenshots headless para probar overflow visual.
 
 ## Solution
-**Paridad (U1):** `MenuTab` 10→15 — 5 tabs espejo `Skills/Tools/Usage/Audit/InitPrj` con `render_*` + `run_*_cmd` thin vía `capture_cli` (`src/tui.rs:86`, `render_content_panel:612`). Upgrade honesto sin selector (`tui.rs:760`).
+**Paridad (U1):** `MenuTab` 10→15 — 5 tabs espejo `Skills/Tools/Usage/Audit/InitPrj` con `render_*` + `run_*_cmd` thin vía `capture_cli` (`src/tui/render.rs`, `render_content_panel:612`). Upgrade honesto sin selector (`src/tui/app.rs`).
 
 **Estabilidad (U2):** `App` añade `output_scroll` + `state_error` banner rojo; `RawModeGuard` con `Drop` restaura `disable_raw_mode` + `LeaveAlternateScreen` incluso en panic; `stdout.is_terminal()` guard; input precedence `picker > modal > tabs`; modal `List+Scrollbar` con `j/k/PgUp/PgDn` y `Esc/Enter/q` close; gate `j/k` context-aware; split `F4 Doctor` / `F5 Backups` con confirm `y/N` y `HarnessKind::parse`.
 

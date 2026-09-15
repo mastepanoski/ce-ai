@@ -1,3 +1,11 @@
+---
+title: "Multi-Harness Skill Registry Engine"
+category: architecture
+problem_type: architectural_refactor
+tags: [architecture, multi, harness, skill, registry]
+applies_when: "When prior to Issue #96, ce-ai lacked a central, harness-neutral index for skill discovery and resolution across AI coding agent harnesses."
+---
+
 <!-- Diátaxis Quadrant: Explanation | Audience: Senior / Architecture -->
 # Issue #96: Multi-Harness Skill Registry Engine
 

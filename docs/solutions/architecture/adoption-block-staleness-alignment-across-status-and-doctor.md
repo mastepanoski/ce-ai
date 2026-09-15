@@ -2,6 +2,8 @@
 module: src/commands/init_prj.rs
 tags: [adoption-block, status, doctor, refactoring, single-source-of-truth]
 problem_type: architecture
+title: "Adoption Block Staleness Alignment Across Status and Doctor Diagnostics"
+applies_when: "When encountering issues related to adoption block staleness alignment across status and doctor diagnostics in architecture."
 ---
 
 # Adoption Block Staleness Alignment Across Status and Doctor Diagnostics

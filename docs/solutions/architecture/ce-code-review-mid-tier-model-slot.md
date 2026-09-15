@@ -13,6 +13,7 @@ components:
   - commands::models
   - commands::doctor
 applies_when: "Configuring multi-tier or persona-level sub-agent dispatch models in OpenCode, distinguishing internal tiering slots from workflow stage slots, or diagnosing cost-tiering model gaps"
+problem_type: architectural_refactor
 ---
 
 # Exposing Mid-Tier Model Slots for Skill Persona Dispatch in OpenCode

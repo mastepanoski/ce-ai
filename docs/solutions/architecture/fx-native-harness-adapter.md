@@ -4,6 +4,7 @@ category: "architecture"
 tags: ["fx", "harness-adapter", "mcp-json", "skills", "openspec", "semver"]
 date: "2026-08-23"
 problem_type: "feature_implementation"
+applies_when: "When encountering issues related to fx native harness adapter architecture & integration in architecture."
 ---
 
 # fx Native Harness Adapter Architecture & Integration

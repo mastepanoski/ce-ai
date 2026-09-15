@@ -2,6 +2,8 @@
 module: harness::grok
 tags: [grok, hooks, session-start, zero-step, negative-finding, stdout-discarded]
 problem_type: architecture
+title: "Grok Build CLI Turn-0 Drift Delivery Evaluation"
+applies_when: "When encountering issues related to grok build cli turn-0 drift delivery evaluation in architecture."
 ---
 
 # Grok Build CLI Turn-0 Drift Delivery Evaluation

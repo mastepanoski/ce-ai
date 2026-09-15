@@ -2,6 +2,8 @@
 module: harness
 tags: [grok, harness, adapter, toml, mcp, rules, xai]
 problem_type: architectural_refactor
+title: "Grok Native Harness Adapter (& Audit Refinements)"
+applies_when: "When encountering issues related to grok native harness adapter (& audit refinements) in architecture."
 ---
 
 # Solution: Grok Native Harness Adapter (Issue #176 & Audit Refinements)
@@ -19,7 +21,7 @@ Previously, `ce-ai` treated xAI Grok Build CLI (`grok`) as a generic JSON harnes
 4. **Project Rule Adoption**: `init-prj` creates or updates `.grok/rules/compound-engineering.md` with demarcated `CE-AI MANAGED BLOCK`.
 5. **Clean Uninstallation**: Unregisters `ce-ai` sidecars and removes managed skills without deleting `config.toml` or user custom skills.
 6. **Thread-Safe Test Environment Guards**: Protected `GROK_HOME` and native harness directory resolution unit tests across `grok.rs` and `mod.rs` with `HARNESS_ENV_LOCK` mutex to prevent race conditions during parallel test execution.
-7. **Legacy Generic JSON Code Cleanup**: Removed dead generic JSON mapping for `HarnessKind::Grok` (`.grok/config.json`) from `src/harness/generic_json.rs`.
+7. **Legacy Generic JSON Code Cleanup**: Removed dead generic JSON mapping for `HarnessKind::Grok` (`.grok/config.json`) from `src/harness/mod.rs` (formerly generic_json.rs).
 
 ## Verification
 - Unit tests in `src/harness/grok.rs` verifying `[mcp_servers]` TOML schema manipulation, zero OpenCode key leaks, thread safety under parallel execution, and managed comment block injection/stripping.

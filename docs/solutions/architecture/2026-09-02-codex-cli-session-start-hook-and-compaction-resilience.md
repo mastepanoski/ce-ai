@@ -2,6 +2,8 @@
 module: harness::codex
 tags: [codex, hooks, session-start, compaction, drift-recovery, zero-step]
 problem_type: architecture
+title: "OpenAI Codex CLI SessionStart Hook & Compaction Resilience"
+applies_when: "When encountering issues related to openai codex cli sessionstart hook & compaction resilience in architecture."
 ---
 
 # OpenAI Codex CLI SessionStart Hook & Compaction Resilience

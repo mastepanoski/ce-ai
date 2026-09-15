@@ -2,6 +2,8 @@
 module: harness
 tags: [agy, gemini, antigravity, harness, adapter, json, mcp, rules, google]
 problem_type: architectural_refactor
+title: "Google Antigravity (agy) Native Harness Adapter"
+applies_when: "When previously, ce-ai treated Google Antigravity (agy) as a generic JSON harness pointing to ~/.gemini/antigravity-cli/antigravity.json."
 ---
 
 # Solution: Google Antigravity (agy) Native Harness Adapter (Issue #179)

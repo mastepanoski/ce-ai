@@ -2,6 +2,8 @@
 module: harness::cursor
 tags: [cursor, hooks, session-start, zero-step, additional_context, drift-recovery]
 problem_type: architecture
+title: "Cursor sessionStart Lifecycle Hook & Turn-0 Drift Delivery"
+applies_when: "When encountering issues related to cursor sessionstart lifecycle hook & turn-0 drift delivery in architecture."
 ---
 
 # Cursor sessionStart Lifecycle Hook & Turn-0 Drift Delivery

@@ -11,6 +11,7 @@ components:
   - scripts
   - workflows
 applies_when: "Adding or maintaining universal installation scripts and multi-platform compilation workflows in ce-ai"
+problem_type: distribution
 ---
 
 # Universal One-Line Installer Script & Multi-Arch Release Matrix

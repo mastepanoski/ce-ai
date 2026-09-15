@@ -18,6 +18,7 @@ tags:
 - hard-gate-invariants
 - github-api
 - token-dilution
+title: "Deterministic Platform Boundaries vs. Probabilistic Prompt Decay"
 ---
 
 # Architectural Solution: Deterministic Platform Boundaries vs. Probabilistic Prompt Decay

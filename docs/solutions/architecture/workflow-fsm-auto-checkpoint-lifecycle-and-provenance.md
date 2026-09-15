@@ -15,6 +15,7 @@ components:
   - init-prj
   - sync
 applies_when: "Extending workflow stage inference, lifecycle hooks across harnesses, or branch-scoped state progression in ce-ai"
+problem_type: architectural_refactor
 ---
 
 # Workflow FSM Auto-Checkpoint Lifecycle, Monotonic Provenance Guard, and Multi-Harness Integration

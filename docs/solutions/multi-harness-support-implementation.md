@@ -2,6 +2,8 @@
 module: harness
 tags: [multi-harness, adapters, registration-spec, sync]
 problem_type: architecture
+title: "Multi-Harness Support Implementation"
+applies_when: "When ce-ai originally managed only OpenCode (opencode.json)."
 ---
 
 # Solution: Multi-Harness Support Implementation

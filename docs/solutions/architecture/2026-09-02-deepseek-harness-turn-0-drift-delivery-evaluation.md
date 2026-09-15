@@ -2,6 +2,8 @@
 module: harness::deepseek
 tags: [deepseek, dsh, hooks, cordis, session-start, zero-step, negative-finding]
 problem_type: architecture
+title: "DeepSeek Harness (dsh) Turn-0 Drift Delivery Evaluation"
+applies_when: "When encountering issues related to deepseek harness (dsh) turn-0 drift delivery evaluation in architecture."
 ---
 
 # DeepSeek Harness (dsh) Turn-0 Drift Delivery Evaluation

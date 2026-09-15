@@ -13,6 +13,7 @@ components:
   - source
   - binary_release
 applies_when: "Implementing in-tool self-updating or in-use executable binary replacement across POSIX and Windows"
+problem_type: distribution
 ---
 
 # Native CLI Binary Self-Update & Cross-Platform In-Use Executable Replacement

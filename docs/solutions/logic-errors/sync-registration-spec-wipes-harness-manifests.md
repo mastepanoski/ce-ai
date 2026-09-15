@@ -13,6 +13,7 @@ root_cause: logic_error
 resolution_type: code_fix
 severity: high
 tags: [sync, install-manifest, sha256, drift-detection, registration-harness, atomic-writes]
+applies_when: "When ce-ai sync rewrites install-manifest.json for every table-driven registration harness (claude, kimi, codex, copilot, cursor, grok, agy, fx)."
 ---
 
 # ce-ai sync wiped SHA256 install-manifest files to empty for non-OpenCode harnesses

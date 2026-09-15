@@ -13,6 +13,7 @@ components:
   - commands::workflow
   - commands::registry
 applies_when: "Implementing or invoking OpenSpec change package archival, transitioning completed or rescoped features to archive/, managing ledger synchronization, or preventing dormant specification sprawl"
+problem_type: architectural_refactor
 ---
 
 # OpenSpec Change Archival CLI Command and Safe Ledger Synchronization

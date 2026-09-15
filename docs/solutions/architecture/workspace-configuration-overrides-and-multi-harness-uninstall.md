@@ -12,6 +12,7 @@ components:
   - uninstall
   - harness
 applies_when: "Adding repository-local configuration overrides (.ce-ai.json) or extending multi-harness uninstall parity in ce-ai"
+problem_type: architectural_refactor
 ---
 
 # Workspace Configuration Overrides (.ce-ai.json) & Complete Multi-Harness Uninstall Parity

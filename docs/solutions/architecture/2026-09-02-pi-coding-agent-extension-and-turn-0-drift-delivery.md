@@ -2,6 +2,8 @@
 module: harness::pi
 tags: [pi, extensions, before_agent_start, session_start, drift-recovery, zero-step]
 problem_type: architecture
+title: "Pi Coding Agent Native Extension & Turn-0 Drift Delivery"
+applies_when: "When encountering issues related to pi coding agent native extension & turn-0 drift delivery in architecture."
 ---
 
 # Pi Coding Agent Native Extension & Turn-0 Drift Delivery

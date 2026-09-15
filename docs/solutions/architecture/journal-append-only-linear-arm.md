@@ -17,6 +17,7 @@ components:
   - commands::adopt
   - commands::doctor
 applies_when: "Investigating performance bottlenecks during install/sync, understanding transactional rollback and recovery mechanics, or reviewing operation journal file formats"
+problem_type: architectural_refactor
 ---
 
 # Append-Only JSONL Operation Journal for Linear-Time Mutation Arming

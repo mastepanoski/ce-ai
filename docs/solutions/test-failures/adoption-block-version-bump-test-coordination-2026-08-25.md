@@ -17,6 +17,7 @@ tags:
   - "version-bump"
   - "test-fixtures"
   - "doctor-status"
+applies_when: "When bumping adoption BLOCK_VERSION and coordinating pinned test fixtures and drift classification tests."
 ---
 
 # Coordinating pinned tests across an adoption-block version bump

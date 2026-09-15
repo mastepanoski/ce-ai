@@ -13,6 +13,7 @@ components:
   - harness::kimi
   - commands::doctor
 applies_when: "Deciding whether ce-ai should mutate or trigger native plugin updates for Kimi Code, or evaluating future harness plugin manager boundaries"
+problem_type: architectural_refactor
 ---
 
 # Kimi Code Native Plugin Divergence: Visibility, Not Control

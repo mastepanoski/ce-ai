@@ -4,6 +4,7 @@ category: "architecture"
 tags: ["agy", "antigravity", "gemini", "harness-adapter", "audit", "mcp-json"]
 date: "2026-08-24"
 problem_type: "audit_refinements"
+applies_when: "When the cross-adapter audit suite identified four specific audit findings for the Google Antigravity (agy) native harness adapter:."
 ---
 
 # Google Antigravity (AGY) Adapter Audit Refinements

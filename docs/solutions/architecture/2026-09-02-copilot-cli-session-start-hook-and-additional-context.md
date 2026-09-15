@@ -7,6 +7,8 @@ tags:
   - additional-context
   - drift-recovery
 problem_type: architecture
+title: "GitHub Copilot CLI Turn-0 `sessionStart` Hook and `additionalContext` Injection"
+applies_when: "When encountering issues related to github copilot cli turn-0 `sessionstart` hook and `additionalcontext` injection in architecture."
 ---
 
 # GitHub Copilot CLI Turn-0 `sessionStart` Hook and `additionalContext` Injection

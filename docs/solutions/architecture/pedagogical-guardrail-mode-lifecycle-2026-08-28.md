@@ -2,6 +2,8 @@
 module: guard
 tags: [guardrail, hitl, pedagogical, iso-42001, nist-ai-rmf, anti-vibe-coding]
 problem_type: architecture
+title: "Pedagogical Guardrail Mode Lifecycle (`ce-ai guard`)"
+applies_when: "When encountering issues related to pedagogical guardrail mode lifecycle (`ce-ai guard`) in architecture."
 ---
 
 # Pedagogical Guardrail Mode Lifecycle (`ce-ai guard`)
