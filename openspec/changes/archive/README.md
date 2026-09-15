@@ -43,3 +43,4 @@ Historical notes:
 - 2026-09-13 sweep: 3 folders archived via 'ce-ai archive --all'.
 - solution-library-lint-and-repair: archived (19/19 tasks) under criterion (1) on 2026-09-15.
 - living-system-specs-promotion: archived (31/31 tasks) under criterion (1) on 2026-09-15.
+- solution-refresh-and-deduplication: archived (20/20 tasks) under criterion (1) on 2026-09-15.
