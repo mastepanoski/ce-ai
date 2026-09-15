@@ -5,6 +5,26 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.55.1] - 2026-09-15
+
+### Fixed
+- **Solution Library Drift & YAML Schema Normalization (#365):**
+  - Normalized all 74 solution markdown files in `docs/solutions/` to satisfy the mandatory 5-field schema (`title`, `category`/`module`, `problem_type`, `tags`, and `applies_when`) with zero loss of body content.
+  - Repaired 9 obsolete source code references across historical solution records (`src/tui.rs` decomposed into `src/tui/`, `src/harness/generic_json.rs`, and relative `tests/mod_tests.rs`).
+  - Validated 100% clean passes on `probe_solution_drift` and `ce-ai doctor` with zero dead paths or frontmatter warnings.
+
+### Security
+- **Supply Chain Advisory Remediation (ISO 27001 / ISO 27002):**
+  - Removed unused legacy dependency `inquire = "0.7"` from `Cargo.toml`, eradicating unmaintained `fxhash 0.2.1` (`RUSTSEC-2025-0057`).
+  - Bumped `rustls` to `0.23.45` in `Cargo.lock` to remediate advisory `RUSTSEC-2026-0285`.
+  - Updated `chacha20` from yanked `0.10.1` to `0.10.2`.
+  - Restored 100% green compliance across GitHub Actions supply chain security audits (`cargo audit`).
+
+### Maintenance
+- **Historical OpenSpec Change Compaction (#363, #364, #366):**
+  - Compacted 110 historical archive packages into the 2026-Q3 milestone rollup (`openspec/changes/archive/milestones/2026-Q3.md`) and compressed tarball (`archive-2026-Q3.tar.gz`).
+  - Safely archived completed changes (`doctor-kimi-marketplace-divergence`, `harness-manifest-sha256-coverage`, `linux-musl-static-release`, and `solution-library-lint-and-repair`), achieving zero unarchived change backlog.
+
 ## [1.55.0] - 2026-09-12
 
 ### Added
