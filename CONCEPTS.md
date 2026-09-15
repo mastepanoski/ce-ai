@@ -107,3 +107,6 @@ Authoritative, evergreen functional contracts organized by subsystem domain unde
 ### Specification Delta Promotion
 An automated knowledge elevation mechanism (`ce-ai spec promote` / `ce-ai archive --promote`) that extracts validated delta requirements from an OpenSpec change (`spec.md`) upon completion and incorporates them into the target living domain specification in `openspec/specs/` with atomic write guarantees (`write_atomic`) and change provenance annotations (`<!-- promoted-from: change:<name> date:<date> -->`).
 
+### Native Harness Adapter Pattern
+An architectural integration pattern where `ce-ai` interfaces with external AI coding harnesses (such as Copilot, Grok, Kimi, Cursor, Claude, Codex) through dedicated adapter modules (`src/harness/<name>.rs`) that manipulate native configuration formats (JSON, TOML, `mcp-config.json`, `mcp.json`) directly, respect tool-specific environment overrides (e.g. `$COPILOT_CONFIG_DIR`, `$GROK_HOME`, `$KIMI_CODE_HOME`), preserve unmanaged user custom plugins and MCP servers, and use thread-safe mutex guards (`HARNESS_ENV_LOCK`) for isolated parallel testing.
+
