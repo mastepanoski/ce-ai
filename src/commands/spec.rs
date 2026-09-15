@@ -493,6 +493,28 @@ pub fn extract_requirements_from_spec_md(content: &str) -> Vec<(String, String)>
     requirements
 }
 
+/// Locates `spec.md` for a change in either active changes or archive.
+pub fn find_change_spec_path(repo_root: &Path, change_name: &str) -> Option<PathBuf> {
+    let active_spec = repo_root
+        .join("openspec")
+        .join("changes")
+        .join(change_name)
+        .join("spec.md");
+    if active_spec.is_file() {
+        return Some(active_spec);
+    }
+    let archive_spec = repo_root
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join(change_name)
+        .join("spec.md");
+    if archive_spec.is_file() {
+        return Some(archive_spec);
+    }
+    None
+}
+
 /// Resolves the target domain for a change folder.
 pub fn resolve_change_target_domain(
     repo_root: &Path,
@@ -503,30 +525,9 @@ pub fn resolve_change_target_domain(
         return Ok(dom.to_string());
     }
 
-    // Check active changes
-    let active_spec = repo_root
-        .join("openspec")
-        .join("changes")
-        .join(change_name)
-        .join("spec.md");
-
-    let target_spec = if active_spec.is_file() {
-        active_spec
-    } else {
-        // Fallback to archive
-        repo_root
-            .join("openspec")
-            .join("changes")
-            .join("archive")
-            .join(change_name)
-            .join("spec.md")
-    };
-
-    if !target_spec.is_file() {
-        return Err(CeError::Usage(format!(
-            "cannot resolve spec.md for change '{change_name}'"
-        )));
-    }
+    let target_spec = find_change_spec_path(repo_root, change_name).ok_or_else(|| {
+        CeError::Usage(format!("cannot resolve spec.md for change '{change_name}'"))
+    })?;
 
     let content = fs::read_to_string(&target_spec)?;
     if let Ok(meta) = parse_domain_spec_metadata(&content) {
@@ -561,22 +562,9 @@ pub fn promote_delta_to_domain_spec(
 ) -> Result<PromoteOutcome, CeError> {
     let target_domain = resolve_change_target_domain(repo_root, change_name, domain_override)?;
 
-    let active_spec = repo_root
-        .join("openspec")
-        .join("changes")
-        .join(change_name)
-        .join("spec.md");
-
-    let source_spec = if active_spec.is_file() {
-        active_spec
-    } else {
-        repo_root
-            .join("openspec")
-            .join("changes")
-            .join("archive")
-            .join(change_name)
-            .join("spec.md")
-    };
+    let source_spec = find_change_spec_path(repo_root, change_name).ok_or_else(|| {
+        CeError::Usage(format!("cannot resolve spec.md for change '{change_name}'"))
+    })?;
 
     let spec_content = fs::read_to_string(&source_spec)?;
     let requirements = extract_requirements_from_spec_md(&spec_content);
