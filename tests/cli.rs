@@ -8741,3 +8741,127 @@ THEN write atomically.
     let state_spec = fs::read_to_string(state_spec_path).unwrap();
     assert!(state_spec.contains("R1. Atomic State Profiles"));
 }
+
+#[test]
+fn test_cli_doc_stats_and_cluster() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let proj = tmp.path().join("project");
+    let sol_dir = proj.join("docs").join("solutions").join("database");
+    fs::create_dir_all(&sol_dir).unwrap();
+
+    for i in 1..=3 {
+        let content = format!(
+            r#"---
+title: "Postgres Connection Pool Saturation Part {i}"
+category: "database"
+tags: [postgres, pool, saturation]
+components: [src/db/pool.rs]
+date: "2026-09-0{i}"
+---
+
+# Details
+"#
+        );
+        fs::write(sol_dir.join(format!("postgres-{i}.md")), content).unwrap();
+    }
+
+    // 1. ce-ai doc stats (human output)
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "stats"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "Solution Library Inventory & Statistics",
+        ))
+        .stdout(predicates::str::contains("Total Solutions: 3"))
+        .stdout(predicates::str::contains("database"))
+        .stdout(predicates::str::contains("postgres"));
+
+    // 2. ce-ai doc stats --json
+    let assert_json = ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "stats", "--json"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(assert_json.get_output().stdout.clone()).unwrap();
+    let stats: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(stats["total_solutions"], 3);
+
+    // 3. ce-ai doc cluster
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "cluster", "--min-size", "3"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Solution Library Clustering"))
+        .stdout(predicates::str::contains("3 solutions"))
+        .stdout(predicates::str::contains("/ce-compound-refresh"));
+
+    // 4. ce-ai doc cluster --json
+    let cluster_json = ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "cluster", "--min-size", "3", "--json"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(cluster_json.get_output().stdout.clone()).unwrap();
+    let report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["total_solutions"], 3);
+    assert_eq!(report["clusters_count"], 1);
+    assert_eq!(report["clustered_solutions_count"], 3);
+}
+
+#[test]
+fn test_cli_doc_lint_and_refresh() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let proj = tmp.path().join("project");
+    let sol_dir = proj.join("docs").join("solutions").join("api");
+    fs::create_dir_all(&sol_dir).unwrap();
+
+    // Valid solution
+    let valid_content = r#"---
+title: "REST API Versioning Strategy"
+module: "api"
+tags: [rest, api, versioning]
+components: [src/api.rs]
+date: "2026-09-10"
+---
+
+# Content
+"#;
+    fs::write(sol_dir.join("versioning.md"), valid_content).unwrap();
+
+    // Solution missing frontmatter
+    let invalid_content = "# No frontmatter here\n";
+    fs::write(sol_dir.join("invalid.md"), invalid_content).unwrap();
+
+    // 1. ce-ai doc lint (non-strict -> warnings, exit 0)
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "lint"])
+        .assert()
+        .success()
+        .stderr(predicates::str::contains("missing required field(s)"));
+
+    // 2. ce-ai doc lint --strict (strict -> exit code 6 CeError::Verification)
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "lint", "--strict"])
+        .assert()
+        .code(6)
+        .stderr(predicates::str::contains("missing required field(s)"));
+
+    // 3. ce-ai doc refresh --dry-run
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "refresh", "api", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "Solution Refresh & Consolidation Plan",
+        ))
+        .stdout(predicates::str::contains("mode: dry-run"))
+        .stdout(predicates::str::contains("/ce-compound-refresh api"));
+}

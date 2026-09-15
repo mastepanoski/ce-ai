@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.57.0] - 2026-09-15
+
+### Added
+- **Solution Library Refresh, Clustering & Deduplication Engine (`ce-ai doc`):**
+  - **Pairwise Similarity & Semantic Clustering (`ce-ai doc cluster`)**: Evaluates multi-dimensional Jaccard similarity across frontmatter tags (0.35), component paths (0.25), normalized title tokens (0.25), and category affinity (0.15) to group related solutions into connected consolidation clusters (>= 3 documents with >= 0.40 similarity).
+  - **Refresh Directive Generation (`ce-ai doc refresh`)**: Audits specific scopes or auto-detects high-density clusters and outputs structured candidate lists with actionable directives for the agent skill `/ce-compound-refresh <scope>`.
+  - **Standalone Solution Linter (`ce-ai doc lint`)**: Fast CLI wrapper around `probe_solution_drift` verifying YAML frontmatter completeness and checking for dead source code references with `--strict` non-zero exit code enforcement.
+  - **Inventory Statistics Reporting (`ce-ai doc stats`)**: Provides comprehensive reporting of total solution counts, category distributions, top tag frequencies, and cluster counts in human-readable and `--json` formats.
+  - **Doctor Health Probe Integration (`probe_solution_clusters`)**: Non-blocking advisory diagnostic in `ce-ai doctor` notifying developers and agents when dense topic clusters accumulate in `docs/solutions/`.
+
 ## [1.56.0] - 2026-09-15
 
 ### Added
