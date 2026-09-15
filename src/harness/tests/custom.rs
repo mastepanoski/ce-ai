@@ -260,7 +260,7 @@ fn register_and_unregister_custom_mcp_server() {
         json2["mcpServers"]["codegraph"],
         serde_json::json!({
             "command": "codegraph",
-            "args": ["mcp"],
+            "args": ["serve", "--mcp"],
             "env": {}
         })
     );
@@ -268,7 +268,7 @@ fn register_and_unregister_custom_mcp_server() {
         json2["mcpServers"]["engram"],
         serde_json::json!({
             "command": "engram",
-            "args": ["serve"],
+            "args": ["mcp", "--tools=agent"],
             "env": {}
         })
     );

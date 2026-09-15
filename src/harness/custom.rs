@@ -388,8 +388,20 @@ pub fn register_custom_mcp_server(
 /// Registers companion MCP servers (`codegraph`, `engram`) into the custom MCP file.
 pub fn register_companions(mcp_file: &Path) -> Result<(), CeError> {
     let env = std::collections::BTreeMap::new();
-    register_custom_mcp_server(mcp_file, "codegraph", "codegraph", &["mcp"], &env)?;
-    register_custom_mcp_server(mcp_file, "engram", "engram", &["serve"], &env)?;
+    register_custom_mcp_server(
+        mcp_file,
+        "codegraph",
+        "codegraph",
+        &["serve", "--mcp"],
+        &env,
+    )?;
+    register_custom_mcp_server(
+        mcp_file,
+        "engram",
+        "engram",
+        &["mcp", "--tools=agent"],
+        &env,
+    )?;
     Ok(())
 }
 
