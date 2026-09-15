@@ -550,7 +550,10 @@ pub fn evaluate_ship_readiness(
         None => gaps.push(ShipReadinessGap::ReviewReceiptMissing),
         Some(r) => {
             if let Some(current) = head_sha {
-                if !current.is_empty() && r.head_sha != current {
+                let matches = r.head_sha == current
+                    || (current.len() >= 7 && r.head_sha.starts_with(current))
+                    || (r.head_sha.len() >= 7 && current.starts_with(&r.head_sha));
+                if !current.is_empty() && !matches {
                     gaps.push(ShipReadinessGap::ReviewReceiptStale);
                 }
             }

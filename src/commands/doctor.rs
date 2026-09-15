@@ -700,7 +700,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     if commits_ahead > 0 && state.is_project_adopted(&repo_root) {
         let (_, dirty) = crate::commands::workflow::probe_git_dirty_files(&repo_root);
         let stage6 = crate::commands::workflow::probe_stage6_artifact(&repo_root, &dirty);
-        let head_sha = crate::commands::workflow::probe_git_head_sha(&repo_root);
+        let head_sha = crate::commands::workflow::probe_git_head_full_sha(&repo_root);
         let receipt = state.review_receipt_for_branch(&repo_root, branch.as_deref());
         let stage = current_wf.as_ref().map(|w| w.stage).unwrap_or_default();
         for gap in crate::commands::workflow::evaluate_ship_readiness(
