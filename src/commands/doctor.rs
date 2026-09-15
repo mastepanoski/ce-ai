@@ -687,6 +687,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         );
     }
 
+    // Living System Specifications Health Probe (living-system-specs-promotion)
+    let spec_warnings = crate::commands::spec::probe_specs_health(&repo_root);
+    for warn in &spec_warnings {
+        println!("doctor-warn: {warn}");
+    }
+
     // Observe-only Ship-readiness probe (Issue #354): Stage 6 + code-review gaps.
     // Non-fatal: never added to `findings`, exit code unaffected. Only runs for
     // adopted workspaces to avoid noise on unrelated repositories.

@@ -5,6 +5,19 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.56.0] - 2026-09-15
+
+### Added
+- **Living System Specifications & Delta Promotion Engine (`ce-ai spec`):**
+  - **Living Domain Contracts (`openspec/specs/`)**: Established canonical, schema-validated domain specifications covering all core subsystems: `harnesses`, `workflow`, `doctor`, `state`, `archive`, `gate`, and `project-adoption`.
+  - **CLI Command Suite (`ce-ai spec`)**:
+    - `ce-ai spec list`: Formatted table and `--json` view of all living domain specs, versions, last updated timestamps, and requirement counts.
+    - `ce-ai spec show <domain>`: Inspects the full authoritative contract for any functional domain.
+    - `ce-ai spec validate`: Rigorous schema validator enforcing YAML frontmatter compliance, domain-to-filename correspondence, and required capabilities sections.
+    - `ce-ai spec promote <change>`: Extracts validated RFC 2119 requirements from an OpenSpec change (`spec.md`) and incorporates them into the target living domain spec with atomic write guarantees (`write_atomic`) and provenance annotations.
+  - **Archive Promotion Integration (`ce-ai archive --promote`)**: Extends change archival with automated requirement promotion into living domain specifications.
+  - **Doctor Health Probe Integration (`probe_specs_health`)**: Non-blocking diagnostics in `ce-ai doctor` auditing domain specification existence, schema validity, and active change domain mappings.
+
 ## [1.55.1] - 2026-09-15
 
 ### Fixed

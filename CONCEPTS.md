@@ -101,3 +101,9 @@ A retention and repository hygiene mechanism (`ce-ai archive compact` / `ce-ai w
 ### Milestone Rollup
 A synthesized, human- and machine-readable markdown digest (`openspec/changes/archive/milestones/<milestone>.md`) produced during archive compaction. It catalogs historical features by quarter or named milestone, providing structured executive summaries, task progress ratios, problem statements, and key acceptance criteria, linked directly to the companion compressed raw archive tarball and registered in `openspec/changes/archive/README.md`.
 
+### Living System Specifications
+Authoritative, evergreen functional contracts organized by subsystem domain under `openspec/specs/<domain>.md` (`harnesses`, `workflow`, `doctor`, `state`, `archive`, `gate`, `project-adoption`). While change folders represent transient delta proposals, living domain specifications document what the system currently is and how it behaves, adhering to strict schema rules validated via `ce-ai spec validate` and `ce-ai doctor`.
+
+### Specification Delta Promotion
+An automated knowledge elevation mechanism (`ce-ai spec promote` / `ce-ai archive --promote`) that extracts validated delta requirements from an OpenSpec change (`spec.md`) upon completion and incorporates them into the target living domain specification in `openspec/specs/` with atomic write guarantees (`write_atomic`) and change provenance annotations (`<!-- promoted-from: change:<name> date:<date> -->`).
+

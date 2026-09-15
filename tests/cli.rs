@@ -8513,3 +8513,231 @@ fn test_cli_archive_compact_lifecycle() {
         ))
         .stdout(predicates::str::contains("Milestone '2026-Q3'"));
 }
+
+#[test]
+fn test_cli_spec_list_show_validate() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let proj = tmp.path().join("project");
+    let specs_dir = proj.join("openspec").join("specs");
+    fs::create_dir_all(&specs_dir).unwrap();
+
+    let harness_spec = r#"---
+title: "Harness Integration Spec"
+domain: harnesses
+version: 1.0.0
+last_updated: "2026-09-15"
+---
+
+# Specification: Harness Integration
+
+## 2. Capabilities & Requirements
+
+### R1. Multi-Harness Discovery
+WHEN ce-ai runs
+THEN detect active harnesses.
+"#;
+
+    let doctor_spec = r#"---
+title: "Doctor Diagnostic Engine"
+domain: doctor
+version: 1.1.0
+last_updated: "2026-09-15"
+---
+
+# Specification: Doctor
+
+## 2. Capabilities & Requirements
+
+### R1. Health Checks
+WHEN doctor is invoked
+THEN evaluate system probes.
+"#;
+
+    fs::write(specs_dir.join("harnesses.md"), harness_spec).unwrap();
+    fs::write(specs_dir.join("doctor.md"), doctor_spec).unwrap();
+
+    // 1. ce-ai spec list (tabular)
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["spec", "list"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("doctor"))
+        .stdout(predicates::str::contains("harnesses"))
+        .stdout(predicates::str::contains(
+            "Total: 2 domain specification(s)",
+        ));
+
+    // 2. ce-ai spec list --json
+    let assert_json = ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["spec", "list", "--json"])
+        .assert()
+        .success();
+    let stdout_bytes = assert_json.get_output().stdout.clone();
+    let val: serde_json::Value = serde_json::from_slice(&stdout_bytes).unwrap();
+    assert_eq!(val.as_array().unwrap().len(), 2);
+
+    // 3. ce-ai spec show <domain>
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["spec", "show", "harnesses"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "Specification: Harness Integration",
+        ))
+        .stdout(predicates::str::contains("Multi-Harness Discovery"));
+
+    // 4. ce-ai spec show non-existent -> Exit 2 Usage
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["spec", "show", "non-existent"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicates::str::contains(
+            "domain specification 'non-existent' not found",
+        ));
+
+    // 5. ce-ai spec validate -> Exit 0
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["spec", "validate"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "all 2 domain specification(s) valid",
+        ));
+}
+
+#[test]
+fn test_cli_spec_promote_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let proj = tmp.path().join("project");
+    let change_dir = proj.join("openspec").join("changes").join("feat-delta");
+    let specs_dir = proj.join("openspec").join("specs");
+    fs::create_dir_all(&change_dir).unwrap();
+    fs::create_dir_all(&specs_dir).unwrap();
+
+    let change_spec = r#"---
+title: "Delta Feature"
+domain: harnesses
+---
+
+# Specification: Delta Feature
+
+## Requirements
+
+### R1. Dynamic Harness Discovery
+WHEN a new harness directory is observed
+THEN automatically register it.
+"#;
+    fs::write(change_dir.join("spec.md"), change_spec).unwrap();
+
+    let existing_domain_spec = r#"---
+title: "Harness Integration"
+domain: harnesses
+version: 1.0.0
+last_updated: "2026-01-01"
+---
+
+# Specification: Harness Integration
+
+## 2. Capabilities & Requirements
+
+### R0. Static Registration
+WHEN installed
+THEN register statically.
+"#;
+    fs::write(specs_dir.join("harnesses.md"), existing_domain_spec).unwrap();
+
+    // 1. Dry run
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["spec", "promote", "feat-delta", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "dry-run: would promote 1 requirement(s) from change 'feat-delta' into domain spec 'harnesses'",
+        ));
+
+    let content_dry = fs::read_to_string(specs_dir.join("harnesses.md")).unwrap();
+    assert!(!content_dry.contains("Dynamic Harness Discovery"));
+
+    // 2. Real promote
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["spec", "promote", "feat-delta"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "spec promote: successfully promoted 1 requirement(s) from 'feat-delta' into 'harnesses'",
+        ));
+
+    let content_promoted = fs::read_to_string(specs_dir.join("harnesses.md")).unwrap();
+    assert!(content_promoted.contains("R1. Dynamic Harness Discovery"));
+    assert!(content_promoted.contains("<!-- promoted-from: change:feat-delta"));
+}
+
+#[test]
+fn test_cli_archive_with_promote() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let proj = tmp.path().join("project");
+    let change_dir = proj
+        .join("openspec")
+        .join("changes")
+        .join("feat-arch-promo");
+    let specs_dir = proj.join("openspec").join("specs");
+    fs::create_dir_all(&change_dir).unwrap();
+    fs::create_dir_all(&specs_dir).unwrap();
+
+    // Write tasks (100% completed)
+    let tasks_md = "- [x] Task 1: Complete implementation\n";
+    fs::write(change_dir.join("tasks.md"), tasks_md).unwrap();
+
+    // Write spec.md with domain: state
+    let spec_md = r#"---
+title: "State Profiles"
+domain: state
+---
+
+# Specification
+
+## Requirements
+
+### R1. Atomic State Profiles
+WHEN profile is saved
+THEN write atomically.
+"#;
+    fs::write(change_dir.join("spec.md"), spec_md).unwrap();
+
+    // Run ce-ai archive with --promote
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["archive", "feat-arch-promo", "--promote"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("archived:"))
+        .stdout(predicates::str::contains(
+            "promoted: 1 requirement(s) from 'feat-arch-promo' into openspec/specs/state.md",
+        ));
+
+    // Verify archived folder exists
+    let archive_dir = proj
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join("feat-arch-promo");
+    assert!(archive_dir.join("tasks.md").exists());
+    assert!(!change_dir.exists());
+
+    // Verify domain spec was created/updated
+    let state_spec_path = specs_dir.join("state.md");
+    assert!(state_spec_path.exists());
+    let state_spec = fs::read_to_string(state_spec_path).unwrap();
+    assert!(state_spec.contains("R1. Atomic State Profiles"));
+}
