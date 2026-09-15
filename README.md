@@ -53,7 +53,7 @@ ce-ai doctor
 | `ce-ai upgrade --to <tag>` | Upgrade the plugin to a release tag | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
 | `ce-ai models set/list/profile …` | Assign models per agent slot, snapshot profiles | [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) |
 | `ce-ai uninstall --harness <name>` | Restore pre-install configuration cleanly | [Backup & Uninstall](docs/user-guide/backup-and-uninstall.md) |
-| `ce-ai archive [compact]` | Archive completed features and roll up historical changes | — |
+| `ce-ai archive` / `ce-ai spec` | Archive features, roll up history & manage living specs | — |
 | `ce-ai self-update` | Update ce-ai CLI binary to latest release | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
 
 ## Documentation Map
@@ -77,7 +77,7 @@ ce-ai doctor
 | 🎮 [FSM & Checkpoints Masterclass](docs/user-guide/fsm-and-checkpoints-explained.md) | **Senior** | Explanation — 7-stage cycle, savegames, sub-loops |
 | ⚖️ [Checkpoints vs. Memory & Planning Files](docs/user-guide/checkpoints-vs-memory-explained.md) | **Beginner** | Explanation — why checkpoints are a validated CLI write, not an Engram/handoff note or a `task_progress.md` |
 | 🧭 [Workflow Panel: Native vs Agent Skills](docs/user-guide/workflow-panel-native-vs-agent-skills.md) | **Beginner** | Explanation — why the TUI dashboard runs some actions and only points to others |
-| 📐 [OpenSpec specifications](openspec/changes/archive/ce-ai/) | **Senior** | Reference — archived SSOT package: proposal, exploration, design, spec, tasks |
+| 📐 [OpenSpec specifications](openspec/specs/) | **Senior** | Reference — living system specifications & domain contracts |
 | 🧠 [Solutions Library](docs/solutions/) · [Plans & Audits](docs/plans/) | Contributor | Reference — solved problems, architecture decisions, delivery history |
 
 ## Security, Governance & Quality Gates

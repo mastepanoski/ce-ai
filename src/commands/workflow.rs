@@ -95,6 +95,14 @@ pub struct ArchiveArgs {
     /// Criterion 2 STATUS attestation for features with incomplete tasks.
     #[arg(long)]
     pub status: Option<String>,
+
+    /// Automatically promote delta requirements into target domain spec during archival.
+    #[arg(long, default_value_t = false)]
+    pub promote: bool,
+
+    /// Target domain spec override for specification promotion.
+    #[arg(long)]
+    pub domain: Option<String>,
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
@@ -542,7 +550,10 @@ pub fn evaluate_ship_readiness(
         None => gaps.push(ShipReadinessGap::ReviewReceiptMissing),
         Some(r) => {
             if let Some(current) = head_sha {
-                if !current.is_empty() && r.head_sha != current {
+                let matches = r.head_sha == current
+                    || (current.len() >= 7 && r.head_sha.starts_with(current))
+                    || (r.head_sha.len() >= 7 && current.starts_with(&r.head_sha));
+                if !current.is_empty() && !matches {
                     gaps.push(ShipReadinessGap::ReviewReceiptStale);
                 }
             }
@@ -2117,6 +2128,30 @@ pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
                 }
             }
         }
+
+        if args.promote {
+            for o in &outcomes {
+                match crate::commands::spec::promote_delta_to_domain_spec(
+                    &repo_root,
+                    &o.feature,
+                    args.domain.as_deref(),
+                    true,
+                ) {
+                    Ok(promo) => {
+                        println!(
+                            "  [dry-run] would promote {} requirement(s) from '{}' into domain spec '{}'",
+                            promo.requirements_promoted, promo.change, promo.domain
+                        );
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "warning: [dry-run] failed to preview promotion for '{}': {err}",
+                            o.feature
+                        );
+                    }
+                }
+            }
+        }
         println!("dry-run: 0 filesystem mutations applied");
         return Ok(());
     }
@@ -2125,6 +2160,30 @@ pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
 
     let archived_names: Vec<String> = outcomes.iter().map(|o| o.feature.clone()).collect();
     reconcile_state_active_feature(ctx, &archived_names, false)?;
+
+    if args.promote {
+        for o in &outcomes {
+            match crate::commands::spec::promote_delta_to_domain_spec(
+                &repo_root,
+                &o.feature,
+                args.domain.as_deref(),
+                false,
+            ) {
+                Ok(promo) => {
+                    println!(
+                        "promoted: {} requirement(s) from '{}' into openspec/specs/{}.md",
+                        promo.requirements_promoted, o.feature, promo.domain
+                    );
+                }
+                Err(err) => {
+                    eprintln!(
+                        "warning: failed to promote requirements for '{}': {err}",
+                        o.feature
+                    );
+                }
+            }
+        }
+    }
 
     if outcomes.len() == 1 {
         let o = &outcomes[0];

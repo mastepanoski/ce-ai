@@ -687,6 +687,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         );
     }
 
+    // Living System Specifications Health Probe (living-system-specs-promotion)
+    let spec_warnings = crate::commands::spec::probe_specs_health(&repo_root);
+    for warn in &spec_warnings {
+        println!("doctor-warn: {warn}");
+    }
+
     // Observe-only Ship-readiness probe (Issue #354): Stage 6 + code-review gaps.
     // Non-fatal: never added to `findings`, exit code unaffected. Only runs for
     // adopted workspaces to avoid noise on unrelated repositories.
@@ -694,7 +700,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     if commits_ahead > 0 && state.is_project_adopted(&repo_root) {
         let (_, dirty) = crate::commands::workflow::probe_git_dirty_files(&repo_root);
         let stage6 = crate::commands::workflow::probe_stage6_artifact(&repo_root, &dirty);
-        let head_sha = crate::commands::workflow::probe_git_head_sha(&repo_root);
+        let head_sha = crate::commands::workflow::probe_git_head_full_sha(&repo_root);
         let receipt = state.review_receipt_for_branch(&repo_root, branch.as_deref());
         let stage = current_wf.as_ref().map(|w| w.stage).unwrap_or_default();
         for gap in crate::commands::workflow::evaluate_ship_readiness(

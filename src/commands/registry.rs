@@ -81,6 +81,8 @@ pub enum Commands {
     Gate(gate::GateCommands),
     /// Archive completed OpenSpec change packages to openspec/changes/archive/ (alias for workflow archive).
     Archive(crate::commands::workflow::ArchiveArgs),
+    /// Manage living system specifications in openspec/specs/.
+    Spec(crate::commands::spec::SpecArgs),
 }
 
 impl CeCommand for Commands {
@@ -113,6 +115,7 @@ impl CeCommand for Commands {
             Commands::Gate(cmd) => match cmd {
                 gate::GateCommands::Check(args) => gate::run_gate_check(ctx, args),
             },
+            Commands::Spec(args) => crate::commands::spec::run_spec(ctx, args),
         }
     }
 }

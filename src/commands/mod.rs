@@ -14,6 +14,7 @@ pub mod models;
 pub mod registry;
 pub mod self_update;
 pub mod skills;
+pub mod spec;
 pub mod status;
 pub mod sync;
 pub mod tools;
