@@ -1442,7 +1442,8 @@ pub fn run_graduate(ctx: &Context, args: &GraduateArgs) -> Result<(), CeError> {
     let rel_source = source_file
         .strip_prefix(&repo_root)
         .unwrap_or(&source_file)
-        .display();
+        .to_string_lossy()
+        .replace('\\', "/");
     let problem_text = if parsed.problem_statement.is_empty() {
         "No problem statement provided in ODD task brief."
     } else {
