@@ -947,3 +947,94 @@ fn test_doc_hygiene_helper_fallback() {
     assert!(!state_with.doc_hygiene().require_solution_frontmatter);
     assert_eq!(state_with.doc_hygiene().archive_compaction_threshold, 15);
 }
+
+#[test]
+fn test_execution_mode_parse_and_display() {
+    use crate::state::state::ExecutionMode;
+
+    assert_eq!(ExecutionMode::parse("auto").unwrap(), ExecutionMode::Auto);
+    assert_eq!(
+        ExecutionMode::parse("organic").unwrap(),
+        ExecutionMode::Organic
+    );
+    assert_eq!(ExecutionMode::parse("odd").unwrap(), ExecutionMode::Organic);
+    assert_eq!(ExecutionMode::parse("ODD").unwrap(), ExecutionMode::Organic);
+    assert_eq!(
+        ExecutionMode::parse("compound").unwrap(),
+        ExecutionMode::Compound
+    );
+    assert_eq!(ExecutionMode::parse("ce").unwrap(), ExecutionMode::Compound);
+    assert_eq!(
+        ExecutionMode::parse("openspec").unwrap(),
+        ExecutionMode::Compound
+    );
+    assert!(ExecutionMode::parse("invalid-mode").is_err());
+
+    assert_eq!(ExecutionMode::Auto.as_str(), "auto");
+    assert_eq!(ExecutionMode::Organic.as_str(), "organic");
+    assert_eq!(ExecutionMode::Compound.as_str(), "compound");
+    assert_eq!(format!("{}", ExecutionMode::Organic), "organic");
+}
+
+#[test]
+fn test_workflow_state_execution_mode_serialization_roundtrip() {
+    use crate::state::state::{ExecutionMode, WorkflowSource, WorkflowStage, WorkflowState};
+
+    let wf = WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: "Fix parser bug".to_string(),
+        feature_name: Some("fix-parser".to_string()),
+        updated_at: "2026-09-16T12:00:00Z".to_string(),
+        source: WorkflowSource::Manual,
+        resolution: None,
+        new_cycle: false,
+        execution_mode: Some(ExecutionMode::Organic),
+    };
+
+    let json = serde_json::to_string(&wf).unwrap();
+    assert!(json.contains(r#""execution_mode":"organic""#));
+
+    let deserialized: WorkflowState = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.execution_mode, Some(ExecutionMode::Organic));
+
+    // Deserializing legacy JSON without execution_mode field
+    let legacy_json = r#"{
+        "stage": "worktdd",
+        "task": "Legacy task",
+        "updated_at": "2026-09-16T12:00:00Z",
+        "source": "manual",
+        "new_cycle": false
+    }"#;
+    let legacy_wf: WorkflowState = serde_json::from_str(legacy_json).unwrap();
+    assert_eq!(legacy_wf.execution_mode, None);
+}
+
+#[test]
+fn test_state_set_execution_mode_for_branch() {
+    use crate::state::state::{ExecutionMode, State, WorkflowStage};
+    use std::path::Path;
+
+    let root = Path::new("/workspace/test");
+    let mut state = State::new();
+    state
+        .validate_and_set_workflow_for_branch(
+            root,
+            Some("fix/parser"),
+            WorkflowStage::Ideation,
+            "fixing parser",
+            Some("fix-parser".to_string()),
+            crate::state::state::WorkflowSource::Manual,
+        )
+        .unwrap();
+
+    let initial = state
+        .current_workflow_for_branch(root, Some("fix/parser"))
+        .unwrap();
+    assert_eq!(initial.execution_mode, None);
+
+    state.set_execution_mode_for_branch(root, Some("fix/parser"), Some(ExecutionMode::Organic));
+    let updated = state
+        .current_workflow_for_branch(root, Some("fix/parser"))
+        .unwrap();
+    assert_eq!(updated.execution_mode, Some(ExecutionMode::Organic));
+}

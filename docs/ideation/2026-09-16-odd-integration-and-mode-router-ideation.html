@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ce-ai Ideation: ODD Integration, OpenSpec Coexistence &amp; Adaptive Mode Router</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-elevated: #21262d;
+      --surface-card: #1c2128;
+      --border: #30363d;
+      --border-accent: #388bfd;
+      --text: #c9d1d9;
+      --text-bright: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-glow: rgba(56, 139, 253, 0.15);
+      --success: #3fb950;
+      --warning: #d29922;
+      --danger: #f85149;
+      --purple: #bc8cff;
+      --cyan: #39c5cf;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 15px;
+      padding: 32px 20px 80px 20px;
+    }
+
+    .container { max-width: 1000px; margin: 0 auto; }
+
+    header.doc-header {
+      background: linear-gradient(180deg, var(--surface-card) 0%, var(--surface) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      margin-bottom: 36px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle { color: var(--text-muted); font-size: 15px; margin-bottom: 16px; }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .meta-item { display: flex; flex-direction: column; }
+    .meta-label {
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+    }
+    .meta-value { color: var(--text-bright); font-family: "JetBrains Mono", monospace; font-weight: 500; }
+
+    section { margin-bottom: 40px; }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h3 { font-size: 17px; font-weight: 600; color: var(--text-bright); margin-bottom: 8px; }
+
+    p { margin-bottom: 14px; }
+
+    .code-block {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+      overflow-x: auto;
+      margin-bottom: 16px;
+      color: #e6edf3;
+      line-height: 1.5;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      background-color: rgba(56, 139, 253, 0.08);
+      padding: 14px 18px;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      margin-bottom: 18px;
+      font-size: 14px;
+    }
+
+    .callout.tip {
+      border-left-color: var(--success);
+      background-color: rgba(63, 185, 80, 0.08);
+    }
+
+    .callout.warning {
+      border-left-color: var(--warning);
+      background-color: rgba(210, 153, 34, 0.08);
+    }
+
+    .callout.important {
+      border-left-color: var(--purple);
+      background-color: rgba(188, 140, 255, 0.08);
+    }
+
+    .nav-jump {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 24px;
+      padding: 14px;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+
+    .nav-jump a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 13px;
+      padding: 4px 10px;
+      background: var(--surface-card);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      transition: all 0.2s ease;
+    }
+
+    .nav-jump a:hover {
+      background: var(--border-accent);
+      color: #fff;
+    }
+
+    .idea-card {
+      background-color: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    .idea-card.rank-1 {
+      border-color: var(--accent);
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+
+    .idea-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .idea-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-bright);
+    }
+
+    .badges {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .badge-rank { background-color: var(--accent); color: #fff; }
+    .badge-axis { background-color: var(--surface-elevated); color: var(--cyan); border: 1px solid var(--border); }
+    .badge-conf { background-color: rgba(63, 185, 80, 0.2); color: var(--success); }
+    .badge-cx { background-color: rgba(188, 140, 255, 0.2); color: var(--purple); }
+
+    .idea-field {
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .field-label {
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 4px;
+    }
+
+    .basis-tag {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--surface-elevated);
+      color: var(--accent);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      font-size: 13.5px;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    th {
+      background-color: var(--surface);
+      color: var(--text-bright);
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) { background-color: rgba(255, 255, 255, 0.015); }
+
+    .diagram-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin: 18px 0;
+      overflow-x: auto;
+    }
+
+    svg.diagram {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header class="doc-header">
+    <h1>ce-ai Ideation: ODD Integration, OpenSpec Coexistence &amp; Adaptive Mode Router</h1>
+    <p class="subtitle">First-principles analysis: reconciling Gentle AI's Organic Driven Development (Problem + Guardrails + DoD) with ce-ai's Living Specifications &amp; Compound Flywheel.</p>
+    <div class="meta-grid">
+      <div class="meta-item">
+        <span class="meta-label">Date</span>
+        <span class="meta-value">2026-09-16</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Topic</span>
+        <span class="meta-value">odd-openspec-mode-router-analysis</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Focus</span>
+        <span class="meta-value">ODD vs SDD/OpenSpec, Living Contracts, Heuristic Router &amp; Rust code injection</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Mode</span>
+        <span class="meta-value">repo-grounded</span>
+      </div>
+    </div>
+  </header>
+
+  <section id="critical-clarification">
+    <h2>1. Clarification &amp; Philosophical Framing</h2>
+    
+    <div class="callout important">
+      <strong>Disentangling ce-ai from Gentle AI:</strong>
+      <code>ce-ai</code> is an entirely independent, clean-room Rust CLI and multi-harness manager. It was not built on top of Gentle AI's codebase. While both ecosystems can optionally utilize developer sidecars (such as Engram for memory, CodeGraph for AST indexing, Context7, or RTK), these tools are optional plugins in Gentle AI, and standalone companion sidecars in <code>ce-ai</code>. 
+    </div>
+
+    <h3>The Current Evolution of Gentle AI's ODD</h3>
+    <p>
+      Gentle AI's ODD (Organic Driven Development) has evolved to steer away from traditional, rigid <strong>Spec-Driven Development (SDD)</strong>.
+      Instead of demanding exhaustive, prescriptive upfront specification files before exploratory work begins, ODD relies on an agile triad:
+    </p>
+    <ul>
+      <li><strong>1. Problem Statement (Descripción del Problema):</strong> Articulating the actual failure, friction, or capability gap from the user/runtime perspective—without pre-coding the solution in prose.</li>
+      <li><strong>2. Constraints &amp; Guardrails (Restricciones y Límites):</strong> Defining the non-negotiable boundaries (security boundaries, API backwards-compatibility, memory ceilings, forbidden anti-patterns).</li>
+      <li><strong>3. Definition of Done (Criterios de Finalización / DoD):</strong> Clear, observable, empirical criteria that prove the problem is solved (e.g., specific test cases passing, zero drift, verified command exit codes).</li>
+    </ul>
+
+    <h3>Why This Causes Tension: Should ce-ai Question OpenSpec?</h3>
+    <p>
+      Gentle AI's departure from SDD raises a legitimate question: <em>If ODD moves away from heavy upfront specs, is OpenSpec in <code>ce-ai</code> an outdated ceremonial burden?</em>
+    </p>
+    <p>
+      The short answer is <strong>No, but its role must be properly partitioned</strong>:
+    </p>
+    <ul>
+      <li><strong>Why OpenSpec is irreplaceable in ce-ai:</strong> <code>ce-ai</code> governs production-grade AI agent operations under ISO/IEC 27001, ISO 42001, and NIST AI RMF standards. OpenSpec in <code>ce-ai</code> is <em>not</em> just a design document; it is a <strong>Living System of Record</strong>. It provides:
+        <ol style="margin-left: 20px; margin-top: 6px;">
+          <li><strong>Canonical System Specs (<code>openspec/specs/</code>):</strong> Persistent source of truth across sessions for system capabilities (<code>specs/workflow.md</code>, <code>specs/gate.md</code>, <code>specs/doctor.md</code>).</li>
+          <li><strong>Delta Ledgers (<code>openspec/changes/&lt;feature&gt;/</code>):</strong> Deterministic tracking that links git commits with work units (<code>tasks.md</code>), enabling reconciliation (<code>reconcile_tasks_with_git</code>) and automated spec promotion during archival (<code>ce-ai archive --promote</code>).</li>
+          <li><strong>Auditability &amp; Safety Gates:</strong> Hard invariants that prevent agents from wandering or hallucinating uncontrolled changes in multi-tenant or team repositories.</li>
+        </ol>
+      </li>
+      <li><strong>Where OpenSpec fails:</strong> When applied dogmatically to <em>every small task</em> (a 10-line bugfix, an isolated chore, an exploratory spike). Forcing 5 markdown files (<code>proposal.md</code>, <code>exploration.md</code>, <code>design.md</code>, <code>spec.md</code>, <code>tasks.md</code>) on a minor fix creates cognitive friction, burns tokens, and slows down development.</li>
+    </ul>
+
+    <div class="callout tip">
+      <strong>The Deep Synthesis:</strong>
+      ODD is the <em>Solutioning &amp; Tactical Engine</em> (Problem + Guardrails + DoD).<br>
+      OpenSpec is the <em>Architectural &amp; System-of-Record Engine</em> (Living Contracts + Delta Promotion).<br>
+      They are not competitors; they operate at different architectural altitudes.
+    </div>
+  </section>
+
+  <section id="axes">
+    <h2>2. Topic Axes (Surface Decomposition)</h2>
+    <ul>
+      <li><strong>Axis 1: Heuristic Mode Classification</strong> — Deterministic signals (zero LLM token cost) to route requests between ODD fast-path and OpenSpec compound flywheel.</li>
+      <li><strong>Axis 2: Artifact &amp; Ledger Coexistence</strong> — The contract between lightweight task tracking (<code>odd/tasks/</code> or single-file brief) and the formal living directory (<code>openspec/changes/</code>).</li>
+      <li><strong>Axis 3: Turn-0 &amp; Harness Hook Injection</strong> — How <code>ce-ai workflow resume</code> adapts the context banner during session start (<code>SessionStart</code>, <code>PreInvocation</code>).</li>
+      <li><strong>Axis 4: Gate Governance &amp; LOC Ceilings</strong> — How <code>src/commands/gate.rs</code> permits organic fast-path writes while strictly guarding against uncontracted architectural drift.</li>
+      <li><strong>Axis 5: The "Graduation Bridge"</strong> — The mechanical transition path when an organic task grows into a formal system specification change.</li>
+    </ul>
+  </section>
+
+  <section id="ranked-ideas">
+    <h2>3. Ranked Ideas &amp; Architectural Solutions</h2>
+
+    <div class="nav-jump">
+      <span style="font-size: 13px; color: var(--text-muted); align-self: center; margin-right: 4px;">Jump to:</span>
+      <a href="#idea-1">#1 Turn-0 Adaptive Mode Router (Deterministic)</a>
+      <a href="#idea-2">#2 The "Graduation Bridge" (ce-ai workflow graduate)</a>
+      <a href="#idea-3">#3 ODD Problem-Guardrail-DoD Brief Schema</a>
+      <a href="#idea-4">#4 Dual-Track Gate Engine in src/commands/gate.rs</a>
+      <a href="#idea-5">#5 Persistent Memory Alignment via Engram</a>
+    </div>
+
+    <!-- IDEA 1 -->
+    <div class="idea-card rank-1" id="idea-1">
+      <div class="idea-header">
+        <div class="idea-title">Idea 1: Turn-0 Adaptive Mode Router (Deterministic &amp; Heuristic)</div>
+        <div class="badges">
+          <span class="badge badge-rank">Rank #1</span>
+          <span class="badge badge-axis">Axis 1 &amp; 3</span>
+          <span class="badge badge-conf">Confidence: 96%</span>
+          <span class="badge badge-cx">Complexity: Med</span>
+        </div>
+      </div>
+
+      <div class="idea-field">
+        <div class="field-label">Description</div>
+        <p>
+          Implement a deterministic Mode Router directly inside <code>ce-ai workflow resume</code> and the Turn-0 session start hooks (Claude Code, Codex, Cursor, Antigravity <code>PreInvocation</code>).
+          <strong>Critique of LLM-based routers:</strong> Calling an LLM agent to route requests introduces 1.5–3.5s of latency, costs recurring tokens, and suffers from prompt hallucinations.
+          Instead, <code>ce-ai</code> evaluates the workspace state in under 5ms using deterministic heuristics:
+        </p>
+        <ol style="margin-left: 20px; margin-bottom: 12px;">
+          <li><strong>Explicit Flag/Override:</strong> <code>ce-ai workflow --mode [odd|compound]</code> or user prompt directive (<code>--odd</code> / <code>--compound</code>).</li>
+          <li><strong>Active OpenSpec Directory:</strong> If <code>openspec/changes/&lt;feature&gt;/</code> exists and is unresolved ➔ <strong>Compound Mode</strong> (enforces 7-stage workflow).</li>
+          <li><strong>Branch Taxonomy:</strong>
+            <ul>
+              <li><code>fix/*</code>, <code>chore/*</code>, <code>spike/*</code>, <code>test/*</code> ➔ <strong>ODD Mode</strong> (Fast-path: Problem + Guardrails + DoD).</li>
+              <li><code>feat/*</code>, <code>refactor/*</code>, <code>spec/*</code> ➔ <strong>Compound Mode</strong> (Formal OpenSpec contract required).</li>
+            </ul>
+          </li>
+          <li><strong>Project Adoption Tier:</strong> <code>AdoptionTier::Minimal</code> defaults to ODD mode; <code>AdoptionTier::Full</code> defaults to Compound mode.</li>
+        </ol>
+      </div>
+
+      <div class="diagram-container">
+        <svg class="diagram" viewBox="0 0 900 240" width="900" height="240" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="10" width="880" height="220" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+          
+          <!-- Event -->
+          <rect x="30" y="80" width="140" height="65" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="2"/>
+          <text x="100" y="107" fill="#f0f6fc" font-size="13" font-weight="700" text-anchor="middle" font-family="Inter, sans-serif">Harness Turn-0</text>
+          <text x="100" y="125" fill="#8b949e" font-size="11" text-anchor="middle" font-family="JetBrains Mono, monospace">ce-ai workflow resume</text>
+
+          <path d="M 170 112 L 230 112" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+          <!-- Heuristic Evaluator -->
+          <rect x="230" y="45" width="240" height="135" rx="8" fill="#1c2128" stroke="#bc8cff" stroke-width="2"/>
+          <text x="350" y="75" fill="#f0f6fc" font-size="14" font-weight="700" text-anchor="middle" font-family="Inter, sans-serif">Deterministic Classifier</text>
+          <text x="350" y="98" fill="#39c5cf" font-size="11" text-anchor="middle" font-family="JetBrains Mono, monospace">&lt; 5ms / 0 Token Overhead</text>
+          <text x="350" y="122" fill="#8b949e" font-size="11" text-anchor="middle" font-family="Inter, sans-serif">• Branch prefix (fix/ vs feat/)</text>
+          <text x="350" y="140" fill="#8b949e" font-size="11" text-anchor="middle" font-family="Inter, sans-serif">• Active openspec/changes/</text>
+          <text x="350" y="158" fill="#8b949e" font-size="11" text-anchor="middle" font-family="Inter, sans-serif">• Adoption Tier &amp; LOC delta</text>
+
+          <!-- Branch arrows -->
+          <path d="M 470 85 L 530 55" stroke="#3fb950" stroke-width="2"/>
+          <path d="M 470 140 L 530 170" stroke="#58a6ff" stroke-width="2"/>
+
+          <!-- ODD Output -->
+          <rect x="530" y="20" width="340" height="75" rx="8" fill="#21262d" stroke="#3fb950" stroke-width="1.5"/>
+          <text x="545" y="45" fill="#3fb950" font-size="13" font-weight="700" font-family="Inter, sans-serif">Mode: ODD (Organic Fast-Path)</text>
+          <text x="545" y="65" fill="#c9d1d9" font-size="11" font-family="Inter, sans-serif">• Triad: Problem + Guardrails + DoD</text>
+          <text x="545" y="82" fill="#8b949e" font-size="11" font-family="JetBrains Mono, monospace">• No OpenSpec ceremony required (&lt;200 LOC)</text>
+
+          <!-- CE Output -->
+          <rect x="530" y="135" width="340" height="75" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
+          <text x="545" y="160" fill="#58a6ff" font-size="13" font-weight="700" font-family="Inter, sans-serif">Mode: Compound (Living Specification)</text>
+          <text x="545" y="180" fill="#c9d1d9" font-size="11" font-family="Inter, sans-serif">• OpenSpec Delta Ledger &amp; Spec Promotion</text>
+          <text x="545" y="197" fill="#8b949e" font-size="11" font-family="JetBrains Mono, monospace">• 7-Stage FSM Gate &amp; Code Review Receipt</text>
+
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#58a6ff"/>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+
+      <div class="idea-field">
+        <div class="field-label">Concrete Injection Points in Rust Codebase</div>
+        <div class="code-block">
+// 1. src/state/state.rs: Add WorkflowMode to State
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ExecutionMode {
+    #[default]
+    Auto,      // Resolved dynamically by heuristics
+    Organic,   // ODD Fast-Path (Problem + Guardrails + DoD)
+    Compound,  // Full 7-stage OpenSpec Flywheel
+}
+
+// 2. src/commands/workflow.rs: Probe and inject inside resume_lines()
+pub fn probe_execution_mode(repo_root: &Path, branch: Option<&str>, wf: &Option<WorkflowState>, tier: AdoptionTier) -> ExecutionMode {
+    if let Some(w) = wf {
+        if w.stage >= WorkflowStage::OpenSpec && w.stage < WorkflowStage::GitShipping {
+            return ExecutionMode::Compound;
+        }
+    }
+    let openspec_dir = repo_root.join("openspec").join("changes");
+    if openspec_dir.is_dir() && has_active_unarchived_change(&openspec_dir) {
+        return ExecutionMode::Compound;
+    }
+    if let Some(b) = branch {
+        if b.starts_with("fix/") || b.starts_with("chore/") || b.starts_with("spike/") {
+            return ExecutionMode::Organic;
+        }
+        if b.starts_with("feat/") || b.starts_with("spec/") {
+            return ExecutionMode::Compound;
+        }
+    }
+    match tier {
+        AdoptionTier::Minimal => ExecutionMode::Organic,
+        _ => ExecutionMode::Compound,
+    }
+}
+        </div>
+      </div>
+
+      <div class="idea-field">
+        <div class="field-label">Basis &amp; Rationale</div>
+        <p>
+          <span class="basis-tag">direct: src/commands/workflow.rs:355-470</span>:
+          <code>resume_lines()</code> is already executed by hooks on every single agent turn start.
+          Enhancing it to inject the appropriate guidance (ODD prompt for bugfixes/chores; Compound FSM for features) eliminates user decision fatigue without introducing external routing overhead.
+        </p>
+      </div>
+    </div>
+
+    <!-- IDEA 2 -->
+    <div class="idea-card" id="idea-2">
+      <div class="idea-header">
+        <div class="idea-title">Idea 2: The "Graduation Bridge" (ce-ai workflow graduate)</div>
+        <div class="badges">
+          <span class="badge badge-axis">Axis 2 &amp; 5</span>
+          <span class="badge badge-conf">Confidence: 92%</span>
+          <span class="badge badge-cx">Complexity: Low</span>
+        </div>
+      </div>
+
+      <div class="idea-field">
+        <div class="field-label">Description</div>
+        <p>
+          A common failure mode in organic workflows is that a task begins as a simple exploratory spike or quick fix, but exploration reveals an architectural cross-cutting change touching multiple sub-modules.
+          Under pure ODD, the developer either cuts corners to keep it informal, or has to manually stop, copy-paste notes, and write an OpenSpec package from scratch.
+        </p>
+        <p>
+          <code>ce-ai</code> should provide a native graduation command:
+          <code>ce-ai workflow graduate &lt;feature-name&gt;</code>.
+          This command ingests the active ODD task file (e.g. <code>odd/tasks/&lt;feature&gt;.md</code> or an exploratory scratchpad), maps the Problem Statement to <code>proposal.md</code>, the Guardrails to <code>spec.md</code>, and the DoD checkboxes to <code>tasks.md</code>, automatically registering the change in <code>state.json</code> and advancing the FSM to Stage 3 (Execution Plan).
+        </p>
+      </div>
+
+      <div class="idea-field">
+        <div class="field-label">Basis &amp; Rationale</div>
+        <p>
+          <span class="basis-tag">reasoned: Continuous Refinement Principle</span>:
+          Protects developers from the "spec wall" while strictly preventing uncontrolled scope creep. Developers start in ODD with zero ceremony, and only pay the OpenSpec bookkeeping tax when the problem objectively demands architectural permanence.
+        </p>
+      </div>
+    </div>
+
+    <!-- IDEA 3 -->
+    <div class="idea-card" id="idea-3">
+      <div class="idea-header">
+        <div class="idea-title">Idea 3: The ODD Single-File Brief Schema (Problem + Guardrails + DoD)</div>
+        <div class="badges">
+          <span class="badge badge-axis">Axis 2</span>
+          <span class="badge badge-conf">Confidence: 94%</span>
+          <span class="badge badge-cx">Complexity: Low</span>
+        </div>
+      </div>
+
+      <div class="idea-field">
+        <div class="field-label">Description</div>
+        <p>
+          Define the formal contract for organic tasks in <code>ce-ai</code> under <code>odd/tasks/&lt;slug&gt;.md</code>.
+          Rather than leaving organic tasks unformatted or vague, <code>ce-ai</code> standardizes the minimal ODD template that Gentle AI advocates:
+        </p>
+        <div class="code-block">
+---
+feature: csv-export-filter
+mode: organic
+created_at: 2026-09-16
+status: active
+---
+
+# Problem Statement
+Users cannot export filtered search results to CSV from the analytics table, forcing manual copy-pasting.
+
+# Guardrails &amp; Invariants
+- MUST NOT add external heavy dependencies.
+- MUST stream CSV generation to avoid OOM on &gt;10k rows.
+- MUST preserve existing JSON export API without breaking changes.
+
+# Definition of Done (DoD)
+- [ ] Unit test proving CSV formatting handles escaped commas and quotes.
+- [ ] Integration test verifying streaming output response headers.
+- [ ] cargo clippy and cargo test pass with 0 errors.
+        </div>
+      </div>
+
+      <div class="idea-field">
+        <div class="field-label">Basis &amp; Rationale</div>
+        <p>
+          <span class="basis-tag">external: Gentle AI ODD Specification</span>:
+          Replaces the 5-file OpenSpec requirement for tactical tasks with a single, highly legible markdown file. It gives the AI agent strict boundaries (Guardrails) and an undeniable finish line (DoD) without requiring 200 lines of speculative architectural prose.
+        </p>
+      </div>
+    </div>
+
+    <!-- IDEA 4 -->
+    <div class="idea-card" id="idea-4">
+      <div class="idea-header">
+        <div class="idea-title">Idea 4: Dual-Track Gate Engine with LOC Ceilings in src/commands/gate.rs</div>
+        <div class="badges">
+          <span class="badge badge-axis">Axis 4</span>
+          <span class="badge badge-conf">Confidence: 90%</span>
+          <span class="badge badge-cx">Complexity: Med</span>
+        </div>
+      </div>
+
+      <div class="idea-field">
+        <div class="field-label">Description</div>
+        <p>
+          Update <code>src/commands/gate.rs</code> (the observe-only gate evaluator) to formally recognize <code>ExecutionMode::Organic</code>.
+          Currently, <code>gate.rs</code> contains hardcoded exemptions:
+        </p>
+        <div class="code-block">
+// Existing in src/commands/gate.rs:351-367
+if tier == AdoptionTier::Minimal {
+    return (GateDecision::Pass, None, Vec::new(), "project tier minimal permits writes without full OpenSpec contract".to_string());
+}
+if clean.starts_with("ce-debug") { ... return (GateDecision::Pass, ...); }
+        </div>
+        <p>
+          We generalize this into a principled <strong>Dual-Track Gate Policy</strong>:
+        </p>
+        <ul>
+          <li><strong>Organic Pass Rule:</strong> When <code>ExecutionMode::Organic</code> is active (e.g. branch is <code>fix/</code> or single-file ODD brief exists), file writes are permitted without demanding an OpenSpec directory.</li>
+          <li><strong>Safety LOC Ceiling:</strong> If git diff exceeds <strong>200 LOC</strong> in Organic mode, the gate emits an advisory warning:
+          <em>"Notice: Organic task diff (+245 LOC) exceeds the tactical ceiling (~200 LOC). Consider running 'ce-ai workflow graduate' to capture living contracts in OpenSpec."</em></li>
+        </ul>
+      </div>
+
+      <div class="idea-field">
+        <div class="field-label">Basis &amp; Rationale</div>
+        <p>
+          <span class="basis-tag">direct: CONTRIBUTING.md §4 &amp; src/commands/gate.rs</span>:
+          <code>CONTRIBUTING.md</code> already establishes a target of ~200 LOC per atomic work unit. Hooking this threshold into the gate prevents ODD from degenerating into unmonitored monolithic commits while keeping small chores completely unblocked.
+        </p>
+      </div>
+    </div>
+
+    <!-- IDEA 5 -->
+    <div class="idea-card" id="idea-5">
+      <div class="idea-header">
+        <div class="idea-title">Idea 5: Unified Engram Task Mirror Protocol</div>
+        <div class="badges">
+          <span class="badge badge-axis">Axis 5</span>
+          <span class="badge badge-conf">Confidence: 95%</span>
+          <span class="badge badge-cx">Complexity: Low</span>
+        </div>
+      </div>
+
+      <div class="idea-field">
+        <div class="field-label">Description</div>
+        <p>
+          Ensure that task state persistence across sessions is unified under Engram persistent memory using a canonical topic key:
+          <code>tasks/&lt;feature-slug&gt;</code>.
+          Whether the active task is an organic brief (<code>odd/tasks/&lt;feature&gt;.md</code>) or a formal OpenSpec task list (<code>openspec/changes/&lt;feature&gt;/tasks.md</code>), both serialize their status and checklist into Engram under the same key.
+        </p>
+        <p>
+          When any agent boots in Claude Code, Codex, or Antigravity, calling <code>mem_context</code> immediately restores the current task, uncompleted checklist items, and active guardrails, completely insulating the developer from context window truncation or harness switches.
+        </p>
+      </div>
+
+      <div class="idea-field">
+        <div class="field-label">Basis &amp; Rationale</div>
+        <p>
+          <span class="basis-tag">direct: RULE[user_global] &amp; Engram Protocol</span>:
+          Engram is the cross-session persistence backbone. By sharing the exact topic key format, context re-hydration works identically across both modes.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="rejections">
+    <h2>4. Rejection Summary (What Was Cut &amp; Why)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Proposed Concept</th>
+          <th>Rejection Category</th>
+          <th>Specific Rationale</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>LLM Runtime Router Agent</strong></td>
+          <td>Latency / Cost / Non-determinism</td>
+          <td>Invoking an LLM to classify user intent on every prompt introduces 2–4s latency and recurring token costs. Deterministic heuristics (git branch, active changes, explicit flags) achieve >98% accuracy instantaneously.</td>
+        </tr>
+        <tr>
+          <td><strong>Deprecating OpenSpec in Favor of Pure ODD</strong></td>
+          <td>Governance &amp; Architectural Collapse</td>
+          <td>Gentle AI's avoidance of SDD works for smaller tools, but <code>ce-ai</code> requires living contracts (<code>openspec/specs/</code>) for release integrity, cross-harness drift detection, and compliance (ISO/NIST). OpenSpec must be preserved for architectural features.</td>
+        </tr>
+        <tr>
+          <td><strong>Unrestricted ODD without LOC Ceilings</strong></td>
+          <td>Risk of Monolithic Drift</td>
+          <td>Allowing ODD to be used without a LOC ceiling (&gt;200 LOC) allows agents to perform massive 1,000-line refactors without architecture review, defeating ce-ai's quality invariants.</td>
+        </tr>
+        <tr>
+          <td><strong>Separate Git Worktrees per Mode</strong></td>
+          <td>Workflow Friction</td>
+          <td>Forcing ODD into separate git worktrees fragments the local repo. Mode should be a lightweight behavioral attribute of the current session, not a separate disk checkout.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="synthesis">
+    <h2>5. Recommended Architecture &amp; Delivery Matrix</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Dimension</th>
+          <th>ODD Fast-Path (Organic Mode)</th>
+          <th>Compound Flywheel (OpenSpec Mode)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Target Scope</strong></td>
+          <td>Bugfixes, chores, spikes, small tweaks (&lt; 200 LOC)</td>
+          <td>New features, breaking changes, architecture refactors</td>
+        </tr>
+        <tr>
+          <td><strong>Trigger Signals</strong></td>
+          <td><code>fix/*</code>, <code>chore/*</code> branches, <code>ce-debug</code>, or explicit <code>--odd</code></td>
+          <td><code>feat/*</code> branches, <code>openspec/changes/</code> dir, or explicit <code>--compound</code></td>
+        </tr>
+        <tr>
+          <td><strong>Specification Shape</strong></td>
+          <td>Single-file brief: Problem + Guardrails + DoD (<code>odd/tasks/</code>)</td>
+          <td>5-stage living package: Proposal, Exploration, Design, Spec, Tasks</td>
+        </tr>
+        <tr>
+          <td><strong>Gate Enforcement</strong></td>
+          <td>Write permitted without OpenSpec; warning if &gt; 200 LOC</td>
+          <td>Strict gate: OpenSpec required before work units commence</td>
+        </tr>
+        <tr>
+          <td><strong>Graduation Path</strong></td>
+          <td colspan="2" style="text-align: center; font-weight: 600; color: var(--accent);">
+            <code>ce-ai workflow graduate &lt;feature&gt;</code> promotes ODD brief into OpenSpec package
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+</body>
+</html>

@@ -72,6 +72,7 @@ fn probe_openspec_context_detects_features_and_counts_tasks() {
         source: WorkflowSource::Manual,
         resolution: None,
         new_cycle: false,
+        execution_mode: None,
     });
 
     let info = probe_openspec_context_in(repo_root, &wf).expect("must detect feature");
@@ -694,6 +695,7 @@ fn test_maybe_auto_checkpoint_second_cycle_on_same_branch() {
         source: WorkflowSource::Manual,
         resolution: Some(FeatureResolution::Branch),
         new_cycle: false,
+        execution_mode: None,
     };
     let key = State::workspace_branch_key(&repo_root, None);
     state.workflows.insert(key, init_wf.clone());
@@ -748,6 +750,7 @@ fn repo_state_for(
         stage6_artifact_present: stage6,
         review_receipt: receipt,
         doc_debt: None,
+        execution_mode: crate::state::state::ExecutionMode::Compound,
     }
 }
 
@@ -2113,4 +2116,325 @@ fn test_probe_doc_debt_coordination_and_repo_state() {
     let debt = repo_state.doc_debt.unwrap();
     assert!(debt.has_debt());
     assert!(debt.summary_line().contains("1 unarchived (open subtasks)"));
+}
+
+#[test]
+fn test_probe_execution_mode_heuristics_and_precedence() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    // 1. CLI override takes highest precedence
+    assert_eq!(
+        probe_execution_mode(
+            root,
+            Some("feat/something"),
+            &None,
+            AdoptionTier::Full,
+            Some(ExecutionMode::Organic)
+        ),
+        ExecutionMode::Organic
+    );
+    assert_eq!(
+        probe_execution_mode(
+            root,
+            Some("fix/bug"),
+            &None,
+            AdoptionTier::Minimal,
+            Some(ExecutionMode::Compound)
+        ),
+        ExecutionMode::Compound
+    );
+
+    // 2. OpenSpec directory precedence rule: active openspec/changes/<feat> overrides branch prefix
+    let changes_dir = root.join("openspec").join("changes").join("active-feat");
+    std::fs::create_dir_all(&changes_dir).unwrap();
+    assert_eq!(
+        probe_execution_mode(
+            root,
+            Some("fix/tactical-bug"),
+            &None,
+            AdoptionTier::Full,
+            None
+        ),
+        ExecutionMode::Compound
+    );
+    // Cleanup openspec dir for remaining tests
+    std::fs::remove_dir_all(root.join("openspec")).unwrap();
+
+    // 3. Git branch prefix heuristics
+    for prefix in [
+        "fix/issue-1",
+        "chore/update-deps",
+        "spike/new-idea",
+        "test/unit-fix",
+    ] {
+        assert_eq!(
+            probe_execution_mode(root, Some(prefix), &None, AdoptionTier::Full, None),
+            ExecutionMode::Organic,
+            "prefix {prefix} should classify as Organic"
+        );
+    }
+    for prefix in ["feat/new-api", "spec/v2-data"] {
+        assert_eq!(
+            probe_execution_mode(root, Some(prefix), &None, AdoptionTier::Full, None),
+            ExecutionMode::Compound,
+            "prefix {prefix} should classify as Compound"
+        );
+    }
+
+    // 4. Stored WorkflowState execution_mode
+    let wf_state_organic = WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: "work".to_string(),
+        feature_name: Some("feat".to_string()),
+        updated_at: "now".to_string(),
+        source: WorkflowSource::Manual,
+        resolution: None,
+        new_cycle: false,
+        execution_mode: Some(ExecutionMode::Organic),
+    };
+    assert_eq!(
+        probe_execution_mode(
+            root,
+            None,
+            &Some(wf_state_organic),
+            AdoptionTier::Full,
+            None
+        ),
+        ExecutionMode::Organic
+    );
+
+    // 5. Non-git directory presence fallback
+    let odd_tasks = root.join("odd").join("tasks");
+    std::fs::create_dir_all(&odd_tasks).unwrap();
+    std::fs::write(odd_tasks.join("bug.md"), "# Bug").unwrap();
+    assert_eq!(
+        probe_execution_mode(root, None, &None, AdoptionTier::Full, None),
+        ExecutionMode::Organic
+    );
+    std::fs::remove_dir_all(root.join("odd")).unwrap();
+
+    // 6. Adoption tier fallback
+    assert_eq!(
+        probe_execution_mode(root, None, &None, AdoptionTier::Minimal, None),
+        ExecutionMode::Organic
+    );
+    assert_eq!(
+        probe_execution_mode(root, None, &None, AdoptionTier::Full, None),
+        ExecutionMode::Compound
+    );
+}
+
+#[test]
+fn test_generate_and_parse_odd_task_template() {
+    let template = generate_odd_task_template("parser-escape-bug");
+    assert!(template.contains("feature: parser-escape-bug"));
+    assert!(template.contains("mode: organic"));
+    assert!(template.contains("# Problem Statement"));
+    assert!(template.contains("# Guardrails & Invariants"));
+    assert!(template.contains("# Definition of Done (DoD)"));
+
+    let tmp = TempDir::new().unwrap();
+    let file_path = tmp.path().join("task.md");
+    std::fs::write(&file_path, &template).unwrap();
+
+    let parsed = parse_odd_task_file(&file_path).expect("should parse canonical template");
+    assert_eq!(parsed.feature, "parser-escape-bug");
+    assert!(!parsed.problem_statement.is_empty());
+    assert!(!parsed.guardrails.is_empty());
+    assert_eq!(parsed.dod_items.len(), 3);
+    assert!(!parsed.dod_items[0].checked);
+
+    // Test custom content with checked and unchecked items
+    let custom = r#"---
+feature: custom-feat
+mode: organic
+---
+
+# Problem Statement
+Custom observed issue.
+
+# Guardrails & Invariants
+- Guardrail 1
+- Guardrail 2
+
+# Definition of Done (DoD)
+- [x] Reproduce in test
+- [ ] Fix the bug
+- [x] Pass clippy
+"#;
+    let custom_file = tmp.path().join("custom.md");
+    std::fs::write(&custom_file, custom).unwrap();
+    let custom_parsed = parse_odd_task_file(&custom_file).unwrap();
+    assert_eq!(custom_parsed.feature, "custom-feat");
+    assert_eq!(custom_parsed.problem_statement, "Custom observed issue.");
+    assert_eq!(custom_parsed.dod_items.len(), 3);
+    assert!(custom_parsed.dod_items[0].checked);
+    assert_eq!(custom_parsed.dod_items[0].title, "Reproduce in test");
+    assert!(!custom_parsed.dod_items[1].checked);
+    assert_eq!(custom_parsed.dod_items[1].title, "Fix the bug");
+    assert!(custom_parsed.dod_items[2].checked);
+    assert_eq!(custom_parsed.dod_items[2].title, "Pass clippy");
+}
+
+#[test]
+fn test_run_graduate_error_cases() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+    let config_dir = root.join("config");
+    std::fs::create_dir_all(&config_dir).unwrap();
+    let state = State::new();
+    state.save(&config_dir.join("state.json")).unwrap();
+
+    let ctx = Context {
+        config_dir,
+        opencode_config_dir: root.join("opencode"),
+        workspace_root: Some(root.to_path_buf()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    // Error case 1: Missing source file returns Usage error (exit code 2)
+    let args_missing = GraduateArgs {
+        feature: Some("non-existent-feat".to_string()),
+    };
+    let res = run_graduate(&ctx, &args_missing);
+    assert!(res.is_err());
+    match res.unwrap_err() {
+        CeError::Usage(msg) => {
+            assert!(msg.contains("ODD source task file not found"));
+        }
+        other => panic!("expected CeError::Usage, got {other:?}"),
+    }
+
+    // Error case 2: Destination collision returns State error (exit code 3)
+    let odd_tasks = root.join("odd").join("tasks");
+    std::fs::create_dir_all(&odd_tasks).unwrap();
+    let source_file = odd_tasks.join("colliding-feat.md");
+    std::fs::write(&source_file, generate_odd_task_template("colliding-feat")).unwrap();
+
+    let dest_dir = root.join("openspec").join("changes").join("colliding-feat");
+    std::fs::create_dir_all(&dest_dir).unwrap();
+
+    let args_collision = GraduateArgs {
+        feature: Some("colliding-feat".to_string()),
+    };
+    let res_coll = run_graduate(&ctx, &args_collision);
+    assert!(res_coll.is_err());
+    match res_coll.unwrap_err() {
+        CeError::State(msg) => {
+            assert!(msg.contains("OpenSpec change directory already exists"));
+        }
+        other => panic!("expected CeError::State, got {other:?}"),
+    }
+}
+
+#[test]
+fn test_run_graduate_happy_path_lossless_transformation() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+    let config_dir = root.join("config");
+    std::fs::create_dir_all(&config_dir).unwrap();
+    let state = State::new();
+    state.save(&config_dir.join("state.json")).unwrap();
+
+    let ctx = Context {
+        config_dir: config_dir.clone(),
+        opencode_config_dir: root.join("opencode"),
+        workspace_root: Some(root.to_path_buf()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let odd_tasks = root.join("odd").join("tasks");
+    std::fs::create_dir_all(&odd_tasks).unwrap();
+    let source_file = odd_tasks.join("smart-fix.md");
+    let odd_content = r#"---
+feature: smart-fix
+mode: organic
+---
+
+# Problem Statement
+Under heavy load, connection pool overflows.
+
+# Guardrails & Invariants
+- Zero third-party crates.
+- Latency overhead under 1ms.
+
+# Definition of Done (DoD)
+- [x] Reproduce in stress test fixture
+- [ ] Implement exponential backoff
+- [x] Verify no deadlock on pool exhaustion
+"#;
+    std::fs::write(&source_file, odd_content).unwrap();
+
+    let args = GraduateArgs {
+        feature: Some("smart-fix".to_string()),
+    };
+    let res = run_graduate(&ctx, &args);
+    assert!(res.is_ok(), "graduation should succeed");
+
+    // 1. Source file must be removed to prevent dual-tracking
+    assert!(
+        !source_file.exists(),
+        "source ODD file must be deleted after graduation"
+    );
+
+    // 2. OpenSpec change package created
+    let change_dir = root.join("openspec").join("changes").join("smart-fix");
+    assert!(change_dir.is_dir());
+
+    let proposal = std::fs::read_to_string(change_dir.join("proposal.md")).unwrap();
+    assert!(proposal.contains("Under heavy load, connection pool overflows."));
+    assert!(proposal.contains("Promoted from Organic Task `odd/tasks/smart-fix.md`"));
+
+    let spec = std::fs::read_to_string(change_dir.join("spec.md")).unwrap();
+    assert!(spec.contains("Zero third-party crates."));
+    assert!(spec.contains("Latency overhead under 1ms."));
+
+    let tasks = std::fs::read_to_string(change_dir.join("tasks.md")).unwrap();
+    assert!(tasks.contains("- [x] Reproduce in stress test fixture"));
+    assert!(tasks.contains("- [ ] Implement exponential backoff"));
+    assert!(tasks.contains("- [x] Verify no deadlock on pool exhaustion"));
+
+    // 3. State updated to Stage 4 (WorkTdd) in Compound mode
+    let reloaded_state = State::load(&config_dir.join("state.json")).unwrap();
+    let wf = reloaded_state.workflow.expect("workflow state must be set");
+    assert_eq!(wf.stage, WorkflowStage::WorkTdd);
+    assert_eq!(wf.feature_name, Some("smart-fix".to_string()));
+    assert_eq!(wf.execution_mode, Some(ExecutionMode::Compound));
+}
+
+#[test]
+fn test_status_and_resume_banners_with_mode() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+    let config_dir = root.join("config");
+    std::fs::create_dir_all(&config_dir).unwrap();
+    let state = State::new();
+    state.save(&config_dir.join("state.json")).unwrap();
+
+    let ctx = Context {
+        config_dir,
+        opencode_config_dir: root.join("opencode"),
+        workspace_root: Some(root.to_path_buf()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    // Organic mode banner
+    let lines_organic = status_lines_with_mode(&ctx, Some(ExecutionMode::Organic)).unwrap();
+    let text_organic = lines_organic.join("\n");
+    assert!(text_organic.contains("[Workflow Mode: Organic Driven Development (ODD Fast-Path)]"));
+    assert!(text_organic.contains("Tactical Execution Triad"));
+    assert!(text_organic.contains("Graduation Notice"));
+
+    // Compound mode banner
+    let lines_compound = status_lines_with_mode(&ctx, Some(ExecutionMode::Compound)).unwrap();
+    let text_compound = lines_compound.join("\n");
+    assert!(text_compound.contains("[Workflow FSM & Progress Recovery Status]"));
+    assert!(text_compound.contains("7-Stage Cycle (Compound Engineering Skill Mappings):"));
 }

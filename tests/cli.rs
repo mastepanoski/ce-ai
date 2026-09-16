@@ -8865,3 +8865,160 @@ date: "2026-09-10"
         .stdout(predicates::str::contains("mode: dry-run"))
         .stdout(predicates::str::contains("/ce-compound-refresh api"));
 }
+
+#[test]
+fn test_cli_odd_mode_router_and_graduation_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let repo_root = tmp.path().join("repo");
+    fs::create_dir_all(&repo_root).unwrap();
+
+    // 1. Initialize git repo and commit an initial file
+    git_cmd()
+        .args(["init", "-b", "main"])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+    git_cmd()
+        .args(["config", "user.name", "Test User"])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+    git_cmd()
+        .args(["config", "user.email", "test@example.com"])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+
+    let readme = repo_root.join("README.md");
+    fs::write(&readme, "# Test Repo\n").unwrap();
+    git_cmd()
+        .args(["add", "README.md"])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+    git_cmd()
+        .args(["commit", "-m", "initial commit"])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+
+    // Switch to tactical bugfix branch: fix/parser-panic
+    git_cmd()
+        .args(["checkout", "-b", "fix/parser-panic"])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+
+    // 2. Status on fix/* branch automatically routes to Organic Driven Development (ODD)
+    ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "[Workflow Mode: Organic Driven Development (ODD Fast-Path)]",
+        ))
+        .stdout(predicates::str::contains("Tactical Execution Triad"));
+
+    // 3. Create canonical ODD task brief at odd/tasks/fix-parser.md
+    let odd_dir = repo_root.join("odd").join("tasks");
+    fs::create_dir_all(&odd_dir).unwrap();
+    let odd_file = odd_dir.join("fix-parser.md");
+    let odd_content = r#"---
+feature: fix-parser
+mode: organic
+created: 2026-09-16
+status: active
+---
+
+# Problem Statement
+Parser panics on empty input stream.
+
+# Guardrails & Invariants
+- Zero third-party dependencies added.
+- Must return error instead of panicking.
+
+# Definition of Done (DoD)
+- [x] Reproduce panic in unit test fixture
+- [ ] Implement empty check in parse_stream
+- [x] Pass cargo test and clippy
+"#;
+    fs::write(&odd_file, odd_content).unwrap();
+
+    // 4. Gate check permits writes in Organic mode without requiring an OpenSpec directory
+    ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args([
+            "gate",
+            "check",
+            "--tool",
+            "Write",
+            "--path",
+            "src/parser.rs",
+            "--mode",
+            "enforce",
+        ])
+        .assert()
+        .success();
+
+    // 5. Graduate feature via top-level CLI alias `ce-ai graduate fix-parser`
+    ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["graduate", "fix-parser"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "graduated ODD task 'fix-parser' to OpenSpec successfully!",
+        ));
+
+    // 6. Verify source brief is removed to prevent dual-tracking
+    assert!(
+        !odd_file.exists(),
+        "odd/tasks/fix-parser.md must be deleted after graduation"
+    );
+
+    // 7. Verify OpenSpec package artifacts created with preserved checkboxes
+    let spec_dir = repo_root
+        .join("openspec")
+        .join("changes")
+        .join("fix-parser");
+    assert!(spec_dir.is_dir(), "openspec/changes/fix-parser must exist");
+
+    let proposal = fs::read_to_string(spec_dir.join("proposal.md")).unwrap();
+    assert!(proposal.contains("Parser panics on empty input stream."));
+    assert!(proposal.contains("Promoted from Organic Task `odd/tasks/fix-parser.md`"));
+
+    let spec = fs::read_to_string(spec_dir.join("spec.md")).unwrap();
+    assert!(spec.contains("Zero third-party dependencies added."));
+    assert!(spec.contains("Must return error instead of panicking."));
+
+    let tasks = fs::read_to_string(spec_dir.join("tasks.md")).unwrap();
+    assert!(tasks.contains("- [x] Reproduce panic in unit test fixture"));
+    assert!(tasks.contains("- [ ] Implement empty check in parse_stream"));
+    assert!(tasks.contains("- [x] Pass cargo test and clippy"));
+
+    // 8. Workflow status should now be in Compound mode / Stage 4
+    ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "[Workflow FSM & Progress Recovery Status]",
+        ))
+        .stdout(predicates::str::contains("Stage 4: TDD & Work"))
+        .stdout(predicates::str::contains("fix-parser"));
+
+    // 9. Re-graduating should fail with exit code 3 (CeError::State) because dest already exists
+    // Recreate brief to simulate re-run attempt
+    fs::write(&odd_file, odd_content).unwrap();
+    ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["workflow", "graduate", "fix-parser"])
+        .assert()
+        .code(3)
+        .stderr(predicates::str::contains(
+            "OpenSpec change directory already exists",
+        ));
+}
