@@ -100,9 +100,9 @@ pub fn status(ctx: &Context) -> Result<(), CeError> {
 fn mcp_spec_for_tool(tool: &str) -> Option<(&'static str, &'static [&'static str])> {
     match tool {
         "context7" => Some(("npx", &["-y", "@upstash/context7-mcp@latest"])),
-        "engram" => Some(("engram", &["serve"])),
+        "engram" => Some(("engram", &["mcp", "--tools=agent"])),
         "rtk" => Some(("rtk", &["mcp"])),
-        "codegraph" => Some(("codegraph", &["mcp"])),
+        "codegraph" => Some(("codegraph", &["serve", "--mcp"])),
         _ => None,
     }
 }

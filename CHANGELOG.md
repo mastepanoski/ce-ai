@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.57.1] - 2026-09-15
+
+### Fixed
+- **Companion MCP Server Invocation Arguments for CodeGraph & Engram**:
+  - **CodeGraph Command Correction**: Updated CodeGraph MCP registration across all AI agent harnesses (`src/harness/registration.rs`, `src/opencode/config.rs`, `src/harness/custom.rs`, `src/commands/tools.rs`) from `["mcp"]` to `["serve", "--mcp"]`. Resolves `error: unknown command 'mcp'` when AI assistants spawn CodeGraph as a stdio MCP server.
+  - **Engram Stdio MCP Correction**: Updated Engram MCP registration across all harnesses from `["serve"]` to `["mcp", "--tools=agent"]`. Resolves port conflict errors (`listen tcp 127.0.0.1:7437: bind: address already in use`) and ensures Engram starts in stdio JSON-RPC MCP server mode rather than trying to spawn an HTTP server.
+  - **Config Self-Healing**: Running `ce-ai sync`, `ce-ai upgrade`, or `ce-ai install` automatically heals stale `["mcp"]` or `["serve"]` entries across all registered harness configurations (`~/.claude/settings.json`, `~/.cursor/mcp.json`, `~/.config/opencode/opencode.json`, `~/.copilot/mcp-config.json`, etc.).
+
 ## [1.57.0] - 2026-09-15
 
 ### Added

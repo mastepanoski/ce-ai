@@ -148,12 +148,12 @@ pub fn register_companions(config_path: &Path) -> Result<(), CeError> {
     register_mcp_server(
         config_path,
         "codegraph",
-        serde_json::json!({ "command": "codegraph", "args": ["mcp"] }),
+        serde_json::json!({ "command": "codegraph", "args": ["serve", "--mcp"] }),
     )?;
     register_mcp_server(
         config_path,
         "engram",
-        serde_json::json!({ "command": "engram", "args": ["serve"] }),
+        serde_json::json!({ "command": "engram", "args": ["mcp", "--tools=agent"] }),
     )?;
     Ok(())
 }

@@ -82,11 +82,14 @@ fn register_companions_registers_codegraph_and_engram() {
 
     assert_eq!(calls[0].0, "codegraph");
     assert_eq!(calls[0].1, "codegraph");
-    assert_eq!(calls[0].2, vec!["mcp".to_string()]);
+    assert_eq!(calls[0].2, vec!["serve".to_string(), "--mcp".to_string()]);
 
     assert_eq!(calls[1].0, "engram");
     assert_eq!(calls[1].1, "engram");
-    assert_eq!(calls[1].2, vec!["serve".to_string()]);
+    assert_eq!(
+        calls[1].2,
+        vec!["mcp".to_string(), "--tools=agent".to_string()]
+    );
 }
 
 static DIR_TEST_CALLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);

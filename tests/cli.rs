@@ -3424,7 +3424,7 @@ fn install_copilot_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
     assert!(config.mcp_servers.contains_key("codegraph"));
     assert!(config.mcp_servers.contains_key("engram"));
     assert_eq!(config.mcp_servers["codegraph"].command, "codegraph");
-    assert_eq!(config.mcp_servers["codegraph"].args, vec!["mcp"]);
+    assert_eq!(config.mcp_servers["codegraph"].args, vec!["serve", "--mcp"]);
     assert!(config.extra.is_empty(), "Zero OpenCode key leaks");
 
     // opencode directory must remain pristine / non-existent
@@ -3576,7 +3576,7 @@ fn install_grok_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
             .iter()
             .map(|v| v.as_str().unwrap())
             .collect::<Vec<_>>(),
-        vec!["mcp"]
+        vec!["serve", "--mcp"]
     );
     assert!(!root.contains_key("plugin"), "Zero OpenCode key leaks");
     assert!(!root.contains_key("skills"), "Zero OpenCode key leaks");
@@ -3824,7 +3824,7 @@ fn install_kimi_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
             .iter()
             .map(|v| v.as_str().unwrap())
             .collect::<Vec<_>>(),
-        vec!["mcp"]
+        vec!["serve", "--mcp"]
     );
 
     assert!(config.get("plugin").is_none(), "Zero OpenCode key leaks");
@@ -4255,12 +4255,12 @@ fn install_fx_harness_writes_to_native_dir_and_leaves_opencode_pristine() {
 
     let codegraph = &config.mcp["codegraph"];
     assert_eq!(codegraph.r#type.as_deref(), Some("local"));
-    assert_eq!(codegraph.command, vec!["codegraph", "mcp"]);
+    assert_eq!(codegraph.command, vec!["codegraph", "serve", "--mcp"]);
     assert!(codegraph.environment.is_empty());
 
     let engram = &config.mcp["engram"];
     assert_eq!(engram.r#type.as_deref(), Some("local"));
-    assert_eq!(engram.command, vec!["engram", "serve"]);
+    assert_eq!(engram.command, vec!["engram", "mcp", "--tools=agent"]);
     assert!(engram.environment.is_empty());
 
     // opencode directory must remain pristine / non-existent
@@ -6783,11 +6783,11 @@ fn install_registers_codegraph_and_engram_for_opencode_and_custom() {
     let opencode_cfg = read_json(&opencode_json);
     assert_eq!(
         opencode_cfg["mcpServers"]["codegraph"],
-        serde_json::json!({ "command": "codegraph", "args": ["mcp"] })
+        serde_json::json!({ "command": "codegraph", "args": ["serve", "--mcp"] })
     );
     assert_eq!(
         opencode_cfg["mcpServers"]["engram"],
-        serde_json::json!({ "command": "engram", "args": ["serve"] })
+        serde_json::json!({ "command": "engram", "args": ["mcp", "--tools=agent"] })
     );
 
     // 2. Custom install with --mcp-file auto-registers companions
@@ -6815,11 +6815,11 @@ fn install_registers_codegraph_and_engram_for_opencode_and_custom() {
     let custom_cfg = read_json(&mcp_file);
     assert_eq!(
         custom_cfg["mcpServers"]["codegraph"],
-        serde_json::json!({ "command": "codegraph", "args": ["mcp"], "env": {} })
+        serde_json::json!({ "command": "codegraph", "args": ["serve", "--mcp"], "env": {} })
     );
     assert_eq!(
         custom_cfg["mcpServers"]["engram"],
-        serde_json::json!({ "command": "engram", "args": ["serve"], "env": {} })
+        serde_json::json!({ "command": "engram", "args": ["mcp", "--tools=agent"], "env": {} })
     );
 
     // Simulate drift: remove companion entries

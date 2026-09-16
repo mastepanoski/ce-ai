@@ -51,8 +51,22 @@ impl RegistrationSpec {
             other => other,
         };
 
-        register(target_config, "codegraph", "codegraph", &["mcp"], &env).map_err(wrap_io)?;
-        register(target_config, "engram", "engram", &["serve"], &env).map_err(wrap_io)?;
+        register(
+            target_config,
+            "codegraph",
+            "codegraph",
+            &["serve", "--mcp"],
+            &env,
+        )
+        .map_err(wrap_io)?;
+        register(
+            target_config,
+            "engram",
+            "engram",
+            &["mcp", "--tools=agent"],
+            &env,
+        )
+        .map_err(wrap_io)?;
         Ok(())
     }
 }

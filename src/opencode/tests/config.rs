@@ -190,10 +190,10 @@ fn register_companions_writes_codegraph_and_engram() {
     let val = read_json(&path);
     assert_eq!(
         val["mcpServers"]["codegraph"],
-        serde_json::json!({ "command": "codegraph", "args": ["mcp"] })
+        serde_json::json!({ "command": "codegraph", "args": ["serve", "--mcp"] })
     );
     assert_eq!(
         val["mcpServers"]["engram"],
-        serde_json::json!({ "command": "engram", "args": ["serve"] })
+        serde_json::json!({ "command": "engram", "args": ["mcp", "--tools=agent"] })
     );
 }
