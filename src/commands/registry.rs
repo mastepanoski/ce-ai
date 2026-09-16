@@ -81,6 +81,8 @@ pub enum Commands {
     Gate(gate::GateCommands),
     /// Archive completed OpenSpec change packages to openspec/changes/archive/ (alias for workflow archive).
     Archive(crate::commands::workflow::ArchiveArgs),
+    /// Graduate an ODD task brief to formal OpenSpec change package (alias for workflow graduate).
+    Graduate(crate::commands::workflow::GraduateArgs),
     /// Manage living system specifications in openspec/specs/.
     Spec(crate::commands::spec::SpecArgs),
     /// Solution library clustering, deduplication, and refresh engine.
@@ -104,6 +106,7 @@ impl CeCommand for Commands {
             Commands::Usage(sub) => crate::commands::usage::run(ctx, sub),
             Commands::Workflow(args) => workflow::run(ctx, args),
             Commands::Archive(args) => workflow::run_archive(ctx, args),
+            Commands::Graduate(args) => workflow::run_graduate(ctx, args),
             Commands::Audit(args) => audit::run(ctx, args),
             Commands::InitPrj {
                 path,

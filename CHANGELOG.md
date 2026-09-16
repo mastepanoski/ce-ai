@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.58.0] - 2026-09-16
+
+### Added
+- **Adaptive Mode Router & Organic Driven Development (ODD) Fast-Path**:
+  - **In-Binary Deterministic Classification**: Sub-5ms Turn-0 mode probing (`probe_execution_mode`) in `workflow resume` and status hooks. Evaluates Git branch semantics (`fix/*`, `chore/*`, `spike/*`, `test/*` ➔ Organic; `feat/*`, `spec/*` ➔ Compound), active `openspec/changes/` directory presence (anti-dual-tracking precedence), and project adoption tiers with zero runtime LLM overhead.
+  - **ODD Fast-Path Execution**: Zero-ceremony tactical bugfixes and chores (< 200 LOC) using canonical single-file briefs (`odd/tasks/<feature>.md`) defining a Problem Statement, Inviolable Guardrails, and a testable Definition of Done checklist.
+  - **Dual-Track Observe-Only Gate Engine**: Extended `evaluate_gate_policy` in `src/commands/gate.rs` to permit agent tool writes in Organic mode without requiring an OpenSpec directory. Emits an observe-only advisory notice when git diff exceeds 200 LOC recommending graduation without blocking tool writes (exit code 0).
+  - **Lossless Graduation Bridge (`ce-ai workflow graduate <feature>` / `ce-ai graduate <feature>`)**: Mechanical promotion bridge that converts `odd/tasks/<feature>.md` into a formal OpenSpec change package (`openspec/changes/<feature>/{proposal.md, spec.md, tasks.md}`), preserving Definition of Done progress and checkbox states (`- [x]`, `- [ ]`), removing the source brief to prevent dual-ledger drift, and transitioning the workflow directly to Stage 4 (`WorkTdd`) in `Compound` mode.
+  - **Domain Concepts & Glossary**: Documented `Adaptive Mode Router`, `Organic Driven Development (ODD Fast-Path)`, and `Graduation Bridge` in `CONCEPTS.md`.
+
 ## [1.57.1] - 2026-09-15
 
 ### Fixed

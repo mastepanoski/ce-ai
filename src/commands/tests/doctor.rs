@@ -874,6 +874,7 @@ fn test_doctor_surfaces_blocked_gate_receipt() {
         source: WorkflowSource::default(),
         resolution: None,
         new_cycle: false,
+        execution_mode: None,
     };
     state
         .workflows

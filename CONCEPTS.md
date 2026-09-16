@@ -110,3 +110,12 @@ An automated knowledge elevation mechanism (`ce-ai spec promote` / `ce-ai archiv
 ### Native Harness Adapter Pattern
 An architectural integration pattern where `ce-ai` interfaces with external AI coding harnesses (such as Copilot, Grok, Kimi, Cursor, Claude, Codex) through dedicated adapter modules (`src/harness/<name>.rs`) that manipulate native configuration formats (JSON, TOML, `mcp-config.json`, `mcp.json`) directly, respect tool-specific environment overrides (e.g. `$COPILOT_CONFIG_DIR`, `$GROK_HOME`, `$KIMI_CODE_HOME`), preserve unmanaged user custom plugins and MCP servers, and use thread-safe mutex guards (`HARNESS_ENV_LOCK`) for isolated parallel testing.
 
+### Adaptive Mode Router
+A deterministic, zero-token classification mechanism embedded directly in `ce-ai workflow resume` (executed across native harness Turn-0 hooks such as `SessionStart` and `PreInvocation`). In under 5 milliseconds, it evaluates Git branch semantics (`fix/*` vs `feat/*`), active `openspec/changes/` state, and project adoption tiers to dynamically toggle between the lightweight ODD Fast-Path (Problem + Guardrails + DoD) and the formal 7-stage Compound Engineering Flywheel without runtime LLM overhead.
+
+### Organic Driven Development (ODD Fast-Path)
+A lightweight execution protocol within `ce-ai` inspired by Gentle AI, designed for tactical bugfixes and chores (< 200 LOC). It replaces upfront multi-file specification documents with a standardized single-file brief (`odd/tasks/<feature>.md`) defining a Problem Statement, Inviolable Guardrails, and a testable Definition of Done checklist, backed by an observe-only gate policy in `src/commands/gate.rs`.
+
+### Graduation Bridge
+A seamless promotion command (`ce-ai workflow graduate <feature>`) that mechanically transitions an organic exploratory task (`odd/tasks/<feature>.md`) into a fully structured OpenSpec change package (`openspec/changes/<feature>/{proposal.md, spec.md, tasks.md}`) whenever exploration reveals cross-cutting architectural complexity (> 200 LOC). It maps Problem Statement to proposal, Guardrails to formal criteria, and DoD checklists to work units while preserving checked progress and removing the ODD file to prevent dual-ledger desynchronization.
+

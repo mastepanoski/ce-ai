@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::commands::Context;
 use crate::error::CeError;
-use crate::state::state::{AdoptionTier, FeatureResolution, State, WorkflowStage};
+use crate::state::state::{AdoptionTier, ExecutionMode, FeatureResolution, State, WorkflowStage};
 pub use crate::state::state::{GateDecision, GateMode, GateReceipt};
 
 /// Well-known structured log location relative to ce-ai config dir.
@@ -99,6 +99,10 @@ pub struct GateCheckArgs {
     /// Optional explicit entry point (e.g. ce-debug, ce-work)
     #[arg(long)]
     pub entry_point: Option<String>,
+
+    /// Optional execution mode override (auto, organic, compound)
+    #[arg(long = "execution-mode")]
+    pub execution_mode: Option<String>,
 
     /// Emergency kill-switch to immediately bypass gate check logic
     #[arg(long)]
@@ -307,21 +311,9 @@ pub fn evaluate_gate_policy(
     has_spec: bool,
     has_tasks: bool,
     mode: GateMode,
+    execution_mode: ExecutionMode,
 ) -> (GateDecision, Option<GateEdgeCase>, Vec<String>, String) {
-    // 1. Undetermined if checkpoint is absent or ambiguous
-    let stage = match declared_stage {
-        Some(s) => s,
-        None => {
-            return (
-                GateDecision::Undetermined,
-                None,
-                Vec::new(),
-                "no active workflow checkpoint found".to_string(),
-            );
-        }
-    };
-
-    // 2. Edge case isolation (never mixed with blocked or pass, never blocks)
+    // 1. Edge case isolation (never mixed with blocked or pass, never blocks)
     if resolution == Some(FeatureResolution::MtimeFallback) {
         return (
             GateDecision::EdgeCase,
@@ -347,7 +339,30 @@ pub fn evaluate_gate_policy(
         );
     }
 
-    // 3. AdoptionTier::Minimal exemption
+    // 2. Organic mode exemption (permits writes without formal OpenSpec contract)
+    if execution_mode == ExecutionMode::Organic {
+        return (
+            GateDecision::Pass,
+            None,
+            Vec::new(),
+            "organic execution mode permits writes without formal OpenSpec contract".to_string(),
+        );
+    }
+
+    // 3. Undetermined if checkpoint is absent or ambiguous
+    let stage = match declared_stage {
+        Some(s) => s,
+        None => {
+            return (
+                GateDecision::Undetermined,
+                None,
+                Vec::new(),
+                "no active workflow checkpoint found".to_string(),
+            );
+        }
+    };
+
+    // 4. AdoptionTier::Minimal exemption
     if tier == AdoptionTier::Minimal {
         return (
             GateDecision::Pass,
@@ -357,7 +372,7 @@ pub fn evaluate_gate_policy(
         );
     }
 
-    // 4. Direct Entry Point: ce-debug exemption (for bugfixes)
+    // 5. Direct Entry Point: ce-debug exemption (for bugfixes)
     if let Some(entry) = entry_point {
         let clean = entry.trim().to_lowercase();
         if clean.starts_with("ce-debug")
@@ -374,7 +389,7 @@ pub fn evaluate_gate_policy(
         }
     }
 
-    // 5. Non-Stage 4 writes pass
+    // 6. Non-Stage 4 writes pass
     if stage != WorkflowStage::WorkTdd {
         return (
             GateDecision::Pass,
@@ -388,7 +403,7 @@ pub fn evaluate_gate_policy(
         );
     }
 
-    // 6. Stage 4 (ce-work) contract evaluation
+    // 7. Stage 4 (ce-work) contract evaluation
     let feat = feature_name.unwrap_or("unknown");
     let mut missing = Vec::new();
     if !has_proposal {
@@ -449,6 +464,7 @@ pub fn evaluate_gate_decision(
         has_spec,
         has_tasks,
         GateMode::Observe,
+        ExecutionMode::Compound,
     );
     (decision, edge, reason)
 }
@@ -498,20 +514,19 @@ pub fn run_gate_check(ctx: &Context, args: &GateCheckArgs) -> Result<(), CeError
         None
     };
 
+    let wf_opt = state_opt
+        .as_ref()
+        .and_then(|s| s.current_workflow_for_branch(&repo_root, branch.as_deref()));
+
     let (declared_stage, feature_name, resolution, is_new_cycle_task, task_desc) =
-        if let Some(ref state) = state_opt {
-            if let Some(wf) = state.current_workflow_for_branch(&repo_root, branch.as_deref()) {
-                let is_new_cycle = wf.new_cycle;
-                (
-                    Some(wf.stage),
-                    wf.feature_name.clone(),
-                    wf.resolution,
-                    is_new_cycle,
-                    Some(wf.task.clone()),
-                )
-            } else {
-                (None, None, None, false, None)
-            }
+        if let Some(ref wf) = wf_opt {
+            (
+                Some(wf.stage),
+                wf.feature_name.clone(),
+                wf.resolution,
+                wf.new_cycle,
+                Some(wf.task.clone()),
+            )
         } else {
             (None, None, None, false, None)
         };
@@ -525,6 +540,19 @@ pub fn run_gate_check(ctx: &Context, args: &GateCheckArgs) -> Result<(), CeError
 
     let state_gate_mode = state_opt.as_ref().and_then(|s| s.gate_mode);
     let gate_mode = resolve_gate_mode(args.mode.as_deref(), state_gate_mode);
+
+    // Turn-0 mode resolution:
+    let cli_execution_mode = args
+        .execution_mode
+        .as_deref()
+        .and_then(|m| ExecutionMode::parse(m).ok());
+    let execution_mode = crate::commands::workflow::probe_execution_mode(
+        &repo_root,
+        branch.as_deref(),
+        &wf_opt,
+        tier,
+        cli_execution_mode,
+    );
 
     // 7. Resolve entry point (CLI argument > task description)
     let entry_point = args.entry_point.as_deref().or(task_desc.as_deref());
@@ -568,6 +596,7 @@ pub fn run_gate_check(ctx: &Context, args: &GateCheckArgs) -> Result<(), CeError
         has_spec,
         has_tasks,
         gate_mode,
+        execution_mode,
     );
 
     // 10. Append structured telemetry record (best effort, errors safely swallowed)
@@ -613,6 +642,16 @@ pub fn run_gate_check(ctx: &Context, args: &GateCheckArgs) -> Result<(), CeError
             "write blocked on '{path_str}': missing required OpenSpec contract artifacts ({})",
             missing.join(", ")
         )));
+    }
+
+    // 13. Observe-only advisory notice for Organic mode exceeding 200 LOC ceiling
+    if execution_mode == ExecutionMode::Organic {
+        let diff_loc = crate::commands::workflow::probe_git_diff_loc(&repo_root);
+        if diff_loc > 200 && !ctx.quiet {
+            eprintln!(
+                "Notice: Organic task diff (+{diff_loc} LOC) exceeds 200 LOC ceiling. Consider running 'ce-ai workflow graduate' to formalize in OpenSpec."
+            );
+        }
     }
 
     Ok(())

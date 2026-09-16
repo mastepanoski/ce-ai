@@ -149,6 +149,43 @@ impl std::fmt::Display for FeatureResolution {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ExecutionMode {
+    #[default]
+    Auto,
+    Organic,
+    Compound,
+}
+
+impl ExecutionMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ExecutionMode::Auto => "auto",
+            ExecutionMode::Organic => "organic",
+            ExecutionMode::Compound => "compound",
+        }
+    }
+
+    pub fn parse(s: &str) -> Result<Self, CeError> {
+        let clean = s.trim().to_lowercase();
+        match clean.as_str() {
+            "auto" => Ok(ExecutionMode::Auto),
+            "organic" | "odd" => Ok(ExecutionMode::Organic),
+            "compound" | "ce" | "openspec" => Ok(ExecutionMode::Compound),
+            _ => Err(CeError::Usage(format!(
+                "invalid execution mode '{s}'. Valid modes: auto, organic (odd), compound (ce)"
+            ))),
+        }
+    }
+}
+
+impl std::fmt::Display for ExecutionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct WorkflowState {
     pub stage: WorkflowStage,
@@ -162,6 +199,8 @@ pub struct WorkflowState {
     pub resolution: Option<FeatureResolution>,
     #[serde(default)]
     pub new_cycle: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_mode: Option<ExecutionMode>,
 }
 
 /// One tracked file of an adopted skills surface (path relative to the
@@ -528,6 +567,7 @@ impl State {
                     source: WorkflowSource::Manual,
                     resolution: None,
                     new_cycle: false,
+                    execution_mode: None,
                 });
             }
         }
@@ -613,23 +653,26 @@ impl State {
         let is_reset_to_stage_1 =
             target_stage == WorkflowStage::Ideation && current_stage != WorkflowStage::Ideation;
 
-        let (feature_name, resolution) = match feature {
+        let (feature_name, resolution, execution_mode) = match feature {
             Some(f) => {
                 let trimmed = f.trim().to_string();
+                let current = self.current_workflow_for_branch(root, branch);
+                let mode = current.as_ref().and_then(|wf| wf.execution_mode);
                 if trimmed.is_empty() {
-                    (None, None)
+                    (None, None, mode)
                 } else {
-                    (Some(trimmed), resolution)
+                    (Some(trimmed), resolution, mode)
                 }
             }
             None => {
                 if is_reset_to_stage_1 {
-                    (None, None)
+                    (None, None, None)
                 } else {
                     let current = self.current_workflow_for_branch(root, branch);
                     let feat = current.as_ref().and_then(|wf| wf.feature_name.clone());
                     let res = resolution.or_else(|| current.as_ref().and_then(|wf| wf.resolution));
-                    (feat, res)
+                    let mode = current.as_ref().and_then(|wf| wf.execution_mode);
+                    (feat, res, mode)
                 }
             }
         };
@@ -642,12 +685,31 @@ impl State {
             source,
             resolution,
             new_cycle: is_new_cycle,
+            execution_mode,
         };
 
         let key = Self::workspace_branch_key(root, branch);
         self.workflows.insert(key, new_wf.clone());
         self.workflow = Some(new_wf);
         Ok(())
+    }
+
+    /// Sets or clears the execution mode for the specified workspace and branch.
+    pub fn set_execution_mode_for_branch(
+        &mut self,
+        root: &Path,
+        branch: Option<&str>,
+        mode: Option<ExecutionMode>,
+    ) {
+        let key = Self::workspace_branch_key(root, branch);
+        if let Some(wf) = self.workflows.get_mut(&key) {
+            wf.execution_mode = mode;
+            wf.updated_at = chrono::Utc::now().to_rfc3339();
+        }
+        if let Some(ref mut wf) = self.workflow {
+            wf.execution_mode = mode;
+            wf.updated_at = chrono::Utc::now().to_rfc3339();
+        }
     }
 
     /// Validates stage transition and updates state.workflows for the specified workspace.
@@ -702,6 +764,7 @@ impl State {
                     source: WorkflowSource::Manual,
                     resolution: None,
                     new_cycle: false,
+                    execution_mode: None,
                 }))
         }
     }

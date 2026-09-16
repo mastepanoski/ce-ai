@@ -15,8 +15,8 @@ use crate::opencode::manifest::InstallManifest;
 use crate::opencode::plugins::MANAGED_DIR;
 use crate::state::diff;
 use crate::state::state::{
-    DocHygieneConfig, FeatureResolution, ReviewReceipt, State, WorkflowSource, WorkflowStage,
-    WorkflowState,
+    AdoptionTier, DocHygieneConfig, ExecutionMode, FeatureResolution, ReviewReceipt, State,
+    WorkflowSource, WorkflowStage, WorkflowState,
 };
 
 pub use crate::commands::archive_compact::{
@@ -37,6 +37,9 @@ pub enum Action {
         /// Output machine-readable JSON format.
         #[arg(long)]
         json: bool,
+        /// Execution mode override: auto, organic (odd), compound (ce).
+        #[arg(long, value_name = "MODE")]
+        mode: Option<String>,
     },
     /// Save a workflow progress checkpoint before context compaction or hand-off.
     Checkpoint {
@@ -52,6 +55,9 @@ pub enum Action {
         /// Output machine-readable JSON format.
         #[arg(long)]
         json: bool,
+        /// Execution mode override: auto, organic (odd), compound (ce).
+        #[arg(long, value_name = "MODE")]
+        mode: Option<String>,
     },
     /// Resume workflow from exact checkpoint using Engram memory and OpenSpec state.
     Resume {
@@ -61,6 +67,9 @@ pub enum Action {
         /// Antigravity PreInvocation hook mode (reads stdin, dedupes per conversationId, injects ephemeralMessage).
         #[arg(long)]
         pre_invocation: bool,
+        /// Execution mode override: auto, organic (odd), compound (ce).
+        #[arg(long, value_name = "MODE")]
+        mode: Option<String>,
     },
     /// Record a code-review receipt for the current branch head (observe-only ship gate, issue #354).
     ReviewReceipt {
@@ -71,8 +80,16 @@ pub enum Action {
         #[arg(long)]
         override_reason: Option<String>,
     },
+    /// Graduate an ODD task brief to formal OpenSpec change package.
+    Graduate(GraduateArgs),
     /// Archive completed OpenSpec change packages to openspec/changes/archive/.
     Archive(ArchiveArgs),
+}
+
+#[derive(clap::Args, Debug, Clone, Default)]
+pub struct GraduateArgs {
+    /// Target feature name to graduate from odd/tasks/<feature>.md to openspec/changes/<feature>/.
+    pub feature: Option<String>,
 }
 
 #[derive(clap::Args, Debug, Clone, Default)]
@@ -111,14 +128,15 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let state_path = ctx.config_dir.join("state.json");
 
     match &args.action {
-        Action::Status { json } => {
+        Action::Status { json, mode } => {
+            let cli_mode = mode.as_deref().map(ExecutionMode::parse).transpose()?;
             let _ = maybe_auto_checkpoint(ctx, &repo_root, &state_path);
             if *json {
                 let state = State::load(&state_path)?;
                 let wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
                 println!("{}", serde_json::to_string_pretty(&wf)?);
             } else {
-                for line in status_lines(ctx)? {
+                for line in status_lines_with_mode(ctx, cli_mode)? {
                     println!("{line}");
                 }
             }
@@ -128,9 +146,18 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             stage,
             feature,
             json,
+            mode,
         } => {
+            let cli_mode = mode.as_deref().map(ExecutionMode::parse).transpose()?;
             let target_stage = WorkflowStage::parse(stage)?;
             let lines = checkpoint_lines(ctx, target_stage, task, feature.as_deref())?;
+            if let Some(m) = cli_mode {
+                let mut state = State::load(&state_path)?;
+                state.set_execution_mode_for_branch(&repo_root, branch.as_deref(), Some(m));
+                if !ctx.dry_run {
+                    state.save(&state_path)?;
+                }
+            }
             if *json {
                 let state = State::load(&state_path)?;
                 println!(
@@ -148,16 +175,18 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         Action::Resume {
             json,
             pre_invocation,
+            mode,
         } => {
+            let cli_mode = mode.as_deref().map(ExecutionMode::parse).transpose()?;
             let _ = maybe_auto_checkpoint(ctx, &repo_root, &state_path);
             if *pre_invocation {
                 handle_pre_invocation(ctx)?;
             } else if *json {
                 let state = State::load(&state_path)?;
                 let wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
-                let repo_state = probe_repo_state(ctx, &wf);
+                let repo_state = probe_repo_state_with_mode(ctx, &wf, cli_mode);
                 let openspec_info = repo_state.openspec_context.clone();
-                let text_lines = resume_lines(ctx)?;
+                let text_lines = resume_lines_with_mode(ctx, cli_mode)?;
                 let additional_context = text_lines.join("\n");
                 let payload = json!({
                     "additionalContext": additional_context,
@@ -172,7 +201,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 });
                 println!("{}", serde_json::to_string_pretty(&payload)?);
             } else {
-                for line in resume_lines(ctx)? {
+                for line in resume_lines_with_mode(ctx, cli_mode)? {
                     println!("{line}");
                 }
             }
@@ -192,6 +221,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 println!("{line}");
             }
         }
+        Action::Graduate(graduate_args) => run_graduate(ctx, graduate_args)?,
         Action::Archive(archive_args) => run_archive(ctx, archive_args)?,
     }
     Ok(())
@@ -200,29 +230,65 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 /// Real status content as renderable lines; the CLI prints them and the TUI
 /// renders them verbatim in its result modal.
 pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
+    status_lines_with_mode(ctx, None)
+}
+
+pub fn status_lines_with_mode(
+    ctx: &Context,
+    cli_mode: Option<ExecutionMode>,
+) -> Result<Vec<String>, CeError> {
     let repo_root = ctx.repo_root();
     let branch = probe_git_branch(&repo_root);
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load(&state_path)?;
+    let wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
+    let tier = probe_adoption_tier(&state, &repo_root);
+    let mode = probe_execution_mode(&repo_root, branch.as_deref(), &wf, tier, cli_mode);
 
-    let mut lines = vec![
-        "== [Workflow FSM & Progress Recovery Status] ==".to_string(),
-        "7-Stage Cycle (Compound Engineering Skill Mappings):".to_string(),
-        "  • [1: Ideation]   ➔ ce-brainstorm / ce-ideate / ce-strategy".to_string(),
-        "  • [2: OpenSpec]   ➔ Formal Spec Definition (proposal, spec, tasks)".to_string(),
-        "  • [3: Plan]       ➔ ce-plan / ce-doc-review".to_string(),
-        "  • [4: Work/TDD]   ➔ ce-work / ce-debug (Direct Entry Point for Bug Fixes) / ce-simplify-code".to_string(),
-        "  • [5: Verify]     ➔ Empirical Testing (project test/e2e commands)".to_string(),
-        "  • [6: Compound]   ➔ ce-compound / ce-compound-refresh (docs/solutions/)".to_string(),
-        "  • [7: Ship]       ➔ ce-commit-push-pr / ce-commit / ce-resolve-pr-feedback".to_string(),
-        String::new(),
-    ];
+    let mut lines = Vec::new();
+    if mode == ExecutionMode::Organic {
+        lines.push("== [Workflow Mode: Organic Driven Development (ODD Fast-Path)] ==".to_string());
+        lines.push("Tactical Execution Triad (odd/tasks/<feature>.md):".to_string());
+        lines.push(
+            "  • Problem Statement     ➔ Describe observed symptom, error, or tactical friction"
+                .to_string(),
+        );
+        lines.push(
+            "  • Guardrails & Limits   ➔ Inviolable safety, compatibility, and performance bounds"
+                .to_string(),
+        );
+        lines.push(
+            "  • Definition of Done    ➔ Concrete, testable checkboxes (- [ ] / - [x])".to_string(),
+        );
+        lines.push("  * Graduation Notice     ➔ For scope > 200 LOC, run 'ce-ai workflow graduate <feature>' to formalize in OpenSpec.".to_string());
+        lines.push(String::new());
+    } else {
+        lines.push("== [Workflow FSM & Progress Recovery Status] ==".to_string());
+        lines.push("7-Stage Cycle (Compound Engineering Skill Mappings):".to_string());
+        lines.push("  • [1: Ideation]   ➔ ce-brainstorm / ce-ideate / ce-strategy".to_string());
+        lines.push(
+            "  • [2: OpenSpec]   ➔ Formal Spec Definition (proposal, spec, tasks)".to_string(),
+        );
+        lines.push("  • [3: Plan]       ➔ ce-plan / ce-doc-review".to_string());
+        lines.push("  • [4: Work/TDD]   ➔ ce-work / ce-debug (Direct Entry Point for Bug Fixes) / ce-simplify-code".to_string());
+        lines.push(
+            "  • [5: Verify]     ➔ Empirical Testing (project test/e2e commands)".to_string(),
+        );
+        lines.push(
+            "  • [6: Compound]   ➔ ce-compound / ce-compound-refresh (docs/solutions/)".to_string(),
+        );
+        lines.push(
+            "  • [7: Ship]       ➔ ce-commit-push-pr / ce-commit / ce-resolve-pr-feedback"
+                .to_string(),
+        );
+        lines.push(String::new());
+    }
 
     if let Some(cp) = state.latest_release_tag.as_ref() {
         lines.push(format!("latest release: {cp}"));
     }
 
-    match state.current_workflow_for_branch(&repo_root, branch.as_deref()) {
+    match &wf {
         Some(wf) => {
             lines.push(format!(
                 "current phase: Stage {}: {} ({})",
@@ -243,42 +309,50 @@ pub fn status_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
             lines.push(format!("last updated: {}", wf.updated_at));
         }
         None => {
-            lines.push("current phase: Stage 1: Ideation (ce-brainstorm)".to_string());
-            lines.push("active subtask: No active task recorded".to_string());
-            lines.push(
-                "(No progress checkpoint saved yet — run `ce-ai workflow checkpoint`)".to_string(),
-            );
+            if mode == ExecutionMode::Organic {
+                lines.push("current phase: Organic Task (ODD Fast-Path)".to_string());
+                lines.push("active subtask: No active task brief recorded".to_string());
+            } else {
+                lines.push("current phase: Stage 1: Ideation (ce-brainstorm)".to_string());
+                lines.push("active subtask: No active task recorded".to_string());
+                lines.push(
+                    "(No progress checkpoint saved yet — run `ce-ai workflow checkpoint`)"
+                        .to_string(),
+                );
+            }
         }
     }
 
-    let repo_state = probe_repo_state(
-        ctx,
-        &state.current_workflow_for_branch(&repo_root, branch.as_deref()),
-    );
-    let stage = state
-        .current_workflow_for_branch(&repo_root, branch.as_deref())
-        .map(|w| w.stage)
-        .unwrap_or_default();
-    if repo_state.adoption_status.is_some() {
-        for gap in repo_state.ship_readiness_gaps(stage) {
-            lines.push(format!("! Warning: {}", gap.describe()));
+    if mode == ExecutionMode::Compound {
+        let repo_state = probe_repo_state(
+            ctx,
+            &state.current_workflow_for_branch(&repo_root, branch.as_deref()),
+        );
+        let stage = state
+            .current_workflow_for_branch(&repo_root, branch.as_deref())
+            .map(|w| w.stage)
+            .unwrap_or_default();
+        if repo_state.adoption_status.is_some() {
+            for gap in repo_state.ship_readiness_gaps(stage) {
+                lines.push(format!("! Warning: {}", gap.describe()));
+            }
         }
-    }
-    if let Some(desync) = &repo_state.task_desync {
-        let warn = desync.warning_line();
-        if !warn.is_empty() {
-            lines.push(warn);
+        if let Some(desync) = &repo_state.task_desync {
+            let warn = desync.warning_line();
+            if !warn.is_empty() {
+                lines.push(warn);
+            }
         }
-    }
-    if !repo_state.unarchived_completed_changes.is_empty() {
-        let count = repo_state.unarchived_completed_changes.len();
-        lines.push(format!(
-            "! Warning: {count} OpenSpec change(s) complete but not archived — run 'ce-ai doctor' for details"
-        ));
-    }
-    if let Some(debt) = &repo_state.doc_debt {
-        if debt.has_debt() {
-            lines.push(format!("! Warning: {}", debt.summary_line()));
+        if !repo_state.unarchived_completed_changes.is_empty() {
+            let count = repo_state.unarchived_completed_changes.len();
+            lines.push(format!(
+                "! Warning: {count} OpenSpec change(s) complete but not archived — run 'ce-ai doctor' for details"
+            ));
+        }
+        if let Some(debt) = &repo_state.doc_debt {
+            if debt.has_debt() {
+                lines.push(format!("! Warning: {}", debt.summary_line()));
+            }
         }
     }
 
@@ -353,15 +427,25 @@ pub fn checkpoint_lines(
 
 /// Resume surfaces the checkpoint-derived status plus hand-off framing lines.
 pub fn resume_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
+    resume_lines_with_mode(ctx, None)
+}
+
+pub fn resume_lines_with_mode(
+    ctx: &Context,
+    cli_mode: Option<ExecutionMode>,
+) -> Result<Vec<String>, CeError> {
     let repo_root = ctx.repo_root();
     let branch = probe_git_branch(&repo_root);
-    let mut lines = vec!["workflow: resuming execution from latest checkpoint...".to_string()];
-    lines.extend(status_lines(ctx)?);
-
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load(&state_path)?;
     let wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
-    let repo_state = probe_repo_state(ctx, &wf);
+    let tier = probe_adoption_tier(&state, &repo_root);
+    let mode = probe_execution_mode(&repo_root, branch.as_deref(), &wf, tier, cli_mode);
+
+    let mut lines = vec!["workflow: resuming execution from latest checkpoint...".to_string()];
+    lines.extend(status_lines_with_mode(ctx, Some(mode))?);
+
+    let repo_state = probe_repo_state_with_mode(ctx, &wf, Some(mode));
 
     lines.push(String::new());
     lines.push("== [Environment State & Drift Status] ==".to_string());
@@ -371,6 +455,7 @@ pub fn resume_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
     } else {
         lines.push("  git branch: non-git workspace".to_string());
     }
+    lines.push(format!("  execution mode: {}", mode.as_str()));
 
     if repo_state.is_git_clean {
         lines.push("  working tree: clean (0 uncommitted changes)".to_string());
@@ -428,41 +513,55 @@ pub fn resume_lines(ctx: &Context) -> Result<Vec<String>, CeError> {
         }
     }
 
-    if repo_state.unarchived_completed_changes.is_empty() {
-        lines.push("  openspec ledger: clean (0 pending archival)".to_string());
-    } else {
-        let count = repo_state.unarchived_completed_changes.len();
-        lines.push(format!(
-            "  openspec ledger: ! {count} change(s) complete but not archived — run 'ce-ai doctor' for details"
-        ));
-    }
-    if let Some(debt) = &repo_state.doc_debt {
-        lines.push(format!("  {}", debt.summary_line()));
-    }
-
-    if let Some(info) = &repo_state.openspec_context {
-        lines.push(String::new());
-        lines.push(format!("== [Context Re-hydration: {}] ==", info.feature));
-        lines.push(format!("  spec location: {}", info.path.display()));
-        lines.push(format!("  has proposal: {}", info.has_proposal));
-        lines.push(format!("  has spec: {}", info.has_spec));
-        lines.push(format!("  has tasks: {}", info.has_tasks));
-        if info.total_tasks > 0 {
+    if mode == ExecutionMode::Compound {
+        if repo_state.unarchived_completed_changes.is_empty() {
+            lines.push("  openspec ledger: clean (0 pending archival)".to_string());
+        } else {
+            let count = repo_state.unarchived_completed_changes.len();
             lines.push(format!(
-                "  tasks progress: {}/{} completed ([x])",
-                info.completed_tasks, info.total_tasks
+                "  openspec ledger: ! {count} change(s) complete but not archived — run 'ce-ai doctor' for details"
             ));
         }
-        if let Some(desync) = &repo_state.task_desync {
-            let warn = desync.warning_line();
-            if !warn.is_empty() {
-                lines.push(format!("  {warn}"));
+        if let Some(debt) = &repo_state.doc_debt {
+            lines.push(format!("  {}", debt.summary_line()));
+        }
+
+        if let Some(info) = &repo_state.openspec_context {
+            lines.push(String::new());
+            lines.push(format!("== [Context Re-hydration: {}] ==", info.feature));
+            lines.push(format!("  spec location: {}", info.path.display()));
+            lines.push(format!("  has proposal: {}", info.has_proposal));
+            lines.push(format!("  has spec: {}", info.has_spec));
+            lines.push(format!("  has tasks: {}", info.has_tasks));
+            if info.total_tasks > 0 {
+                lines.push(format!(
+                    "  tasks progress: {}/{} completed ([x])",
+                    info.completed_tasks, info.total_tasks
+                ));
             }
+            if let Some(desync) = &repo_state.task_desync {
+                let warn = desync.warning_line();
+                if !warn.is_empty() {
+                    lines.push(format!("  {warn}"));
+                }
+            }
+        }
+    } else if let Some(odd) = probe_active_odd_task(&repo_root, &wf) {
+        lines.push(String::new());
+        lines.push(format!("== [ODD Task Context: {}] ==", odd.feature));
+        lines.push(format!("  task brief: {}", odd.path.display()));
+        if odd.total_dod > 0 {
+            lines.push(format!(
+                "  dod progress: {}/{} completed ([x])",
+                odd.completed_dod, odd.total_dod
+            ));
         }
     }
 
     let stage = wf.as_ref().map(|w| w.stage).unwrap_or_default();
-    lines.extend(ship_readiness_lines(&repo_state, stage));
+    if mode == ExecutionMode::Compound {
+        lines.extend(ship_readiness_lines(&repo_state, stage));
+    }
 
     lines.push(String::new());
     lines.push(
@@ -495,6 +594,8 @@ pub struct RepoState {
     pub review_receipt: Option<ReviewReceipt>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc_debt: Option<DocDebtReport>,
+    #[serde(default)]
+    pub execution_mode: ExecutionMode,
 }
 
 /// Observe-only ship-readiness gap (issue #354). Nothing here blocks a command.
@@ -979,7 +1080,439 @@ pub fn probe_adoption_status(ctx: &Context) -> Option<AdoptionBlockStatus> {
     Some(check_adoption_block_status(&agents_file, entry.tier))
 }
 
+pub fn probe_adoption_tier(state: &State, repo_root: &Path) -> AdoptionTier {
+    state
+        .projects
+        .iter()
+        .find(|p| p.path == repo_root)
+        .map(|p| p.tier)
+        .unwrap_or(AdoptionTier::Full)
+}
+
+pub fn probe_execution_mode(
+    repo_root: &Path,
+    branch: Option<&str>,
+    wf: &Option<WorkflowState>,
+    tier: AdoptionTier,
+    cli_override: Option<ExecutionMode>,
+) -> ExecutionMode {
+    if let Some(mode) = cli_override {
+        if mode != ExecutionMode::Auto {
+            return mode;
+        }
+    }
+
+    // 1. OpenSpec precedence rule (R4b): if an unresolved directory exists in openspec/changes/ (excluding "archive")
+    let openspec_changes_dir = repo_root.join("openspec").join("changes");
+    if openspec_changes_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&openspec_changes_dir) {
+            let has_active_openspec = entries.flatten().any(|e| {
+                let p = e.path();
+                p.is_dir() && e.file_name() != "archive"
+            });
+            if has_active_openspec {
+                return ExecutionMode::Compound;
+            }
+        }
+    }
+
+    // 2. Git branch prefix heuristics (R3 / R4)
+    if let Some(b) = branch {
+        let b_clean = b.trim();
+        if b_clean.starts_with("fix/")
+            || b_clean.starts_with("chore/")
+            || b_clean.starts_with("spike/")
+            || b_clean.starts_with("test/")
+        {
+            return ExecutionMode::Organic;
+        }
+        if b_clean.starts_with("feat/") || b_clean.starts_with("spec/") {
+            return ExecutionMode::Compound;
+        }
+    }
+
+    // 3. Active odd/tasks/<feature>.md exists
+    let odd_tasks_dir = repo_root.join("odd").join("tasks");
+    if odd_tasks_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&odd_tasks_dir) {
+            let has_odd_tasks = entries.flatten().any(|e| {
+                let p = e.path();
+                p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("md")
+            });
+            if has_odd_tasks {
+                return ExecutionMode::Organic;
+            }
+        }
+    }
+
+    // 4. Stored execution_mode in WorkflowState if present
+    if let Some(m) = wf.as_ref().and_then(|w| w.execution_mode) {
+        if m != ExecutionMode::Auto {
+            return m;
+        }
+    }
+
+    // 5. Non-git workspace / tier fallback (R3b)
+    if tier == AdoptionTier::Minimal {
+        ExecutionMode::Organic
+    } else {
+        ExecutionMode::Compound
+    }
+}
+
+pub fn probe_git_diff_loc(repo_root: &Path) -> usize {
+    let out = match git_probe(repo_root, &["diff", "HEAD", "--numstat"]) {
+        Some(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
+        _ => match git_probe(repo_root, &["diff", "--numstat"]) {
+            Some(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
+            _ => return 0,
+        },
+    };
+
+    let mut total_loc = 0;
+    for line in out.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 2 {
+            let added: usize = parts[0].parse().unwrap_or(0);
+            let deleted: usize = parts[1].parse().unwrap_or(0);
+            total_loc += added + deleted;
+        }
+    }
+    total_loc
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OddTaskContent {
+    pub feature: String,
+    pub problem_statement: String,
+    pub guardrails: String,
+    pub dod_items: Vec<OddDoDItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OddDoDItem {
+    pub checked: bool,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OddTaskSummary {
+    pub feature: String,
+    pub path: PathBuf,
+    pub completed_dod: usize,
+    pub total_dod: usize,
+}
+
+pub fn generate_odd_task_template(feature: &str) -> String {
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    format!(
+        r#"---
+feature: {feature}
+mode: organic
+created: {today}
+status: active
+---
+
+# Problem Statement
+<!-- Describe the observed symptom, error, or tactical friction -->
+
+# Guardrails & Invariants
+<!-- Non-negotiable safety, performance, and compatibility limits -->
+
+# Definition of Done (DoD)
+- [ ] Add reproduction test case
+- [ ] Implement fix
+- [ ] cargo clippy and cargo test pass cleanly
+"#
+    )
+}
+
+pub fn parse_odd_task_file(path: &Path) -> Result<OddTaskContent, CeError> {
+    if !path.exists() {
+        return Err(CeError::Usage(format!(
+            "ODD task file '{}' does not exist",
+            path.display()
+        )));
+    }
+    let content = std::fs::read_to_string(path)?;
+    parse_odd_task_content(&content, path)
+}
+
+pub fn parse_odd_task_content(content: &str, path: &Path) -> Result<OddTaskContent, CeError> {
+    let default_feature = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("task")
+        .to_string();
+
+    let mut feature = default_feature;
+    let mut body = content;
+
+    if let Some(rest) = content.strip_prefix("---") {
+        if let Some(end_idx) = rest.find("---") {
+            let frontmatter = &rest[..end_idx];
+            body = rest[end_idx + 3..].trim();
+            for line in frontmatter.lines() {
+                let trimmed = line.trim();
+                if let Some(val) = trimmed.strip_prefix("feature:") {
+                    let feat_val = val.trim().trim_matches('"').trim_matches('\'');
+                    if !feat_val.is_empty() {
+                        feature = feat_val.to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    let mut problem_statement = String::new();
+    let mut guardrails = String::new();
+    let mut dod_items = Vec::new();
+
+    let mut current_section = "";
+    for line in body.lines() {
+        let trimmed = line.trim();
+        if let Some(stripped) = trimmed.strip_prefix("# ") {
+            let title = stripped.trim().to_lowercase();
+            if title.contains("problem") {
+                current_section = "problem";
+            } else if title.contains("guardrail") || title.contains("invariant") {
+                current_section = "guardrails";
+            } else if title.contains("definition of done") || title.contains("dod") {
+                current_section = "dod";
+            } else {
+                current_section = "other";
+            }
+            continue;
+        }
+
+        match current_section {
+            "problem" => {
+                if !problem_statement.is_empty() {
+                    problem_statement.push('\n');
+                }
+                problem_statement.push_str(line);
+            }
+            "guardrails" => {
+                if !guardrails.is_empty() {
+                    guardrails.push('\n');
+                }
+                guardrails.push_str(line);
+            }
+            "dod" => {
+                if trimmed.starts_with("- [ ] ") || trimmed.starts_with("- [ ]") {
+                    let item_text = if trimmed.len() > 5 {
+                        trimmed[5..].trim().to_string()
+                    } else {
+                        String::new()
+                    };
+                    dod_items.push(OddDoDItem {
+                        checked: false,
+                        title: item_text,
+                    });
+                } else if trimmed.starts_with("- [x] ")
+                    || trimmed.starts_with("- [x]")
+                    || trimmed.starts_with("- [X] ")
+                    || trimmed.starts_with("- [X]")
+                {
+                    let item_text = if trimmed.len() > 5 {
+                        trimmed[5..].trim().to_string()
+                    } else {
+                        String::new()
+                    };
+                    dod_items.push(OddDoDItem {
+                        checked: true,
+                        title: item_text,
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(OddTaskContent {
+        feature,
+        problem_statement: problem_statement.trim().to_string(),
+        guardrails: guardrails.trim().to_string(),
+        dod_items,
+    })
+}
+
+pub fn probe_active_odd_task(
+    repo_root: &Path,
+    wf: &Option<WorkflowState>,
+) -> Option<OddTaskSummary> {
+    let odd_tasks_dir = repo_root.join("odd").join("tasks");
+    if !odd_tasks_dir.is_dir() {
+        return None;
+    }
+
+    if let Some(feat) = wf.as_ref().and_then(|w| w.feature_name.as_deref()) {
+        let direct_file = odd_tasks_dir.join(format!("{feat}.md"));
+        if direct_file.is_file() {
+            if let Ok(parsed) = parse_odd_task_file(&direct_file) {
+                let total = parsed.dod_items.len();
+                let completed = parsed.dod_items.iter().filter(|i| i.checked).count();
+                return Some(OddTaskSummary {
+                    feature: parsed.feature,
+                    path: direct_file,
+                    completed_dod: completed,
+                    total_dod: total,
+                });
+            }
+        }
+    }
+
+    if let Ok(entries) = std::fs::read_dir(&odd_tasks_dir) {
+        let mut md_files: Vec<PathBuf> = entries
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("md"))
+            .collect();
+        md_files.sort();
+        if let Some(file) = md_files.into_iter().next() {
+            if let Ok(parsed) = parse_odd_task_file(&file) {
+                let total = parsed.dod_items.len();
+                let completed = parsed.dod_items.iter().filter(|i| i.checked).count();
+                return Some(OddTaskSummary {
+                    feature: parsed.feature,
+                    path: file,
+                    completed_dod: completed,
+                    total_dod: total,
+                });
+            }
+        }
+    }
+    None
+}
+
+pub fn run_graduate(ctx: &Context, args: &GraduateArgs) -> Result<(), CeError> {
+    let repo_root = ctx.repo_root();
+    let branch = probe_git_branch(&repo_root);
+    let state_path = ctx.config_dir.join("state.json");
+    let state = if state_path.exists() {
+        State::load(&state_path)?
+    } else {
+        State::default()
+    };
+    let wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
+
+    let feature_name = if let Some(f) = &args.feature {
+        f.trim().to_string()
+    } else if let Some(f) = wf.as_ref().and_then(|w| w.feature_name.clone()) {
+        f
+    } else if let Some(odd) = probe_active_odd_task(&repo_root, &wf) {
+        odd.feature
+    } else {
+        return Err(CeError::Usage(
+            "specify a feature name to graduate, e.g. 'ce-ai workflow graduate <feature>'"
+                .to_string(),
+        ));
+    };
+
+    if feature_name.is_empty() {
+        return Err(CeError::Usage("feature name cannot be empty".to_string()));
+    }
+
+    let source_file = repo_root
+        .join("odd")
+        .join("tasks")
+        .join(format!("{feature_name}.md"));
+    if !source_file.is_file() {
+        return Err(CeError::Usage(format!(
+            "ODD source task file not found at '{}'",
+            source_file.display()
+        )));
+    }
+
+    let dest_dir = repo_root
+        .join("openspec")
+        .join("changes")
+        .join(&feature_name);
+    if dest_dir.exists() {
+        return Err(CeError::State(format!(
+            "OpenSpec change directory already exists at '{}'. Refusing to overwrite.",
+            dest_dir.display()
+        )));
+    }
+
+    let parsed = parse_odd_task_file(&source_file)?;
+
+    std::fs::create_dir_all(&dest_dir)?;
+
+    let rel_source = source_file
+        .strip_prefix(&repo_root)
+        .unwrap_or(&source_file)
+        .display();
+    let problem_text = if parsed.problem_statement.is_empty() {
+        "No problem statement provided in ODD task brief."
+    } else {
+        &parsed.problem_statement
+    };
+    let proposal_content = format!(
+        "# Proposal: {feature_name}\n\n## Problem Statement\n{problem_text}\n\n## In-Scope\n- Promoted from Organic Task `{rel_source}`.\n- Implement all Definition of Done deliverables.\n\n## Out-of-Scope\n- Unrelated architectural refactorings outside the scoped problem statement.\n"
+    );
+    std::fs::write(dest_dir.join("proposal.md"), proposal_content)?;
+
+    let guardrails_text = if parsed.guardrails.is_empty() {
+        "No explicit guardrails defined in ODD task brief."
+    } else {
+        &parsed.guardrails
+    };
+    let spec_content = format!(
+        "# Specification: {feature_name}\n\n## Requirements & Guardrails\n{guardrails_text}\n"
+    );
+    std::fs::write(dest_dir.join("spec.md"), spec_content)?;
+
+    let mut tasks_content = format!("# Tasks: {feature_name}\n\n- [ ] **Work Unit 1: Implementation & Verification** (~200 LOC)\n");
+    if parsed.dod_items.is_empty() {
+        tasks_content.push_str("  - [ ] Implement deliverables\n  - [ ] Run test suite\n");
+    } else {
+        for item in &parsed.dod_items {
+            let mark = if item.checked { "x" } else { " " };
+            tasks_content.push_str(&format!("  - [{mark}] {}\n", item.title));
+        }
+    }
+    std::fs::write(dest_dir.join("tasks.md"), tasks_content)?;
+
+    std::fs::remove_file(&source_file)?;
+
+    let mut new_state = state;
+    let key = State::workspace_branch_key(&repo_root, branch.as_deref());
+    let new_wf = WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: format!("Working on {feature_name} (graduated from ODD)"),
+        feature_name: Some(feature_name.clone()),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        source: WorkflowSource::Manual,
+        resolution: branch.as_ref().map(|_| FeatureResolution::Branch),
+        new_cycle: false,
+        execution_mode: Some(ExecutionMode::Compound),
+    };
+    new_state.workflows.insert(key, new_wf.clone());
+    new_state.workflow = Some(new_wf);
+    if !ctx.dry_run {
+        new_state.save(&state_path)?;
+    }
+
+    println!("workflow: graduated ODD task '{feature_name}' to OpenSpec successfully!");
+    println!("  source removed: {}", source_file.display());
+    println!("  package created: {}", dest_dir.display());
+    println!("  files generated: proposal.md, spec.md, tasks.md");
+    println!("  stage transitioned: Stage 4 (Work/TDD)");
+    println!("  execution mode: compound");
+
+    Ok(())
+}
+
 pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState {
+    probe_repo_state_with_mode(ctx, wf, None)
+}
+
+pub fn probe_repo_state_with_mode(
+    ctx: &Context,
+    wf: &Option<WorkflowState>,
+    cli_mode: Option<ExecutionMode>,
+) -> RepoState {
     let repo_root = ctx.repo_root();
     let git_branch = probe_git_branch(&repo_root);
     let head_sha = probe_git_head_sha(&repo_root);
@@ -1021,6 +1554,14 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
         &doc_hygiene_cfg,
     ));
 
+    let tier = State::load(&ctx.config_dir.join("state.json"))
+        .ok()
+        .map(|s| probe_adoption_tier(&s, &repo_root))
+        .unwrap_or(AdoptionTier::Full);
+
+    let execution_mode =
+        probe_execution_mode(&repo_root, git_branch.as_deref(), wf, tier, cli_mode);
+
     RepoState {
         git_branch,
         head_sha,
@@ -1036,6 +1577,7 @@ pub fn probe_repo_state(ctx: &Context, wf: &Option<WorkflowState>) -> RepoState 
         stage6_artifact_present,
         review_receipt,
         doc_debt,
+        execution_mode,
     }
 }
 

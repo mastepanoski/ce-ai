@@ -199,9 +199,9 @@ fn test_pure_decision_engine_edge_cases_isolated() {
 #[test]
 fn test_evaluate_gate_policy_matrix_exemptions_and_enforcement() {
     use crate::commands::gate::evaluate_gate_policy;
-    use crate::state::state::{AdoptionTier, GateMode};
+    use crate::state::state::{AdoptionTier, ExecutionMode, GateMode};
 
-    // 1. Enforce mode blocks Stage 4 with missing artifacts and returns missing list
+    // 1. Enforce mode blocks Stage 4 with missing artifacts and returns missing list in Compound mode
     let (decision, edge, missing, reason) = evaluate_gate_policy(
         Some(WorkflowStage::WorkTdd),
         Some("blocked-feat"),
@@ -214,13 +214,14 @@ fn test_evaluate_gate_policy_matrix_exemptions_and_enforcement() {
         true,
         false, // missing tasks
         GateMode::Enforce,
+        ExecutionMode::Compound,
     );
     assert_eq!(decision, GateDecision::Blocked);
     assert_eq!(edge, None);
     assert_eq!(missing, vec!["proposal.md", "tasks.md"]);
     assert!(reason.contains("Stage 4 (ce-work) active for 'blocked-feat'"));
 
-    // 2. Observe mode returns WouldBlock for same scenario
+    // 2. Observe mode returns WouldBlock for same scenario in Compound mode
     let (decision, edge, missing, _) = evaluate_gate_policy(
         Some(WorkflowStage::WorkTdd),
         Some("observe-feat"),
@@ -233,6 +234,7 @@ fn test_evaluate_gate_policy_matrix_exemptions_and_enforcement() {
         true,
         false,
         GateMode::Observe,
+        ExecutionMode::Compound,
     );
     assert_eq!(decision, GateDecision::WouldBlock);
     assert_eq!(edge, None);
@@ -256,6 +258,7 @@ fn test_evaluate_gate_policy_matrix_exemptions_and_enforcement() {
             false, // no spec
             false, // no tasks
             GateMode::Enforce,
+            ExecutionMode::Compound,
         );
         assert_eq!(decision, GateDecision::Pass);
         assert_eq!(edge, None);
@@ -276,6 +279,7 @@ fn test_evaluate_gate_policy_matrix_exemptions_and_enforcement() {
         false, // no spec
         false, // no tasks
         GateMode::Enforce,
+        ExecutionMode::Compound,
     );
     assert_eq!(decision, GateDecision::Pass);
     assert_eq!(edge, None);
@@ -295,6 +299,7 @@ fn test_evaluate_gate_policy_matrix_exemptions_and_enforcement() {
         false,
         false,
         GateMode::Enforce,
+        ExecutionMode::Compound,
     );
     assert_eq!(decision, GateDecision::Pass);
     assert_eq!(edge, None);
@@ -313,10 +318,33 @@ fn test_evaluate_gate_policy_matrix_exemptions_and_enforcement() {
         false,
         false,
         GateMode::Enforce,
+        ExecutionMode::Compound,
     );
     assert_eq!(decision, GateDecision::EdgeCase);
     assert_eq!(edge, Some(GateEdgeCase::MtimeFallback));
     assert!(missing.is_empty());
+
+    // 7. Organic execution mode permits writes without OpenSpec contract
+    let (decision, edge, missing, reason) = evaluate_gate_policy(
+        Some(WorkflowStage::WorkTdd),
+        Some("odd-feat"),
+        Some(FeatureResolution::Branch),
+        false,
+        false,
+        AdoptionTier::Full,
+        Some("ce-work"),
+        false, // no proposal
+        false, // no spec
+        false, // no tasks
+        GateMode::Enforce,
+        ExecutionMode::Organic,
+    );
+    assert_eq!(decision, GateDecision::Pass);
+    assert_eq!(edge, None);
+    assert!(missing.is_empty());
+    assert!(
+        reason.contains("organic execution mode permits writes without formal OpenSpec contract")
+    );
 }
 
 #[test]
@@ -657,6 +685,7 @@ fn test_run_gate_check_stale_cycle_guard_uses_typed_flag_not_display_string() {
         source: WorkflowSource::Inferred,
         resolution: None,
         new_cycle: true,
+        execution_mode: None,
     };
     let key = State::workspace_branch_key(&repo_root, None);
     state.workflows.insert(key.clone(), wf.clone());
@@ -688,6 +717,7 @@ fn test_run_gate_check_stale_cycle_guard_uses_typed_flag_not_display_string() {
         source: WorkflowSource::Inferred,
         resolution: None,
         new_cycle: true,
+        execution_mode: None,
     };
     state.workflows.insert(key, wf2.clone());
     state.workflow = Some(wf2);
@@ -739,6 +769,7 @@ fn test_run_gate_check_blocking_enforcement_and_receipt_creation() {
         source: WorkflowSource::Manual,
         resolution: None,
         new_cycle: false,
+        execution_mode: None,
     };
     let key = State::workspace_branch_key(&repo_root, None);
     state.workflows.insert(key, wf.clone());
@@ -750,6 +781,7 @@ fn test_run_gate_check_blocking_enforcement_and_receipt_creation() {
         path: Some("src/commands/new_feat.rs".to_string()),
         mode: Some("enforce".to_string()),
         entry_point: None,
+        execution_mode: None,
         disabled: false,
     };
 
@@ -820,6 +852,7 @@ fn test_run_gate_check_observe_mode_does_not_block() {
         source: WorkflowSource::Manual,
         resolution: None,
         new_cycle: false,
+        execution_mode: None,
     };
     let key = State::workspace_branch_key(&repo_root, None);
     state.workflows.insert(key, wf.clone());
@@ -831,6 +864,7 @@ fn test_run_gate_check_observe_mode_does_not_block() {
         path: Some("src/observe.rs".to_string()),
         mode: Some("observe".to_string()),
         entry_point: None,
+        execution_mode: None,
         disabled: false,
     };
 
@@ -887,6 +921,7 @@ fn test_run_gate_check_ce_debug_and_tier_minimal_exemptions_pass() {
         source: WorkflowSource::Manual,
         resolution: None,
         new_cycle: false,
+        execution_mode: None,
     };
     let key = State::workspace_branch_key(&repo_root, None);
     state.workflows.insert(key.clone(), wf_debug.clone());
@@ -898,6 +933,7 @@ fn test_run_gate_check_ce_debug_and_tier_minimal_exemptions_pass() {
         path: Some("src/auth.rs".to_string()),
         mode: Some("enforce".to_string()),
         entry_point: None,
+        execution_mode: None,
         disabled: false,
     };
     assert!(run_gate_check(&ctx, &args_debug).is_ok());
@@ -924,6 +960,7 @@ fn test_run_gate_check_ce_debug_and_tier_minimal_exemptions_pass() {
         source: WorkflowSource::Manual,
         resolution: None,
         new_cycle: false,
+        execution_mode: None,
     };
     state.workflows.insert(key, wf_minimal.clone());
     state.workflow = Some(wf_minimal);
@@ -934,6 +971,7 @@ fn test_run_gate_check_ce_debug_and_tier_minimal_exemptions_pass() {
         path: Some("src/minimal.rs".to_string()),
         mode: Some("enforce".to_string()),
         entry_point: None,
+        execution_mode: None,
         disabled: false,
     };
     assert!(run_gate_check(&ctx, &args_minimal).is_ok());
@@ -952,4 +990,73 @@ fn test_run_gate_check_ce_debug_and_tier_minimal_exemptions_pass() {
             .decision,
         GateDecision::Pass
     );
+}
+
+#[test]
+fn test_run_gate_check_organic_mode_permits_write_and_advisory_on_diff_limit() {
+    use crate::commands::gate::{run_gate_check, GateCheckArgs, GateDecision};
+    use crate::commands::Context;
+    use crate::state::state::{ExecutionMode, State, WorkflowSource, WorkflowStage, WorkflowState};
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let config_dir = dir.path().join(".ce-ai");
+    std::fs::create_dir_all(&config_dir).unwrap();
+    let repo_root = dir.path().join("repo");
+    std::fs::create_dir_all(&repo_root).unwrap();
+
+    let ctx = Context {
+        config_dir: config_dir.clone(),
+        opencode_config_dir: config_dir.join("opencode"),
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: false,
+    };
+
+    let state_path = config_dir.join("state.json");
+    let mut state = State::default();
+
+    // Workflow state explicitly set to Organic mode without any OpenSpec files
+    let wf_organic = WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: "Fixing quick bug organically".to_string(),
+        feature_name: Some("quick-fix".to_string()),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        source: WorkflowSource::Manual,
+        resolution: None,
+        new_cycle: false,
+        execution_mode: Some(ExecutionMode::Organic),
+    };
+    let key = State::workspace_branch_key(&repo_root, None);
+    state.workflows.insert(key, wf_organic.clone());
+    state.workflow = Some(wf_organic);
+    state.save(&state_path).unwrap();
+
+    // 1. Tool write in Organic mode passes with exit code 0 even without OpenSpec contract
+    let args = GateCheckArgs {
+        tool: Some("Write".to_string()),
+        path: Some("src/quick_fix.rs".to_string()),
+        mode: Some("enforce".to_string()),
+        entry_point: None,
+        execution_mode: Some("organic".to_string()),
+        disabled: false,
+    };
+
+    let res = run_gate_check(&ctx, &args);
+    assert!(res.is_ok(), "gate check must pass in organic mode");
+
+    let stats = crate::commands::gate::load_gate_stats(&config_dir).unwrap();
+    assert_eq!(stats.pass, 1);
+    assert_eq!(stats.blocked, 0);
+
+    let state_reloaded = State::load(&state_path).unwrap();
+    let receipt = state_reloaded
+        .gate_receipts
+        .get("quick-fix")
+        .expect("receipt must exist for quick-fix");
+    assert_eq!(receipt.decision, GateDecision::Pass);
+    assert!(receipt
+        .reason
+        .contains("organic execution mode permits writes"));
 }
