@@ -487,19 +487,61 @@ pub fn reconcile_project_harness_hooks(target_dir: &Path, inner_body: &str) -> R
     // 2. Claude
     let claude_dir = target_dir.join(".claude");
     let claude_md_root = target_dir.join("CLAUDE.md");
-    let has_user_claude_md = claude_md_root.exists() && {
-        let text = fs::read_to_string(&claude_md_root).unwrap_or_default();
-        text.trim() != "@AGENTS.md"
-    };
-    if claude_dir.exists() || has_user_claude_md {
-        let claude_rule_path = if claude_md_root.exists() {
-            claude_md_root
-        } else {
-            claude_dir.join("CLAUDE.md")
-        };
-        crate::harness::claude::update_claude_md(&claude_rule_path, inner_body)?;
+    let claude_md_nested = claude_dir.join("CLAUDE.md");
+    let target_agents_md = target_dir.join("AGENTS.md");
 
-        let settings_path = target_dir.join(".claude").join("settings.json");
+    let claude_rule_path_opt = if claude_md_root.exists() {
+        Some(claude_md_root)
+    } else if claude_md_nested.exists() {
+        Some(claude_md_nested)
+    } else if claude_dir.exists() {
+        Some(claude_dir.join("CLAUDE.md"))
+    } else {
+        None
+    };
+
+    if let Some(claude_rule_path) = claude_rule_path_opt {
+        let existing_content = if claude_rule_path.exists() {
+            fs::read_to_string(&claude_rule_path).unwrap_or_default()
+        } else {
+            String::new()
+        };
+
+        let delegates = target_agents_md.exists()
+            && crate::harness::claude::delegates_to_agents_md(&existing_content);
+
+        if delegates {
+            // Claude Code already imports AGENTS.md, which contains the managed block.
+            // If CLAUDE.md has a duplicate managed block (from prior versions or edits), strip it.
+            if existing_content.contains(crate::harness::claude::CE_MANAGED_BEGIN)
+                || existing_content.contains(BLOCK_BEGIN_MARKER)
+            {
+                let stripped = crate::harness::claude::strip_managed_block(&existing_content);
+                let mut cleaned = stripped.trim_end().to_string();
+                if !cleaned.is_empty() {
+                    let newline = if existing_content.contains("\r\n") {
+                        "\r\n"
+                    } else {
+                        "\n"
+                    };
+                    cleaned.push_str(newline);
+                }
+                if cleaned != existing_content {
+                    crate::state::write_atomic(&claude_rule_path, cleaned.as_bytes())?;
+                }
+            }
+        } else {
+            // No delegation to AGENTS.md: only update if .claude exists or user has custom instructions
+            let has_user_claude_md =
+                claude_rule_path.exists() && !existing_content.trim().is_empty();
+            if claude_dir.exists() || has_user_claude_md {
+                crate::harness::claude::update_claude_md(&claude_rule_path, inner_body)?;
+            }
+        }
+    }
+
+    if claude_dir.exists() {
+        let settings_path = claude_dir.join("settings.json");
         let _ = crate::harness::claude::ensure_session_start_hook(&settings_path);
         let _ = crate::harness::claude::ensure_claude_gate_hook(&settings_path);
     }

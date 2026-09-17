@@ -427,3 +427,67 @@ fn ensures_and_removes_gate_hook_lifecycle() {
     assert!(!settings_path.exists());
     assert!(!has_claude_gate_hook(&settings_path));
 }
+
+#[test]
+fn test_delegates_to_agents_md_syntaxes() {
+    // Exact forms
+    assert!(delegates_to_agents_md("@AGENTS.md"));
+    assert!(delegates_to_agents_md("@./AGENTS.md"));
+    assert!(delegates_to_agents_md("@../AGENTS.md"));
+    assert!(delegates_to_agents_md("@dir/subdir/AGENTS.md"));
+    assert!(delegates_to_agents_md("@agents.md"));
+
+    // Quotes and whitespace
+    assert!(delegates_to_agents_md("   @AGENTS.md   "));
+    assert!(delegates_to_agents_md("@\"AGENTS.md\""));
+    assert!(delegates_to_agents_md("@'./AGENTS.md'"));
+
+    // List bullets
+    assert!(delegates_to_agents_md("- @AGENTS.md"));
+    assert!(delegates_to_agents_md("* @./AGENTS.md"));
+
+    // With comments/directives on the line
+    assert!(delegates_to_agents_md(
+        "@AGENTS.md - follow standard directives"
+    ));
+
+    // Embedded in multiline document
+    let doc = "# Project Instructions\n\n@AGENTS.md\n\n## Custom Rules\n- Rule 1\n";
+    assert!(delegates_to_agents_md(doc));
+
+    // Negative cases
+    assert!(!delegates_to_agents_md(""));
+    assert!(!delegates_to_agents_md("@OTHER.md"));
+    assert!(!delegates_to_agents_md("@README.md"));
+    assert!(!delegates_to_agents_md(
+        "Please see @AGENTS.md for instructions."
+    ));
+
+    // Inside code fences
+    let fenced = "Here is an example:\n```markdown\n@AGENTS.md\n```\n";
+    assert!(!delegates_to_agents_md(fenced));
+
+    let tilde_fenced = "Here is an example:\n~~~markdown\n@AGENTS.md\n~~~\n";
+    assert!(!delegates_to_agents_md(tilde_fenced));
+}
+
+#[test]
+fn test_strip_managed_block_handles_both_markers_and_preserves_surrounding() {
+    // 1. CE_MANAGED markers
+    let text1 = format!(
+        "# Title\n\n{}\nManaged\n{}\n\n# Footer",
+        CE_MANAGED_BEGIN, CE_MANAGED_END
+    );
+    let stripped1 = strip_managed_block(&text1);
+    assert_eq!(stripped1.trim(), "# Title\n\n# Footer");
+
+    // 2. BLOCK_BEGIN markers
+    let text2 = "# Title\n\n<!-- ce-ai:block begin v=4 tier=full sha256=abc -->\nManaged\n<!-- ce-ai:block end -->\n\n# Footer";
+    let stripped2 = strip_managed_block(text2);
+    assert_eq!(stripped2.trim(), "# Title\n\n# Footer");
+
+    // 3. Just the block
+    let text3 = format!("{}\nManaged\n{}", CE_MANAGED_BEGIN, CE_MANAGED_END);
+    let stripped3 = strip_managed_block(&text3);
+    assert_eq!(stripped3.trim(), "");
+}

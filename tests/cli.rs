@@ -2043,6 +2043,57 @@ fn init_prj_and_deinit_prj_roundtrip_fresh_repo() {
 }
 
 #[test]
+fn init_prj_with_claude_dir_does_not_duplicate_managed_block_into_claude_md() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    let prj_dir = tmp.path().join("claude-project");
+    fs::create_dir_all(prj_dir.join(".claude")).unwrap();
+
+    // 1. Run init-prj on a project that has .claude/
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Adopted project"));
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    let claude_stub = prj_dir.join("CLAUDE.md");
+    assert!(agents_file.exists());
+    assert!(claude_stub.exists());
+
+    // AGENTS.md must contain the full managed block
+    let agents_text = fs::read_to_string(&agents_file).unwrap();
+    assert!(agents_text.contains(&block_begin_prefix("full")));
+
+    // CLAUDE.md must ONLY contain @AGENTS.md and NO managed block markers
+    let claude_text = fs::read_to_string(&claude_stub).unwrap();
+    assert_eq!(claude_text.trim(), "@AGENTS.md");
+    assert!(!claude_text.contains("CE-AI MANAGED BLOCK BEGIN"));
+    assert!(!claude_text.contains("ce-ai:block begin"));
+
+    // 2. Pre-seed a duplicate block and run sync to verify automatic healing
+    let duplicate = "@AGENTS.md\n\n# User Custom\n\n<!-- CE-AI MANAGED BLOCK BEGIN -->\nDuplicate\n<!-- CE-AI MANAGED BLOCK END -->\n";
+    fs::write(&claude_stub, duplicate).unwrap();
+
+    ceai(&config_dir, &home).args(["sync"]).assert().success();
+
+    let claude_healed = fs::read_to_string(&claude_stub).unwrap();
+    assert!(claude_healed.contains("@AGENTS.md"));
+    assert!(claude_healed.contains("# User Custom"));
+    assert!(!claude_healed.contains("CE-AI MANAGED BLOCK BEGIN"));
+    assert!(!claude_healed.contains("Duplicate"));
+
+    // 3. De-adopt and verify clean removal of stub
+    ceai(&config_dir, &home)
+        .args(["deinit-prj", prj_dir.to_str().unwrap()])
+        .assert()
+        .success();
+}
+
+#[test]
 fn init_prj_dry_run_does_not_claim_adoption() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
@@ -3235,6 +3286,8 @@ fn init_prj_claude_writes_claude_md() {
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
     let prj_dir = tmp.path().join("my-project");
     fs::create_dir_all(prj_dir.join(".claude")).unwrap();
+    // Non-delegating user CLAUDE.md receives the managed block directly
+    fs::write(prj_dir.join("CLAUDE.md"), "# Custom Claude Guidelines\n").unwrap();
 
     ceai(&config_dir, &home)
         .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
@@ -3244,6 +3297,7 @@ fn init_prj_claude_writes_claude_md() {
     let md_path = prj_dir.join("CLAUDE.md");
     assert!(md_path.exists());
     let content = fs::read_to_string(&md_path).unwrap();
+    assert!(content.contains("# Custom Claude Guidelines"));
     assert!(content.contains("<!-- CE-AI MANAGED BLOCK BEGIN -->"));
     assert!(content.contains("<!-- CE-AI MANAGED BLOCK END -->"));
 }
