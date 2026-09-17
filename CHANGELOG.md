@@ -5,6 +5,15 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.58.1] - 2026-09-17
+
+### Fixed
+- **Claude Code Instruction Deduplication in `init-prj` and `sync` (#377)**:
+  - **Delegation-Aware Reconciliation**: `reconcile_project_harness_hooks` now detects when a project's `CLAUDE.md` (or `.claude/CLAUDE.md`) delegates to `AGENTS.md` via `@` import syntax (`@AGENTS.md`, `@./AGENTS.md`, etc.), skipping redundant injection of the managed 7-Stage block into `CLAUDE.md`.
+  - **Self-Healing Duplicate Cleanup**: Running `ce-ai sync` or `ce-ai init-prj` automatically strips legacy duplicate managed blocks from `CLAUDE.md` if the file already imports `AGENTS.md`, eliminating ~500 tokens of duplicate prompt context per Claude Code session while fully preserving user-defined instructions.
+  - **Non-Delegating Fallback Preserved**: Projects whose `CLAUDE.md` does not import `AGENTS.md` continue to have the managed block injected directly, ensuring Claude Code consistently receives governance directives.
+  - **De-adoption Stub Cleanup**: `ce-ai deinit-prj` cleanly removes `@AGENTS.md` stub files on project de-adoption.
+
 ## [1.58.0] - 2026-09-16
 
 ### Added

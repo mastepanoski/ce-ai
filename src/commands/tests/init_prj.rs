@@ -157,3 +157,69 @@ fn test_reconcile_rtk_hooks_if_supported_resolves_home_from_ctx() {
         assert!(home_dir.join(".claude").exists());
     }
 }
+
+#[test]
+fn test_reconcile_project_harness_hooks_skips_claude_when_delegating_to_agents() {
+    let tmp = TempDir::new().unwrap();
+    let project_dir = tmp.path();
+
+    fs::write(project_dir.join("AGENTS.md"), "# AGENTS\n").unwrap();
+    let claude_dir = project_dir.join(".claude");
+    fs::create_dir_all(&claude_dir).unwrap();
+    let claude_settings = claude_dir.join("settings.json");
+    fs::write(&claude_settings, "{}").unwrap();
+
+    let claude_md = project_dir.join("CLAUDE.md");
+    fs::write(&claude_md, "@AGENTS.md\n").unwrap();
+
+    reconcile_project_harness_hooks(project_dir, "## Managed Block").unwrap();
+
+    let claude_content = fs::read_to_string(&claude_md).unwrap();
+    assert_eq!(claude_content.trim(), "@AGENTS.md");
+    assert!(!claude_content.contains("Managed Block"));
+}
+
+#[test]
+fn test_reconcile_project_harness_hooks_strips_duplicate_claude_block_when_delegating() {
+    let tmp = TempDir::new().unwrap();
+    let project_dir = tmp.path();
+
+    fs::write(project_dir.join("AGENTS.md"), "# AGENTS\n").unwrap();
+    let claude_dir = project_dir.join(".claude");
+    fs::create_dir_all(&claude_dir).unwrap();
+
+    let claude_md = project_dir.join("CLAUDE.md");
+    let duplicate_content = format!(
+        "@AGENTS.md\n\n# User Guidelines\nBe careful.\n\n{}\n## Managed Block\n{}\n",
+        crate::harness::claude::CE_MANAGED_BEGIN,
+        crate::harness::claude::CE_MANAGED_END
+    );
+    fs::write(&claude_md, duplicate_content).unwrap();
+
+    reconcile_project_harness_hooks(project_dir, "## Managed Block").unwrap();
+
+    let claude_content = fs::read_to_string(&claude_md).unwrap();
+    assert!(claude_content.contains("@AGENTS.md"));
+    assert!(claude_content.contains("# User Guidelines\nBe careful."));
+    assert!(!claude_content.contains(crate::harness::claude::CE_MANAGED_BEGIN));
+    assert!(!claude_content.contains("## Managed Block"));
+}
+
+#[test]
+fn test_reconcile_project_harness_hooks_injects_claude_when_not_delegating() {
+    let tmp = TempDir::new().unwrap();
+    let project_dir = tmp.path();
+
+    let claude_dir = project_dir.join(".claude");
+    fs::create_dir_all(&claude_dir).unwrap();
+
+    let claude_md = project_dir.join("CLAUDE.md");
+    fs::write(&claude_md, "# Custom Rules\n").unwrap();
+
+    reconcile_project_harness_hooks(project_dir, "## Managed Block").unwrap();
+
+    let claude_content = fs::read_to_string(&claude_md).unwrap();
+    assert!(claude_content.contains("# Custom Rules"));
+    assert!(claude_content.contains(crate::harness::claude::CE_MANAGED_BEGIN));
+    assert!(claude_content.contains("## Managed Block"));
+}

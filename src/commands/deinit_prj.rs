@@ -111,7 +111,10 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
         ] {
             if claude_rule.exists() {
                 if let Ok(c_text) = fs::read_to_string(claude_rule) {
-                    if c_text.contains(crate::harness::claude::CE_MANAGED_BEGIN) {
+                    if c_text.contains(crate::harness::claude::CE_MANAGED_BEGIN)
+                        || c_text.contains(BLOCK_BEGIN_MARKER)
+                        || c_text.trim() == "@AGENTS.md"
+                    {
                         let stripped = crate::harness::claude::strip_managed_block(&c_text);
                         if stripped.trim().is_empty() || stripped.trim() == "@AGENTS.md" {
                             report_best_effort_remove(claude_rule, fs::remove_file(claude_rule));

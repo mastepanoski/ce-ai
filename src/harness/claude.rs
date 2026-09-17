@@ -241,13 +241,16 @@ pub fn update_managed_block(content: &str, managed_text: &str) -> String {
 
 /// Strip demarcated managed comment block on project de-adoption or uninstallation.
 pub fn strip_managed_block(content: &str) -> String {
-    let start_opt = content.find(CE_MANAGED_BEGIN);
-    let end_opt = content.find(CE_MANAGED_END);
+    let mut result = content.to_string();
 
-    match (start_opt, end_opt) {
+    // 1. Strip CE_MANAGED_BEGIN ... CE_MANAGED_END
+    let start_opt = result.find(CE_MANAGED_BEGIN);
+    let end_opt = result.find(CE_MANAGED_END);
+
+    result = match (start_opt, end_opt) {
         (Some(start), Some(end)) if start <= end => {
-            let before = content[..start].trim_end();
-            let after = content[end + CE_MANAGED_END.len()..].trim_start();
+            let before = result[..start].trim_end();
+            let after = result[end + CE_MANAGED_END.len()..].trim_start();
             if before.is_empty() {
                 after.to_string()
             } else if after.is_empty() {
@@ -256,12 +259,68 @@ pub fn strip_managed_block(content: &str) -> String {
                 format!("{}\n\n{}", before, after)
             }
         }
-        (Some(start), _) => content[..start].trim_end().to_string(),
-        (_, Some(end)) => content[end + CE_MANAGED_END.len()..]
+        (Some(start), _) => result[..start].trim_end().to_string(),
+        (_, Some(end)) => result[end + CE_MANAGED_END.len()..]
             .trim_start()
             .to_string(),
-        (None, None) => content.to_string(),
+        (None, None) => result,
+    };
+
+    // 2. Also strip BLOCK_BEGIN_MARKER ... BLOCK_END_MARKER if present
+    const BLOCK_BEGIN: &str = "<!-- ce-ai:block begin";
+    const BLOCK_END: &str = "<!-- ce-ai:block end -->";
+    if let Some(start) = result.find(BLOCK_BEGIN) {
+        if let Some(end_rel) = result[start..].find(BLOCK_END) {
+            let end = start + end_rel + BLOCK_END.len();
+            let before = result[..start].trim_end();
+            let after = result[end..].trim_start();
+            result = if before.is_empty() {
+                after.to_string()
+            } else if after.is_empty() {
+                before.to_string()
+            } else {
+                format!("{}\n\n{}", before, after)
+            };
+        }
     }
+
+    result
+}
+
+/// Returns true if the given markdown content delegates to an `AGENTS.md` file via Claude Code's `@` import syntax.
+pub fn delegates_to_agents_md(content: &str) -> bool {
+    let mut in_code_fence = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_code_fence = !in_code_fence;
+            continue;
+        }
+        if in_code_fence {
+            continue;
+        }
+
+        // Support optional bullet prefixes: "- @AGENTS.md" or "* @AGENTS.md"
+        let unbulleted = trimmed
+            .strip_prefix('-')
+            .or_else(|| trimmed.strip_prefix('*'))
+            .map(|s| s.trim())
+            .unwrap_or(trimmed);
+
+        if let Some(rest) = unbulleted.strip_prefix('@') {
+            let target_token = rest.split_whitespace().next().unwrap_or("");
+            let clean_target = target_token.trim_matches(['"', '\'', '`']);
+            if let Some(file_name) = std::path::Path::new(clean_target).file_name() {
+                if file_name
+                    .to_string_lossy()
+                    .eq_ignore_ascii_case("AGENTS.md")
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 pub const RESUME_COMMAND: &str = "ce-ai workflow resume";
