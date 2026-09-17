@@ -1171,10 +1171,10 @@ pub fn probe_git_diff_loc(repo_root: &Path) -> usize {
 
     let mut total_loc = 0;
     for line in out.lines() {
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() >= 2 {
-            let added: usize = parts[0].parse().unwrap_or(0);
-            let deleted: usize = parts[1].parse().unwrap_or(0);
+        let mut parts = line.split_whitespace();
+        if let (Some(a), Some(d)) = (parts.next(), parts.next()) {
+            let added: usize = a.parse().unwrap_or(0);
+            let deleted: usize = d.parse().unwrap_or(0);
             total_loc += added + deleted;
         }
     }
@@ -1299,29 +1299,18 @@ pub fn parse_odd_task_content(content: &str, path: &Path) -> Result<OddTaskConte
                 guardrails.push_str(line);
             }
             "dod" => {
-                if trimmed.starts_with("- [ ] ") || trimmed.starts_with("- [ ]") {
-                    let item_text = if trimmed.len() > 5 {
-                        trimmed[5..].trim().to_string()
-                    } else {
-                        String::new()
-                    };
+                if let Some(rest) = trimmed.strip_prefix("- [ ]") {
                     dod_items.push(OddDoDItem {
                         checked: false,
-                        title: item_text,
+                        title: rest.trim().to_string(),
                     });
-                } else if trimmed.starts_with("- [x] ")
-                    || trimmed.starts_with("- [x]")
-                    || trimmed.starts_with("- [X] ")
-                    || trimmed.starts_with("- [X]")
+                } else if let Some(rest) = trimmed
+                    .strip_prefix("- [x]")
+                    .or_else(|| trimmed.strip_prefix("- [X]"))
                 {
-                    let item_text = if trimmed.len() > 5 {
-                        trimmed[5..].trim().to_string()
-                    } else {
-                        String::new()
-                    };
                     dod_items.push(OddDoDItem {
                         checked: true,
-                        title: item_text,
+                        title: rest.trim().to_string(),
                     });
                 }
             }
