@@ -243,6 +243,10 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 },
                 thresholds: crate::decisions::RoutingThresholds::default(),
             },
+            skills: crate::decisions::SkillRoutingConfig {
+                enabled: true,
+                minimum_confidence_pct: 70,
+            },
         },
         "shadow" => DecisionsConfig {
             enabled: true,
@@ -265,6 +269,10 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 },
                 thresholds: crate::decisions::RoutingThresholds::default(),
             },
+            skills: crate::decisions::SkillRoutingConfig {
+                enabled: true,
+                minimum_confidence_pct: 70,
+            },
         },
         "local" => DecisionsConfig {
             enabled: true,
@@ -280,6 +288,10 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                     reasoning: Some("mock/reasoning".into()),
                 },
                 thresholds: crate::decisions::RoutingThresholds::default(),
+            },
+            skills: crate::decisions::SkillRoutingConfig {
+                enabled: true,
+                minimum_confidence_pct: 70,
             },
         },
         _ => {

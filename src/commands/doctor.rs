@@ -876,6 +876,16 @@ pub(crate) fn probe_decision_engine_health(
         } else {
             println!("doctor-info: decision-routing: disabled (static agent slots used)");
         }
+
+        let skills_cfg = &decisions_cfg.skills;
+        if skills_cfg.enabled {
+            println!(
+                "doctor-info: skill-routing: active (threshold: {}%)",
+                skills_cfg.minimum_confidence_pct
+            );
+        } else {
+            println!("doctor-info: skill-routing: disabled (keyword matching used)");
+        }
     } else {
         println!(
             "doctor-info: decision-engine: not configured (optional System 1 decision layer; run 'ce-ai decisions setup' to enable fast probabilistic routing & risk checks)"

@@ -6,6 +6,7 @@ pub mod budget;
 pub mod jev;
 pub mod mock;
 pub mod routing;
+pub mod skill_routing;
 pub mod types;
 
 pub use auth::{
@@ -17,6 +18,9 @@ pub use mock::{HealthStatus, MockDecisionProvider};
 pub use routing::{
     ModelClass, ModelClassCatalog, ModelRouter, ModelRoutingConfig, RoutingResolution,
     RoutingThresholds,
+};
+pub use skill_routing::{
+    SkillClassification, SkillRouter, SkillRoutingConfig, SkillRoutingResult, RECOGNIZED_CATEGORIES,
 };
 pub use types::{
     DecisionAnswer, DecisionContext, DecisionMode, DecisionQuestion, DecisionRequest,

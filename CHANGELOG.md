@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.61.0] - 2026-09-18
+
+### Added
+- **Dynamic Skill Selection & Injection — System One Context-Aware Plugin/Skill Advisory (#384)**:
+  - **Skill Category Metadata & Frontmatter Extension (`src/source/registry.rs`)**: Extended `SkillEntry` and `SkillFrontmatter` with optional `categories` metadata. Enhanced YAML frontmatter parser to extract categories from top-level (`categories: [...]`), bulleted lists, or nested decision metadata (`decision.categories: [...]`) without breaking backward compatibility.
+  - **Semantic Intent Category Classification (`src/decisions/skill_routing.rs`)**: Implemented `SkillRouter` evaluating 7 standardized semantic dimensions (`architecture`, `security`, `testing`, `debugging`, `documentation`, `code_review`, `research`) via the System 1 Decision Engine. Applied integer-percentage thresholding (`minimum_confidence_pct = 70`) preserving `State` `Eq` derivation.
+  - **Authoritative Precedence & Cryptographic Invariant Enforcement**: Decision provider suggestions are treated strictly as untrusted category hints. Local `SkillRegistry` retains exclusive ownership of path resolution, scope precedence (Workspace `.ce-ai` > Workspace `.opencode` > Global), authorized root boundaries, and runtime SHA256 integrity verification. Tampered or missing skill files fail closed with `fallback-fuzzy` degradation.
+  - **CLI Diagnostics & Dynamic Advisory Ergonomics (`ce-ai skills resolve`)**: Extended `ce-ai skills resolve "<task>"` to support `--json` structured formatting (emitting `task`, `candidate_categories`, `classifications`, `resolved_skills`, `fallback_applied`, `latency_ms`) and `--verbose` confidence metrics and category breakdown.
+  - **Presets & Doctor Health Probe Integration**: Configured `ce-ai decisions setup --preset recommended|shadow|local` to automatically enable skill routing with 70% threshold. Updated `ce-ai doctor` to probe and display active skill routing status.
+  - **Graceful Fallback Invariant**: Immediate fallback to deterministic keyword matching with exit code 0 when skill routing is unconfigured, disabled, or if the decision provider encounters network/circuit-breaker failures.
+
 ## [1.60.0] - 2026-09-18
 
 ### Added

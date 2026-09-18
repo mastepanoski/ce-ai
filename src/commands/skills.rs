@@ -44,6 +44,10 @@ pub enum Action {
         /// Output resolution result in machine-readable JSON format.
         #[arg(long, default_value_t = false)]
         json: bool,
+
+        /// Print verbose category classification scores and resolution details.
+        #[arg(long, short = 'v', default_value_t = false)]
+        verbose: bool,
     },
     /// Run diagnostic health check on skill registry integrity (alias to ce-ai doctor probe).
     Doctor,
@@ -118,6 +122,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             query_pos,
             query,
             json,
+            verbose,
         } => {
             let effective_query = query_pos
                 .as_deref()
@@ -131,7 +136,19 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             }
 
             let harness_kind = harness.parse::<HarnessKind>()?;
-            let (status, skills, markdown) = registry.resolve(harness_kind, effective_query);
+            let state = crate::state::state::State::load_with_workspace_overrides(
+                &ctx.config_dir.join("state.json"),
+                ctx.workspace_root.as_deref(),
+            )
+            .unwrap_or_default();
+            let decisions_config = state.decisions.unwrap_or_default();
+            let engine = crate::decisions::DecisionEngine::from_config(&decisions_config);
+            let router = crate::decisions::skill_routing::SkillRouter::new(
+                &decisions_config.skills,
+                Some(&engine),
+            );
+            let (routing_result, status, markdown) =
+                router.route(&registry, harness_kind, effective_query);
 
             if status == "fallback-fuzzy" {
                 eprintln!(
@@ -143,12 +160,60 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             if *json {
                 let output = serde_json::json!({
                     "resolution_status": status,
-                    "query": effective_query,
                     "harness": harness_kind.as_str(),
-                    "skills": skills,
+                    "task": routing_result.task,
+                    "query": effective_query,
+                    "candidate_categories": routing_result.candidate_categories,
+                    "classifications": routing_result.classifications,
+                    "resolved_skills": routing_result.resolved_skills,
+                    "skills": routing_result.resolved_skills,
+                    "fallback_applied": routing_result.fallback_applied,
+                    "rationale": routing_result.rationale,
+                    "latency_ms": routing_result.latency_ms,
                 });
                 println!("{}", serde_json::to_string_pretty(&output)?);
             } else {
+                if *verbose || ctx.verbose {
+                    println!("🎯 Skill Intent Classification:");
+                    println!("  Task: {}", routing_result.task);
+                    if routing_result.fallback_applied {
+                        println!("  Fallback: yes ({})", routing_result.rationale);
+                    } else {
+                        println!("  Rationale: {}", routing_result.rationale);
+                    }
+                    if !routing_result.classifications.is_empty() {
+                        println!("  Category Breakdown:");
+                        for c in &routing_result.classifications {
+                            let indicator = if c.selected { " [SELECTED]" } else { "" };
+                            println!(
+                                "    - {:<15} {:.0}%{}",
+                                c.category,
+                                c.confidence * 100.0,
+                                indicator
+                            );
+                        }
+                    }
+                    if !routing_result.candidate_categories.is_empty() {
+                        println!(
+                            "  Candidate Categories: {}",
+                            routing_result.candidate_categories.join(", ")
+                        );
+                    }
+                    let resolved_names: Vec<_> = routing_result
+                        .resolved_skills
+                        .iter()
+                        .map(|s| s.name.as_str())
+                        .collect();
+                    if resolved_names.is_empty() {
+                        println!("  Resolved Skills: (none)");
+                    } else {
+                        println!("  Resolved Skills: {}", resolved_names.join(", "));
+                    }
+                    if routing_result.latency_ms > 0 {
+                        println!("  Latency: {}ms", routing_result.latency_ms);
+                    }
+                    println!();
+                }
                 print!("{}", markdown);
             }
         }
@@ -181,3 +246,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "tests/skills.rs"]
+mod tests;

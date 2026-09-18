@@ -9349,3 +9349,108 @@ fn test_cli_models_route_and_doctor_routing() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("decision-routing: active"));
 }
+
+#[test]
+fn test_cli_skills_resolve_with_routing() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join(".ce-ai");
+    let home = tmp.path().join("home");
+    let repo_root = tmp.path().join("repo");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(&repo_root).unwrap();
+
+    git_cmd()
+        .args(["init", "-b", "main"])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+
+    // Create a mock skill file on disk
+    let skill_path = config_dir.join("security_SKILL.md");
+    let skill_content =
+        b"# Security Review Skill\nAudit authentication tokens and security cookies.";
+    fs::write(&skill_path, skill_content).unwrap();
+    let sha = sha256_hex(skill_content);
+
+    // Create skills-registry.json
+    let registry_json = serde_json::json!({
+        "version": "1",
+        "updated_at": "2026-09-18T00:00:00Z",
+        "skills": [
+            {
+                "name": "security-review",
+                "description": "Audit authentication cookies and security tokens",
+                "scope": "global",
+                "triggers": ["security", "audit"],
+                "categories": ["security"],
+                "sha256": sha,
+                "harness_paths": {
+                    "opencode": skill_path.to_str().unwrap()
+                }
+            }
+        ]
+    });
+    fs::write(
+        config_dir.join("skills-registry.json"),
+        serde_json::to_string_pretty(&registry_json).unwrap(),
+    )
+    .unwrap();
+
+    // 1. Missing query returns error
+    let out = ceai(&config_dir, &home)
+        .args(["skills", "resolve"])
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert_eq!(out.status.code(), Some(2)); // CeError::Usage
+
+    // 2. Default (unconfigured) resolve via keyword matching
+    let out = ceai(&config_dir, &home)
+        .args(["skills", "resolve", "Audit security"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("<!-- ce-ai:skill_resolution status=paths-injected -->"));
+    assert!(stdout.contains("security-review"));
+
+    // 3. Resolve with --json
+    let out = ceai(&config_dir, &home)
+        .args(["skills", "resolve", "Audit security", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&out.stdout)).unwrap();
+    assert_eq!(json["task"], "Audit security");
+    assert_eq!(json["fallback_applied"], true);
+    assert_eq!(json["resolved_skills"][0]["name"], "security-review");
+
+    // 4. Configure local preset (mock provider with skill routing enabled)
+    ceai(&config_dir, &home)
+        .args(["decisions", "setup", "--preset", "local"])
+        .assert()
+        .success();
+
+    // 5. Doctor probe reflects skill-routing status
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["doctor"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("skill-routing: active (threshold: 70%)"));
+
+    // 6. Resolve with --verbose diagnostics
+    let out = ceai(&config_dir, &home)
+        .args(["skills", "resolve", "Audit security", "--verbose"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("🎯 Skill Intent Classification:"));
+    assert!(stdout.contains("Task: Audit security"));
+    assert!(stdout.contains("Resolved Skills: security-review"));
+}
