@@ -3,6 +3,7 @@
 
 pub mod auth;
 pub mod budget;
+pub mod jev;
 pub mod mock;
 pub mod types;
 
@@ -10,6 +11,7 @@ pub use auth::{
     default_credentials_path, mask_api_key, resolve_api_key, save_api_key, CredentialsFile,
 };
 pub use budget::{BudgetConfig, BudgetTracker, CircuitState, FallbackReason, MonthlyLedger};
+pub use jev::{JevConfig, JevProvider, JevWireRequest, JevWireResponse};
 pub use mock::{HealthStatus, MockDecisionProvider};
 pub use types::{
     DecisionAnswer, DecisionContext, DecisionMode, DecisionQuestion, DecisionRequest,

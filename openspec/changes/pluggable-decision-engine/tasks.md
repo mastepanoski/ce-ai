@@ -23,13 +23,13 @@
   - [x] Add unit tests validating monthly rollover, budget cutoff, and consecutive failure tripping (3 timeouts ➔ open circuit).
   - [x] TDD Verification: `cargo test decisions::budget`
 
-- [ ] **Work Unit 4: Jev (TypeSafe AI) HTTP Client Provider** (est. ~190 LOC)
-  - [ ] Create `src/decisions/jev.rs` implementing `DecisionProvider` for TypeSafe AI's Jev API.
-  - [ ] Map `DecisionQuestion` enums to Jev API JSON schema and parse responses with probability distributions.
-  - [ ] Wire timeout and connection pooling using `reqwest::blocking`.
-  - [ ] Implement `check_health()` endpoint ping for doctor integration.
-  - [ ] Add unit tests validating payload serialization and response parsing against sample Jev responses.
-  - [ ] TDD Verification: `cargo test decisions::jev`
+- [x] **Work Unit 4: Jev (TypeSafe AI) HTTP Client Provider** (est. ~190 LOC)
+  - [x] Create `src/decisions/jev.rs` implementing `DecisionProvider` for TypeSafe AI's Jev API.
+  - [x] Map `DecisionQuestion` enums to Jev API JSON schema and parse responses with probability distributions.
+  - [x] Wire timeout and connection pooling using `reqwest::blocking`.
+  - [x] Implement `check_health()` endpoint ping for doctor integration.
+  - [x] Add unit tests validating payload serialization and response parsing against sample Jev responses.
+  - [x] TDD Verification: `cargo test decisions::jev`
 
 - [ ] **Work Unit 5: CLI Subcommand, Doctor Probe & Integration** (est. ~210 LOC)
   - [ ] Create `src/commands/decisions.rs` implementing `ce-ai decisions [status|auth|setup|test]`.
