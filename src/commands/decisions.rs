@@ -50,6 +50,8 @@ pub enum Action {
         #[arg(long)]
         provider: Option<String>,
     },
+    /// Evaluate model routing recommendation for a given task description.
+    Route(crate::commands::models::RouteArgs),
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
@@ -58,6 +60,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         Action::Auth { key, check } => handle_auth(ctx, key.as_deref(), *check),
         Action::Setup { preset } => handle_setup(ctx, preset),
         Action::Test { provider } => handle_test(ctx, provider.as_deref()),
+        Action::Route(route_args) => crate::commands::models::route(ctx, route_args),
     }
 }
 
@@ -231,6 +234,15 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 cooloff_secs: 60,
             },
             jev: JevConfig::default(),
+            routing: crate::decisions::ModelRoutingConfig {
+                enabled: true,
+                models: crate::decisions::ModelClassCatalog {
+                    fast: Some("anthropic/claude-3-5-haiku".into()),
+                    standard: Some("anthropic/claude-3-5-sonnet".into()),
+                    reasoning: Some("anthropic/claude-3-7-sonnet".into()),
+                },
+                thresholds: crate::decisions::RoutingThresholds::default(),
+            },
         },
         "shadow" => DecisionsConfig {
             enabled: true,
@@ -244,6 +256,15 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 cooloff_secs: 60,
             },
             jev: JevConfig::default(),
+            routing: crate::decisions::ModelRoutingConfig {
+                enabled: true,
+                models: crate::decisions::ModelClassCatalog {
+                    fast: Some("anthropic/claude-3-5-haiku".into()),
+                    standard: Some("anthropic/claude-3-5-sonnet".into()),
+                    reasoning: Some("anthropic/claude-3-7-sonnet".into()),
+                },
+                thresholds: crate::decisions::RoutingThresholds::default(),
+            },
         },
         "local" => DecisionsConfig {
             enabled: true,
@@ -251,6 +272,15 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
             mode: DecisionMode::Active,
             budget: BudgetConfig::default(),
             jev: JevConfig::default(),
+            routing: crate::decisions::ModelRoutingConfig {
+                enabled: true,
+                models: crate::decisions::ModelClassCatalog {
+                    fast: Some("mock/fast".into()),
+                    standard: Some("mock/standard".into()),
+                    reasoning: Some("mock/reasoning".into()),
+                },
+                thresholds: crate::decisions::RoutingThresholds::default(),
+            },
         },
         _ => {
             return Err(CeError::Usage(format!(

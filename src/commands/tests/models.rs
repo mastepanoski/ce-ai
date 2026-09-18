@@ -305,3 +305,71 @@ fn set_mid_tier_slot_persists_and_creates_snapshot() {
     let count = std::fs::read_dir(&versions_dir).unwrap().count();
     assert!(count >= 1);
 }
+
+#[test]
+fn test_models_route_cli_disabled_returns_fallback() {
+    let tmp = TempDir::new().unwrap();
+    let ctx = hermetic_ctx(&tmp);
+
+    let route_args = RouteArgs {
+        task: "Fix a spelling error in comments".into(),
+        json: false,
+        verbose: false,
+        slot: None,
+        model: None,
+        default_model: "anthropic/claude-3-5-sonnet".into(),
+    };
+
+    let result = route(&ctx, &route_args);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_models_route_cli_explicit_override_takes_precedence() {
+    let tmp = TempDir::new().unwrap();
+    let ctx = hermetic_ctx(&tmp);
+
+    let route_args = RouteArgs {
+        task: "Fix a spelling error in comments".into(),
+        json: true,
+        verbose: true,
+        slot: None,
+        model: Some("custom/override-model".into()),
+        default_model: "anthropic/claude-3-5-sonnet".into(),
+    };
+
+    let result = route(&ctx, &route_args);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_models_route_cli_slot_assignment_takes_precedence() {
+    let tmp = TempDir::new().unwrap();
+    let ctx = hermetic_ctx(&tmp);
+
+    // Save a model assignment in state.json
+    let mut state = State::default();
+    state.model_assignments.insert(
+        "ce-brainstorm".into(),
+        crate::state::state::ModelAssignment {
+            provider_id: "openai".into(),
+            model_id: "gpt-4o".into(),
+            effort: None,
+        },
+    );
+    let state_file = ctx.config_dir.join("state.json");
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::write(&state_file, serde_json::to_string(&state).unwrap()).unwrap();
+
+    let route_args = RouteArgs {
+        task: "Brainstorm new product ideas".into(),
+        json: true,
+        verbose: false,
+        slot: Some("ce-brainstorm".into()),
+        model: None,
+        default_model: "anthropic/claude-3-5-sonnet".into(),
+    };
+
+    let result = route(&ctx, &route_args);
+    assert!(result.is_ok());
+}

@@ -860,6 +860,22 @@ pub(crate) fn probe_decision_engine_health(
                 }
             }
         }
+
+        let routing = &decisions_cfg.routing;
+        if routing.enabled {
+            let fast = routing.models.fast.as_deref().unwrap_or("unconfigured");
+            let std = routing.models.standard.as_deref().unwrap_or("unconfigured");
+            let rsn = routing
+                .models
+                .reasoning
+                .as_deref()
+                .unwrap_or("unconfigured");
+            println!(
+                "doctor-info: decision-routing: active (fast: {fast}, standard: {std}, reasoning: {rsn})"
+            );
+        } else {
+            println!("doctor-info: decision-routing: disabled (static agent slots used)");
+        }
     } else {
         println!(
             "doctor-info: decision-engine: not configured (optional System 1 decision layer; run 'ce-ai decisions setup' to enable fast probabilistic routing & risk checks)"

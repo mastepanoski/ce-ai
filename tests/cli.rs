@@ -9258,3 +9258,94 @@ fn test_cli_doctor_probe_decisions() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("decision-engine: mock provider active (offline testing mode)"));
 }
+
+#[test]
+fn test_cli_models_route_and_doctor_routing() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join(".ce-ai");
+    let home = tmp.path().join("home");
+    std::fs::create_dir_all(&config_dir).unwrap();
+    std::fs::create_dir_all(&home).unwrap();
+
+    // 1. When decisions are not configured, models route returns fallback model gracefully (exit 0)
+    let out = ceai(&config_dir, &home)
+        .args(["models", "route", "Fix spelling error in comments"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Task: Fix spelling error in comments"));
+    assert!(stdout.contains("Fallback Applied: yes"));
+
+    // 2. Output as JSON
+    let out = ceai(&config_dir, &home)
+        .args([
+            "models",
+            "route",
+            "Fix spelling error in comments",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&out.stdout)).unwrap();
+    assert_eq!(json["task"], "Fix spelling error in comments");
+    assert_eq!(json["fallback_applied"], true);
+
+    // 3. Explicit model override takes precedence
+    let out = ceai(&config_dir, &home)
+        .args([
+            "models",
+            "route",
+            "Fix spelling error",
+            "--model",
+            "custom/override-model",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&out.stdout)).unwrap();
+    assert_eq!(json["resolved_model"], "custom/override-model");
+    assert_eq!(json["fallback_applied"], false);
+
+    // 4. Configure local preset (mock provider + mock models catalog)
+    ceai(&config_dir, &home)
+        .args(["decisions", "setup", "--preset", "local"])
+        .assert()
+        .success();
+
+    // 5. Query via decisions route alias
+    let out = ceai(&config_dir, &home)
+        .args([
+            "decisions",
+            "route",
+            "Design distributed consensus protocol",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&out.stdout)).unwrap();
+    assert!(json["resolved_model"].as_str().is_some());
+
+    // 6. Doctor reflects active routing catalog
+    let repo_root = tmp.path().join("repo");
+    std::fs::create_dir_all(&repo_root).unwrap();
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["doctor"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("decision-routing: active"));
+}

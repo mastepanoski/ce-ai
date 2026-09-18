@@ -400,6 +400,8 @@ pub struct DecisionsConfig {
     pub budget: crate::decisions::BudgetConfig,
     #[serde(default)]
     pub jev: crate::decisions::JevConfig,
+    #[serde(default)]
+    pub routing: crate::decisions::ModelRoutingConfig,
 }
 
 fn default_provider_name() -> String {
@@ -414,6 +416,7 @@ impl Default for DecisionsConfig {
             mode: crate::decisions::DecisionMode::Active,
             budget: crate::decisions::BudgetConfig::default(),
             jev: crate::decisions::JevConfig::default(),
+            routing: crate::decisions::ModelRoutingConfig::default(),
         }
     }
 }
