@@ -50,6 +50,22 @@ pub enum Action {
         #[arg(long)]
         provider: Option<String>,
     },
+    /// Evaluate execution risk policy for a command or tool invocation.
+    CheckRisk {
+        /// Tool name (e.g. "run_command", "write_to_file", "delete_file").
+        tool: String,
+        /// Command string or target path to evaluate.
+        command: String,
+        /// Optional prompt or context of the current task.
+        #[arg(long)]
+        task: Option<String>,
+        /// Output in JSON format.
+        #[arg(long)]
+        json: bool,
+        /// Display individual risk dimension scores.
+        #[arg(long)]
+        verbose: bool,
+    },
     /// Evaluate model routing recommendation for a given task description.
     Route(crate::commands::models::RouteArgs),
 }
@@ -60,6 +76,13 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         Action::Auth { key, check } => handle_auth(ctx, key.as_deref(), *check),
         Action::Setup { preset } => handle_setup(ctx, preset),
         Action::Test { provider } => handle_test(ctx, provider.as_deref()),
+        Action::CheckRisk {
+            tool,
+            command,
+            task,
+            json,
+            verbose,
+        } => handle_check_risk(ctx, tool, command, task.as_deref(), *json, *verbose),
         Action::Route(route_args) => crate::commands::models::route(ctx, route_args),
     }
 }
@@ -124,6 +147,12 @@ fn handle_status(ctx: &Context, as_json: bool) -> Result<(), CeError> {
                 "session_requests": tracker.session_requests(),
                 "max_session_requests": config.budget.max_session_requests,
                 "consecutive_failures": tracker.consecutive_failures(),
+            },
+            "risk": {
+                "enabled": config.risk.enabled,
+                "confirmation_threshold_pct": config.risk.thresholds.confirmation_threshold_pct,
+                "deny_threshold_pct": config.risk.thresholds.deny_threshold_pct,
+                "fallback": config.risk.fallback.as_str(),
             }
         });
         println!(
@@ -174,6 +203,19 @@ fn handle_status(ctx: &Context, as_json: bool) -> Result<(), CeError> {
         "  Failures:      {} consecutive (circuit closed)",
         tracker.consecutive_failures()
     );
+
+    println!();
+    println!("Risk Evaluation Engine");
+    println!(
+        "  Enabled:     {}",
+        if config.risk.enabled { "yes" } else { "no" }
+    );
+    println!(
+        "  Thresholds:  Confirmation >= {}%, Deny >= {}%",
+        config.risk.thresholds.confirmation_threshold_pct,
+        config.risk.thresholds.deny_threshold_pct
+    );
+    println!("  Fallback:    {}", config.risk.fallback.as_str());
 
     Ok(())
 }
@@ -247,6 +289,11 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 enabled: true,
                 minimum_confidence_pct: 70,
             },
+            risk: crate::decisions::RiskConfig {
+                enabled: true,
+                thresholds: crate::decisions::RiskThresholds::default(),
+                fallback: crate::decisions::RiskFallbackPolicy::RequireConfirmation,
+            },
         },
         "shadow" => DecisionsConfig {
             enabled: true,
@@ -273,6 +320,11 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 enabled: true,
                 minimum_confidence_pct: 70,
             },
+            risk: crate::decisions::RiskConfig {
+                enabled: true,
+                thresholds: crate::decisions::RiskThresholds::default(),
+                fallback: crate::decisions::RiskFallbackPolicy::RequireConfirmation,
+            },
         },
         "local" => DecisionsConfig {
             enabled: true,
@@ -292,6 +344,11 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
             skills: crate::decisions::SkillRoutingConfig {
                 enabled: true,
                 minimum_confidence_pct: 70,
+            },
+            risk: crate::decisions::RiskConfig {
+                enabled: true,
+                thresholds: crate::decisions::RiskThresholds::default(),
+                fallback: crate::decisions::RiskFallbackPolicy::RequireConfirmation,
             },
         },
         _ => {
@@ -399,4 +456,152 @@ fn handle_test(ctx: &Context, provider_override: Option<&str>) -> Result<(), CeE
     }
 
     Ok(())
+}
+
+fn handle_check_risk(
+    ctx: &Context,
+    tool: &str,
+    command: &str,
+    task: Option<&str>,
+    as_json: bool,
+    verbose: bool,
+) -> Result<(), CeError> {
+    let state_path = ctx.config_dir.join("state.json");
+    let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
+        .unwrap_or_default();
+    let config = state.decisions.unwrap_or_default();
+
+    let provider_box: Option<Box<dyn DecisionProvider>> = if !config.enabled {
+        None
+    } else if config.provider == "mock" {
+        Some(Box::new(MockDecisionProvider::new()))
+    } else {
+        Some(Box::new(JevProvider::new(config.jev.clone(), None)))
+    };
+
+    let engine = DecisionEngine::new(provider_box, config.mode);
+    let evaluator = crate::decisions::RiskEvaluator::new(&config.risk, Some(&engine));
+    let result = evaluator.evaluate(tool, command, task);
+
+    // Persist to risk audit log
+    let _ = crate::decisions::log_risk_event(&ctx.config_dir, &result);
+
+    if as_json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&result)
+                .map_err(|e| CeError::Runtime(format!("failed to serialize risk result: {e}")))?
+        );
+        return Ok(());
+    }
+
+    let policy_label = match result.policy {
+        crate::decisions::ExecutionPolicy::Allow => "ALLOW (Safe to execute)",
+        crate::decisions::ExecutionPolicy::RequireConfirmation => {
+            "REQUIRE_CONFIRMATION (User approval needed)"
+        }
+        crate::decisions::ExecutionPolicy::Deny => "DENY (Categorically blocked)",
+    };
+
+    println!("Risk Evaluation Policy: {policy_label}");
+    println!("  Tool:       {}", result.tool);
+    println!("  Command:    {}", result.command);
+    if let Some(t) = &result.task {
+        println!("  Task:       {t}");
+    }
+    println!("  Score:      {:.1}%", result.composite_risk_score * 100.0);
+    println!("  Reason:     {}", result.reason);
+    if result.fallback_applied {
+        println!("  Fallback:   Active (provider unconfigured or unreachable)");
+    }
+    println!("  Latency:    {}ms", result.latency_ms);
+
+    if verbose && !result.dimensions.is_empty() {
+        println!();
+        println!("Risk Dimensions Breakdown:");
+        for dim in &result.dimensions {
+            let status = if dim.elevated { "ELEVATED" } else { "safe" };
+            println!(
+                "  - {:<22} {:>5.1}% [{status}]",
+                dim.dimension,
+                dim.confidence * 100.0
+            );
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_handle_check_risk_deterministic_denial() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().to_path_buf(),
+            opencode_config_dir: temp.path().join("opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        let res = handle_check_risk(&ctx, "run_command", "rm -rf /", None, true, false);
+        assert!(res.is_ok());
+
+        let log_file = crate::decisions::risk_events_log_path(&ctx.config_dir);
+        assert!(log_file.exists());
+        let log_content = std::fs::read_to_string(&log_file).unwrap();
+        assert!(log_content.contains("\"policy\":\"deny\""));
+        assert!(log_content.contains("Deterministic denial"));
+    }
+
+    #[test]
+    fn test_handle_check_risk_safe_read_only() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().to_path_buf(),
+            opencode_config_dir: temp.path().join("opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        let res = handle_check_risk(&ctx, "run_command", "ls -la", None, true, false);
+        assert!(res.is_ok());
+
+        let log_file = crate::decisions::risk_events_log_path(&ctx.config_dir);
+        assert!(log_file.exists());
+        let log_content = std::fs::read_to_string(&log_file).unwrap();
+        assert!(log_content.contains("\"policy\":\"allow\""));
+        assert!(log_content.contains("Categorically safe"));
+    }
+
+    #[test]
+    fn test_handle_setup_presets_configure_risk() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().to_path_buf(),
+            opencode_config_dir: temp.path().join("opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        handle_setup(&ctx, "recommended").unwrap();
+        let state = State::load(&ctx.config_dir.join("state.json")).unwrap();
+        let decisions = state.decisions.unwrap();
+        assert!(decisions.risk.enabled);
+        assert_eq!(decisions.risk.thresholds.confirmation_threshold_pct, 60);
+        assert_eq!(decisions.risk.thresholds.deny_threshold_pct, 90);
+        assert_eq!(
+            decisions.risk.fallback,
+            crate::decisions::RiskFallbackPolicy::RequireConfirmation
+        );
+    }
 }

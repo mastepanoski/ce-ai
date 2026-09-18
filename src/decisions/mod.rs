@@ -5,6 +5,7 @@ pub mod auth;
 pub mod budget;
 pub mod jev;
 pub mod mock;
+pub mod risk;
 pub mod routing;
 pub mod skill_routing;
 pub mod types;
@@ -15,6 +16,11 @@ pub use auth::{
 pub use budget::{BudgetConfig, BudgetTracker, CircuitState, FallbackReason, MonthlyLedger};
 pub use jev::{JevConfig, JevProvider, JevWireRequest, JevWireResponse};
 pub use mock::{HealthStatus, MockDecisionProvider};
+pub use risk::{
+    check_deterministic_denial, is_safe_read_only, log_risk_event, redact_sensitive_content,
+    risk_events_log_path, ExecutionPolicy, RiskConfig, RiskDimensionScore, RiskEvaluationResult,
+    RiskEvaluator, RiskFallbackPolicy, RiskThresholds, RECOGNIZED_RISK_DIMENSIONS,
+};
 pub use routing::{
     ModelClass, ModelClassCatalog, ModelRouter, ModelRoutingConfig, RoutingResolution,
     RoutingThresholds,

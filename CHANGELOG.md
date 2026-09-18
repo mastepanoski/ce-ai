@@ -5,6 +5,21 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.62.0] - 2026-09-18
+
+### Added
+- **Risk-Aware Tool Execution & Intelligent Permission Evaluation Engine (#385)**:
+  - **Two-Tier Defense-in-Depth Model (`src/decisions/risk.rs`)**: Implemented two-tier security authorization combining deterministic pre-filtering (Tier 1) with System 1 probabilistic risk classification (Tier 2).
+  - **Deterministic Security Pre-Filter (`check_deterministic_denial`)**: Immediate 0ms Categorical Denials for root wipes (`rm -rf /`), device wipes (`mkfs`, `dd if=/dev/zero`), fork bombs, privilege escalation (`sudo`, `doas`, `su`), protected filesystem modifications (`/etc/shadow`, `/etc/sudoers`), key exfiltration (`.ssh/id_rsa`, `.gnupg/`), and protected branch force-pushes.
+  - **Hard Invariant Enforcement**: Probabilistic classification can elevate `Allow` to `RequireConfirmation` or `Deny`, but can NEVER override a deterministic denial under any circumstances.
+  - **Categorically Safe Read-Only Bypass (`is_safe_read_only`)**: Fast-path 0ms authorization for read-only tools (`read_file`, `view_file`, `list_dir`, `grep_search`) and benign inspection commands (`ls`, `pwd`, `cat`, `git status`, `git diff`, `cargo check`, `cargo clippy`) without network overhead.
+  - **6 Semantic Risk Dimensions & Thresholds**: System 1 evaluation across `destructive`, `credential_sensitive`, `external_side_effect`, `privilege_escalation`, `irreversible`, and `scope_exceeds_task`. Configured via integer percentage thresholds in `state.json` (`confirmation_threshold_pct = 60`, `deny_threshold_pct = 90`) preserving `State` `Eq` derivation.
+  - **Conservative Fail-Closed Degradation**: When decision providers timeout, encounter HTTP errors, or when circuit-breakers trip, execution defaults to `RequireConfirmation` (or configured `deny` fallback), guaranteeing zero unconfirmed escalation during outages.
+  - **Sensitive Credential Sanitization (`redact_sensitive_content`)**: Pre-prompt argument sanitizer redacting API tokens (`sk-*`, `ghp_*`, `ts_*`), passwords, and private key blocks before dispatch to remote decision providers or local audit logs.
+  - **CLI Diagnostic Subcommand (`ce-ai decisions check-risk`)**: Added `ce-ai decisions check-risk "<tool>" "<command>" [--task "<task>"] [--json] [--verbose]` for evaluating risk policies and inspecting dimension scores.
+  - **Audit Event Logging (`log_risk_event`)**: Automatically logs redacted evaluation outcomes and telemetry to `risk-events.jsonl` in the configuration directory.
+  - **Preset & Doctor Health Probe Integration**: Configured `setup --preset recommended|shadow|local` to initialize risk thresholds. Updated `ce-ai doctor` with risk engine probe reporting threshold configurations and fallback policies.
+
 ## [1.61.0] - 2026-09-18
 
 ### Added
