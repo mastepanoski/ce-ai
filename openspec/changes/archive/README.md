@@ -49,3 +49,4 @@ Historical notes:
 - odd-mode-router-and-graduation: archived (45/45 tasks) under criterion (1) on 2026-09-18.
 - model-routing: archived (27/27 tasks) under criterion (1) on 2026-09-18.
 - skill-routing: archived (25/25 tasks) under criterion (1) on 2026-09-18.
+- risk-aware-execution: archived (25/25 tasks) under criterion (1) on 2026-09-18.
