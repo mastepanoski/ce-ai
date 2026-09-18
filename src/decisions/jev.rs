@@ -83,7 +83,7 @@ impl JevProvider {
     }
 
     pub fn has_api_key(&self) -> bool {
-        self.api_key.is_some()
+        self.api_key.is_some() || crate::decisions::auth::resolve_api_key(None).is_some()
     }
 
     /// Serializes a domain `DecisionRequest` into the Jev wire protocol.
@@ -117,12 +117,19 @@ impl DecisionProvider for JevProvider {
     }
 
     fn evaluate(&self, request: DecisionRequest) -> Result<DecisionResponse, CeError> {
-        let key = self.api_key.as_deref().ok_or_else(|| {
-            CeError::Usage(
-                "Jev API key not configured. Set TYPESAFE_API_KEY environment variable or run 'ce-ai decisions auth'."
-                    .into(),
-            )
-        })?;
+        let key_resolved;
+        let key = match self.api_key.as_deref() {
+            Some(k) => k,
+            None => {
+                key_resolved = crate::decisions::auth::resolve_api_key(None);
+                key_resolved.as_deref().ok_or_else(|| {
+                    CeError::Usage(
+                        "Jev API key not configured. Set TYPESAFE_API_KEY environment variable or run 'ce-ai decisions auth'."
+                            .into(),
+                    )
+                })?
+            }
+        };
 
         let url = format!("{}/decide", self.config.endpoint.trim_end_matches('/'));
         let wire_req = self.build_wire_payload(request);
@@ -168,15 +175,21 @@ impl DecisionProvider for JevProvider {
     }
 
     fn check_health(&self) -> Result<HealthStatus, CeError> {
+        let key_resolved;
         let key = match self.api_key.as_deref() {
-            Some(k) => k,
+            Some(k) => Some(k),
             None => {
-                return Ok(HealthStatus {
-                    available: false,
-                    latency_ms: 0,
-                    message: "API key not configured (missing TYPESAFE_API_KEY)".into(),
-                });
+                key_resolved = crate::decisions::auth::resolve_api_key(None);
+                key_resolved.as_deref()
             }
+        };
+
+        let Some(key) = key else {
+            return Ok(HealthStatus {
+                available: false,
+                latency_ms: 0,
+                message: "API key not configured (missing TYPESAFE_API_KEY)".into(),
+            });
         };
 
         let url = format!("{}/health", self.config.endpoint.trim_end_matches('/'));

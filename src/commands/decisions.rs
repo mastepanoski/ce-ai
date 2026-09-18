@@ -4,7 +4,7 @@ use clap::{Args as ClapArgs, Subcommand};
 use serde_json::json;
 
 use crate::commands::Context;
-use crate::decisions::auth::{mask_api_key, resolve_api_key, save_api_key};
+use crate::decisions::auth::{resolve_api_key, save_api_key};
 use crate::decisions::budget::{BudgetConfig, BudgetTracker};
 use crate::decisions::jev::{JevConfig, JevProvider};
 use crate::decisions::mock::MockDecisionProvider;
@@ -95,7 +95,7 @@ fn handle_status(ctx: &Context, as_json: bool) -> Result<(), CeError> {
             let health = mock.check_health()?;
             (Some(Box::new(mock)), health)
         } else {
-            let jev = JevProvider::new(config.jev.clone(), resolved_key.clone());
+            let jev = JevProvider::new(config.jev.clone(), None);
             let health = jev.check_health()?;
             (Some(Box::new(jev)), health)
         };
@@ -109,7 +109,6 @@ fn handle_status(ctx: &Context, as_json: bool) -> Result<(), CeError> {
             "mode": config.mode.as_str(),
             "model": config.jev.model,
             "has_api_key": resolved_key.is_some(),
-            "api_key_masked": resolved_key.as_deref().map(mask_api_key),
             "health": {
                 "available": health.available,
                 "latency_ms": health.latency_ms,
@@ -141,7 +140,7 @@ fn handle_status(ctx: &Context, as_json: bool) -> Result<(), CeError> {
     println!("  Model:       {}", config.jev.model);
 
     match resolved_key.as_deref() {
-        Some(k) => println!("  API Key:     configured ({})", mask_api_key(k)),
+        Some(_) => println!("  API Key:     configured"),
         None => println!("  API Key:     not set (TYPESAFE_API_KEY missing)"),
     }
 
@@ -179,11 +178,7 @@ fn handle_status(ctx: &Context, as_json: bool) -> Result<(), CeError> {
 fn handle_auth(ctx: &Context, key: Option<&str>, check: bool) -> Result<(), CeError> {
     if let Some(k) = key {
         let saved_path = save_api_key(k, None)?;
-        println!(
-            "Saved API key to {} ({})",
-            saved_path.display(),
-            mask_api_key(k)
-        );
+        println!("Saved API key to {}", saved_path.display());
     }
 
     let resolved = resolve_api_key(None);
@@ -195,7 +190,7 @@ fn handle_auth(ctx: &Context, key: Option<&str>, check: bool) -> Result<(), CeEr
                 .unwrap_or_default();
         let config = state.decisions.unwrap_or_default();
 
-        let jev = JevProvider::new(config.jev, resolved.clone());
+        let jev = JevProvider::new(config.jev, None);
         let health = jev.check_health()?;
 
         if health.available {
@@ -208,7 +203,7 @@ fn handle_auth(ctx: &Context, key: Option<&str>, check: bool) -> Result<(), CeEr
         }
     } else if key.is_none() {
         match resolved.as_deref() {
-            Some(k) => println!("Current API key: configured ({})", mask_api_key(k)),
+            Some(_) => println!("Current API key: configured"),
             None => println!("Current API key: not set (run 'ce-ai decisions auth --key <KEY>' or export TYPESAFE_API_KEY)"),
         }
     }
@@ -290,7 +285,6 @@ fn handle_test(ctx: &Context, provider_override: Option<&str>) -> Result<(), CeE
     let config = state.decisions.unwrap_or_default();
 
     let target_provider = provider_override.unwrap_or(&config.provider);
-    let resolved_key = resolve_api_key(None);
 
     let provider: Box<dyn DecisionProvider> = if target_provider == "mock" {
         Box::new(
@@ -312,7 +306,7 @@ fn handle_test(ctx: &Context, provider_override: Option<&str>) -> Result<(), CeE
                 ),
         )
     } else {
-        Box::new(JevProvider::new(config.jev, resolved_key))
+        Box::new(JevProvider::new(config.jev, None))
     };
 
     let req = DecisionRequest::new(DecisionContext::new("Sample test task from ce-ai CLI"))

@@ -819,23 +819,20 @@ pub(crate) fn probe_decision_engine_health(
         } else {
             // Jev provider
             match resolved_key {
-                Some(key) => {
-                    let masked = crate::decisions::auth::mask_api_key(&key);
-                    let jev = crate::decisions::jev::JevProvider::new(
-                        decisions_cfg.jev.clone(),
-                        Some(key),
-                    );
+                Some(_) => {
+                    let jev =
+                        crate::decisions::jev::JevProvider::new(decisions_cfg.jev.clone(), None);
                     match jev.check_health() {
                         Ok(health) if health.available => {
                             println!(
-                                "doctor-info: decision-engine: jev ({}) active and healthy ({}ms)",
-                                masked, health.latency_ms
+                                "doctor-info: decision-engine: jev active and healthy ({}ms)",
+                                health.latency_ms
                             );
                         }
                         Ok(health) => {
                             let msg = format!(
-                                "decision-engine: jev ({}) health check failed: {}",
-                                masked, health.message
+                                "decision-engine: jev health check failed: {}",
+                                health.message
                             );
                             if strict {
                                 findings.push(msg);
