@@ -10,7 +10,10 @@ fn ctx() -> (TempDir, Context) {
 
 #[test]
 fn status_lists_stages_and_defaults_without_checkpoint() {
-    let (_tmp, ctx) = ctx();
+    let (_tmp, mut ctx) = ctx();
+    let ws = _tmp.path().join("workspace");
+    std::fs::create_dir_all(&ws).unwrap();
+    ctx.workspace_root = Some(ws);
     let joined = status_lines(&ctx).unwrap().join("\n");
     assert!(joined.contains("[1: Ideation]"));
     assert!(joined.contains("[7: Ship]"));
