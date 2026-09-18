@@ -9,12 +9,12 @@
   - [x] Add unit tests in `src/decisions/types.rs` and `src/decisions/mock.rs` validating serialization and offline evaluation.
   - [x] TDD Verification: `cargo test decisions::mock`
 
-- [ ] **Work Unit 2: Credential Resolution & Security Hygiene** (est. ~160 LOC)
-  - [ ] Create `src/decisions/auth.rs` implementing tiered resolution: `TYPESAFE_API_KEY` ➔ `JEV_API_KEY` ➔ `~/.config/ce-ai/credentials.toml`.
-  - [ ] Implement secure file write utility setting `0600` Unix permissions for `credentials.toml`.
-  - [ ] Implement key masking helper (e.g. `ts-****...****`) for terminal display.
-  - [ ] Add unit tests validating environment variable precedence, file fallback, and masking.
-  - [ ] TDD Verification: `cargo test decisions::auth`
+- [x] **Work Unit 2: Credential Resolution & Security Hygiene** (est. ~160 LOC)
+  - [x] Create `src/decisions/auth.rs` implementing tiered resolution: `TYPESAFE_API_KEY` ➔ `JEV_API_KEY` ➔ `~/.config/ce-ai/credentials.toml`.
+  - [x] Implement secure file write utility setting `0600` Unix permissions for `credentials.toml`.
+  - [x] Implement key masking helper (e.g. `ts-****...****`) for terminal display.
+  - [x] Add unit tests validating environment variable precedence, file fallback, and masking.
+  - [x] TDD Verification: `cargo test decisions::auth`
 
 - [ ] **Work Unit 3: Budget Ceilings, Rate Limiting & Circuit Breaker** (est. ~200 LOC)
   - [ ] Create `src/decisions/budget.rs` with `BudgetConfig`, `BudgetTracker`, and `CircuitBreaker`.
