@@ -44,6 +44,11 @@ A performance test suite (`benches/benchmarks.rs`) guaranteeing that state resol
 ### Project Adoption Engine
 A non-destructive, fully reversible CLI mechanism (`ce-ai init-prj` / `ce-ai deinit-prj`) that injects marker-delimited workflow instruction blocks (`<!-- ce-ai:block begin ... -->`) into `AGENTS.md` and generates derived reference stubs (`CLAUDE.md`) without overwriting pre-existing user documentation or custom agent settings.
 
+### Delegation-Aware Hook Reconciliation
+The process during project adoption and synchronization that inspects whether secondary harness instruction files import the primary specification via import syntax, skipping redundant managed block injection and pruning legacy duplicates.
+
+When an import relationship exists between instruction documents, injecting the managed block into both causes token amplification across agent context windows. Reconciling hooks according to import delegation ensures external agent runtimes receive the complete governance contract exactly once while preserving user custom instructions.
+
 ### Context-Exhaustion Resilience
 A 3-tier defense-in-depth governance pattern (GitHub REST API Branch Protection + `ce-ai doctor` Health Probes + Hard-Gate Invariant Index) that replaces probabilistic prose prompt instructions with fail-closed deterministic platform boundaries to eliminate LLM token dilution and compaction loss in long sessions.
 
