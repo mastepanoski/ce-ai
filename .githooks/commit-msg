@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# .githooks/commit-msg — Zero AI Attribution & Conventional Commit Gate for ce-ai
+# Aligned with AGENTS.md Hard-Gate Invariant #11.
+
+set -e
+
+RED="\033[31m"
+RESET="\033[0m"
+
+COMMIT_MSG_FILE="$1"
+
+if [ -f "$COMMIT_MSG_FILE" ]; then
+    # Detect Co-Authored-By trailers at the beginning of a line
+    if grep -E -i '^[[:space:]]*co-authored-by[[:space:]]*:' "$COMMIT_MSG_FILE" >/dev/null 2>&1; then
+        echo -e "${RED}[ERROR] 'Co-Authored-By:' trailers are strictly forbidden by AGENTS.md Invariant #11.${RESET}"
+        echo -e "${RED}Please remove all AI attribution trailers and use clean Conventional Commits only.${RESET}"
+        exit 1
+    fi
+
+    # Detect AI generation attribution footers at the beginning of a line
+    if grep -E -i '^[[:space:]]*(🤖[[:space:]]*)?generated with ' "$COMMIT_MSG_FILE" >/dev/null 2>&1; then
+        echo -e "${RED}[ERROR] AI generation attribution footers are strictly forbidden by AGENTS.md Invariant #11.${RESET}"
+        echo -e "${RED}Please remove all AI attribution footers and use clean Conventional Commits only.${RESET}"
+        exit 1
+    fi
+fi

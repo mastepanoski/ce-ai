@@ -24,7 +24,7 @@ lint:
 	cargo clippy --all-targets --all-features -- -D warnings
 
 hooks:
-	chmod +x .githooks/pre-commit
+	chmod +x .githooks/pre-commit .githooks/commit-msg
 	git config core.hooksPath .githooks
 
 clean:
