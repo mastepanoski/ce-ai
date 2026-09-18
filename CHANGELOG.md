@@ -5,6 +5,20 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.63.0] - 2026-09-18
+
+### Added
+- **Work Readiness & Verification Advisory Engine (#386)**:
+  - **Advisory Non-Blocking Evaluation (`src/decisions/readiness.rs`)**: Implemented semantic work readiness assessment providing advisory indicators (`✓ Ready`, `△ Needs Attention`, `⚠ Incomplete`) without returning non-zero exit codes or mutating `state.json`.
+  - **Cross-Workflow Support (ODD & CE)**:
+    - **Organic Driven Development (ODD)**: Evaluates 4 semantic dimensions (`dod_satisfied`, `guardrails_respected`, `graduation_recommended`, `ready_to_close`) against task briefs in `odd/tasks/<feature>.md` and git diffs.
+    - **Compound Engineering (CE)**: Evaluates stage-transition dimensions (`requirements_clear`, `implementation_complete`, `tests_sufficient`, `docs_complete`) across the 7-Stage FSM lifecycle.
+  - **Configurable Integer Percentage Thresholds (`ReadinessThresholds`)**: Mapped in `state.json` (`ready_pct = 80`, `warning_pct = 60`) preserving `State` `Eq` derivation.
+  - **Graduation Advisory Trigger**: Elevated confidence in `graduation_recommended` (> 60%) generates actionable guidance recommending `ce-ai graduate` to formalize expanding tasks into OpenSpec.
+  - **Fail-Safe Non-Disruptive Degradation**: If the decision provider is unconfigured, disabled, times out, or encounters errors, the workflow continues uninterrupted with `fallback_applied = true` and exit code 0.
+  - **CLI Diagnostics (`ce-ai decisions check-readiness`)**: Added `ce-ai decisions check-readiness [--feature <feat>] [--task <task>] [--stage <num>] [--json] [--verbose]` for inspecting composite and dimension-level scores.
+  - **Workflow Status & Doctor Health Integration**: Integrated readiness badge into `ce-ai workflow status` and health probe in `ce-ai doctor` displaying active readiness thresholds.
+
 ## [1.62.0] - 2026-09-18
 
 ### Added

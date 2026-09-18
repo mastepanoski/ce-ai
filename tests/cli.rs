@@ -9569,3 +9569,116 @@ fn test_cli_decisions_check_risk_deterministic_and_probabilistic() {
     assert!(stdout.contains("Risk Evaluation Policy:"));
     assert!(stdout.contains("Tool:       run_command"));
 }
+
+#[test]
+fn test_cli_decisions_check_readiness() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let home = tmp.path().join("home");
+    let repo_root = tmp.path().join("project");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(&repo_root).unwrap();
+
+    git_cmd()
+        .args(["init", "-b", "main"])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+
+    // 1. Unconfigured fallback returns exit 0 with fallback advisory
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args([
+            "decisions",
+            "check-readiness",
+            "--feature",
+            "quick-fix",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&out.stdout)).unwrap();
+    assert_eq!(json["target"], "quick-fix");
+    assert_eq!(json["fallback_applied"], true);
+    assert_eq!(json["status"], "ready");
+
+    // 2. Configure local preset
+    ceai(&config_dir, &home)
+        .args(["decisions", "setup", "--preset", "local"])
+        .assert()
+        .success();
+
+    // 3. Verify doctor reports readiness engine active
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["doctor"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("readiness-engine: active (ready: 80%, warning: 60%)"));
+
+    // 4. Create an ODD task brief in odd/tasks/my-feat.md
+    let odd_dir = repo_root.join("odd").join("tasks");
+    fs::create_dir_all(&odd_dir).unwrap();
+    fs::write(
+        odd_dir.join("my-feat.md"),
+        "# Task: My Feature\n\n## Definition of Done\n- [x] unit tests passing\n- [x] verified locally\n",
+    )
+    .unwrap();
+
+    // 5. Evaluate ODD task readiness (mock provider without canned answers defaults to false/not_ready)
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args([
+            "decisions",
+            "check-readiness",
+            "--feature",
+            "my-feat",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&out.stdout)).unwrap();
+    assert_eq!(json["target"], "my-feat");
+    assert_eq!(json["workflow_mode"], "organic");
+    assert_eq!(json["status"], "not_ready");
+    assert_eq!(json["composite_score"].as_f64().unwrap(), 0.0);
+    assert!(json["dimensions"].as_array().unwrap().len() >= 4);
+
+    // 6. Evaluate CE stage transition with --stage and --verbose
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args([
+            "decisions",
+            "check-readiness",
+            "--feature",
+            "my-feat",
+            "--stage",
+            "4",
+            "--verbose",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Work Readiness Advisory:"));
+    assert!(stdout.contains("Stage 4: work"));
+    assert!(stdout.contains("Readiness Dimensions Breakdown:"));
+
+    // 7. Verify workflow status displays readiness advisory badge
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["workflow", "status"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("readiness advisory:"));
+}
