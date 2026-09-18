@@ -2,12 +2,12 @@
 
 ## Estimated Scope: ~940 LOC across 5 atomic work units (~180–210 LOC per work unit)
 
-- [ ] **Work Unit 1: Domain Types, Question Primitives & Provider Trait** (est. ~180 LOC)
-  - [ ] Create `src/decisions/types.rs` with `DecisionQuestion` (`Boolean`, `Choice`, `Score`), `DecisionAnswer`, `DecisionRequest`, `DecisionResponse`, and `DecisionMode`.
-  - [ ] Create `src/decisions/mod.rs` with `DecisionProvider` trait and `DecisionEngine` dispatcher.
-  - [ ] Create `src/decisions/mock.rs` with `MockDecisionProvider` supporting customizable canned answers and failure modes.
-  - [ ] Add unit tests in `src/decisions/types.rs` and `src/decisions/mock.rs` validating serialization and offline evaluation.
-  - [ ] TDD Verification: `cargo test decisions::mock`
+- [x] **Work Unit 1: Domain Types, Question Primitives & Provider Trait** (est. ~180 LOC)
+  - [x] Create `src/decisions/types.rs` with `DecisionQuestion` (`Boolean`, `Choice`, `Score`), `DecisionAnswer`, `DecisionRequest`, `DecisionResponse`, and `DecisionMode`.
+  - [x] Create `src/decisions/mod.rs` with `DecisionProvider` trait and `DecisionEngine` dispatcher.
+  - [x] Create `src/decisions/mock.rs` with `MockDecisionProvider` supporting customizable canned answers and failure modes.
+  - [x] Add unit tests in `src/decisions/types.rs` and `src/decisions/mock.rs` validating serialization and offline evaluation.
+  - [x] TDD Verification: `cargo test decisions::mock`
 
 - [ ] **Work Unit 2: Credential Resolution & Security Hygiene** (est. ~160 LOC)
   - [ ] Create `src/decisions/auth.rs` implementing tiered resolution: `TYPESAFE_API_KEY` ➔ `JEV_API_KEY` ➔ `~/.config/ce-ai/credentials.toml`.
