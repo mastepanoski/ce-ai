@@ -50,3 +50,4 @@ Historical notes:
 - model-routing: archived (27/27 tasks) under criterion (1) on 2026-09-18.
 - skill-routing: archived (25/25 tasks) under criterion (1) on 2026-09-18.
 - risk-aware-execution: archived (25/25 tasks) under criterion (1) on 2026-09-18.
+- work-readiness-advisory: archived (26/26 tasks) under criterion (1) on 2026-09-18.
