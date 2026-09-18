@@ -47,3 +47,4 @@ Historical notes:
 - fix-claude-agents-block-dedup: archived (17/17 tasks) under criterion (1) on 2026-09-18.
 - fix-companion-mcp-args: archived (26/26 tasks) under criterion (1) on 2026-09-18.
 - odd-mode-router-and-graduation: archived (45/45 tasks) under criterion (1) on 2026-09-18.
+- model-routing: archived (27/27 tasks) under criterion (1) on 2026-09-18.
