@@ -7,6 +7,7 @@ fn test_resolve_markdown_is_byte_stable() {
         description: "Explore requirements".to_string(),
         scope: "global".to_string(),
         triggers: vec!["brainstorm".to_string()],
+        categories: Vec::new(),
         sha256: "deadbeef".to_string(),
         harness_paths: BTreeMap::from([(
             "opencode".to_string(),
@@ -126,6 +127,7 @@ fn test_registry_atomic_save_and_load() {
         description: "A test skill".into(),
         scope: "global".into(),
         triggers: vec!["test".into()],
+        categories: Vec::new(),
         sha256: "abc123sha".into(),
         harness_paths: BTreeMap::from([("opencode".into(), "/path/to/SKILL.md".into())]),
     });
@@ -221,4 +223,47 @@ fn test_sequential_thinking_indexing_resolution_and_degradation() {
     let (deg_status, _, deg_md) = registry.resolve(HarnessKind::Pi, "sequential-thinking");
     assert_eq!(deg_status, "fallback-fuzzy");
     assert!(deg_md.contains("status=fallback-fuzzy"));
+}
+
+#[test]
+fn test_frontmatter_extraction_categories() {
+    let inline = r#"---
+name: "security-audit"
+description: "Audit cookies and tokens"
+categories: [security, testing]
+---
+# Skill Body"#;
+    let fm_inline = parse_skill_frontmatter(inline);
+    assert_eq!(fm_inline.categories, vec!["security", "testing"]);
+
+    let bullet = r#"---
+name: "arch-review"
+description: "Architectural evaluation"
+categories:
+  - architecture
+  - debugging
+---
+# Skill Body"#;
+    let fm_bullet = parse_skill_frontmatter(bullet);
+    assert_eq!(fm_bullet.categories, vec!["architecture", "debugging"]);
+
+    let dotted = r#"---
+name: "pr-check"
+description: "Review pull requests"
+decision.categories: [code_review]
+---
+# Skill Body"#;
+    let fm_dotted = parse_skill_frontmatter(dotted);
+    assert_eq!(fm_dotted.categories, vec!["code_review"]);
+
+    let nested = r#"---
+name: "deep-research"
+description: "Explore literature"
+decision:
+  categories:
+    - research
+---
+# Skill Body"#;
+    let fm_nested = parse_skill_frontmatter(nested);
+    assert_eq!(fm_nested.categories, vec!["research"]);
 }

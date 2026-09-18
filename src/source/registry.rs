@@ -21,6 +21,8 @@ pub struct SkillEntry {
     pub description: String,
     pub scope: String,
     pub triggers: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub categories: Vec<String>,
     pub sha256: String,
     /// Mapping of harness kind (e.g. "opencode", "claude") to absolute path.
     pub harness_paths: BTreeMap<String, String>,
@@ -50,6 +52,7 @@ pub struct SkillFrontmatter {
     pub name: String,
     pub description: String,
     pub triggers: Vec<String>,
+    pub categories: Vec<String>,
     pub scope: String,
 }
 
@@ -212,19 +215,47 @@ impl SkillRegistry {
 
     /// Resolves a skill query for a specific harness in dual format.
     pub fn resolve(&self, harness: HarnessKind, query: &str) -> (String, Vec<SkillEntry>, String) {
+        self.resolve_with_routing(harness, query, &[])
+    }
+
+    /// Resolves a skill query taking into account candidate semantic categories.
+    pub fn resolve_with_routing(
+        &self,
+        harness: HarnessKind,
+        query: &str,
+        candidate_categories: &[String],
+    ) -> (String, Vec<SkillEntry>, String) {
         let query_lower = query.to_lowercase();
         let mut matched: Vec<SkillEntry> = Vec::new();
         let mut has_degradation = false;
 
         for entry in &self.skills {
-            let name_match = entry.name.to_lowercase().contains(&query_lower);
-            let desc_match = entry.description.to_lowercase().contains(&query_lower);
-            let trigger_match = entry
-                .triggers
-                .iter()
-                .any(|t| t.to_lowercase().contains(&query_lower));
+            let name_match = !query_lower.is_empty()
+                && (entry.name.to_lowercase().contains(&query_lower)
+                    || query_lower.contains(&entry.name.to_lowercase()));
+            let desc_match =
+                !query_lower.is_empty() && entry.description.to_lowercase().contains(&query_lower);
+            let trigger_match = !query_lower.is_empty()
+                && entry.triggers.iter().any(|t| {
+                    let t_lower = t.to_lowercase();
+                    t_lower.contains(&query_lower) || query_lower.contains(&t_lower)
+                });
 
-            if name_match || desc_match || trigger_match {
+            let category_match = candidate_categories.iter().any(|cat| {
+                let cat_lower = cat.to_lowercase();
+                entry
+                    .categories
+                    .iter()
+                    .any(|c| c.eq_ignore_ascii_case(&cat_lower))
+                    || entry.name.to_lowercase().contains(&cat_lower)
+                    || entry.description.to_lowercase().contains(&cat_lower)
+                    || entry
+                        .triggers
+                        .iter()
+                        .any(|t| t.to_lowercase().contains(&cat_lower))
+            });
+
+            if name_match || desc_match || trigger_match || category_match {
                 // Verify file existence & SHA256 integrity at resolution time
                 if let Some(raw_path) = entry.harness_paths.get(harness.as_str()) {
                     let path = PathBuf::from(raw_path);
@@ -410,6 +441,7 @@ fn process_skill_file(
         description: fm.description.clone(),
         scope: scope.clone(),
         triggers: fm.triggers.clone(),
+        categories: fm.categories.clone(),
         sha256: sha256.clone(),
         harness_paths: BTreeMap::new(),
     });
@@ -420,6 +452,9 @@ fn process_skill_file(
     }
     if !fm.triggers.is_empty() {
         entry.triggers = fm.triggers;
+    }
+    if !fm.categories.is_empty() {
+        entry.categories = fm.categories;
     }
     entry.sha256 = sha256;
 
@@ -469,7 +504,7 @@ pub fn parse_skill_frontmatter(content: &str) -> SkillFrontmatter {
             continue;
         }
 
-        if trimmed.starts_with('-') && (current_key == "triggers" || current_key == "triggers:") {
+        if trimmed.starts_with('-') {
             let item = trimmed
                 .trim_start_matches('-')
                 .trim()
@@ -477,9 +512,17 @@ pub fn parse_skill_frontmatter(content: &str) -> SkillFrontmatter {
                 .trim_matches('\'')
                 .to_string();
             if !item.is_empty() {
-                fm.triggers.push(item);
+                if current_key == "triggers" || current_key == "triggers:" {
+                    fm.triggers.push(item);
+                    continue;
+                } else if current_key == "categories"
+                    || current_key == "categories:"
+                    || current_key == "decision.categories"
+                {
+                    fm.categories.push(item.to_lowercase());
+                    continue;
+                }
             }
-            continue;
         }
 
         if let Some((k, v)) = trimmed.split_once(':') {
@@ -497,6 +540,15 @@ pub fn parse_skill_frontmatter(content: &str) -> SkillFrontmatter {
                         clean_val
                             .split(',')
                             .map(|s| s.trim().trim_matches('"').trim_matches('\'').to_string())
+                            .filter(|s| !s.is_empty()),
+                    );
+                }
+                "categories" | "decision.categories" if !val.is_empty() => {
+                    let clean_val = val.trim_start_matches('[').trim_end_matches(']');
+                    fm.categories.extend(
+                        clean_val
+                            .split(',')
+                            .map(|s| s.trim().trim_matches('"').trim_matches('\'').to_lowercase())
                             .filter(|s| !s.is_empty()),
                     );
                 }
