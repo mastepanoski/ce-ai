@@ -31,9 +31,9 @@
   - [x] Add unit tests validating payload serialization and response parsing against sample Jev responses.
   - [x] TDD Verification: `cargo test decisions::jev`
 
-- [ ] **Work Unit 5: CLI Subcommand, Doctor Probe & Integration** (est. ~210 LOC)
-  - [ ] Create `src/commands/decisions.rs` implementing `ce-ai decisions [status|auth|setup|test]`.
-  - [ ] Register `decisions` subcommand in `src/main.rs`.
-  - [ ] Add `probe_decision_engine` in `src/commands/doctor.rs` with actionable setup recommendations.
-  - [ ] Add CLI integration tests in `tests/cli.rs` verifying `ce-ai decisions status` and doctor output.
-  - [ ] TDD Verification: `cargo test --test cli decisions` and `cargo run -- doctor`
+- [x] **Work Unit 5: CLI Subcommand, Doctor Probe & Integration** (est. ~210 LOC)
+  - [x] Create `src/commands/decisions.rs` implementing `ce-ai decisions [status|auth|setup|test]`.
+  - [x] Register `decisions` subcommand in `src/main.rs`.
+  - [x] Add `probe_decision_engine` in `src/commands/doctor.rs` with actionable setup recommendations.
+  - [x] Add CLI integration tests in `tests/cli.rs` verifying `ce-ai decisions status` and doctor output.
+  - [x] TDD Verification: `cargo test --test cli decisions` and `cargo run -- doctor`

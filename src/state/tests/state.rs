@@ -33,6 +33,7 @@ fn state_with(slot: &str) -> State {
         gate_mode: None,
         gate_receipts: BTreeMap::new(),
         doc_hygiene: None,
+        decisions: None,
     }
 }
 

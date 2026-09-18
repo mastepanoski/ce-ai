@@ -4,6 +4,7 @@ pub mod adopt;
 pub mod archive_compact;
 pub mod audit;
 pub mod backups;
+pub mod decisions;
 pub mod deinit_prj;
 pub mod doc;
 pub mod doctor;

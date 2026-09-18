@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn test_budget_allows_execution_within_limits() {
     let config = BudgetConfig {
-        max_monthly_usd: 5.0,
+        max_monthly_cents: 500,
         max_session_requests: 10,
         timeout_ms: 500,
         max_consecutive_failures: 3,
@@ -16,6 +16,7 @@ fn test_budget_allows_execution_within_limits() {
     tracker.record_success(Some(0.10));
     assert_eq!(tracker.session_requests(), 1);
     assert_eq!(tracker.total_monthly_requests(), 1);
+    assert_eq!(tracker.accumulated_spend_cents(), 10);
     assert!((tracker.accumulated_spend_usd() - 0.10).abs() < f64::EPSILON);
     assert!(tracker.can_execute().is_ok());
 }
@@ -23,7 +24,7 @@ fn test_budget_allows_execution_within_limits() {
 #[test]
 fn test_budget_exceeded_trips_fallback() {
     let config = BudgetConfig {
-        max_monthly_usd: 1.0,
+        max_monthly_cents: 100,
         max_session_requests: 100,
         timeout_ms: 500,
         max_consecutive_failures: 3,
@@ -43,7 +44,7 @@ fn test_budget_exceeded_trips_fallback() {
 #[test]
 fn test_session_limit_exceeded_trips_fallback() {
     let config = BudgetConfig {
-        max_monthly_usd: 10.0,
+        max_monthly_cents: 1000,
         max_session_requests: 2,
         timeout_ms: 500,
         max_consecutive_failures: 3,
@@ -64,7 +65,7 @@ fn test_session_limit_exceeded_trips_fallback() {
 #[test]
 fn test_circuit_breaker_trips_on_consecutive_failures() {
     let config = BudgetConfig {
-        max_monthly_usd: 10.0,
+        max_monthly_cents: 1000,
         max_session_requests: 100,
         timeout_ms: 500,
         max_consecutive_failures: 3,
@@ -100,11 +101,11 @@ fn test_monthly_rollover_resets_spend() {
 
     // Simulate an old month
     tracker.ledger.month = "2025-01".into();
-    tracker.ledger.accumulated_spend_usd = 4.90;
+    tracker.ledger.accumulated_spend_cents = 490;
     tracker.ledger.total_requests = 42;
 
     assert!(tracker.can_execute().is_ok());
     assert_ne!(tracker.ledger.month, "2025-01");
-    assert_eq!(tracker.accumulated_spend_usd(), 0.0);
+    assert_eq!(tracker.accumulated_spend_cents(), 0);
     assert_eq!(tracker.total_monthly_requests(), 0);
 }

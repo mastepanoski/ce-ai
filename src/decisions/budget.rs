@@ -12,10 +12,10 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for decision budget and circuit breaker.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BudgetConfig {
-    /// Maximum estimated monthly spend in USD before falling back to deterministic defaults.
-    pub max_monthly_usd: f64,
+    /// Maximum estimated monthly spend in cents (e.g. 500 = $5.00) before falling back to deterministic defaults.
+    pub max_monthly_cents: u64,
     /// Maximum number of decision requests allowed in a single session.
     pub max_session_requests: u32,
     /// Timeout in milliseconds for an individual decision evaluation.
@@ -26,10 +26,16 @@ pub struct BudgetConfig {
     pub cooloff_secs: u64,
 }
 
+impl BudgetConfig {
+    pub fn max_monthly_usd(&self) -> f64 {
+        (self.max_monthly_cents as f64) / 100.0
+    }
+}
+
 impl Default for BudgetConfig {
     fn default() -> Self {
         Self {
-            max_monthly_usd: 5.0,
+            max_monthly_cents: 500,
             max_session_requests: 100,
             timeout_ms: 1000,
             max_consecutive_failures: 3,
@@ -39,12 +45,18 @@ impl Default for BudgetConfig {
 }
 
 /// Persistent monthly ledger tracking accumulated decision usage.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct MonthlyLedger {
     /// Year-Month format: "YYYY-MM"
     pub month: String,
-    pub accumulated_spend_usd: f64,
+    pub accumulated_spend_cents: u64,
     pub total_requests: u32,
+}
+
+impl MonthlyLedger {
+    pub fn accumulated_spend_usd(&self) -> f64 {
+        (self.accumulated_spend_cents as f64) / 100.0
+    }
 }
 
 /// Operational state of the circuit breaker.
@@ -59,10 +71,10 @@ pub enum CircuitState {
 }
 
 /// Advisory reason explaining why a decision evaluation fell back to deterministic defaults.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FallbackReason {
     Disabled,
-    BudgetExceeded { spent_usd: f64, limit_usd: f64 },
+    BudgetExceeded { spent_cents: u64, limit_cents: u64 },
     SessionLimitExceeded { count: u32, limit: u32 },
     CircuitOpen { consecutive_failures: u32 },
     Timeout,
@@ -73,9 +85,11 @@ impl fmt::Display for FallbackReason {
         match self {
             FallbackReason::Disabled => write!(f, "decision engine disabled"),
             FallbackReason::BudgetExceeded {
-                spent_usd,
-                limit_usd,
+                spent_cents,
+                limit_cents,
             } => {
+                let spent_usd = (*spent_cents as f64) / 100.0;
+                let limit_usd = (*limit_cents as f64) / 100.0;
                 write!(
                     f,
                     "monthly budget limit reached (${spent_usd:.2} / ${limit_usd:.2})"
@@ -153,8 +167,12 @@ impl BudgetTracker {
         self.session_requests
     }
 
+    pub fn accumulated_spend_cents(&self) -> u64 {
+        self.ledger.accumulated_spend_cents
+    }
+
     pub fn accumulated_spend_usd(&self) -> f64 {
-        self.ledger.accumulated_spend_usd
+        self.ledger.accumulated_spend_usd()
     }
 
     pub fn total_monthly_requests(&self) -> u32 {
@@ -194,10 +212,10 @@ impl BudgetTracker {
         }
 
         // 3. Check Monthly Budget
-        if self.ledger.accumulated_spend_usd >= self.config.max_monthly_usd {
+        if self.ledger.accumulated_spend_cents >= self.config.max_monthly_cents {
             return Err(FallbackReason::BudgetExceeded {
-                spent_usd: self.ledger.accumulated_spend_usd,
-                limit_usd: self.config.max_monthly_usd,
+                spent_cents: self.ledger.accumulated_spend_cents,
+                limit_cents: self.config.max_monthly_cents,
             });
         }
 
@@ -214,7 +232,8 @@ impl BudgetTracker {
         self.ledger.total_requests += 1;
         if let Some(cost) = cost_usd {
             if cost > 0.0 {
-                self.ledger.accumulated_spend_usd += cost;
+                let cost_cents = (cost * 100.0).round() as u64;
+                self.ledger.accumulated_spend_cents += cost_cents;
             }
         }
 
@@ -236,7 +255,7 @@ impl BudgetTracker {
         let current_month = Utc::now().format("%Y-%m").to_string();
         if self.ledger.month != current_month {
             self.ledger.month = current_month;
-            self.ledger.accumulated_spend_usd = 0.0;
+            self.ledger.accumulated_spend_cents = 0;
             self.ledger.total_requests = 0;
             self.persist();
         }
