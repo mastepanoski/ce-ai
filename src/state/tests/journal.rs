@@ -211,6 +211,7 @@ fn legacy_journal_format_rolls_back_successfully() {
 
 #[test]
 fn journal_arm_complexity_is_strictly_linear() {
+    let _guard = ENV_LOCK.lock().unwrap();
     let tmp = tempdir().unwrap();
     let cfg = tmp.path().join("cfg");
     std::fs::create_dir_all(&cfg).unwrap();
