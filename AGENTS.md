@@ -17,6 +17,7 @@ All AI agents MUST enforce these hard invariants deterministically at every sess
 8. **Preserve Active Worktrees**: NEVER run `git worktree remove` or delete sibling worktrees in `<repo>-worktrees/` without explicit USER permission or verifying creation within the current turn.
 9. **Mandatory Versioning & CHANGELOG**: Every merged feature/fix MUST bump SemVer in `Cargo.toml`, update `CHANGELOG.md`, tag release (`vX.Y.Z`), and create a GitHub Release. Homebrew distribution is owned exclusively by the `mastepanoski/homebrew-ce-ai` tap (self-updating); no formula is maintained in this repository.
 10. **Post-Merge Cleanup**: Immediately after merging a PR, switch to `main`, run `git pull`, delete merged local branches (`git branch -d`), prune remotes (`git fetch --prune`), and remove turn-created temporary worktrees.
+11. **Zero AI Attribution & No Co-Author Trailers**: AI agents MUST NEVER add "Co-Authored-By", AI attribution trailers, or "Generated with [Agent]" footers/badges to git commit messages or PR descriptions. All commits MUST use clean Conventional Commits only.
 
 ---
 
@@ -106,6 +107,10 @@ src/
    - `README.md` MUST stay ≤ 100 lines: title + what/why, Quick Path (install → first command → verification), then an audience-labeled documentation map. Deep internals belong in `docs/`, never inline.
    - Every document MUST have exactly one Diátaxis intent (tutorial / how-to / reference / explanation). Do not blend quadrants within a section.
    - Documentation must self-route two audiences: newbies via the Quick Start tutorial path, seniors directly to reference/architecture.
+
+9. **Zero AI Attribution & No Co-Author Trailers**:
+   - AI agents MUST NEVER add "Co-Authored-By", agent attribution trailers, or "Generated with [Agent]" footers/badges to git commit messages or PR descriptions.
+   - All commits MUST use clean Conventional Commits only.
 
 ---
 

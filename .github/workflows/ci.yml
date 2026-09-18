@@ -117,6 +117,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify Zero AI Attribution Trailers (AGENTS.md Invariant #11)
+        if: github.event_name == 'pull_request'
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          BAD_COMMITS=$(git log --format="%H %s" --extended-regexp --grep="^[[:space:]]*[cC]o-[aA]uthored-[bB]y[[:space:]]*:" "$BASE"...HEAD || true)
+          if [ -n "$BAD_COMMITS" ]; then
+            echo "::error::Commits contain forbidden Co-Authored-By trailers (AGENTS.md Invariant #11):"
+            echo "$BAD_COMMITS"
+            exit 1
+          fi
+
   docker-e2e-gate:
     name: Containerized E2E Gate (NIST AI RMF & ISO 42001)
     runs-on: ubuntu-latest
