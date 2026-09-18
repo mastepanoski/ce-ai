@@ -66,6 +66,24 @@ pub enum Action {
         #[arg(long)]
         verbose: bool,
     },
+    /// Evaluate work readiness and verification advisory for an ODD task or CE stage.
+    CheckReadiness {
+        /// Optional feature or branch name (defaults to active branch/feature).
+        #[arg(long)]
+        feature: Option<String>,
+        /// Optional task brief or task description to evaluate.
+        #[arg(long)]
+        task: Option<String>,
+        /// Optional Compound Engineering stage number (1..7).
+        #[arg(long)]
+        stage: Option<u32>,
+        /// Output in JSON format.
+        #[arg(long)]
+        json: bool,
+        /// Display individual dimension confidence scores.
+        #[arg(long)]
+        verbose: bool,
+    },
     /// Evaluate model routing recommendation for a given task description.
     Route(crate::commands::models::RouteArgs),
 }
@@ -83,6 +101,20 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             json,
             verbose,
         } => handle_check_risk(ctx, tool, command, task.as_deref(), *json, *verbose),
+        Action::CheckReadiness {
+            feature,
+            task,
+            stage,
+            json,
+            verbose,
+        } => handle_check_readiness(
+            ctx,
+            feature.as_deref(),
+            task.as_deref(),
+            *stage,
+            *json,
+            *verbose,
+        ),
         Action::Route(route_args) => crate::commands::models::route(ctx, route_args),
     }
 }
@@ -153,6 +185,11 @@ fn handle_status(ctx: &Context, as_json: bool) -> Result<(), CeError> {
                 "confirmation_threshold_pct": config.risk.thresholds.confirmation_threshold_pct,
                 "deny_threshold_pct": config.risk.thresholds.deny_threshold_pct,
                 "fallback": config.risk.fallback.as_str(),
+            },
+            "readiness": {
+                "enabled": config.readiness.enabled,
+                "ready_pct": config.readiness.thresholds.ready_pct,
+                "warning_pct": config.readiness.thresholds.warning_pct,
             }
         });
         println!(
@@ -216,6 +253,21 @@ fn handle_status(ctx: &Context, as_json: bool) -> Result<(), CeError> {
         config.risk.thresholds.deny_threshold_pct
     );
     println!("  Fallback:    {}", config.risk.fallback.as_str());
+
+    println!();
+    println!("Readiness Advisory Engine");
+    println!(
+        "  Enabled:     {}",
+        if config.readiness.enabled {
+            "yes"
+        } else {
+            "no"
+        }
+    );
+    println!(
+        "  Thresholds:  Ready >= {}%, Warning >= {}%",
+        config.readiness.thresholds.ready_pct, config.readiness.thresholds.warning_pct
+    );
 
     Ok(())
 }
@@ -294,6 +346,10 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 thresholds: crate::decisions::RiskThresholds::default(),
                 fallback: crate::decisions::RiskFallbackPolicy::RequireConfirmation,
             },
+            readiness: crate::decisions::ReadinessConfig {
+                enabled: true,
+                thresholds: crate::decisions::ReadinessThresholds::default(),
+            },
         },
         "shadow" => DecisionsConfig {
             enabled: true,
@@ -325,6 +381,10 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 thresholds: crate::decisions::RiskThresholds::default(),
                 fallback: crate::decisions::RiskFallbackPolicy::RequireConfirmation,
             },
+            readiness: crate::decisions::ReadinessConfig {
+                enabled: true,
+                thresholds: crate::decisions::ReadinessThresholds::default(),
+            },
         },
         "local" => DecisionsConfig {
             enabled: true,
@@ -349,6 +409,10 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 enabled: true,
                 thresholds: crate::decisions::RiskThresholds::default(),
                 fallback: crate::decisions::RiskFallbackPolicy::RequireConfirmation,
+            },
+            readiness: crate::decisions::ReadinessConfig {
+                enabled: true,
+                thresholds: crate::decisions::ReadinessThresholds::default(),
             },
         },
         _ => {
@@ -532,6 +596,158 @@ fn handle_check_risk(
     Ok(())
 }
 
+fn handle_check_readiness(
+    ctx: &Context,
+    feature: Option<&str>,
+    task: Option<&str>,
+    stage: Option<u32>,
+    as_json: bool,
+    verbose: bool,
+) -> Result<(), CeError> {
+    let state_path = ctx.config_dir.join("state.json");
+    let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
+        .unwrap_or_default();
+    let config = state.decisions.clone().unwrap_or_default();
+
+    let provider_box: Option<Box<dyn DecisionProvider>> = if !config.enabled {
+        None
+    } else if config.provider == "mock" {
+        Some(Box::new(MockDecisionProvider::new()))
+    } else {
+        Some(Box::new(JevProvider::new(config.jev.clone(), None)))
+    };
+
+    let engine = DecisionEngine::new(provider_box, config.mode);
+    let evaluator = crate::decisions::ReadinessEvaluator::new(&config.readiness, Some(&engine));
+
+    let repo_root = ctx.repo_root();
+    let diff_stat =
+        crate::commands::workflow::git_probe(&repo_root, &["diff", "--stat"]).and_then(|o| {
+            if o.status.success() {
+                let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s)
+                }
+            } else {
+                None
+            }
+        });
+
+    let branch = crate::commands::workflow::probe_git_branch(&repo_root);
+    let wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
+
+    let feature_name = feature
+        .map(String::from)
+        .or_else(|| wf.as_ref().and_then(|w| w.feature_name.clone()))
+        .or_else(|| branch.clone())
+        .unwrap_or_else(|| "current-task".to_string());
+
+    let result = if let Some(s) = stage {
+        let stage_enum = crate::state::state::WorkflowStage::parse(&s.to_string())
+            .unwrap_or(crate::state::state::WorkflowStage::WorkTdd);
+        let s_name = stage_enum.as_str();
+        let context = task.unwrap_or("Stage transition verification check");
+        evaluator.evaluate_stage(&feature_name, s, s_name, context, diff_stat.as_deref())
+    } else {
+        // Check if odd/tasks/<feature>.md exists
+        let mut brief_summary = task.unwrap_or("Organic task implementation").to_string();
+        let mut checklist_status = String::new();
+
+        let task_file = repo_root
+            .join("odd")
+            .join("tasks")
+            .join(format!("{feature_name}.md"));
+        if task_file.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&task_file) {
+                brief_summary = content.clone();
+                let checklist_lines: Vec<&str> = content
+                    .lines()
+                    .filter(|l| {
+                        l.trim_start().starts_with("- [") || l.trim_start().starts_with("* [")
+                    })
+                    .collect();
+                if !checklist_lines.is_empty() {
+                    checklist_status = checklist_lines.join("\n");
+                }
+            }
+        }
+
+        if checklist_status.is_empty() {
+            checklist_status = task.unwrap_or("- [x] Active task").to_string();
+        }
+
+        let is_ce_fsm = wf.as_ref().is_some_and(|w| {
+            w.execution_mode == Some(crate::state::state::ExecutionMode::Compound)
+        });
+
+        if is_ce_fsm {
+            let s_num = wf.as_ref().map(|w| w.stage.number()).unwrap_or(4);
+            let s_name = wf.as_ref().map(|w| w.stage.as_str()).unwrap_or("work");
+            evaluator.evaluate_stage(
+                &feature_name,
+                s_num,
+                s_name,
+                &brief_summary,
+                diff_stat.as_deref(),
+            )
+        } else {
+            evaluator.evaluate_odd(
+                &feature_name,
+                &brief_summary,
+                &checklist_status,
+                diff_stat.as_deref(),
+            )
+        }
+    };
+
+    if as_json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&result).map_err(|e| CeError::Runtime(format!(
+                "failed to serialize readiness result: {e}"
+            )))?
+        );
+        return Ok(());
+    }
+
+    println!("Work Readiness Advisory: {}", result.status.indicator());
+    println!("  Target:     {}", result.target);
+    println!("  Workflow:   {}", result.workflow_mode);
+    println!("  Score:      {:.1}%", result.composite_score * 100.0);
+    if result.graduation_suggested {
+        println!("  Graduation: RECOMMENDED (consider promoting to formal OpenSpec via 'ce-ai graduate')");
+    }
+    if result.fallback_applied {
+        println!("  Fallback:   Active (deterministic workflow unaffected)");
+    }
+    println!("  Latency:    {}ms", result.latency_ms);
+
+    if !result.advisory_notes.is_empty() {
+        println!();
+        println!("Advisory Guidance:");
+        for note in &result.advisory_notes {
+            println!("  - {note}");
+        }
+    }
+
+    if verbose && !result.dimensions.is_empty() {
+        println!();
+        println!("Readiness Dimensions Breakdown:");
+        for dim in &result.dimensions {
+            let status = if dim.passed { "PASS" } else { "ATTN" };
+            println!(
+                "  - {:<26} {:>5.1}% [{status}]",
+                dim.dimension,
+                dim.confidence * 100.0
+            );
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -582,7 +798,7 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_setup_presets_configure_risk() {
+    fn test_handle_setup_presets_configure_risk_and_readiness() {
         let temp = tempdir().unwrap();
         let ctx = Context {
             config_dir: temp.path().to_path_buf(),
@@ -603,5 +819,55 @@ mod tests {
             decisions.risk.fallback,
             crate::decisions::RiskFallbackPolicy::RequireConfirmation
         );
+
+        assert!(decisions.readiness.enabled);
+        assert_eq!(decisions.readiness.thresholds.ready_pct, 80);
+        assert_eq!(decisions.readiness.thresholds.warning_pct, 60);
+    }
+
+    #[test]
+    fn test_handle_check_readiness_fallback_unconfigured() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().to_path_buf(),
+            opencode_config_dir: temp.path().join("opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        let res = handle_check_readiness(
+            &ctx,
+            Some("my-feat"),
+            Some("Do something"),
+            None,
+            true,
+            false,
+        );
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_handle_check_readiness_stage_transition() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().to_path_buf(),
+            opencode_config_dir: temp.path().join("opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        let res = handle_check_readiness(
+            &ctx,
+            Some("my-feat"),
+            Some("Stage 4 check"),
+            Some(4),
+            false,
+            true,
+        );
+        assert!(res.is_ok());
     }
 }

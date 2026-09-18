@@ -898,6 +898,16 @@ pub(crate) fn probe_decision_engine_health(
         } else {
             println!("doctor-info: risk-engine: disabled (deterministic security rules active)");
         }
+
+        let readiness_cfg = &decisions_cfg.readiness;
+        if readiness_cfg.enabled {
+            println!(
+                "doctor-info: readiness-engine: active (ready: {}%, warning: {}%)",
+                readiness_cfg.thresholds.ready_pct, readiness_cfg.thresholds.warning_pct
+            );
+        } else {
+            println!("doctor-info: readiness-engine: disabled (deterministic workflow active)");
+        }
     } else {
         println!(
             "doctor-info: decision-engine: not configured (optional System 1 decision layer; run 'ce-ai decisions setup' to enable fast probabilistic routing & risk checks)"

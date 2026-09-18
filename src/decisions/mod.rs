@@ -5,6 +5,7 @@ pub mod auth;
 pub mod budget;
 pub mod jev;
 pub mod mock;
+pub mod readiness;
 pub mod risk;
 pub mod routing;
 pub mod skill_routing;
@@ -16,6 +17,10 @@ pub use auth::{
 pub use budget::{BudgetConfig, BudgetTracker, CircuitState, FallbackReason, MonthlyLedger};
 pub use jev::{JevConfig, JevProvider, JevWireRequest, JevWireResponse};
 pub use mock::{HealthStatus, MockDecisionProvider};
+pub use readiness::{
+    ReadinessConfig, ReadinessDimensionScore, ReadinessEvaluationResult, ReadinessEvaluator,
+    ReadinessStatus, ReadinessThresholds, CE_READINESS_DIMENSIONS, ODD_READINESS_DIMENSIONS,
+};
 pub use risk::{
     check_deterministic_denial, is_safe_read_only, log_risk_event, redact_sensitive_content,
     risk_events_log_path, ExecutionPolicy, RiskConfig, RiskDimensionScore, RiskEvaluationResult,

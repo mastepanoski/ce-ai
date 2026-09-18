@@ -323,6 +323,39 @@ pub fn status_lines_with_mode(
         }
     }
 
+    if let Some(decisions_cfg) = &state.decisions {
+        if decisions_cfg.enabled && decisions_cfg.readiness.enabled {
+            let provider_box: Option<Box<dyn crate::decisions::DecisionProvider>> =
+                if decisions_cfg.provider == "mock" {
+                    Some(Box::new(crate::decisions::mock::MockDecisionProvider::new()))
+                } else {
+                    Some(Box::new(crate::decisions::jev::JevProvider::new(
+                        decisions_cfg.jev.clone(),
+                        None,
+                    )))
+                };
+            let engine = crate::decisions::DecisionEngine::new(provider_box, decisions_cfg.mode);
+            let evaluator =
+                crate::decisions::ReadinessEvaluator::new(&decisions_cfg.readiness, Some(&engine));
+            let target_name = wf
+                .as_ref()
+                .and_then(|w| w.feature_name.as_deref())
+                .unwrap_or("current");
+            let result = if mode == ExecutionMode::Organic {
+                evaluator.evaluate_odd(target_name, "workflow status probe", "- [x] active", None)
+            } else {
+                let s_num = wf.as_ref().map(|w| w.stage.number()).unwrap_or(1);
+                let s_name = wf.as_ref().map(|w| w.stage.as_str()).unwrap_or("ideation");
+                evaluator.evaluate_stage(target_name, s_num, s_name, "workflow status probe", None)
+            };
+            lines.push(format!(
+                "readiness advisory: {} ({:.0}%)",
+                result.status.indicator(),
+                result.composite_score * 100.0
+            ));
+        }
+    }
+
     if mode == ExecutionMode::Compound {
         let repo_state = probe_repo_state(
             ctx,
