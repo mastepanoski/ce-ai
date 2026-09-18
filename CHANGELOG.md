@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.60.0] - 2026-09-18
+
+### Added
+- **Adaptive Model Route Selection — System One Dynamic Advisory Layer (#383)**:
+  - **Logical Model Classes & Capability Catalog (`src/decisions/routing.rs`)**: Abstracted model capability tiers (`fast`, `standard`, `reasoning`) mapped in `state.json` (`[decisions.routing.models]`). Decouples task routing from specific vendor model identifiers and supports adjacent capability fallback degradation when a preferred class is unmapped.
+  - **Deterministic Routing Policy Engine**: Structured 4-dimension classification queries (`complexity`, `needs_reasoning`, `needs_large_context`, `risk`) dispatched to the Decision Engine (System 1) with integer-percentage confidence thresholds (`reasoning_threshold_pct = 75`, `standard_threshold_pct = 50`) guaranteeing `Eq` trait compliance in `State`.
+  - **Strict Override Precedence & Non-Invasive Hierarchy**: Enforces deterministic precedence hierarchy (`explicit CLI override > agent slot static assignment > adaptive model routing > harness default model`). Adaptive routing advises model selection without clobbering user configurations.
+  - **Graceful Degradation Chain**: Instant fallback to default models with exit code 0 upon provider error, timeout, circuit breaker tripping, or unconfigured routing.
+  - **CLI Advisory Command (`ce-ai models route "<task>"`)**: Interactive query tool and alias (`ce-ai decisions route`) supporting human-readable output, `--json` structured formatting, and `--verbose` confidence metrics for testing model routing.
+  - **Setup Preset & Doctor Integration**: `ce-ai decisions setup --preset recommended` automatically provisions multi-provider model classes (`haiku`, `sonnet 3.5`, `sonnet 3.7`) and enables routing; `ce-ai doctor` inspects routing status and mapped catalog models.
+
 ## [1.59.0] - 2026-09-18
 
 ### Added

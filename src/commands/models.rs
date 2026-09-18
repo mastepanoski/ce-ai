@@ -109,6 +109,29 @@ pub enum ModelsCommand {
     List,
     /// Named profile save/load with append-only snapshots.
     Profile(ProfileArgs),
+    /// Query adaptive model route recommendation for a task description.
+    Route(RouteArgs),
+}
+
+#[derive(clap::Args, Debug, Clone)]
+pub struct RouteArgs {
+    /// Natural language task description or prompt to evaluate.
+    pub task: String,
+    /// Output in JSON format.
+    #[arg(long)]
+    pub json: bool,
+    /// Verbose output with full decision answers and confidence metrics.
+    #[arg(short, long)]
+    pub verbose: bool,
+    /// Check against existing static assignment for a specific slot.
+    #[arg(long)]
+    pub slot: Option<String>,
+    /// Test an explicit model override.
+    #[arg(long)]
+    pub model: Option<String>,
+    /// Default fallback model if unconfigured or unrouted.
+    #[arg(long, default_value = "anthropic/claude-3-5-sonnet")]
+    pub default_model: String,
 }
 
 #[derive(clap::Args)]
@@ -149,7 +172,60 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             ProfileCommand::Save(args) => save(ctx, &args.name),
             ProfileCommand::Load(args) => load(ctx, &args.name),
         },
+        ModelsCommand::Route(args) => route(ctx, args),
     }
+}
+
+pub fn route(ctx: &Context, args: &RouteArgs) -> Result<(), CeError> {
+    let state_path = ctx.config_dir.join("state.json");
+    let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
+        .unwrap_or_default();
+    let decisions_config = state.decisions.unwrap_or_default();
+    let routing_config = &decisions_config.routing;
+
+    let slot_assignment = args.slot.as_deref().and_then(|slot| {
+        state
+            .model_assignments
+            .get(slot)
+            .map(|a| format!("{}/{}", a.provider_id, a.model_id))
+    });
+
+    let engine = crate::decisions::DecisionEngine::from_config(&decisions_config);
+    let router = crate::decisions::routing::ModelRouter::new(routing_config, Some(&engine));
+    let res = router.route(
+        &args.task,
+        &args.default_model,
+        args.model.as_deref(),
+        slot_assignment.as_deref(),
+    );
+
+    if args.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&res).map_err(|e| CeError::State(e.to_string()))?
+        );
+    } else {
+        println!("Task: {}", res.task);
+        println!("Recommended Class: {}", res.recommended_class);
+        println!("Resolved Model: {}", res.resolved_model);
+        if res.fallback_applied {
+            println!("Fallback Applied: yes ({})", res.rationale);
+        } else {
+            println!("Rationale: {}", res.rationale);
+        }
+        if args.verbose {
+            println!("Dimensions:");
+            println!("  Complexity: {}", res.complexity);
+            println!("  Needs Reasoning: {}", res.needs_reasoning);
+            println!("  Needs Large Context: {}", res.needs_large_context);
+            println!("  Risk: {}", res.risk);
+            if res.latency_ms > 0 {
+                println!("Latency: {}ms", res.latency_ms);
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Renders assignments as `slot -> "provider/model"` for profiles and snapshots.

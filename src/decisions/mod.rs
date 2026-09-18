@@ -5,6 +5,7 @@ pub mod auth;
 pub mod budget;
 pub mod jev;
 pub mod mock;
+pub mod routing;
 pub mod types;
 
 pub use auth::{
@@ -13,6 +14,10 @@ pub use auth::{
 pub use budget::{BudgetConfig, BudgetTracker, CircuitState, FallbackReason, MonthlyLedger};
 pub use jev::{JevConfig, JevProvider, JevWireRequest, JevWireResponse};
 pub use mock::{HealthStatus, MockDecisionProvider};
+pub use routing::{
+    ModelClass, ModelClassCatalog, ModelRouter, ModelRoutingConfig, RoutingResolution,
+    RoutingThresholds,
+};
 pub use types::{
     DecisionAnswer, DecisionContext, DecisionMode, DecisionQuestion, DecisionRequest,
     DecisionResponse,
@@ -49,6 +54,21 @@ impl DecisionEngine {
             provider: Some(Box::new(mock)),
             mode,
         }
+    }
+
+    /// Creates an engine configured according to state DecisionsConfig.
+    pub fn from_config(config: &crate::state::state::DecisionsConfig) -> Self {
+        if !config.enabled || config.mode == DecisionMode::Off {
+            return Self::new(None, DecisionMode::Off);
+        }
+
+        let provider: Option<Box<dyn DecisionProvider>> = if config.provider == "mock" {
+            Some(Box::new(mock::MockDecisionProvider::new()))
+        } else {
+            Some(Box::new(jev::JevProvider::new(config.jev.clone(), None)))
+        };
+
+        Self::new(provider, config.mode)
     }
 
     pub fn mode(&self) -> DecisionMode {
