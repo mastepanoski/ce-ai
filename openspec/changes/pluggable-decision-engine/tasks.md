@@ -16,12 +16,12 @@
   - [x] Add unit tests validating environment variable precedence, file fallback, and masking.
   - [x] TDD Verification: `cargo test decisions::auth`
 
-- [ ] **Work Unit 3: Budget Ceilings, Rate Limiting & Circuit Breaker** (est. ~200 LOC)
-  - [ ] Create `src/decisions/budget.rs` with `BudgetConfig`, `BudgetTracker`, and `CircuitBreaker`.
-  - [ ] Implement persistent monthly ledger tracking spend and request counts under `~/.config/ce-ai/decision_budget.json`.
-  - [ ] Implement graceful fallback: `BudgetTracker::can_execute()` returning `FallbackReason::BudgetExceeded` or `CircuitOpen` without erroring.
-  - [ ] Add unit tests validating monthly rollover, budget cutoff, and consecutive failure tripping (3 timeouts ➔ open circuit).
-  - [ ] TDD Verification: `cargo test decisions::budget`
+- [x] **Work Unit 3: Budget Ceilings, Rate Limiting & Circuit Breaker** (est. ~200 LOC)
+  - [x] Create `src/decisions/budget.rs` with `BudgetConfig`, `BudgetTracker`, and `CircuitBreaker`.
+  - [x] Implement persistent monthly ledger tracking spend and request counts under `~/.config/ce-ai/decision_budget.json`.
+  - [x] Implement graceful fallback: `BudgetTracker::can_execute()` returning `FallbackReason::BudgetExceeded` or `CircuitOpen` without erroring.
+  - [x] Add unit tests validating monthly rollover, budget cutoff, and consecutive failure tripping (3 timeouts ➔ open circuit).
+  - [x] TDD Verification: `cargo test decisions::budget`
 
 - [ ] **Work Unit 4: Jev (TypeSafe AI) HTTP Client Provider** (est. ~190 LOC)
   - [ ] Create `src/decisions/jev.rs` implementing `DecisionProvider` for TypeSafe AI's Jev API.
