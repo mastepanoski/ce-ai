@@ -5,6 +5,7 @@
 use std::collections::BTreeMap;
 
 use crate::commands::Context;
+use crate::decisions::DecisionProvider;
 use crate::error::CeError;
 use crate::harness::HarnessKind;
 use crate::opencode::config::read_config;
@@ -699,6 +700,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         println!("doctor-info: {warn}");
     }
 
+    // Pluggable Decision Engine Health Probe (#382)
+    probe_decision_engine_health(ctx, &state, args.strict, &mut findings);
+
     // Observe-only Ship-readiness probe (Issue #354): Stage 6 + code-review gaps.
     // Non-fatal: never added to `findings`, exit code unaffected. Only runs for
     // adopted workspaces to avoid noise on unrelated repositories.
@@ -772,6 +776,95 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         "doctor found {} finding(s)",
         findings.len()
     )))
+}
+
+pub(crate) fn probe_decision_engine_health(
+    _ctx: &Context,
+    state: &State,
+    strict: bool,
+    findings: &mut Vec<String>,
+) {
+    if let Some(decisions_cfg) = &state.decisions {
+        if !decisions_cfg.enabled {
+            println!("doctor-info: decision-engine: disabled in configuration");
+            return;
+        }
+
+        let resolved_key = crate::decisions::auth::resolve_api_key(None);
+        if decisions_cfg.provider == "mock" {
+            let mock = crate::decisions::mock::MockDecisionProvider::new();
+            match mock.check_health() {
+                Ok(health) if health.available => {
+                    println!(
+                        "doctor-info: decision-engine: mock provider active (offline testing mode)"
+                    );
+                }
+                Ok(health) => {
+                    let msg = format!("decision-engine: mock health error: {}", health.message);
+                    if strict {
+                        findings.push(msg);
+                    } else {
+                        println!("doctor-warn: {}", msg);
+                    }
+                }
+                Err(e) => {
+                    let msg = format!("decision-engine: mock health error: {e}");
+                    if strict {
+                        findings.push(msg);
+                    } else {
+                        println!("doctor-warn: {}", msg);
+                    }
+                }
+            }
+        } else {
+            // Jev provider
+            match resolved_key {
+                Some(_) => {
+                    let jev =
+                        crate::decisions::jev::JevProvider::new(decisions_cfg.jev.clone(), None);
+                    match jev.check_health() {
+                        Ok(health) if health.available => {
+                            println!(
+                                "doctor-info: decision-engine: jev active and healthy ({}ms)",
+                                health.latency_ms
+                            );
+                        }
+                        Ok(health) => {
+                            let msg = format!(
+                                "decision-engine: jev health check failed: {}",
+                                health.message
+                            );
+                            if strict {
+                                findings.push(msg);
+                            } else {
+                                println!("doctor-warn: {}", msg);
+                            }
+                        }
+                        Err(e) => {
+                            let msg = format!("decision-engine: jev health probe error: {e}");
+                            if strict {
+                                findings.push(msg);
+                            } else {
+                                println!("doctor-warn: {}", msg);
+                            }
+                        }
+                    }
+                }
+                None => {
+                    let msg = "decision-provider-unauthenticated: Jev enabled but TYPESAFE_API_KEY not found (run 'ce-ai decisions auth' or set TYPESAFE_API_KEY)".to_string();
+                    if strict {
+                        findings.push(msg);
+                    } else {
+                        println!("doctor-warn: {}", msg);
+                    }
+                }
+            }
+        }
+    } else {
+        println!(
+            "doctor-info: decision-engine: not configured (optional System 1 decision layer; run 'ce-ai decisions setup' to enable fast probabilistic routing & risk checks)"
+        );
+    }
 }
 
 #[cfg(test)]

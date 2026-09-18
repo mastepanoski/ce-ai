@@ -3,6 +3,7 @@
 
 pub mod capture;
 pub mod commands;
+pub mod decisions;
 pub mod error;
 pub mod harness;
 pub mod opencode;

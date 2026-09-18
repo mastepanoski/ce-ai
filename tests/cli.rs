@@ -9083,3 +9083,178 @@ Parser panics on empty input stream.
             "OpenSpec change directory already exists",
         ));
 }
+
+#[test]
+fn test_cli_decisions_status_disabled_by_default() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let home = tmp.path().join("home");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["decisions", "status"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Decision Engine is disabled"));
+
+    ceai(&config_dir, &home)
+        .args(["decisions", "status", "--json"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("\"enabled\": false"));
+}
+
+#[test]
+fn test_cli_decisions_setup_recommended_and_status() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let home = tmp.path().join("home");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+
+    // 1. Setup recommended preset
+    ceai(&config_dir, &home)
+        .args(["decisions", "setup", "--preset", "recommended"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "Decision Engine configured with preset 'recommended'",
+        ))
+        .stdout(predicates::str::contains("Provider: jev"))
+        .stdout(predicates::str::contains("Budget:   $5.00 monthly ceiling"));
+
+    // 2. Status now reports enabled and active
+    ceai(&config_dir, &home)
+        .args(["decisions", "status", "--json"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("\"enabled\": true"))
+        .stdout(predicates::str::contains("\"provider\": \"jev\""))
+        .stdout(predicates::str::contains("\"mode\": \"active\""))
+        .stdout(predicates::str::contains("\"has_api_key\": false"));
+}
+
+#[test]
+fn test_cli_decisions_auth_file_and_masking() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let home = tmp.path().join("home");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+
+    // 1. Configure auth with test key
+    ceai(&config_dir, &home)
+        .args([
+            "decisions",
+            "auth",
+            "--key",
+            "ts_live_secret1234567890abcdef",
+        ])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Saved API key to"));
+
+    // 2. Check auth status
+    ceai(&config_dir, &home)
+        .args(["decisions", "auth"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Current API key: configured"));
+
+    // 3. Verify credentials file permissions on unix
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let creds_file = home.join(".config/ce-ai/credentials.toml");
+        assert!(creds_file.exists());
+        let perms = fs::metadata(&creds_file).unwrap().permissions();
+        assert_eq!(perms.mode() & 0o777, 0o600);
+    }
+}
+
+#[test]
+fn test_cli_decisions_setup_local_and_eval_test() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let home = tmp.path().join("home");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+
+    // 1. Setup local (mock) preset
+    ceai(&config_dir, &home)
+        .args(["decisions", "setup", "--preset", "local"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "Decision Engine configured with preset 'local'",
+        ))
+        .stdout(predicates::str::contains("Provider: mock"));
+
+    // 2. Test evaluation with mock provider
+    ceai(&config_dir, &home)
+        .args(["decisions", "test", "--provider", "mock"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "Evaluating sample decision with provider 'mock'",
+        ))
+        .stdout(predicates::str::contains("Decision Response"))
+        .stdout(predicates::str::contains("is_safe: true"))
+        .stdout(predicates::str::contains("category: refactor"));
+}
+
+#[test]
+fn test_cli_doctor_probe_decisions() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let home = tmp.path().join("home");
+    let repo_root = tmp.path().join("project");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(repo_root.join("openspec/specs")).unwrap();
+
+    // Initialize git repo for doctor
+    git_cmd()
+        .args(["init", "-b", "main"])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+
+    // 1. By default, doctor reports unconfigured
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["doctor"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("decision-engine: not configured"));
+
+    // 2. With mock preset configured, doctor reports mock provider active
+    ceai(&config_dir, &home)
+        .args(["decisions", "setup", "--preset", "local"])
+        .assert()
+        .success();
+
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["doctor"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("decision-engine: mock provider active (offline testing mode)"));
+}

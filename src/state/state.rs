@@ -387,6 +387,37 @@ impl Default for DocHygieneConfig {
     }
 }
 
+/// Configuration for the optional Decision Engine.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DecisionsConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_provider_name")]
+    pub provider: String,
+    #[serde(default)]
+    pub mode: crate::decisions::DecisionMode,
+    #[serde(default)]
+    pub budget: crate::decisions::BudgetConfig,
+    #[serde(default)]
+    pub jev: crate::decisions::JevConfig,
+}
+
+fn default_provider_name() -> String {
+    "jev".to_string()
+}
+
+impl Default for DecisionsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider: default_provider_name(),
+            mode: crate::decisions::DecisionMode::Active,
+            budget: crate::decisions::BudgetConfig::default(),
+            jev: crate::decisions::JevConfig::default(),
+        }
+    }
+}
+
 /// Canonical state file at `~/.ce-ai/state.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
@@ -424,6 +455,8 @@ pub struct State {
     pub gate_receipts: BTreeMap<String, GateReceipt>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc_hygiene: Option<DocHygieneConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decisions: Option<DecisionsConfig>,
 }
 fn default_version() -> u32 {
     1

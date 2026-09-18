@@ -9,8 +9,8 @@ use std::path::PathBuf;
 use clap::Subcommand;
 
 use crate::commands::{
-    audit, backups, deinit_prj, doc, doctor, gate, guard, init_prj, install, models, self_update,
-    skills, status, sync, tools, uninstall, upgrade, usage, workflow, Context,
+    audit, backups, decisions, deinit_prj, doc, doctor, gate, guard, init_prj, install, models,
+    self_update, skills, status, sync, tools, uninstall, upgrade, usage, workflow, Context,
 };
 use crate::error::CeError;
 
@@ -87,11 +87,14 @@ pub enum Commands {
     Spec(crate::commands::spec::SpecArgs),
     /// Solution library clustering, deduplication, and refresh engine.
     Doc(doc::DocArgs),
+    /// Pluggable Decision Engine: fast probabilistic System 1 classification, model routing, and safety checks.
+    Decisions(decisions::Args),
 }
 
 impl CeCommand for Commands {
     fn run(&self, ctx: &Context) -> Result<(), CeError> {
         match self {
+            Commands::Decisions(args) => decisions::run(ctx, args),
             Commands::Install(args) => install::run(ctx, args),
             Commands::Sync(args) => sync::run(ctx, args),
             Commands::Upgrade(args) => upgrade::run(ctx, args),
