@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.59.0] - 2026-09-18
+
+### Added
+- **Pluggable Decision Engine Foundation & TypeSafe AI (Jev) Provider (#382)**:
+  - **Provider-Agnostic Decision Interface (`src/decisions/`)**: Core `DecisionProvider` trait and primitives (`DecisionQuestion`, `DecisionAnswer`, `DecisionRequest`, `DecisionResponse`, `DecisionMode`) enabling fast, low-latency micro-decisions (System One) decoupled from heavy LLM reasoning.
+  - **TypeSafe AI (Jev) Provider (`src/decisions/jev.rs`)**: High-performance HTTP client communicating with TypeSafe AI's Jev API using `reqwest::blocking` connection pooling and typed payload parsing with confidence distributions.
+  - **Secure & Tiered Credential Management (`src/decisions/auth.rs`)**: Credential resolution order (`TYPESAFE_API_KEY` ➔ `JEV_API_KEY` ➔ `~/.config/ce-ai/credentials.toml`), secure `0600` file permissions on Unix, and key masking (`ts****...****cdef`) ensuring zero API key leakage in logs, state files, or CLI output.
+  - **Budget Ceilings, Rate Limiting & Circuit Breaker (`src/decisions/budget.rs`)**: Configurable cost ceilings (integer cents in `state.json` ensuring `Eq` trait compliance), monthly ledger tracking, session request quotas, and a 3-strike consecutive failure circuit breaker with graceful degradation to deterministic fallbacks (exit code 0).
+  - **CLI Subcommands (`ce-ai decisions [status|auth|setup|test]`)**: Dedicated subcommands for querying engine status, securely storing/checking credentials, applying quick presets (`recommended`, `shadow`, `local`), and testing decisions offline or against live providers.
+  - **`ce-ai doctor` Integration Probe**: Diagnostic probe reporting Decision Engine configuration, provider health/latency, API key validity, and actionable setup onboarding recommendations.
+
 ## [1.58.1] - 2026-09-17
 
 ### Fixed
