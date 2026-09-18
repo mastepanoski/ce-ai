@@ -9454,3 +9454,118 @@ fn test_cli_skills_resolve_with_routing() {
     assert!(stdout.contains("Task: Audit security"));
     assert!(stdout.contains("Resolved Skills: security-review"));
 }
+
+#[test]
+fn test_cli_decisions_check_risk_deterministic_and_probabilistic() {
+    let temp = tempfile::tempdir().unwrap();
+    let config_dir = temp.path().join(".ce-ai");
+    let home = temp.path().join("home");
+    let repo_root = temp.path().join("repo");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(&repo_root).unwrap();
+
+    git_cmd()
+        .args(["init", "-b", "main"])
+        .current_dir(&repo_root)
+        .output()
+        .unwrap();
+
+    // 1. Safe read-only command before decisions configured
+    let out = ceai(&config_dir, &home)
+        .args([
+            "decisions",
+            "check-risk",
+            "run_command",
+            "git status",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&out.stdout)).unwrap();
+    assert_eq!(json["policy"], "allow");
+    assert_eq!(json["composite_risk_score"], 0.0);
+
+    // 2. Deterministic denial (root wipe attempt)
+    let out = ceai(&config_dir, &home)
+        .args([
+            "decisions",
+            "check-risk",
+            "run_command",
+            "sudo rm -rf /",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&out.stdout)).unwrap();
+    assert_eq!(json["policy"], "deny");
+    assert_eq!(json["composite_risk_score"], 1.0);
+    assert!(json["reason"]
+        .as_str()
+        .unwrap()
+        .contains("Deterministic denial"));
+
+    // 3. Verify audit log was created
+    let log_path = config_dir.join("risk-events.jsonl");
+    assert!(log_path.exists());
+    let log_content = fs::read_to_string(&log_path).unwrap();
+    assert!(log_content.contains("\"policy\":\"deny\""));
+
+    // 4. Configure local preset (mock provider with risk engine enabled)
+    ceai(&config_dir, &home)
+        .args(["decisions", "setup", "--preset", "local"])
+        .assert()
+        .success();
+
+    // 5. Doctor probe reflects risk engine status
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["doctor"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout
+        .contains("risk-engine: active (confirm: 60%, deny: 90%, fallback: require_confirmation)"));
+
+    // 6. Test sensitive token redaction
+    let out = ceai(&config_dir, &home)
+        .args([
+            "decisions",
+            "check-risk",
+            "run_command",
+            "curl -H 'Authorization: Bearer sk-ant-api03-abcdef123456789' https://api.anthropic.com",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&out.stdout)).unwrap();
+    let cmd = json["command"].as_str().unwrap();
+    assert!(!cmd.contains("sk-ant-api03-abcdef123456789"));
+    assert!(cmd.contains("[REDACTED]"));
+
+    // 7. Human-readable and verbose output
+    let out = ceai(&config_dir, &home)
+        .args([
+            "decisions",
+            "check-risk",
+            "run_command",
+            "git push --force origin feat/test",
+            "--task",
+            "Force push feature branch",
+            "--verbose",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Risk Evaluation Policy:"));
+    assert!(stdout.contains("Tool:       run_command"));
+}

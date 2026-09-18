@@ -886,6 +886,18 @@ pub(crate) fn probe_decision_engine_health(
         } else {
             println!("doctor-info: skill-routing: disabled (keyword matching used)");
         }
+
+        let risk_cfg = &decisions_cfg.risk;
+        if risk_cfg.enabled {
+            println!(
+                "doctor-info: risk-engine: active (confirm: {}%, deny: {}%, fallback: {})",
+                risk_cfg.thresholds.confirmation_threshold_pct,
+                risk_cfg.thresholds.deny_threshold_pct,
+                risk_cfg.fallback.as_str()
+            );
+        } else {
+            println!("doctor-info: risk-engine: disabled (deterministic security rules active)");
+        }
     } else {
         println!(
             "doctor-info: decision-engine: not configured (optional System 1 decision layer; run 'ce-ai decisions setup' to enable fast probabilistic routing & risk checks)"
