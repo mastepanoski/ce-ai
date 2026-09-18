@@ -1744,6 +1744,7 @@ fn assert_dry_run_zero_mutation(
     let mut full_args = vec!["--dry-run"];
     full_args.extend_from_slice(args);
     ceai(config_dir, home_dir)
+        .current_dir(workspace_dir)
         .args(full_args)
         .assert()
         .success();
@@ -1792,8 +1793,10 @@ fn workflow_status_checkpoint_and_resume_subcommands() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
     let workspace = tmp.path().join("workspace");
+    fs::create_dir_all(&workspace).unwrap();
 
     ceai(&config_dir, &home)
+        .current_dir(&workspace)
         .args(["workflow", "status"])
         .assert()
         .success()
@@ -1801,6 +1804,7 @@ fn workflow_status_checkpoint_and_resume_subcommands() {
 
     // Stage 1 -> Stage 2: Valid transition
     ceai(&config_dir, &home)
+        .current_dir(&workspace)
         .args([
             "workflow",
             "checkpoint",
@@ -1817,6 +1821,7 @@ fn workflow_status_checkpoint_and_resume_subcommands() {
 
     // Stage 2 -> Stage 5: Invalid jump (fails with exit code 2)
     ceai(&config_dir, &home)
+        .current_dir(&workspace)
         .args([
             "workflow",
             "checkpoint",
@@ -1832,6 +1837,7 @@ fn workflow_status_checkpoint_and_resume_subcommands() {
 
     // Status derives phase/task from saved workflow state
     ceai(&config_dir, &home)
+        .current_dir(&workspace)
         .args(["workflow", "status"])
         .assert()
         .success()
@@ -1850,6 +1856,7 @@ fn workflow_status_checkpoint_and_resume_subcommands() {
     );
 
     ceai(&config_dir, &home)
+        .current_dir(&workspace)
         .args(["workflow", "resume"])
         .assert()
         .success()

@@ -44,3 +44,6 @@ Historical notes:
 - solution-library-lint-and-repair: archived (19/19 tasks) under criterion (1) on 2026-09-15.
 - living-system-specs-promotion: archived (31/31 tasks) under criterion (1) on 2026-09-15.
 - solution-refresh-and-deduplication: archived (20/20 tasks) under criterion (1) on 2026-09-15.
+- fix-claude-agents-block-dedup: archived (17/17 tasks) under criterion (1) on 2026-09-18.
+- fix-companion-mcp-args: archived (26/26 tasks) under criterion (1) on 2026-09-18.
+- odd-mode-router-and-graduation: archived (45/45 tasks) under criterion (1) on 2026-09-18.
