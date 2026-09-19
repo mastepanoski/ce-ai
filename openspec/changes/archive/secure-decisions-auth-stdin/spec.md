@@ -1,3 +1,10 @@
+---
+title: "Secure Stdin & Masked Input for Decisions Auth"
+domain: state
+version: 1.0.0
+last_updated: "2026-09-19"
+---
+
 # Specification: Secure Stdin & Masked Input for Decisions Auth
 
 ## Requirements & Acceptance Criteria
