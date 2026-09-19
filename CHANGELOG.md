@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.63.1] - 2026-09-18
+
+### Fixed
+- **Codex CLI and Multi-Harness Stop Hook Clean JSON Output**:
+  - **Stop Hook Schema Compliance**: Fixed an issue where OpenAI Codex CLI failed with `hook returned invalid stop hook JSON output` when executing `ce-ai workflow resume` at turn-end.
+  - **Dynamic Stdin Hook Detection**: `ce-ai workflow resume` now inspects incoming `stdin` for lifecycle hook event JSON (`hook_event_name`) when executed non-interactively.
+  - **Silent Clean JSON Output**: For `Stop` and `PreCompact` hooks, executes autonomous Workflow FSM stage progression (`maybe_auto_checkpoint`) silently and emits `{}` to `stdout` with exit code 0, conforming to Codex and Claude Code hook schemas.
+  - **Continuation Loop Guard**: Detects `stop_hook_active: true` to prevent recursive re-triggering during turn-end evaluation.
+  - **Explicit `--event <EVENT>` CLI Flag**: Added `--event` parameter to `ce-ai workflow resume` for deterministic hook event dispatch.
+  - **Harness Detection Resiliency**: Updated `has_codex_event_hook` and `has_event_hook` in `src/harness/codex.rs` and `src/harness/claude.rs` to recognize commands with explicit arguments while retaining backward compatibility with existing user configs.
+
 ## [1.63.0] - 2026-09-18
 
 ### Added

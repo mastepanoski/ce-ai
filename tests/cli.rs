@@ -5522,6 +5522,44 @@ fn init_prj_codex_injects_and_deinits_session_start_hook() {
         .success()
         .stdout(predicate::str::contains("\"hookSpecificOutput\""));
 
+    // Verify ce-ai workflow resume --event Stop outputs clean JSON object
+    ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args(["workflow", "resume", "--event", "Stop"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("{}"))
+        .stdout(predicate::str::contains("workflow: resuming").not());
+
+    // Verify ce-ai workflow resume with stdin Stop hook payload outputs clean JSON object
+    ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args(["workflow", "resume"])
+        .write_stdin(r#"{"hook_event_name": "Stop", "session_id": "codex-test-1"}"#)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("{}"))
+        .stdout(predicate::str::contains("workflow: resuming").not());
+
+    // Verify ce-ai workflow resume with stdin stop_hook_active outputs clean JSON without looping
+    ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args(["workflow", "resume"])
+        .write_stdin(r#"{"hook_event_name": "Stop", "stop_hook_active": true}"#)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("{}"))
+        .stdout(predicate::str::contains("workflow: resuming").not());
+
+    // Verify ce-ai workflow resume --event PreCompact outputs clean JSON object
+    ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args(["workflow", "resume", "--event", "PreCompact"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("{}"))
+        .stdout(predicate::str::contains("workflow: resuming").not());
+
     // De-init cleans up the hook, preserving other config settings
     ceai(&config_dir, &home)
         .args(["deinit-prj", prj_dir.to_str().unwrap()])

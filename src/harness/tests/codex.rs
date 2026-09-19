@@ -248,3 +248,37 @@ command = "echo user-start"
         "echo user-start"
     );
 }
+
+#[test]
+fn codex_session_start_hook_matches_flagged_commands() {
+    let tmp = TempDir::new().unwrap();
+    let config_path = tmp.path().join(".codex/config.toml");
+    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+
+    let custom_toml = r#"[[hooks.SessionStart]]
+matcher = "startup|resume|compact"
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "ce-ai workflow resume --event SessionStart"
+
+[[hooks.Stop]]
+matcher = ".*"
+[[hooks.Stop.hooks]]
+type = "command"
+command = "ce-ai workflow resume --event Stop"
+
+[[hooks.PreCompact]]
+matcher = ".*"
+[[hooks.PreCompact.hooks]]
+type = "command"
+command = "ce-ai workflow resume --event PreCompact"
+"#;
+    std::fs::write(&config_path, custom_toml).unwrap();
+
+    assert!(has_session_start_hook(&config_path));
+
+    let removed = remove_session_start_hook(&config_path).unwrap();
+    assert!(removed);
+    assert!(!has_session_start_hook(&config_path));
+    assert!(!config_path.exists(), "File should be deleted when empty");
+}

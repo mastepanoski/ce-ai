@@ -2441,3 +2441,95 @@ fn test_status_and_resume_banners_with_mode() {
     assert!(text_compound.contains("[Workflow FSM & Progress Recovery Status]"));
     assert!(text_compound.contains("7-Stage Cycle (Compound Engineering Skill Mappings):"));
 }
+
+#[test]
+fn test_parse_hook_payload() {
+    // Valid Stop event
+    let (name, active) =
+        parse_hook_payload(r#"{"hook_event_name": "Stop", "session_id": "abc-123"}"#);
+    assert_eq!(name, Some("Stop".to_string()));
+    assert_eq!(active, None);
+
+    // Stop event with stop_hook_active true
+    let (name, active) =
+        parse_hook_payload(r#"{"hook_event_name": "Stop", "stop_hook_active": true}"#);
+    assert_eq!(name, Some("Stop".to_string()));
+    assert_eq!(active, Some(true));
+
+    // Stop event with stop_hook_active false
+    let (name, active) =
+        parse_hook_payload(r#"{"hook_event_name": "Stop", "stop_hook_active": false}"#);
+    assert_eq!(name, Some("Stop".to_string()));
+    assert_eq!(active, Some(false));
+
+    // PreCompact event (camelCase hookEventName)
+    let (name, active) =
+        parse_hook_payload(r#"{"hookEventName": "PreCompact", "session_id": "xyz"}"#);
+    assert_eq!(name, Some("PreCompact".to_string()));
+    assert_eq!(active, None);
+
+    // SessionStart event
+    let (name, active) = parse_hook_payload(r#"{"hook_event_name": "SessionStart"}"#);
+    assert_eq!(name, Some("SessionStart".to_string()));
+    assert_eq!(active, None);
+
+    // Fallback: stopHookActive present without hook_event_name
+    let (name, active) = parse_hook_payload(r#"{"stopHookActive": false}"#);
+    assert_eq!(name, Some("Stop".to_string()));
+    assert_eq!(active, Some(false));
+
+    // Empty or non-JSON content
+    assert_eq!(parse_hook_payload(""), (None, None));
+    assert_eq!(parse_hook_payload("   "), (None, None));
+    assert_eq!(parse_hook_payload("plain text line"), (None, None));
+    assert_eq!(
+        parse_hook_payload(r#"{"some_other_key": 123}"#),
+        (None, None)
+    );
+}
+
+#[test]
+fn test_resolve_hook_context() {
+    // Explicit CLI event takes precedence
+    let (ev, active, from_stdin) = resolve_hook_context(Some("Stop"), None);
+    assert_eq!(ev, Some("Stop".to_string()));
+    assert_eq!(active, None);
+    assert!(!from_stdin);
+
+    let (ev, active, from_stdin) =
+        resolve_hook_context(Some("PreCompact"), Some(r#"{"hook_event_name": "Stop"}"#));
+    assert_eq!(ev, Some("PreCompact".to_string()));
+    assert_eq!(active, None);
+    assert!(!from_stdin);
+
+    // Dynamic resolution from stdin JSON
+    let (ev, active, from_stdin) = resolve_hook_context(
+        None,
+        Some(r#"{"hook_event_name": "Stop", "stop_hook_active": true}"#),
+    );
+    assert_eq!(ev, Some("Stop".to_string()));
+    assert_eq!(active, Some(true));
+    assert!(from_stdin);
+
+    let (ev, active, from_stdin) =
+        resolve_hook_context(None, Some(r#"{"hook_event_name": "PreCompact"}"#));
+    assert_eq!(ev, Some("PreCompact".to_string()));
+    assert_eq!(active, None);
+    assert!(from_stdin);
+
+    // Empty or non-hook stdin yields None
+    let (ev, active, from_stdin) = resolve_hook_context(None, None);
+    assert_eq!(ev, None);
+    assert_eq!(active, None);
+    assert!(!from_stdin);
+
+    let (ev, active, from_stdin) = resolve_hook_context(None, Some(""));
+    assert_eq!(ev, None);
+    assert_eq!(active, None);
+    assert!(!from_stdin);
+
+    let (ev, active, from_stdin) = resolve_hook_context(None, Some("human readable text\n"));
+    assert_eq!(ev, None);
+    assert_eq!(active, None);
+    assert!(!from_stdin);
+}
