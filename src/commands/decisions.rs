@@ -31,9 +31,12 @@ pub enum Action {
     },
     /// Configure or test Decision Provider authentication credentials.
     Auth {
-        /// API key value to set (if omitted, displays current key status).
+        /// API key value to set (if omitted, prompts securely via stdin or displays current key status).
+        #[arg(long, num_args = 0..=1)]
+        key: Option<Option<String>>,
+        /// Read API key value from standard input.
         #[arg(long)]
-        key: Option<String>,
+        stdin: bool,
         /// Verify provider connectivity with the resolved API key.
         #[arg(long)]
         check: bool,
@@ -91,7 +94,9 @@ pub enum Action {
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     match &args.action {
         Action::Status { json } => handle_status(ctx, *json),
-        Action::Auth { key, check } => handle_auth(ctx, key.as_deref(), *check),
+        Action::Auth { key, stdin, check } => {
+            handle_auth(ctx, key.as_ref().map(|o| o.as_deref()), *stdin, *check)
+        }
         Action::Setup { preset } => handle_setup(ctx, preset),
         Action::Test { provider } => handle_test(ctx, provider.as_deref()),
         Action::CheckRisk {
@@ -272,10 +277,45 @@ fn handle_status(ctx: &Context, as_json: bool) -> Result<(), CeError> {
     Ok(())
 }
 
-fn handle_auth(ctx: &Context, key: Option<&str>, check: bool) -> Result<(), CeError> {
-    if let Some(k) = key {
-        let saved_path = save_api_key(k, None)?;
-        println!("Saved API key to {}", saved_path.display());
+fn handle_auth(
+    ctx: &Context,
+    key: Option<Option<&str>>,
+    from_stdin: bool,
+    check: bool,
+) -> Result<(), CeError> {
+    let mut key_updated = false;
+
+    if from_stdin {
+        let read_key = crate::decisions::auth::read_api_key_from_stdin()?;
+        let saved_path = save_api_key(&read_key, None)?;
+        println!("Saved API key to OS Keyring and {}", saved_path.display());
+        key_updated = true;
+    } else if let Some(key_arg) = key {
+        match key_arg {
+            Some(k) => {
+                eprintln!(
+                    "warning: passing API key via command-line arguments exposes it in shell history and process lists; prefer interactive prompt via 'ce-ai decisions auth --key' or '--stdin'"
+                );
+                let saved_path = save_api_key(k, None)?;
+                println!("Saved API key to OS Keyring and {}", saved_path.display());
+                key_updated = true;
+            }
+            None => {
+                let read_key = crate::decisions::auth::prompt_api_key_interactive(
+                    "Enter TypeSafe/Jev API key: ",
+                )?;
+                match read_key {
+                    Some(k) => {
+                        let saved_path = save_api_key(&k, None)?;
+                        println!("Saved API key to OS Keyring and {}", saved_path.display());
+                        key_updated = true;
+                    }
+                    None => {
+                        println!("No key entered; preserving current configuration.");
+                    }
+                }
+            }
+        }
     }
 
     let resolved = resolve_api_key(None);
@@ -298,10 +338,12 @@ fn handle_auth(ctx: &Context, key: Option<&str>, check: bool) -> Result<(), CeEr
         } else {
             eprintln!("Authentication verification failed: {}", health.message);
         }
-    } else if key.is_none() {
+    } else if !key_updated {
         match resolved.as_deref() {
             Some(_) => println!("Current API key: configured"),
-            None => println!("Current API key: not set (run 'ce-ai decisions auth --key <KEY>' or export TYPESAFE_API_KEY)"),
+            None => println!(
+                "Current API key: not set (run 'ce-ai decisions auth --key' or export TYPESAFE_API_KEY)"
+            ),
         }
     }
 
@@ -436,7 +478,7 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
         config.budget.max_monthly_usd()
     );
     println!();
-    println!("Next step: run 'ce-ai decisions auth --key <KEY>' or export TYPESAFE_API_KEY.");
+    println!("Next step: run 'ce-ai decisions auth' or export TYPESAFE_API_KEY.");
 
     Ok(())
 }
@@ -868,6 +910,113 @@ mod tests {
             false,
             true,
         );
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_auth_clap_parsing_modes() {
+        use clap::Parser;
+
+        #[derive(Parser, Debug)]
+        struct Cli {
+            #[command(subcommand)]
+            action: Action,
+        }
+
+        // 1. Plain auth (no flags)
+        let parsed1 = Cli::try_parse_from(["cli", "auth"]).unwrap();
+        match parsed1.action {
+            Action::Auth { key, stdin, check } => {
+                assert_eq!(key, None);
+                assert!(!stdin);
+                assert!(!check);
+            }
+            _ => panic!("expected Action::Auth"),
+        }
+
+        // 2. Auth with --stdin
+        let parsed2 = Cli::try_parse_from(["cli", "auth", "--stdin"]).unwrap();
+        match parsed2.action {
+            Action::Auth { key, stdin, check } => {
+                assert_eq!(key, None);
+                assert!(stdin);
+                assert!(!check);
+            }
+            _ => panic!("expected Action::Auth"),
+        }
+
+        // 3. Auth with --key without value
+        let parsed3 = Cli::try_parse_from(["cli", "auth", "--key"]).unwrap();
+        match parsed3.action {
+            Action::Auth { key, stdin, check } => {
+                assert_eq!(key, Some(None));
+                assert!(!stdin);
+                assert!(!check);
+            }
+            _ => panic!("expected Action::Auth"),
+        }
+
+        // 4. Auth with --key with value
+        let parsed4 = Cli::try_parse_from(["cli", "auth", "--key", "ts-val-123"]).unwrap();
+        match parsed4.action {
+            Action::Auth { key, stdin, check } => {
+                assert_eq!(key, Some(Some("ts-val-123".to_string())));
+                assert!(!stdin);
+                assert!(!check);
+            }
+            _ => panic!("expected Action::Auth"),
+        }
+
+        // 5. Auth with --stdin and --check
+        let parsed5 = Cli::try_parse_from(["cli", "auth", "--stdin", "--check"]).unwrap();
+        match parsed5.action {
+            Action::Auth { key, stdin, check } => {
+                assert_eq!(key, None);
+                assert!(stdin);
+                assert!(check);
+            }
+            _ => panic!("expected Action::Auth"),
+        }
+    }
+
+    #[test]
+    fn test_handle_auth_with_key_arg() {
+        let temp = tempdir().unwrap();
+        let creds_path = temp.path().join("credentials.toml");
+        std::env::set_var("CE_AI_CREDENTIALS_PATH", creds_path.to_str().unwrap());
+
+        let ctx = Context {
+            config_dir: temp.path().to_path_buf(),
+            opencode_config_dir: temp.path().join("opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        let res = handle_auth(&ctx, Some(Some("ts-unit-key-456")), false, false);
+        assert!(res.is_ok());
+
+        let resolved = resolve_api_key(None);
+        assert_eq!(resolved.as_deref(), Some("ts-unit-key-456"));
+
+        std::env::remove_var("CE_AI_CREDENTIALS_PATH");
+    }
+
+    #[test]
+    fn test_handle_auth_non_interactive_no_flags() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().to_path_buf(),
+            opencode_config_dir: temp.path().join("opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        // In non-interactive test runner, should simply display status without hanging
+        let res = handle_auth(&ctx, None, false, false);
         assert!(res.is_ok());
     }
 }

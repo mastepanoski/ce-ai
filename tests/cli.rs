@@ -24,7 +24,11 @@ fn ceai(config_dir: &Path, home: &Path) -> Command {
     cmd.arg("--config-dir")
         .arg(config_dir)
         .env("HOME", home)
-        .env("CE_AI_OPENCODE_CONFIG", home.join(".config/opencode"));
+        .env("CE_AI_OPENCODE_CONFIG", home.join(".config/opencode"))
+        .env(
+            "CE_AI_CREDENTIALS_PATH",
+            home.join(".config/ce-ai/credentials.toml"),
+        );
     // Hermetic git resolution: under the pre-commit hook GIT_DIR points at the
     // real checkout, which would make doctor's repo probes leave the fixture.
     for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
@@ -9219,6 +9223,57 @@ fn test_cli_decisions_auth_file_and_masking() {
         let perms = fs::metadata(&creds_file).unwrap().permissions();
         assert_eq!(perms.mode() & 0o777, 0o600);
     }
+}
+
+#[test]
+fn test_cli_decisions_auth_stdin_piped_and_empty_validation() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let home = tmp.path().join("home");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+
+    // 1. Piped valid key via --stdin
+    ceai(&config_dir, &home)
+        .args(["decisions", "auth", "--stdin"])
+        .write_stdin("ts_piped_secret_abcdef123456\n")
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Saved API key to OS Keyring and"));
+
+    // Verify key resolved
+    ceai(&config_dir, &home)
+        .args(["decisions", "auth"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Current API key: configured"));
+
+    // 2. Empty piped stdin fails with exit code 2 (CeError::Usage)
+    ceai(&config_dir, &home)
+        .args(["decisions", "auth", "--stdin"])
+        .write_stdin("\n")
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .code(2)
+        .stderr(predicates::str::contains(
+            "API key provided via stdin cannot be empty",
+        ));
+
+    // 3. Security warning emitted when using --key <VAL>
+    ceai(&config_dir, &home)
+        .args(["decisions", "auth", "--key", "ts_secret_argv"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .success()
+        .stderr(predicates::str::contains(
+            "warning: passing API key via command-line arguments exposes it in shell history",
+        ));
 }
 
 #[test]

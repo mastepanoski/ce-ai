@@ -5,6 +5,19 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.64.0] - 2026-09-19
+
+### Added
+- **OS Keyring Integration & Secure Stdin Input for Decisions Auth**:
+  - **OS Keyring Credential Storage (`keyring`)**: Securely saves and resolves TypeSafe / Jev API keys directly from the native OS credential store (macOS Keychain, Windows Credential Manager, Linux Secret Service).
+  - **Cross-Tool Interoperability**: Automatically recognizes API keys already configured under `jevkit` service in the OS Keyring.
+  - **Interactive Masked Terminal Ingestion (`rpassword`)**: Running `ce-ai decisions auth --key` (without a value) securely prompts for the API key in interactive terminals with characters hidden, printing a confirmation without leaving secrets in the terminal buffer.
+  - **Standard Input Streaming (`--stdin`)**: Added `--stdin` flag to `ce-ai decisions auth` to read credentials directly from piped or redirected input (`echo "$KEY" | ce-ai decisions auth --stdin` or password managers), with strict empty/whitespace validation (exit code 2 `CeError::Usage`).
+  - **Shell History Leakage Protection**: Emits a security deprecation warning on `stderr` when `--key <VAL>` is provided via command-line arguments to advise operators against process table (`ps`) and shell history (`.zsh_history`) pollution.
+  - **macOS Keychain GUI Prompt Prevention**: Prioritized `~/.config/ce-ai/credentials.toml` (mode `0600`) over the OS Keyring to eliminate unexpected macOS SecurityAgent password dialogs on ad-hoc signed CLI binaries, and applied the `-A` access flag when writing to macOS Keychain.
+  - **CodeQL & Secret Leakage Hardening**: Avoids printing masked API keys during `auth` status inspection, eliminating cleartext secret logging risks in CI and terminal logs.
+  - **Living System Spec & Stage 6 Compound Knowledge**: Promoted auth delta requirements into `openspec/specs/state.md` and captured root cause / resolution in `docs/solutions/bugfixes/macos-keychain-prompts-and-secure-stdin-auth.md`.
+
 ## [1.63.1] - 2026-09-18
 
 ### Fixed

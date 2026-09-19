@@ -1,6 +1,6 @@
 [package]
 name = "ce-ai"
-version = "1.63.1"
+version = "1.64.0"
 edition = "2021"
 description = "CLI for managing the compound-engineering plugin across AI harnesses"
 license = "MIT"
@@ -20,6 +20,8 @@ toml = "0.8"
 ctrlc = "3"
 tempfile = "3"
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
+keyring = "4.2"
+rpassword = "7.3"
 
 [dev-dependencies]
 assert_cmd = "2"

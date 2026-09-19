@@ -52,3 +52,26 @@ fn test_credentials_file_unix_permissions() {
     let mode = metadata.permissions().mode() & 0o777;
     assert_eq!(mode, 0o600, "credentials.toml must have 0600 permissions");
 }
+
+#[test]
+fn test_read_api_key_from_reader() {
+    // Valid key with trailing newline
+    let input = "  ts-custom-key-999 \n";
+    let key = read_api_key_from_reader(input.as_bytes()).expect("valid key");
+    assert_eq!(key, "ts-custom-key-999");
+
+    // Valid key with Windows CRLF
+    let input_crlf = "ts-crlf-key-888\r\n";
+    let key_crlf = read_api_key_from_reader(input_crlf.as_bytes()).expect("valid crlf key");
+    assert_eq!(key_crlf, "ts-crlf-key-888");
+
+    // Empty input fails with Usage error
+    let empty = "";
+    let err = read_api_key_from_reader(empty.as_bytes()).expect_err("empty should fail");
+    assert!(matches!(err, CeError::Usage(_)));
+
+    // Whitespace-only input fails with Usage error
+    let whitespace = "   \t \n";
+    let err2 = read_api_key_from_reader(whitespace.as_bytes()).expect_err("whitespace should fail");
+    assert!(matches!(err2, CeError::Usage(_)));
+}

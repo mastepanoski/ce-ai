@@ -11,17 +11,35 @@ fn test_jev_config_defaults() {
 
 #[test]
 fn test_jev_missing_api_key_returns_usage_error() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let non_existent = tmp.path().join("credentials.toml");
+    std::env::set_var("CE_AI_CREDENTIALS_PATH", non_existent.to_str().unwrap());
+    let saved_typesafe = std::env::var("TYPESAFE_API_KEY").ok();
+    let saved_jev = std::env::var("JEV_API_KEY").ok();
+    std::env::remove_var("TYPESAFE_API_KEY");
+    std::env::remove_var("JEV_API_KEY");
+
     let provider = JevProvider::new(JevConfig::default(), None);
-    assert!(!provider.has_api_key());
+    let has_key = provider.has_api_key();
 
     let req = DecisionRequest::new(DecisionContext::new("Test task"));
     let err = provider
         .evaluate(req)
         .expect_err("should error without API key");
-    assert!(matches!(err, CeError::Usage(_)));
-    assert!(format!("{err}").contains("TYPESAFE_API_KEY"));
 
     let health = provider.check_health().expect("health check");
+
+    if let Some(v) = saved_typesafe {
+        std::env::set_var("TYPESAFE_API_KEY", v);
+    }
+    if let Some(v) = saved_jev {
+        std::env::set_var("JEV_API_KEY", v);
+    }
+    std::env::remove_var("CE_AI_CREDENTIALS_PATH");
+
+    assert!(!has_key);
+    assert!(matches!(err, CeError::Usage(_)));
+    assert!(format!("{err}").contains("TYPESAFE_API_KEY"));
     assert!(!health.available);
     assert!(health.message.contains("missing TYPESAFE_API_KEY"));
 }
