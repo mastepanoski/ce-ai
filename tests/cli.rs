@@ -9250,9 +9250,7 @@ fn test_cli_decisions_auth_stdin_piped_and_empty_validation() {
         .env_remove("JEV_API_KEY")
         .assert()
         .success()
-        .stdout(predicates::str::contains(
-            "Current API key: configured (ts****...****3456)",
-        ));
+        .stdout(predicates::str::contains("Current API key: configured"));
 
     // 2. Empty piped stdin fails with exit code 2 (CeError::Usage)
     ceai(&config_dir, &home)

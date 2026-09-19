@@ -340,10 +340,7 @@ fn handle_auth(
         }
     } else if !key_updated {
         match resolved.as_deref() {
-            Some(k) => println!(
-                "Current API key: configured ({})",
-                crate::decisions::auth::mask_api_key(k)
-            ),
+            Some(_) => println!("Current API key: configured"),
             None => println!(
                 "Current API key: not set (run 'ce-ai decisions auth --key' or export TYPESAFE_API_KEY)"
             ),
