@@ -24,7 +24,11 @@ fn ceai(config_dir: &Path, home: &Path) -> Command {
     cmd.arg("--config-dir")
         .arg(config_dir)
         .env("HOME", home)
-        .env("CE_AI_OPENCODE_CONFIG", home.join(".config/opencode"));
+        .env("CE_AI_OPENCODE_CONFIG", home.join(".config/opencode"))
+        .env(
+            "CE_AI_CREDENTIALS_PATH",
+            home.join(".config/ce-ai/credentials.toml"),
+        );
     // Hermetic git resolution: under the pre-commit hook GIT_DIR points at the
     // real checkout, which would make doctor's repo probes leave the fixture.
     for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
