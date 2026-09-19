@@ -49,6 +49,48 @@ pub fn keyring_get() -> Option<String> {
         return None;
     }
 
+    #[cfg(target_os = "macos")]
+    {
+        // On macOS, try reading via `security find-generic-password -w`.
+        // If the item was added with -A, this succeeds cleanly without SecurityAgent popups.
+        if let Ok(output) = std::process::Command::new("security")
+            .args([
+                "find-generic-password",
+                "-s",
+                KEYRING_SERVICE,
+                "-a",
+                KEYRING_USER,
+                "-w",
+            ])
+            .output()
+        {
+            if output.status.success() {
+                let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !s.is_empty() {
+                    return Some(s);
+                }
+            }
+        }
+        if let Ok(output) = std::process::Command::new("security")
+            .args([
+                "find-generic-password",
+                "-s",
+                "jevkit",
+                "-a",
+                KEYRING_USER,
+                "-w",
+            ])
+            .output()
+        {
+            if output.status.success() {
+                let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !s.is_empty() {
+                    return Some(s);
+                }
+            }
+        }
+    }
+
     if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
         if let Ok(key) = entry.get_password() {
             let clean = key.trim().to_string();
@@ -81,6 +123,32 @@ pub fn keyring_set(key: &str) -> Result<(), CeError> {
     if clean.is_empty() {
         return Err(CeError::Usage("cannot save empty API key".into()));
     }
+
+    #[cfg(target_os = "macos")]
+    {
+        // On macOS, storing via `security add-generic-password` with `-A` allows
+        // ad-hoc compiled CLI binaries to read the item without triggering SecurityAgent UI prompts.
+        let status = std::process::Command::new("security")
+            .args([
+                "add-generic-password",
+                "-U",
+                "-s",
+                KEYRING_SERVICE,
+                "-a",
+                KEYRING_USER,
+                "-w",
+                clean,
+                "-A",
+            ])
+            .status();
+
+        if let Ok(s) = status {
+            if s.success() {
+                return Ok(());
+            }
+        }
+    }
+
     let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
         .map_err(|e| CeError::Runtime(format!("failed to open OS keyring: {e}")))?;
     entry
@@ -93,6 +161,25 @@ pub fn keyring_set(key: &str) -> Result<(), CeError> {
 pub fn keyring_delete() -> Result<bool, CeError> {
     if std::env::var("CE_AI_CREDENTIALS_PATH").is_ok() {
         return Ok(false);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let status = std::process::Command::new("security")
+            .args([
+                "delete-generic-password",
+                "-s",
+                KEYRING_SERVICE,
+                "-a",
+                KEYRING_USER,
+            ])
+            .status();
+
+        if let Ok(s) = status {
+            if s.success() {
+                return Ok(true);
+            }
+        }
     }
 
     let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
@@ -109,8 +196,8 @@ pub fn keyring_delete() -> Result<bool, CeError> {
 /// Resolves the API key using tiered precedence:
 /// 1. `TYPESAFE_API_KEY` process environment variable.
 /// 2. `JEV_API_KEY` process environment variable.
-/// 3. OS Keyring (`~/.keychain` / Windows Credential Manager / Secret Service) when no custom path is given.
-/// 4. `credentials.toml` file (custom path or default `~/.config/ce-ai/credentials.toml`).
+/// 3. `credentials.toml` file (custom path or default `~/.config/ce-ai/credentials.toml`, mode `0600`).
+/// 4. OS Keyring (`~/.keychain` / Windows Credential Manager / Secret Service).
 pub fn resolve_api_key(custom_path: Option<&Path>) -> Option<String> {
     // 1. Process environment: TYPESAFE_API_KEY
     if let Ok(key) = std::env::var("TYPESAFE_API_KEY") {
@@ -145,24 +232,26 @@ pub fn resolve_api_key(custom_path: Option<&Path>) -> Option<String> {
         return None;
     }
 
-    // 3. OS Keyring
-    if let Some(key) = keyring_get() {
-        return Some(key);
-    }
-
-    // 4. Default user global credentials file
-    let path = default_credentials_path()?;
-    if path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            if let Ok(creds) = toml::from_str::<CredentialsFile>(&content) {
-                if let Some(key) = creds.typesafe_api_key {
-                    let clean = key.trim();
-                    if !clean.is_empty() {
-                        return Some(clean.to_string());
+    // 3. User global credentials file (~/.config/ce-ai/credentials.toml, mode 0600)
+    // Checking this first avoids triggering external OS Keyring / SecurityAgent authorization dialogs.
+    if let Some(path) = default_credentials_path() {
+        if path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(creds) = toml::from_str::<CredentialsFile>(&content) {
+                    if let Some(key) = creds.typesafe_api_key {
+                        let clean = key.trim();
+                        if !clean.is_empty() {
+                            return Some(clean.to_string());
+                        }
                     }
                 }
             }
         }
+    }
+
+    // 4. OS Keyring fallback (~/.keychain / Windows Credential Manager / Secret Service)
+    if let Some(key) = keyring_get() {
+        return Some(key);
     }
 
     None
