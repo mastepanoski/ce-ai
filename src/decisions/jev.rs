@@ -192,36 +192,120 @@ impl DecisionProvider for JevProvider {
             });
         };
 
-        let url = format!("{}/health", self.config.endpoint.trim_end_matches('/'));
+        let trimmed = self.config.endpoint.trim_end_matches('/');
+        let primary_url = if trimmed.ends_with("/v1") {
+            format!("{trimmed}/models")
+        } else if trimmed.contains("api.typesafe.ai") {
+            format!("{trimmed}/v1/models")
+        } else {
+            format!("{trimmed}/models")
+        };
+        let fallback_url = if trimmed.ends_with("/v1") {
+            format!("{}/health", trimmed.trim_end_matches("/v1"))
+        } else {
+            format!("{trimmed}/health")
+        };
+
         let start = Instant::now();
 
-        match self
+        // 1. Try primary models/auth probe
+        let first_attempt = self
             .client
-            .get(&url)
+            .get(&primary_url)
             .header("Authorization", format!("Bearer {key}"))
-            .send()
-        {
-            Ok(resp) => {
+            .send();
+
+        match first_attempt {
+            Ok(resp) if resp.status().is_success() => {
                 let latency_ms = start.elapsed().as_millis() as u64;
-                if resp.status().is_success() {
-                    Ok(HealthStatus {
-                        available: true,
-                        latency_ms,
-                        message: format!("Jev API healthy ({}ms)", latency_ms),
-                    })
-                } else {
-                    Ok(HealthStatus {
+                Ok(HealthStatus {
+                    available: true,
+                    latency_ms,
+                    message: format!("Jev API healthy ({}ms)", latency_ms),
+                })
+            }
+            Ok(resp) if resp.status() == reqwest::StatusCode::UNAUTHORIZED => {
+                let latency_ms = start.elapsed().as_millis() as u64;
+                Ok(HealthStatus {
+                    available: false,
+                    latency_ms,
+                    message: "Jev authentication failed: HTTP 401 Unauthorized (check API key)"
+                        .into(),
+                })
+            }
+            Ok(resp) if resp.status() == reqwest::StatusCode::FORBIDDEN => {
+                let latency_ms = start.elapsed().as_millis() as u64;
+                Ok(HealthStatus {
+                    available: false,
+                    latency_ms,
+                    message: "Jev authentication failed: HTTP 403 Forbidden".into(),
+                })
+            }
+            Ok(resp) if resp.status() == reqwest::StatusCode::NOT_FOUND => {
+                // Primary endpoint 404 (e.g. mock server) -> try fallback health endpoint
+                match self
+                    .client
+                    .get(&fallback_url)
+                    .header("Authorization", format!("Bearer {key}"))
+                    .send()
+                {
+                    Ok(fb_resp) => {
+                        let latency_ms = start.elapsed().as_millis() as u64;
+                        if fb_resp.status().is_success() {
+                            Ok(HealthStatus {
+                                available: true,
+                                latency_ms,
+                                message: format!("Jev API healthy ({}ms)", latency_ms),
+                            })
+                        } else {
+                            Ok(HealthStatus {
+                                available: false,
+                                latency_ms,
+                                message: format!(
+                                    "Jev health check returned HTTP {}",
+                                    fb_resp.status()
+                                ),
+                            })
+                        }
+                    }
+                    Err(e) => Ok(HealthStatus {
                         available: false,
-                        latency_ms,
-                        message: format!("Jev health check returned HTTP {}", resp.status()),
-                    })
+                        latency_ms: start.elapsed().as_millis() as u64,
+                        message: format!("Jev connection error: {e}"),
+                    }),
                 }
             }
-            Err(e) => Ok(HealthStatus {
-                available: false,
-                latency_ms: start.elapsed().as_millis() as u64,
-                message: format!("Jev connection error: {e}"),
-            }),
+            Ok(resp) => {
+                let latency_ms = start.elapsed().as_millis() as u64;
+                Ok(HealthStatus {
+                    available: false,
+                    latency_ms,
+                    message: format!("Jev health check returned HTTP {}", resp.status()),
+                })
+            }
+            Err(e) => {
+                // If primary request failed, also try fallback URL before giving up
+                match self
+                    .client
+                    .get(&fallback_url)
+                    .header("Authorization", format!("Bearer {key}"))
+                    .send()
+                {
+                    Ok(fb_resp) if fb_resp.status().is_success() => {
+                        let latency_ms = start.elapsed().as_millis() as u64;
+                        Ok(HealthStatus {
+                            available: true,
+                            latency_ms,
+                            message: format!("Jev API healthy ({}ms)", latency_ms),
+                        })
+                    }
+                    _ => Ok(HealthStatus {
+                        available: false,
+                        latency_ms: start.elapsed().as_millis() as u64,
+                        message: format!("Jev connection error: {e}"),
+                    }),
+                }
+            }
         }
     }
 }
