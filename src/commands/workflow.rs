@@ -70,6 +70,9 @@ pub enum Action {
         /// Execution mode override: auto, organic (odd), compound (ce).
         #[arg(long, value_name = "MODE")]
         mode: Option<String>,
+        /// Lifecycle hook event name (e.g. SessionStart, Stop, PreCompact).
+        #[arg(long, value_name = "EVENT")]
+        event: Option<String>,
     },
     /// Record a code-review receipt for the current branch head (observe-only ship gate, issue #354).
     ReviewReceipt {
@@ -176,12 +179,48 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             json,
             pre_invocation,
             mode,
+            event,
         } => {
+            if *pre_invocation {
+                let _ = maybe_auto_checkpoint(ctx, &repo_root, &state_path);
+                handle_pre_invocation(ctx)?;
+                return Ok(());
+            }
+
+            let stdin_str = if !std::io::stdin().is_terminal() {
+                let mut buf = String::new();
+                let _ = std::io::stdin().read_to_string(&mut buf);
+                Some(buf)
+            } else {
+                None
+            };
+
+            let (resolved_event, stop_hook_active, from_hook_stdin) =
+                resolve_hook_context(event.as_deref(), stdin_str.as_deref());
+
+            let norm_event = resolved_event.as_deref().map(|s| s.to_ascii_lowercase());
+
+            match norm_event.as_deref() {
+                Some("stop") => {
+                    if stop_hook_active == Some(true) {
+                        println!("{{}}");
+                        return Ok(());
+                    }
+                    let _ = maybe_auto_checkpoint(ctx, &repo_root, &state_path);
+                    println!("{{}}");
+                    return Ok(());
+                }
+                Some("precompact") => {
+                    let _ = maybe_auto_checkpoint(ctx, &repo_root, &state_path);
+                    println!("{{}}");
+                    return Ok(());
+                }
+                _ => {}
+            }
+
             let cli_mode = mode.as_deref().map(ExecutionMode::parse).transpose()?;
             let _ = maybe_auto_checkpoint(ctx, &repo_root, &state_path);
-            if *pre_invocation {
-                handle_pre_invocation(ctx)?;
-            } else if *json {
+            if *json || (from_hook_stdin && norm_event.as_deref() == Some("sessionstart")) {
                 let state = State::load(&state_path)?;
                 let wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
                 let repo_state = probe_repo_state_with_mode(ctx, &wf, cli_mode);
@@ -3099,6 +3138,53 @@ pub fn reconcile_tasks_with_git(
     } else {
         None
     }
+}
+
+#[derive(Deserialize, Default, Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HookPayload {
+    #[serde(alias = "hook_event_name", alias = "hookEventName")]
+    pub hook_event_name: Option<String>,
+    #[serde(alias = "stop_hook_active", alias = "stopHookActive")]
+    pub stop_hook_active: Option<bool>,
+    #[serde(alias = "session_id", alias = "sessionId")]
+    pub session_id: Option<String>,
+}
+
+pub(crate) fn parse_hook_payload(content: &str) -> (Option<String>, Option<bool>) {
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return (None, None);
+    }
+    if let Ok(payload) = serde_json::from_str::<HookPayload>(trimmed) {
+        if let Some(name) = payload.hook_event_name {
+            return (Some(name), payload.stop_hook_active);
+        }
+        if payload.stop_hook_active.is_some() {
+            return (Some("Stop".to_string()), payload.stop_hook_active);
+        }
+    }
+    (None, None)
+}
+
+pub(crate) fn resolve_hook_context(
+    cli_event: Option<&str>,
+    stdin_content: Option<&str>,
+) -> (Option<String>, Option<bool>, bool) {
+    if let Some(ev) = cli_event {
+        let trimmed = ev.trim();
+        if !trimmed.is_empty() {
+            return (Some(trimmed.to_string()), None, false);
+        }
+    }
+
+    if let Some(content) = stdin_content {
+        let (name, active) = parse_hook_payload(content);
+        if name.is_some() {
+            return (name, active, true);
+        }
+    }
+
+    (None, None, false)
 }
 
 #[derive(Deserialize, Default, Debug)]

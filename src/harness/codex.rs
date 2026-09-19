@@ -258,7 +258,11 @@ fn has_codex_event_hook(hooks_table: &toml::Table, event_name: &str) -> bool {
                             cmd.as_table()
                                 .and_then(|c| c.get("command"))
                                 .and_then(|s| s.as_str())
-                                == Some(CODEX_RESUME_COMMAND)
+                                .map(|s| {
+                                    s == CODEX_RESUME_COMMAND
+                                        || s.starts_with("ce-ai workflow resume")
+                                })
+                                .unwrap_or(false)
                         })
                     })
                     .unwrap_or(false)
@@ -458,10 +462,16 @@ pub fn remove_session_start_hook(config_path: &Path) -> Result<bool, CeError> {
                     {
                         let prev_len = hooks_arr.len();
                         hooks_arr.retain(|h| {
-                            h.as_table()
+                            let is_resume = h
+                                .as_table()
                                 .and_then(|t| t.get("command"))
                                 .and_then(|c| c.as_str())
-                                != Some(CODEX_RESUME_COMMAND)
+                                .map(|s| {
+                                    s == CODEX_RESUME_COMMAND
+                                        || s.starts_with("ce-ai workflow resume")
+                                })
+                                .unwrap_or(false);
+                            !is_resume
                         });
                         if hooks_arr.len() != prev_len {
                             changed = true;

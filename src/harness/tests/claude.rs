@@ -132,6 +132,48 @@ fn ensures_and_removes_session_start_hook_lifecycle() {
 }
 
 #[test]
+fn claude_session_start_hook_matches_flagged_commands() {
+    let tmp = TempDir::new().unwrap();
+    let settings_path = tmp.path().join("settings.json");
+
+    let custom_json = serde_json::json!({
+        "hooks": {
+            "SessionStart": [
+                {
+                    "matcher": ".*",
+                    "hooks": [{"type": "command", "command": "ce-ai workflow resume --event SessionStart"}]
+                }
+            ],
+            "Stop": [
+                {
+                    "matcher": ".*",
+                    "hooks": [{"type": "command", "command": "ce-ai workflow resume --event Stop"}]
+                }
+            ],
+            "PreCompact": [
+                {
+                    "matcher": ".*",
+                    "hooks": [{"type": "command", "command": "ce-ai workflow resume --event PreCompact"}]
+                }
+            ]
+        }
+    });
+
+    std::fs::write(
+        &settings_path,
+        serde_json::to_string_pretty(&custom_json).unwrap(),
+    )
+    .unwrap();
+
+    assert!(has_session_start_hook(&settings_path));
+
+    let removed = remove_session_start_hook(&settings_path).unwrap();
+    assert!(removed);
+    assert!(!has_session_start_hook(&settings_path));
+    assert!(!settings_path.exists());
+}
+
+#[test]
 fn preserves_user_hooks_and_settings_in_claude_settings_json() {
     let tmp = TempDir::new().unwrap();
     let settings_path = tmp.path().join("settings.json");

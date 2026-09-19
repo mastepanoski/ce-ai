@@ -338,7 +338,12 @@ fn has_event_hook(hooks_obj: &serde_json::Value, event_name: &str) -> bool {
                     .and_then(|h_arr| h_arr.as_array())
                     .map(|cmds| {
                         cmds.iter().any(|cmd| {
-                            cmd.get("command").and_then(|c| c.as_str()) == Some(RESUME_COMMAND)
+                            cmd.get("command")
+                                .and_then(|c| c.as_str())
+                                .map(|s| {
+                                    s == RESUME_COMMAND || s.starts_with("ce-ai workflow resume")
+                                })
+                                .unwrap_or(false)
                         })
                     })
                     .unwrap_or(false)
@@ -486,7 +491,14 @@ pub fn remove_session_start_hook(settings_path: &Path) -> Result<bool, CeError> 
                     {
                         let prev_len = hooks_list.len();
                         hooks_list.retain(|cmd| {
-                            cmd.get("command").and_then(|c| c.as_str()) != Some(RESUME_COMMAND)
+                            let is_resume = cmd
+                                .get("command")
+                                .and_then(|c| c.as_str())
+                                .map(|s| {
+                                    s == RESUME_COMMAND || s.starts_with("ce-ai workflow resume")
+                                })
+                                .unwrap_or(false);
+                            !is_resume
                         });
                         if hooks_list.len() != prev_len {
                             changed = true;
