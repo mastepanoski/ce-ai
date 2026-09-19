@@ -9222,6 +9222,59 @@ fn test_cli_decisions_auth_file_and_masking() {
 }
 
 #[test]
+fn test_cli_decisions_auth_stdin_piped_and_empty_validation() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let home = tmp.path().join("home");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+
+    // 1. Piped valid key via --stdin
+    ceai(&config_dir, &home)
+        .args(["decisions", "auth", "--stdin"])
+        .write_stdin("ts_piped_secret_abcdef123456\n")
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Saved API key to OS Keyring and"));
+
+    // Verify key resolved
+    ceai(&config_dir, &home)
+        .args(["decisions", "auth"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "Current API key: configured (ts****...****3456)",
+        ));
+
+    // 2. Empty piped stdin fails with exit code 2 (CeError::Usage)
+    ceai(&config_dir, &home)
+        .args(["decisions", "auth", "--stdin"])
+        .write_stdin("\n")
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .code(2)
+        .stderr(predicates::str::contains(
+            "API key provided via stdin cannot be empty",
+        ));
+
+    // 3. Security warning emitted when using --key <VAL>
+    ceai(&config_dir, &home)
+        .args(["decisions", "auth", "--key", "ts_secret_argv"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .assert()
+        .success()
+        .stderr(predicates::str::contains(
+            "warning: passing API key via command-line arguments exposes it in shell history",
+        ));
+}
+
+#[test]
 fn test_cli_decisions_setup_local_and_eval_test() {
     let tmp = TempDir::new().unwrap();
     let config_dir = tmp.path().join("config");
