@@ -13,7 +13,7 @@ use tempfile::TempDir;
 /// embeds a block header must derive from this constant: a stale hardcoded
 /// version flips classifier branches after a bump (see
 /// docs/solutions/test-failures/adoption-block-version-bump-test-coordination-2026-08-25.md).
-const CUR_BLOCK_VERSION: u32 = 4;
+const CUR_BLOCK_VERSION: u32 = 5;
 
 fn block_begin_prefix(tier: &str) -> String {
     format!("<!-- ce-ai:block begin v={CUR_BLOCK_VERSION} tier={tier}")
@@ -5368,6 +5368,23 @@ fn init_prj_full_tier_contains_turn_zero_directive() {
 }
 
 #[test]
+fn init_prj_full_tier_contains_post_merge_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("post-merge-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let agents_text = fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap();
+    assert!(agents_text.contains("### 🧹 Post-Merge Lifecycle & Clean State"));
+    assert!(agents_text.contains("ce-ai archive <feature>"));
+}
+
+#[test]
 fn doctor_reports_and_sync_repairs_missing_opencode_plugin() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
@@ -7730,7 +7747,10 @@ fn workflow_and_doctor_detect_unarchived_completed_changes() {
         .assert()
         .success()
         .stdout(predicates::str::contains(
-            "openspec ledger: ! 1 change(s) complete but not archived — run 'ce-ai doctor' for details",
+            "openspec ledger: ! 1 change(s) complete but not archived — run 'ce-ai archive <feature>'",
+        ))
+        .stdout(predicates::str::contains(
+            "! Action Required: OpenSpec change 'feat-done' is complete (2/2 tasks). Run 'ce-ai archive feat-done' to seal the change package.",
         ));
 
     // Surface 1 (JSON): ce-ai workflow resume --json
@@ -7747,14 +7767,20 @@ fn workflow_and_doctor_detect_unarchived_completed_changes() {
 
     let add_ctx = parsed["additionalContext"].as_str().unwrap();
     assert!(add_ctx.contains(
-        "openspec ledger: ! 1 change(s) complete but not archived — run 'ce-ai doctor' for details"
+        "openspec ledger: ! 1 change(s) complete but not archived — run 'ce-ai archive <feature>'"
+    ));
+    assert!(add_ctx.contains(
+        "! Action Required: OpenSpec change 'feat-done' is complete (2/2 tasks). Run 'ce-ai archive feat-done' to seal the change package."
     ));
 
     let hook_ctx = parsed["hookSpecificOutput"]["additionalContext"]
         .as_str()
         .unwrap();
     assert!(hook_ctx.contains(
-        "openspec ledger: ! 1 change(s) complete but not archived — run 'ce-ai doctor' for details"
+        "openspec ledger: ! 1 change(s) complete but not archived — run 'ce-ai archive <feature>'"
+    ));
+    assert!(hook_ctx.contains(
+        "! Action Required: OpenSpec change 'feat-done' is complete (2/2 tasks). Run 'ce-ai archive feat-done' to seal the change package."
     ));
 
     let unarchived = parsed["repo_state"]["unarchived_completed_changes"]
@@ -7772,7 +7798,7 @@ fn workflow_and_doctor_detect_unarchived_completed_changes() {
         .assert()
         .success()
         .stdout(predicates::str::contains(
-            "! Warning: 1 OpenSpec change(s) complete but not archived — run 'ce-ai doctor' for details",
+            "! Warning: 1 OpenSpec change(s) complete but not archived — run 'ce-ai archive <feature>'",
         ));
 
     // 5. Surface 3: ce-ai doctor (verbose details + non-fatal exit 0)
@@ -7782,8 +7808,76 @@ fn workflow_and_doctor_detect_unarchived_completed_changes() {
         .assert()
         .success()
         .stdout(predicates::str::contains(
-            "doctor-warn: openspec change 'feat-done' is complete (2/2 tasks) but not archived — see openspec/changes/archive/README.md",
+            "doctor-warn: openspec change 'feat-done' is complete (2/2 tasks) but not archived — run 'ce-ai archive feat-done'",
         ));
+}
+
+#[test]
+fn test_cli_resume_completed_openspec_prescription() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    let proj = tmp.path().join("proj");
+    fs::create_dir_all(&proj).unwrap();
+
+    git_cmd()
+        .args(["init", "-q"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    // Create completed change: openspec/changes/post-merge-feat/tasks.md
+    let feat_dir = proj
+        .join("openspec")
+        .join("changes")
+        .join("post-merge-feat");
+    fs::create_dir_all(&feat_dir).unwrap();
+    let tasks_content = "# Tasks\n- [x] 1. Complete work unit 1\n- [x] 2. Complete work unit 2\n";
+    fs::write(feat_dir.join("tasks.md"), tasks_content).unwrap();
+
+    // 1. ce-ai workflow resume in organic mode on main: emits action required prescription
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["workflow", "resume"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "openspec ledger: ! 1 change(s) complete but not archived — run 'ce-ai archive <feature>'",
+        ))
+        .stdout(predicates::str::contains(
+            "! Action Required: OpenSpec change 'post-merge-feat' is complete (2/2 tasks). Run 'ce-ai archive post-merge-feat' to seal the change package.",
+        ));
+
+    // 2. ce-ai doctor provides the exact runnable command
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "doctor-warn: openspec change 'post-merge-feat' is complete (2/2 tasks) but not archived — run 'ce-ai archive post-merge-feat'",
+        ));
+
+    // 3. Execute the prescribed command: ce-ai archive post-merge-feat
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["archive", "post-merge-feat"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("archived: 'post-merge-feat' ->"));
+
+    // 4. Subsequent resume reports clean ledger
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["workflow", "resume", "--mode", "compound"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "openspec ledger: clean (0 pending archival)",
+        ))
+        .stdout(predicates::str::contains("! Action Required:").not());
 }
 
 #[test]

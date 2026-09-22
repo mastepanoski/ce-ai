@@ -19,7 +19,7 @@ pub const GITIGNORE_END_MARKER: &str = "# END CE-AI MANAGED BLOCK";
 
 /// Managed block schema version, shared by the on-disk header and the
 /// `state.json` adoption entry so the two cannot drift apart.
-pub const BLOCK_VERSION: u32 = 4;
+pub const BLOCK_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -94,7 +94,10 @@ Before creating PRs or writing feature code, agents MUST verify `openspec/change
 - `tasks.md`: Atomic, executable task checklist with TDD verification steps.
 
 ### Single Source of Truth Rule
-Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into the OpenSpec files above (`proposal.md`, `exploration.md`) and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with OpenSpec. Ideation artifacts are retained by default as the permanent raw-history record OpenSpec intentionally does not duplicate; "disposable" never means deleting them. Skip ideation skills entirely when requirements and approach are already clear."#
+Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into the OpenSpec files above (`proposal.md`, `exploration.md`) and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with OpenSpec. Ideation artifacts are retained by default as the permanent raw-history record OpenSpec intentionally does not duplicate; "disposable" never means deleting them. Skip ideation skills entirely when requirements and approach are already clear.
+
+### 🧹 Post-Merge Lifecycle & Clean State
+Immediately after merging a PR on `main`, agents MUST run `ce-ai workflow status` and archive completed OpenSpec changes via `ce-ai archive <feature>` to seal change packages and maintain zero workflow drift."#
         }
         AdoptionTier::Minimal => {
             r#"## 🔄 Compound Engineering Workflow Guidelines
@@ -112,6 +115,7 @@ Orchestrator agents MUST delegate domain tasks to specialized subagents:
 - Use `ce-plan` for implementation unit breakdown.
 - Use `ce-code-review` before opening Pull Requests.
 - Enforce strict PR CI status check gates before merging.
+- Post-merge, ensure completed OpenSpec changes are sealed via `ce-ai archive <feature>`.
 - Ideation outputs (`docs/brainstorms/`, `docs/ideation/`) are disposable inputs: distill them into the specs before delegation; never maintain them in parallel; retain them as raw history instead of deleting them."#
         }
     }

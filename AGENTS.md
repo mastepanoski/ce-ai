@@ -16,7 +16,7 @@ All AI agents MUST enforce these hard invariants deterministically at every sess
 7. **Strict Exit Codes**: Map all errors to `CeError` enum exit codes (`0` Success, `1` Runtime, `2` Usage, `3` State, `4` IO, `5` Network, `6` Verification).
 8. **Preserve Active Worktrees**: NEVER run `git worktree remove` or delete sibling worktrees in `<repo>-worktrees/` without explicit USER permission or verifying creation within the current turn.
 9. **Mandatory Versioning & CHANGELOG**: Every merged feature/fix MUST bump SemVer in `Cargo.toml`, update `CHANGELOG.md`, tag release (`vX.Y.Z`), and create a GitHub Release. Homebrew distribution is owned exclusively by the `mastepanoski/homebrew-ce-ai` tap (self-updating); no formula is maintained in this repository.
-10. **Post-Merge Cleanup**: Immediately after merging a PR, switch to `main`, run `git pull`, delete merged local branches (`git branch -d`), prune remotes (`git fetch --prune`), and remove turn-created temporary worktrees.
+10. **Post-Merge Lifecycle & Clean State**: Immediately after merging a PR, switch to `main`, run `git pull`, delete merged local branches (`git branch -d`), prune remotes (`git fetch --prune`), remove turn-created temporary worktrees, and run `ce-ai workflow status`. If any completed OpenSpec changes exist, the AI agent MUST run `ce-ai archive <feature>` (and submit the corresponding archive PR) so the repository FSM is left at `✓ Ready (100%)` with zero unarchived change warnings before concluding.
 11. **Zero AI Attribution & No Co-Author Trailers**: AI agents MUST NEVER add "Co-Authored-By", AI attribution trailers, or "Generated with [Agent]" footers/badges to git commit messages or PR descriptions. All commits MUST use clean Conventional Commits only.
 
 ---
@@ -193,7 +193,7 @@ Before declaring any task or issue completed, an AI agent MUST satisfy all crite
 - [ ] All GitHub Actions CI jobs pass green across Linux, macOS, and Windows.
 - [ ] Definition of Done (DoD) criteria fully satisfied.
 
-<!-- ce-ai:block begin v=4 tier=minimal sha256=ad726d9a497b691cad4562bf17c1c44f3c7e17e6544931e4cacaa508d3f1134f -->
+<!-- ce-ai:block begin v=5 tier=minimal sha256=ad726d9a497b691cad4562bf17c1c44f3c7e17e6544931e4cacaa508d3f1134f -->
 ## 🔄 Compound Engineering Workflow Guidelines
 
 AI agents operating on this codebase should follow structured planning and verification:
