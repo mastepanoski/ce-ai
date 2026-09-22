@@ -5,6 +5,18 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.67.0] - 2026-09-22
+
+### Added
+- **Automated Post-Merge OpenSpec Archival & Turn-0 Prescriptions (#406)**:
+  - **Turn-0 Action Required Directive (`ce-ai workflow resume`)**: Extended `resume_lines_with_mode` to scan for completed unarchived OpenSpec change packages across all execution modes (both Organic on `main` and Compound). When detected, surfaces an explicit, high-visibility action directive: `! Action Required: OpenSpec change '<feature>' is complete (<completed>/<total> tasks). Run 'ce-ai archive <feature>' to seal the change package.`
+  - **Actionable Diagnostics in `doctor` & `status`**: Replaced passive documentation references (`see openspec/changes/archive/README.md` and `run 'ce-ai doctor' for details`) with the exact runnable remediation command: `run 'ce-ai archive <feature>'`.
+  - **Managed Adoption Block Evolution (`BLOCK_VERSION: 5`)**:
+    - Bumped `BLOCK_VERSION` 4 $\to$ 5 in `src/commands/init_prj.rs`.
+    - Added `### 🧹 Post-Merge Lifecycle & Clean State` governance to Full-tier and Orchestrator-tier managed blocks, mandating that agents run `ce-ai workflow status` and `ce-ai archive <feature>` post-merge before session conclusion.
+  - **Hard Invariant #10 Governance Update**: Updated Hard Invariant #10 in `AGENTS.md` to `Post-Merge Lifecycle & Clean State`, explicitly instructing agents to verify zero unarchived change warnings post-merge.
+  - **CLI Integration & Unit Coverage**: Added unit tests and CLI integration tests (`test_cli_resume_completed_openspec_prescription`) validating prescriptive resume output, doctor commands, and post-archive clean state.
+
 ## [1.66.0] - 2026-09-22
 
 ### Added

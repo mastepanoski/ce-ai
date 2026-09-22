@@ -573,6 +573,28 @@ fn test_probe_unarchived_completed_changes_non_existent_openspec_dir() {
 }
 
 #[test]
+fn test_resume_emits_action_required_for_unarchived_completed_changes() {
+    let (_tmp, mut ctx) = ctx();
+    let ws = _tmp.path().join("workspace");
+    std::fs::create_dir_all(&ws).unwrap();
+    ctx.workspace_root = Some(ws.clone());
+
+    let change_dir = ws.join("openspec").join("changes").join("feat-finished");
+    std::fs::create_dir_all(&change_dir).unwrap();
+    std::fs::write(
+        change_dir.join("tasks.md"),
+        "# Tasks\n- [x] Task 1\n- [x] Task 2\n",
+    )
+    .unwrap();
+
+    let lines = resume_lines(&ctx).unwrap().join("\n");
+    assert!(lines.contains(
+        "openspec ledger: ! 1 change(s) complete but not archived — run 'ce-ai archive <feature>'"
+    ));
+    assert!(lines.contains("! Action Required: OpenSpec change 'feat-finished' is complete (2/2 tasks). Run 'ce-ai archive feat-finished' to seal the change package."));
+}
+
+#[test]
 fn test_stage_inference_resolution_branch_vs_mtime_fallback() {
     let tmp = TempDir::new().unwrap();
     let repo_root = tmp.path();

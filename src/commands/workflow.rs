@@ -418,7 +418,7 @@ pub fn status_lines_with_mode(
         if !repo_state.unarchived_completed_changes.is_empty() {
             let count = repo_state.unarchived_completed_changes.len();
             lines.push(format!(
-                "! Warning: {count} OpenSpec change(s) complete but not archived — run 'ce-ai doctor' for details"
+                "! Warning: {count} OpenSpec change(s) complete but not archived — run 'ce-ai archive <feature>'"
             ));
         }
         if let Some(debt) = &repo_state.doc_debt {
@@ -485,7 +485,7 @@ pub fn checkpoint_lines(
     if !repo_state.unarchived_completed_changes.is_empty() {
         let count = repo_state.unarchived_completed_changes.len();
         lines.push(format!(
-            "! Warning: {count} OpenSpec change(s) complete but not archived — run 'ce-ai doctor' for details"
+            "! Warning: {count} OpenSpec change(s) complete but not archived — run 'ce-ai archive <feature>'"
         ));
     }
     if let Some(debt) = &repo_state.doc_debt {
@@ -585,15 +585,24 @@ pub fn resume_lines_with_mode(
         }
     }
 
-    if mode == ExecutionMode::Compound {
-        if repo_state.unarchived_completed_changes.is_empty() {
+    if repo_state.unarchived_completed_changes.is_empty() {
+        if mode == ExecutionMode::Compound {
             lines.push("  openspec ledger: clean (0 pending archival)".to_string());
-        } else {
-            let count = repo_state.unarchived_completed_changes.len();
+        }
+    } else {
+        let count = repo_state.unarchived_completed_changes.len();
+        lines.push(format!(
+            "  openspec ledger: ! {count} change(s) complete but not archived — run 'ce-ai archive <feature>'"
+        ));
+        for item in &repo_state.unarchived_completed_changes {
             lines.push(format!(
-                "  openspec ledger: ! {count} change(s) complete but not archived — run 'ce-ai doctor' for details"
+                "  ! Action Required: OpenSpec change '{}' is complete ({}/{} tasks). Run 'ce-ai archive {}' to seal the change package.",
+                item.feature, item.completed_tasks, item.total_tasks, item.feature
             ));
         }
+    }
+
+    if mode == ExecutionMode::Compound {
         if let Some(debt) = &repo_state.doc_debt {
             lines.push(format!("  {}", debt.summary_line()));
         }
