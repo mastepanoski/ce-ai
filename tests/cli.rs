@@ -9882,3 +9882,192 @@ fn test_cli_decisions_mode_and_preset_off() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("Valid presets: recommended, shadow, local, off"));
 }
+
+#[test]
+fn test_cli_decisions_stats_and_compare() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let home = tmp.path().join("home");
+    let repo_root = tmp.path().join("project");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(&repo_root).unwrap();
+
+    // 1. Initially empty ledger
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "stats"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Total Decisions:          0"));
+    assert!(stdout.contains("No decision events recorded."));
+
+    // Empty stats --json
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "stats", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stats_json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(stats_json["total_runs"], 0);
+
+    // Empty compare
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "compare"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Runs                     0"));
+    assert!(stdout.contains("No model routing events recorded."));
+
+    // Empty compare --json
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "compare", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let compare_json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(compare_json["total_runs"], 0);
+
+    // 2. Configure local preset with mock provider
+    ceai(&config_dir, &home)
+        .args(["decisions", "setup", "--preset", "local"])
+        .assert()
+        .success();
+
+    // 3. Generate micro-decisions across evaluators
+    // A. Model routing evaluation
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["models", "route", "write a quick python function"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+
+    // B. Risk check evaluation
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["decisions", "check-risk", "run_command", "python deploy.py"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+
+    // C. Stage readiness evaluation
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args([
+            "decisions",
+            "check-readiness",
+            "--feature",
+            "analytics-feat",
+            "--stage",
+            "2",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+
+    // Verify ledger exists and has recorded events
+    let ledger_path = config_dir.join("usage").join("decisions.jsonl");
+    assert!(ledger_path.exists());
+    let ledger_content = fs::read_to_string(&ledger_path).unwrap();
+    assert!(ledger_content.contains("model_routing"));
+    assert!(ledger_content.contains("risk_classification"));
+    assert!(ledger_content.contains("stage_readiness"));
+
+    // 4. Test ce-ai decisions stats (human-readable)
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "stats"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Decision Engine Analytics"));
+    assert!(stdout.contains("Total Decisions:          3"));
+    assert!(stdout.contains("Distribution by Type:"));
+    assert!(stdout.contains("Model Routing"));
+    assert!(stdout.contains("Risk Classification"));
+    assert!(stdout.contains("Stage Readiness"));
+
+    // Test stats filter by --type routing
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "stats", "--type", "routing"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Total Decisions:          1"));
+    assert!(stdout.contains("Model Routing"));
+    assert!(!stdout.contains("Risk Classification"));
+
+    // Test stats --json
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "stats", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stats_json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(stats_json["total_runs"], 3);
+    assert!(stats_json["latency"]["median_ms"].is_number());
+    assert!(stats_json["type_distribution"]["model_routing"].is_number());
+
+    // 5. Test ce-ai decisions compare (human-readable)
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "compare"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Decision Engine — Model Routing Comparison"));
+    assert!(stdout.contains("Runs                     1"));
+    assert!(stdout.contains("Model Cost Comparison:"));
+    assert!(stdout.contains("Static routing (standard)"));
+    assert!(stdout.contains("Adaptive routing"));
+    assert!(stdout.contains("[estimated]"));
+
+    // Test compare --json
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "compare", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let compare_json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(compare_json["total_runs"], 1);
+    assert!(compare_json["static_routing_cost"]["amount_usd"].is_number());
+    assert_eq!(compare_json["static_routing_cost"]["is_observed"], false);
+
+    // 6. Test doctor probe includes decision analytics
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["doctor"])
+        .env_remove("TYPESAFE_API_KEY")
+        .env_remove("JEV_API_KEY")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("doctor-info: decision-analytics: active (3 recorded decisions"));
+
+    // 7. Test shadow mode telemetry recording
+    ceai(&config_dir, &home)
+        .args(["decisions", "mode", "shadow"])
+        .assert()
+        .success();
+
+    let out = ceai(&config_dir, &home)
+        .current_dir(&repo_root)
+        .args(["models", "route", "complex architecture refactor"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "stats", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stats_json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(stats_json["total_runs"], 4);
+    assert_eq!(stats_json["shadow_count"], 1);
+}

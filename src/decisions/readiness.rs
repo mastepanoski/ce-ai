@@ -146,11 +146,28 @@ pub struct ReadinessEvaluationResult {
 pub struct ReadinessEvaluator<'a> {
     config: &'a ReadinessConfig,
     engine: Option<&'a DecisionEngine>,
+    config_dir: Option<&'a std::path::Path>,
+    workflow_id: Option<String>,
 }
 
 impl<'a> ReadinessEvaluator<'a> {
     pub fn new(config: &'a ReadinessConfig, engine: Option<&'a DecisionEngine>) -> Self {
-        Self { config, engine }
+        Self {
+            config,
+            engine,
+            config_dir: None,
+            workflow_id: None,
+        }
+    }
+
+    pub fn with_config_dir(mut self, config_dir: &'a std::path::Path) -> Self {
+        self.config_dir = Some(config_dir);
+        self
+    }
+
+    pub fn with_workflow(mut self, workflow_id: Option<impl Into<String>>) -> Self {
+        self.workflow_id = workflow_id.map(Into::into);
+        self
     }
 
     /// Evaluates readiness for an Organic Driven Development (ODD) task brief.
@@ -208,7 +225,7 @@ impl<'a> ReadinessEvaluator<'a> {
         }
 
         let resp = match engine.evaluate(req) {
-            Ok(r) if !r.fallback_used => r,
+            Ok(r) if !r.fallback_used || r.shadow_mode => r,
             _ => {
                 return ReadinessEvaluationResult {
                     target: feature.to_string(),
@@ -297,6 +314,36 @@ impl<'a> ReadinessEvaluator<'a> {
             ReadinessStatus::NotReady
         };
 
+        if resp.shadow_mode {
+            advisory_notes.insert(
+                0,
+                "Shadow mode active: semantic readiness evaluated without workflow enforcement."
+                    .into(),
+            );
+        }
+
+        if let Some(cd) = self.config_dir {
+            let event = crate::decisions::analytics::DecisionEvent::new(
+                crate::decisions::analytics::DecisionType::StageReadiness,
+                &resp.provider,
+                &resp.model,
+                resp.latency_ms,
+                status.as_str(),
+            )
+            .with_workflow(
+                self.workflow_id
+                    .clone()
+                    .or_else(|| Some(feature.to_string())),
+            )
+            .with_confidence(Some(composite_score))
+            .with_shadow(resp.shadow_mode)
+            .with_fallback(false)
+            .with_estimated_cost(resp.estimated_cost_usd)
+            .with_metadata("target", feature.to_string())
+            .with_metadata("workflow_mode", "organic");
+            let _ = crate::decisions::analytics::log_decision_event(cd, &event);
+        }
+
         ReadinessEvaluationResult {
             target: feature.to_string(),
             workflow_mode: "organic".into(),
@@ -366,7 +413,7 @@ impl<'a> ReadinessEvaluator<'a> {
         }
 
         let resp = match engine.evaluate(req) {
-            Ok(r) if !r.fallback_used => r,
+            Ok(r) if !r.fallback_used || r.shadow_mode => r,
             _ => {
                 return ReadinessEvaluationResult {
                     target: format!("{feature} (Stage {stage_num}: {stage_name})"),
@@ -414,7 +461,7 @@ impl<'a> ReadinessEvaluator<'a> {
 
             if !val || conf < warning_thresh {
                 advisory_notes.push(format!(
-                    "Dimension '{dim}' requires attention prior to stage completion (confidence: {:.0}%).",
+                    "Dimension '{dim}' needs attention (confidence: {:.0}%).",
                     conf * 100.0
                 ));
             }
@@ -439,6 +486,40 @@ impl<'a> ReadinessEvaluator<'a> {
         } else {
             ReadinessStatus::NotReady
         };
+
+        if resp.shadow_mode {
+            advisory_notes.insert(
+                0,
+                "Shadow mode active: semantic readiness evaluated without workflow enforcement."
+                    .into(),
+            );
+        }
+
+        if let Some(cd) = self.config_dir {
+            let event = crate::decisions::analytics::DecisionEvent::new(
+                crate::decisions::analytics::DecisionType::StageReadiness,
+                &resp.provider,
+                &resp.model,
+                resp.latency_ms,
+                status.as_str(),
+            )
+            .with_workflow(
+                self.workflow_id
+                    .clone()
+                    .or_else(|| Some(feature.to_string())),
+            )
+            .with_stage(Some(stage_num.to_string()))
+            .with_confidence(Some(composite_score))
+            .with_shadow(resp.shadow_mode)
+            .with_fallback(false)
+            .with_estimated_cost(resp.estimated_cost_usd)
+            .with_metadata(
+                "target",
+                format!("{feature} (Stage {stage_num}: {stage_name})"),
+            )
+            .with_metadata("workflow_mode", "compound");
+            let _ = crate::decisions::analytics::log_decision_event(cd, &event);
+        }
 
         ReadinessEvaluationResult {
             target: format!("{feature} (Stage {stage_num}: {stage_name})"),

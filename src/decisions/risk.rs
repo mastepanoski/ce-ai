@@ -372,11 +372,28 @@ pub fn is_safe_read_only(tool: &str, command: &str) -> bool {
 pub struct RiskEvaluator<'a> {
     config: &'a RiskConfig,
     engine: Option<&'a DecisionEngine>,
+    config_dir: Option<&'a Path>,
+    workflow_id: Option<String>,
 }
 
 impl<'a> RiskEvaluator<'a> {
     pub fn new(config: &'a RiskConfig, engine: Option<&'a DecisionEngine>) -> Self {
-        Self { config, engine }
+        Self {
+            config,
+            engine,
+            config_dir: None,
+            workflow_id: None,
+        }
+    }
+
+    pub fn with_config_dir(mut self, config_dir: &'a Path) -> Self {
+        self.config_dir = Some(config_dir);
+        self
+    }
+
+    pub fn with_workflow(mut self, workflow_id: Option<impl Into<String>>) -> Self {
+        self.workflow_id = workflow_id.map(Into::into);
+        self
     }
 
     /// Evaluates tool execution risk and yields an authoritative `ExecutionPolicy`.
@@ -420,10 +437,10 @@ impl<'a> RiskEvaluator<'a> {
                 command: sanitized_command,
                 task: task.map(String::from),
                 policy: ExecutionPolicy::Allow,
-                reason: "Risk evaluation is disabled in configuration".into(),
+                reason: "Risk-aware execution is disabled in configuration.".into(),
                 composite_risk_score: 0.0,
                 dimensions: Vec::new(),
-                fallback_applied: false,
+                fallback_applied: true,
                 latency_ms: 0,
             };
         }
@@ -485,9 +502,9 @@ impl<'a> RiskEvaluator<'a> {
             }
         };
 
-        if resp.fallback_used {
+        if resp.fallback_used && !resp.shadow_mode {
             let policy = self.config.fallback.to_execution_policy();
-            return RiskEvaluationResult {
+            let res = RiskEvaluationResult {
                 tool: tool.to_string(),
                 command: sanitized_command,
                 task: task.map(String::from),
@@ -501,6 +518,25 @@ impl<'a> RiskEvaluator<'a> {
                 fallback_applied: true,
                 latency_ms: resp.latency_ms,
             };
+            if let Some(cd) = self.config_dir {
+                let event = crate::decisions::analytics::DecisionEvent::new(
+                    crate::decisions::analytics::DecisionType::RiskClassification,
+                    &resp.provider,
+                    &resp.model,
+                    resp.latency_ms,
+                    policy.as_str(),
+                )
+                .with_workflow(self.workflow_id.clone())
+                .with_fallback(true)
+                .with_shadow(false)
+                .with_metadata("tool", tool.to_string())
+                .with_metadata(
+                    "command_summary",
+                    crate::decisions::analytics::sanitize_task_summary(&res.command),
+                );
+                let _ = crate::decisions::analytics::log_decision_event(cd, &event);
+            }
+            return res;
         }
 
         let mut dimensions = Vec::new();
@@ -542,7 +578,7 @@ impl<'a> RiskEvaluator<'a> {
         let deny_thresh = self.config.thresholds.deny_threshold_pct as f64 / 100.0;
         let confirm_thresh = self.config.thresholds.confirmation_threshold_pct as f64 / 100.0;
 
-        let (policy, reason) = if composite_score >= deny_thresh {
+        let (evaluated_policy, evaluated_reason) = if composite_score >= deny_thresh {
             (
                 ExecutionPolicy::Deny,
                 format!(
@@ -570,6 +606,40 @@ impl<'a> RiskEvaluator<'a> {
                 ),
             )
         };
+
+        let (policy, reason) = if resp.shadow_mode {
+            (
+                ExecutionPolicy::Allow,
+                format!(
+                    "Shadow mode active: suggested policy was {} (score {:.0}%), but execution policy remains unconstrained.",
+                    evaluated_policy.as_str(),
+                    composite_score * 100.0
+                ),
+            )
+        } else {
+            (evaluated_policy, evaluated_reason)
+        };
+
+        if let Some(cd) = self.config_dir {
+            let event = crate::decisions::analytics::DecisionEvent::new(
+                crate::decisions::analytics::DecisionType::RiskClassification,
+                &resp.provider,
+                &resp.model,
+                resp.latency_ms,
+                evaluated_policy.as_str(),
+            )
+            .with_workflow(self.workflow_id.clone())
+            .with_confidence(Some(composite_score))
+            .with_shadow(resp.shadow_mode)
+            .with_fallback(false)
+            .with_estimated_cost(resp.estimated_cost_usd)
+            .with_metadata("tool", tool.to_string())
+            .with_metadata(
+                "command_summary",
+                crate::decisions::analytics::sanitize_task_summary(&sanitized_command),
+            );
+            let _ = crate::decisions::analytics::log_decision_event(cd, &event);
+        }
 
         RiskEvaluationResult {
             tool: tool.to_string(),

@@ -180,7 +180,7 @@ pub fn route(ctx: &Context, args: &RouteArgs) -> Result<(), CeError> {
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
         .unwrap_or_default();
-    let decisions_config = state.decisions.unwrap_or_default();
+    let decisions_config = state.decisions.clone().unwrap_or_default();
     let routing_config = &decisions_config.routing;
 
     let slot_assignment = args.slot.as_deref().and_then(|slot| {
@@ -190,8 +190,17 @@ pub fn route(ctx: &Context, args: &RouteArgs) -> Result<(), CeError> {
             .map(|a| format!("{}/{}", a.provider_id, a.model_id))
     });
 
+    let root = ctx.repo_root();
+    let branch = crate::commands::workflow::probe_git_branch(&root);
+    let current_wf = state.current_workflow_for_branch(&root, branch.as_deref());
+    let workflow_id = current_wf.as_ref().and_then(|w| w.feature_name.clone());
+    let stage = current_wf.as_ref().map(|w| w.stage.as_str().to_string());
+
     let engine = crate::decisions::DecisionEngine::from_config(&decisions_config);
-    let router = crate::decisions::routing::ModelRouter::new(routing_config, Some(&engine));
+    let router = crate::decisions::routing::ModelRouter::new(routing_config, Some(&engine))
+        .with_config_dir(&ctx.config_dir)
+        .with_workflow(workflow_id)
+        .with_stage(stage);
     let res = router.route(
         &args.task,
         &args.default_model,

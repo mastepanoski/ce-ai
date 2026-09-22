@@ -4,6 +4,7 @@ use clap::{Args as ClapArgs, Subcommand};
 use serde_json::json;
 
 use crate::commands::Context;
+use crate::decisions::analytics::{read_decision_events, DecisionAnalytics, DecisionType};
 use crate::decisions::auth::{resolve_api_key, save_api_key};
 use crate::decisions::budget::{BudgetConfig, BudgetTracker};
 use crate::decisions::jev::{JevConfig, JevProvider};
@@ -94,6 +95,27 @@ pub enum Action {
     },
     /// Evaluate model routing recommendation for a given task description.
     Route(crate::commands::models::RouteArgs),
+    /// Display aggregated decision telemetry statistics and performance metrics.
+    Stats {
+        /// Optional workflow or feature ID to filter by.
+        #[arg(long)]
+        workflow: Option<String>,
+        /// Optional decision type filter (model_routing, skill_routing, risk_classification, stage_readiness).
+        #[arg(long = "type")]
+        decision_type: Option<String>,
+        /// Output in JSON format.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Compare static vs adaptive model routing costs and execution metrics.
+    Compare {
+        /// Optional workflow or feature ID to filter by.
+        #[arg(long)]
+        workflow: Option<String>,
+        /// Output in JSON format.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
@@ -127,6 +149,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             *verbose,
         ),
         Action::Route(route_args) => crate::commands::models::route(ctx, route_args),
+        Action::Stats {
+            workflow,
+            decision_type,
+            json,
+        } => handle_stats(ctx, workflow.as_deref(), decision_type.as_deref(), *json),
+        Action::Compare { workflow, json } => handle_compare(ctx, workflow.as_deref(), *json),
     }
 }
 
@@ -398,6 +426,7 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 enabled: true,
                 thresholds: crate::decisions::ReadinessThresholds::default(),
             },
+            analytics: crate::decisions::DecisionAnalyticsConfig::default(),
         },
         "shadow" => DecisionsConfig {
             enabled: true,
@@ -433,6 +462,7 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 enabled: true,
                 thresholds: crate::decisions::ReadinessThresholds::default(),
             },
+            analytics: crate::decisions::DecisionAnalyticsConfig::default(),
         },
         "local" => DecisionsConfig {
             enabled: true,
@@ -462,6 +492,7 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 enabled: true,
                 thresholds: crate::decisions::ReadinessThresholds::default(),
             },
+            analytics: crate::decisions::DecisionAnalyticsConfig::default(),
         },
         "off" | "disabled" => {
             let mut cfg = state.decisions.unwrap_or_default();
@@ -644,7 +675,7 @@ fn handle_check_risk(
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
         .unwrap_or_default();
-    let config = state.decisions.unwrap_or_default();
+    let config = state.decisions.clone().unwrap_or_default();
 
     let provider_box: Option<Box<dyn DecisionProvider>> = if !config.enabled {
         None
@@ -654,8 +685,15 @@ fn handle_check_risk(
         Some(Box::new(JevProvider::new(config.jev.clone(), None)))
     };
 
+    let root = ctx.repo_root();
+    let branch = crate::commands::workflow::probe_git_branch(&root);
+    let current_wf = state.current_workflow_for_branch(&root, branch.as_deref());
+    let workflow_id = current_wf.as_ref().and_then(|w| w.feature_name.clone());
+
     let engine = DecisionEngine::new(provider_box, config.mode);
-    let evaluator = crate::decisions::RiskEvaluator::new(&config.risk, Some(&engine));
+    let evaluator = crate::decisions::RiskEvaluator::new(&config.risk, Some(&engine))
+        .with_config_dir(&ctx.config_dir)
+        .with_workflow(workflow_id);
     let result = evaluator.evaluate(tool, command, task);
 
     // Persist to risk audit log
@@ -729,7 +767,9 @@ fn handle_check_readiness(
     };
 
     let engine = DecisionEngine::new(provider_box, config.mode);
-    let evaluator = crate::decisions::ReadinessEvaluator::new(&config.readiness, Some(&engine));
+    let evaluator = crate::decisions::ReadinessEvaluator::new(&config.readiness, Some(&engine))
+        .with_config_dir(&ctx.config_dir)
+        .with_workflow(feature.map(String::from));
 
     let repo_root = ctx.repo_root();
     let diff_stat =
@@ -855,6 +895,153 @@ fn handle_check_readiness(
             );
         }
     }
+
+    Ok(())
+}
+
+fn handle_stats(
+    ctx: &Context,
+    workflow: Option<&str>,
+    decision_type_str: Option<&str>,
+    json: bool,
+) -> Result<(), CeError> {
+    let parsed_type = match decision_type_str {
+        Some(t) => Some(DecisionType::parse(t)?),
+        None => None,
+    };
+
+    let events = read_decision_events(&ctx.config_dir)?;
+    let analytics = DecisionAnalytics::new(events);
+    let filtered = analytics.filter(workflow, parsed_type);
+    let stats = analytics.compute_stats(&filtered);
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&stats)
+                .map_err(|e| CeError::Runtime(format!("failed to serialize stats: {e}")))?
+        );
+        return Ok(());
+    }
+
+    println!("Decision Engine Analytics\n");
+    println!("Total Decisions:          {}", stats.total_runs);
+    if stats.total_runs == 0 {
+        println!("No decision events recorded.");
+        return Ok(());
+    }
+
+    println!(
+        "Fallback Rate:            {:.1}% ({}/{})",
+        stats.fallback_rate_pct, stats.fallback_count, stats.total_runs
+    );
+    println!("Shadow Mode Decisions:    {}", stats.shadow_count);
+    println!(
+        "Median Latency:           {} ms (p95: {} ms, mean: {} ms)",
+        stats.latency.median_ms, stats.latency.p95_ms, stats.latency.mean_ms
+    );
+    if stats.confidence.avg > 0.0 || stats.confidence.low_confidence_count > 0 {
+        println!(
+            "Average Confidence:       {:.1}% ({} low-confidence <70%)",
+            stats.confidence.avg * 100.0,
+            stats.confidence.low_confidence_count
+        );
+    } else {
+        println!("Average Confidence:       N/A");
+    }
+
+    if !stats.type_distribution.is_empty() {
+        println!("\nDistribution by Type:");
+        for (dtype, count) in &stats.type_distribution {
+            let pct = (*count as f64 / stats.total_runs as f64) * 100.0;
+            let display_name = match dtype.as_str() {
+                "model_routing" => "Model Routing",
+                "skill_routing" => "Skill Routing",
+                "risk_classification" => "Risk Classification",
+                "stage_readiness" => "Stage Readiness",
+                other => other,
+            };
+            println!(
+                "  • {:<22} {} ({:.1}%)",
+                format!("{display_name}:"),
+                count,
+                pct
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn handle_compare(ctx: &Context, workflow: Option<&str>, json: bool) -> Result<(), CeError> {
+    let events = read_decision_events(&ctx.config_dir)?;
+    let analytics = DecisionAnalytics::new(events);
+    let routing_events = analytics.filter(workflow, Some(DecisionType::ModelRouting));
+
+    let shard_dir = crate::capture::ledger::shard_dir(&ctx.config_dir);
+    let mut usage_records = Vec::new();
+    if shard_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&shard_dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.extension().map(|e| e == "jsonl").unwrap_or(false)
+                    && p.file_name()
+                        .map(|n| n != "decisions.jsonl")
+                        .unwrap_or(false)
+                {
+                    if let Ok(records) = crate::capture::ledger::read_shard(&p) {
+                        usage_records.extend(records);
+                    }
+                }
+            }
+        }
+    }
+
+    let comparison = analytics.compare_routing(&routing_events, &usage_records);
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&comparison)
+                .map_err(|e| CeError::Runtime(format!("failed to serialize comparison: {e}")))?
+        );
+        return Ok(());
+    }
+
+    println!("Decision Engine — Model Routing Comparison\n");
+    println!("{:<24} {}", "Runs", comparison.total_runs);
+    if comparison.total_runs == 0 {
+        println!("No model routing events recorded.");
+        return Ok(());
+    }
+
+    println!("{:<24} {:.1}%", "Fast", comparison.fast_pct);
+    println!("{:<24} {:.1}%", "Standard", comparison.standard_pct);
+    println!("{:<24} {:.1}%", "Reasoning", comparison.reasoning_pct);
+    println!();
+    println!("{:<24} {:.1}%", "Fallback", comparison.fallback_pct);
+    println!(
+        "{:<24} {} ms",
+        "Median decision latency", comparison.median_latency_ms
+    );
+    println!();
+    println!("Model Cost Comparison:");
+    println!(
+        "  {:<26} ${:.2}  {}",
+        "Static routing (standard)",
+        comparison.static_routing_cost.amount_usd,
+        comparison.static_routing_cost.label()
+    );
+    println!(
+        "  {:<26} ${:.2}  {}",
+        "Adaptive routing",
+        comparison.adaptive_routing_cost.amount_usd,
+        comparison.adaptive_routing_cost.label()
+    );
+    println!(
+        "  {:<26} ${:.2}  ({:.1}%)",
+        "Estimated Savings:", comparison.estimated_savings_usd, comparison.estimated_savings_pct
+    );
 
     Ok(())
 }
@@ -1066,7 +1253,8 @@ mod tests {
         let res = handle_auth(&ctx, Some(Some("ts-unit-key-456")), false, false);
         assert!(res.is_ok());
 
-        let resolved = resolve_api_key(None);
+        assert!(creds_path.exists());
+        let resolved = resolve_api_key(Some(&creds_path));
         assert_eq!(resolved.as_deref(), Some("ts-unit-key-456"));
 
         std::env::remove_var("CE_AI_CREDENTIALS_PATH");
@@ -1087,5 +1275,131 @@ mod tests {
         // In non-interactive test runner, should simply display status without hanging
         let res = handle_auth(&ctx, None, false, false);
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_handle_stats_and_compare_empty() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().to_path_buf(),
+            opencode_config_dir: temp.path().join("opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        // Should succeed without error even with no ledger
+        assert!(handle_stats(&ctx, None, None, false).is_ok());
+        assert!(handle_stats(&ctx, None, None, true).is_ok());
+        assert!(handle_compare(&ctx, None, false).is_ok());
+        assert!(handle_compare(&ctx, None, true).is_ok());
+    }
+
+    #[test]
+    fn test_handle_stats_and_compare_with_events() {
+        use crate::decisions::analytics::{log_decision_event, DecisionEvent, DecisionType};
+
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().to_path_buf(),
+            opencode_config_dir: temp.path().join("opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        let event1 = DecisionEvent::new(
+            DecisionType::ModelRouting,
+            "mock",
+            "mock-routing",
+            25,
+            "fast",
+        )
+        .with_workflow(Some("wf-101"))
+        .with_confidence(Some(0.92));
+
+        let event2 = DecisionEvent::new(
+            DecisionType::ModelRouting,
+            "mock",
+            "mock-routing",
+            75,
+            "standard",
+        )
+        .with_workflow(Some("wf-101"))
+        .with_fallback(true);
+
+        let event3 = DecisionEvent::new(
+            DecisionType::RiskClassification,
+            "mock",
+            "mock-risk",
+            40,
+            "allow",
+        )
+        .with_workflow(Some("wf-102"));
+
+        log_decision_event(&ctx.config_dir, &event1).unwrap();
+        log_decision_event(&ctx.config_dir, &event2).unwrap();
+        log_decision_event(&ctx.config_dir, &event3).unwrap();
+
+        // Stats with all events
+        assert!(handle_stats(&ctx, None, None, false).is_ok());
+        assert!(handle_stats(&ctx, None, None, true).is_ok());
+
+        // Stats filtered by workflow
+        assert!(handle_stats(&ctx, Some("wf-101"), None, false).is_ok());
+
+        // Stats filtered by type
+        assert!(handle_stats(&ctx, None, Some("model_routing"), false).is_ok());
+        assert!(handle_stats(&ctx, None, Some("risk"), false).is_ok());
+
+        // Compare
+        assert!(handle_compare(&ctx, None, false).is_ok());
+        assert!(handle_compare(&ctx, Some("wf-101"), true).is_ok());
+    }
+
+    #[test]
+    fn test_stats_and_compare_clap_parsing() {
+        use clap::Parser;
+
+        #[derive(Parser, Debug)]
+        struct Cli {
+            #[command(subcommand)]
+            action: Action,
+        }
+
+        let parsed_stats = Cli::try_parse_from([
+            "cli",
+            "stats",
+            "--workflow",
+            "wf-1",
+            "--type",
+            "routing",
+            "--json",
+        ])
+        .unwrap();
+        match parsed_stats.action {
+            Action::Stats {
+                workflow,
+                decision_type,
+                json,
+            } => {
+                assert_eq!(workflow.as_deref(), Some("wf-1"));
+                assert_eq!(decision_type.as_deref(), Some("routing"));
+                assert!(json);
+            }
+            _ => panic!("expected Action::Stats"),
+        }
+
+        let parsed_compare =
+            Cli::try_parse_from(["cli", "compare", "--workflow", "wf-2", "--json"]).unwrap();
+        match parsed_compare.action {
+            Action::Compare { workflow, json } => {
+                assert_eq!(workflow.as_deref(), Some("wf-2"));
+                assert!(json);
+            }
+            _ => panic!("expected Action::Compare"),
+        }
     }
 }

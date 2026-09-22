@@ -408,6 +408,8 @@ pub struct DecisionsConfig {
     pub risk: crate::decisions::RiskConfig,
     #[serde(default)]
     pub readiness: crate::decisions::ReadinessConfig,
+    #[serde(default)]
+    pub analytics: crate::decisions::DecisionAnalyticsConfig,
 }
 
 fn default_provider_name() -> String {
@@ -426,6 +428,7 @@ impl Default for DecisionsConfig {
             skills: crate::decisions::SkillRoutingConfig::default(),
             risk: crate::decisions::RiskConfig::default(),
             readiness: crate::decisions::ReadinessConfig::default(),
+            analytics: crate::decisions::DecisionAnalyticsConfig::default(),
         }
     }
 }
