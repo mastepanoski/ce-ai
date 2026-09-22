@@ -165,11 +165,35 @@ pub struct RoutingResolution {
 pub struct ModelRouter<'a> {
     config: &'a ModelRoutingConfig,
     engine: Option<&'a DecisionEngine>,
+    config_dir: Option<&'a std::path::Path>,
+    workflow_id: Option<String>,
+    stage: Option<String>,
 }
 
 impl<'a> ModelRouter<'a> {
     pub fn new(config: &'a ModelRoutingConfig, engine: Option<&'a DecisionEngine>) -> Self {
-        Self { config, engine }
+        Self {
+            config,
+            engine,
+            config_dir: None,
+            workflow_id: None,
+            stage: None,
+        }
+    }
+
+    pub fn with_config_dir(mut self, config_dir: &'a std::path::Path) -> Self {
+        self.config_dir = Some(config_dir);
+        self
+    }
+
+    pub fn with_workflow(mut self, workflow_id: Option<impl Into<String>>) -> Self {
+        self.workflow_id = workflow_id.map(Into::into);
+        self
+    }
+
+    pub fn with_stage(mut self, stage: Option<impl Into<String>>) -> Self {
+        self.stage = stage.map(Into::into);
+        self
     }
 
     /// Constructs the standard 4-dimension classification request.
@@ -295,7 +319,26 @@ impl<'a> ModelRouter<'a> {
             }
         };
 
-        if resp.fallback_used {
+        if resp.fallback_used && !resp.shadow_mode {
+            let event = crate::decisions::analytics::DecisionEvent::new(
+                crate::decisions::analytics::DecisionType::ModelRouting,
+                &resp.provider,
+                &resp.model,
+                resp.latency_ms,
+                "fallback",
+            )
+            .with_workflow(self.workflow_id.clone())
+            .with_stage(self.stage.clone())
+            .with_fallback(true)
+            .with_shadow(false)
+            .with_metadata(
+                "task_summary",
+                crate::decisions::analytics::sanitize_task_summary(task),
+            );
+            if let Some(cd) = self.config_dir {
+                let _ = crate::decisions::analytics::log_decision_event(cd, &event);
+            }
+
             return RoutingResolution {
                 task: task.to_string(),
                 recommended_class: ModelClass::Standard,
@@ -347,10 +390,76 @@ impl<'a> ModelRouter<'a> {
             )
         };
 
+        if resp.shadow_mode {
+            let event = crate::decisions::analytics::DecisionEvent::new(
+                crate::decisions::analytics::DecisionType::ModelRouting,
+                &resp.provider,
+                &resp.model,
+                resp.latency_ms,
+                target_class.as_str(),
+            )
+            .with_workflow(self.workflow_id.clone())
+            .with_stage(self.stage.clone())
+            .with_confidence(Some(reasoning_conf))
+            .with_fallback(false)
+            .with_shadow(true)
+            .with_estimated_cost(resp.estimated_cost_usd)
+            .with_metadata(
+                "task_summary",
+                crate::decisions::analytics::sanitize_task_summary(task),
+            )
+            .with_metadata("complexity", complexity.clone())
+            .with_metadata("risk", risk.clone())
+            .with_metadata("suggested_class", target_class.as_str())
+            .with_metadata("authoritative_model", default_model.to_string());
+            if let Some(cd) = self.config_dir {
+                let _ = crate::decisions::analytics::log_decision_event(cd, &event);
+            }
+
+            return RoutingResolution {
+                task: task.to_string(),
+                recommended_class: target_class,
+                resolved_model: default_model.to_string(),
+                complexity,
+                needs_reasoning,
+                needs_large_context,
+                risk,
+                rationale: format!(
+                    "Shadow mode active: suggested {target_class} class, but default model ({default_model}) remains authoritative."
+                ),
+                fallback_applied: false,
+                latency_ms: resp.latency_ms,
+            };
+        }
+
         let (resolved_model, fallback_applied) = self
             .config
             .models
             .resolve_with_fallback(target_class, default_model);
+
+        let event = crate::decisions::analytics::DecisionEvent::new(
+            crate::decisions::analytics::DecisionType::ModelRouting,
+            &resp.provider,
+            &resp.model,
+            resp.latency_ms,
+            target_class.as_str(),
+        )
+        .with_workflow(self.workflow_id.clone())
+        .with_stage(self.stage.clone())
+        .with_confidence(Some(reasoning_conf))
+        .with_fallback(fallback_applied)
+        .with_shadow(false)
+        .with_estimated_cost(resp.estimated_cost_usd)
+        .with_metadata(
+            "task_summary",
+            crate::decisions::analytics::sanitize_task_summary(task),
+        )
+        .with_metadata("complexity", complexity.clone())
+        .with_metadata("risk", risk.clone())
+        .with_metadata("resolved_model", resolved_model.clone());
+        if let Some(cd) = self.config_dir {
+            let _ = crate::decisions::analytics::log_decision_event(cd, &event);
+        }
 
         RoutingResolution {
             task: task.to_string(),

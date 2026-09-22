@@ -1,6 +1,7 @@
 //! Pluggable Decision Engine: fast, structured, probabilistic micro-decisions (System 1)
 //! decoupled from deterministic orchestration (System 2).
 
+pub mod analytics;
 pub mod auth;
 pub mod budget;
 pub mod jev;
@@ -10,6 +11,12 @@ pub mod risk;
 pub mod routing;
 pub mod skill_routing;
 pub mod types;
+
+pub use analytics::{
+    decision_ledger_path, log_decision_event, read_decision_events, sanitize_task_summary,
+    ConfidenceStats, CostValue, DecisionAnalytics, DecisionAnalyticsConfig, DecisionEvent,
+    DecisionStats, DecisionType, LatencyStats, RoutingComparison,
+};
 
 pub use auth::{
     default_credentials_path, mask_api_key, resolve_api_key, save_api_key, CredentialsFile,
@@ -110,12 +117,14 @@ impl DecisionEngine {
                                 // Shadow mode records decision telemetry but flags fallback_used = true
                                 // so deterministic policies know not to rely on the answer for enforcement.
                                 resp.fallback_used = true;
+                                resp.shadow_mode = true;
                                 Ok(resp)
                             }
                             Err(_) => {
                                 let mut resp =
                                     DecisionResponse::new(provider.name(), "shadow-error", 0);
                                 resp.fallback_used = true;
+                                resp.shadow_mode = true;
                                 Ok(resp)
                             }
                         }
@@ -123,6 +132,7 @@ impl DecisionEngine {
                     None => {
                         let mut resp = DecisionResponse::new("none", "unconfigured", 0);
                         resp.fallback_used = true;
+                        resp.shadow_mode = true;
                         Ok(resp)
                     }
                 }

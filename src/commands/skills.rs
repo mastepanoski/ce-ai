@@ -146,7 +146,8 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             let router = crate::decisions::skill_routing::SkillRouter::new(
                 &decisions_config.skills,
                 Some(&engine),
-            );
+            )
+            .with_config_dir(&ctx.config_dir);
             let (routing_result, status, markdown) =
                 router.route(&registry, harness_kind, effective_query);
 

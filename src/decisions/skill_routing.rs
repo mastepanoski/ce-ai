@@ -88,11 +88,28 @@ pub struct SkillRoutingResult {
 pub struct SkillRouter<'a> {
     config: &'a SkillRoutingConfig,
     engine: Option<&'a DecisionEngine>,
+    config_dir: Option<&'a std::path::Path>,
+    workflow_id: Option<String>,
 }
 
 impl<'a> SkillRouter<'a> {
     pub fn new(config: &'a SkillRoutingConfig, engine: Option<&'a DecisionEngine>) -> Self {
-        Self { config, engine }
+        Self {
+            config,
+            engine,
+            config_dir: None,
+            workflow_id: None,
+        }
+    }
+
+    pub fn with_config_dir(mut self, config_dir: &'a std::path::Path) -> Self {
+        self.config_dir = Some(config_dir);
+        self
+    }
+
+    pub fn with_workflow(mut self, workflow_id: Option<impl Into<String>>) -> Self {
+        self.workflow_id = workflow_id.map(Into::into);
+        self
     }
 
     /// Constructs the 7-dimension category inquiry request.
@@ -148,7 +165,25 @@ impl<'a> SkillRouter<'a> {
             }
         };
 
-        if resp.fallback_used {
+        if resp.fallback_used && !resp.shadow_mode {
+            if let Some(cd) = self.config_dir {
+                let event = crate::decisions::analytics::DecisionEvent::new(
+                    crate::decisions::analytics::DecisionType::SkillRouting,
+                    &resp.provider,
+                    &resp.model,
+                    resp.latency_ms,
+                    "fallback",
+                )
+                .with_workflow(self.workflow_id.clone())
+                .with_fallback(true)
+                .with_shadow(false)
+                .with_metadata(
+                    "task_summary",
+                    crate::decisions::analytics::sanitize_task_summary(task),
+                );
+                let _ = crate::decisions::analytics::log_decision_event(cd, &event);
+            }
+
             return (
                 Vec::new(),
                 Vec::new(),
@@ -178,6 +213,49 @@ impl<'a> SkillRouter<'a> {
                 confidence: conf,
                 selected,
             });
+        }
+
+        let outcome_str = if candidate_categories.is_empty() {
+            "none".to_string()
+        } else {
+            candidate_categories.join(",")
+        };
+
+        if let Some(cd) = self.config_dir {
+            let event = crate::decisions::analytics::DecisionEvent::new(
+                crate::decisions::analytics::DecisionType::SkillRouting,
+                &resp.provider,
+                &resp.model,
+                resp.latency_ms,
+                &outcome_str,
+            )
+            .with_workflow(self.workflow_id.clone())
+            .with_shadow(resp.shadow_mode)
+            .with_fallback(false)
+            .with_estimated_cost(resp.estimated_cost_usd)
+            .with_metadata(
+                "task_summary",
+                crate::decisions::analytics::sanitize_task_summary(task),
+            );
+            let _ = crate::decisions::analytics::log_decision_event(cd, &event);
+        }
+
+        if resp.shadow_mode {
+            let rationale = if candidate_categories.is_empty() {
+                "Shadow mode active: no categories matched.".into()
+            } else {
+                format!(
+                    "Shadow mode active: matched candidate categories ({}), but no skills injected.",
+                    candidate_categories.join(", ")
+                )
+            };
+            return (
+                Vec::new(),
+                classifications,
+                false,
+                rationale,
+                resp.latency_ms,
+            );
         }
 
         let rationale = if candidate_categories.is_empty() {

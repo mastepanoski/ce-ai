@@ -5,6 +5,23 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.66.0] - 2026-09-22
+
+### Added
+- **Decision Analytics & Evaluation Engine (#387)**:
+  - **Structured Decision Telemetry Ledger (`src/decisions/analytics.rs`)**: Implemented persistent decision telemetry tracking for the Pluggable Decision Engine into `.ce-ai/usage/decisions.jsonl` using atomic appending (`std::fs::OpenOptions::append`), capturing unique ID, ISO 8601 timestamp, decision type, provider, model, latency, confidence, outcome, fallback usage, and shadow mode status.
+  - **Strict Privacy Invariant & State Redaction**: Enforced strict sanitization preventing raw source code, prompts, credentials, full conversations, and raw shell/tool arguments from ever being persisted to the telemetry ledger.
+  - **Counterfactual & Shadow Evaluation**: In `shadow` execution mode, decision evaluators assess queries in the background and record telemetry without altering authoritative deterministic execution.
+  - **Comprehensive Aggregation & Statistics (`ce-ai decisions stats`)**:
+    - Calculates total decision runs, fallback rate (count and percentage), shadow mode runs, latency percentiles (`min`, `median`, `p95`, `mean`, `max`), confidence distribution (average and low-confidence counts), and breakdown by decision type.
+    - Added `--workflow <id>` and `--type <type>` query filters and machine-readable `--json` output.
+  - **Adaptive vs Static Cost Comparison (`ce-ai decisions compare`)**:
+    - Evaluates capability routing distribution (`fast %`, `standard %`, `reasoning %`), fallback rate, and median latency.
+    - Compares static single-model baseline routing costs against adaptive routing with explicit `[observed]` (from actual session tokens in `.ce-ai/usage/`) vs `[estimated]` (from capability benchmark pricing) labeling.
+  - **Evaluator Instrumentation**: Integrated lightweight, non-blocking telemetry logging hooks into `ModelRouter`, `RiskEvaluator`, `SkillRouter`, and `ReadinessEvaluator`.
+  - **Doctor Health Probe Integration**: Extended `ce-ai doctor` probe `probe_decision_engine_health` to report active telemetry volume and empirical fallback rates.
+  - **CLI Integration & End-to-End Tests**: Added end-to-end integration coverage for `stats`, `compare`, `--type`, `--workflow`, `--json`, and shadow mode in `tests/cli.rs`.
+
 ## [1.65.0] - 2026-09-21
 
 ### Added

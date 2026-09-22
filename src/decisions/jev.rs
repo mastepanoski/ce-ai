@@ -107,6 +107,7 @@ impl JevProvider {
             latency_ms,
             estimated_cost_usd: wire.estimated_cost_usd,
             fallback_used: false,
+            shadow_mode: false,
         }
     }
 }

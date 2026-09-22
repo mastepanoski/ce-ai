@@ -779,7 +779,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 }
 
 pub(crate) fn probe_decision_engine_health(
-    _ctx: &Context,
+    ctx: &Context,
     state: &State,
     strict: bool,
     findings: &mut Vec<String>,
@@ -907,6 +907,30 @@ pub(crate) fn probe_decision_engine_health(
             );
         } else {
             println!("doctor-info: readiness-engine: disabled (deterministic workflow active)");
+        }
+
+        let analytics_cfg = &decisions_cfg.analytics;
+        if analytics_cfg.enabled {
+            match crate::decisions::read_decision_events(&ctx.config_dir) {
+                Ok(events) => {
+                    let total = events.len();
+                    if total > 0 {
+                        let fallbacks = events.iter().filter(|e| e.fallback_used).count();
+                        let rate = (fallbacks as f64 / total as f64) * 100.0;
+                        println!(
+                            "doctor-info: decision-analytics: active ({} recorded decisions, {:.1}% fallback rate)",
+                            total, rate
+                        );
+                    } else {
+                        println!("doctor-info: decision-analytics: active (0 recorded decisions)");
+                    }
+                }
+                Err(e) => {
+                    println!("doctor-warn: decision-analytics: unable to read ledger: {e}");
+                }
+            }
+        } else {
+            println!("doctor-info: decision-analytics: disabled");
         }
     } else {
         println!(

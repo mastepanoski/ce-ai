@@ -237,6 +237,8 @@ pub struct DecisionResponse {
     pub estimated_cost_usd: Option<f64>,
     #[serde(default)]
     pub fallback_used: bool,
+    #[serde(default)]
+    pub shadow_mode: bool,
 }
 
 impl DecisionResponse {
@@ -248,6 +250,7 @@ impl DecisionResponse {
             latency_ms,
             estimated_cost_usd: None,
             fallback_used: false,
+            shadow_mode: false,
         }
     }
 
