@@ -53,3 +53,4 @@ Historical notes:
 - work-readiness-advisory: archived (26/26 tasks) under criterion (1) on 2026-09-18.
 - fix-codex-stop-hook-json: archived (30/30 tasks) under criterion (1) on 2026-09-19.
 - secure-decisions-auth-stdin: archived (33/33 tasks) under criterion (1) on 2026-09-19.
+- decision-engine-docs-and-ergonomics: archived (12/12 tasks) under criterion (1) on 2026-09-22.
