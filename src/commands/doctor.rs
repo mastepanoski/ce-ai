@@ -791,7 +791,8 @@ pub(crate) fn probe_decision_engine_health(
         }
 
         let resolved_key = crate::decisions::auth::resolve_api_key(None);
-        if decisions_cfg.provider == "mock" {
+        let p_name = decisions_cfg.provider.to_lowercase();
+        if p_name == "mock" {
             let mock = crate::decisions::mock::MockDecisionProvider::new();
             match mock.check_health() {
                 Ok(health) if health.available => {
@@ -809,6 +810,61 @@ pub(crate) fn probe_decision_engine_health(
                 }
                 Err(e) => {
                     let msg = format!("decision-engine: mock health error: {e}");
+                    if strict {
+                        findings.push(msg);
+                    } else {
+                        println!("doctor-warn: {}", msg);
+                    }
+                }
+            }
+        } else if p_name == "kev" {
+            let kev = crate::decisions::KevProvider::new(decisions_cfg.kev.clone());
+            match kev.check_health() {
+                Ok(health) if health.available => {
+                    println!(
+                        "doctor-info: decision-engine: kev active and healthy ({}ms, endpoint: {})",
+                        health.latency_ms, decisions_cfg.kev.endpoint
+                    );
+                }
+                Ok(health) => {
+                    let msg = format!(
+                        "decision-engine: kev server unreachable at {}: {} (start with: 'python -m kev.serve --run jaredpalmer/kev-4b --port 8009')",
+                        decisions_cfg.kev.endpoint, health.message
+                    );
+                    if strict {
+                        findings.push(msg);
+                    } else {
+                        println!("doctor-warn: {}", msg);
+                    }
+                }
+                Err(e) => {
+                    let msg = format!("decision-engine: kev health probe error: {e}");
+                    if strict {
+                        findings.push(msg);
+                    } else {
+                        println!("doctor-warn: {}", msg);
+                    }
+                }
+            }
+        } else if p_name == "laya" || p_name == "laya-mlx" {
+            let laya = crate::decisions::LayaMlxProvider::new(decisions_cfg.laya.clone());
+            match laya.check_health() {
+                Ok(health) if health.available => {
+                    println!(
+                        "doctor-info: decision-engine: laya-mlx active and healthy on Apple Silicon ({}ms, endpoint: {})",
+                        health.latency_ms, decisions_cfg.laya.endpoint
+                    );
+                }
+                Ok(health) => {
+                    let msg = format!("decision-engine: laya-mlx check: {}", health.message);
+                    if strict {
+                        findings.push(msg);
+                    } else {
+                        println!("doctor-warn: {}", msg);
+                    }
+                }
+                Err(e) => {
+                    let msg = format!("decision-engine: laya-mlx probe error: {e}");
                     if strict {
                         findings.push(msg);
                     } else {

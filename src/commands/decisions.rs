@@ -44,9 +44,15 @@ pub enum Action {
     },
     /// Quick-setup wizard or preset configuration for the Decision Engine.
     Setup {
-        /// Preset configuration: recommended (active Jev + $5 budget), shadow (evaluates without enforcement), local (mock/offline), or off/disabled.
+        /// Preset configuration: recommended (active Jev + $5 budget), shadow (evaluates without enforcement), kev (universal local System One), laya (Apple Silicon MLX), local (mock/offline), or off/disabled.
         #[arg(long, default_value = "recommended")]
         preset: String,
+        /// Explicit provider override ("jev", "kev", "laya", "laya-mlx", "mock").
+        #[arg(long)]
+        provider: Option<String>,
+        /// Custom provider endpoint URL (e.g. "http://127.0.0.1:8009/v1").
+        #[arg(long)]
+        endpoint: Option<String>,
     },
     /// Get or set the operational execution mode (active, shadow, off).
     Mode {
@@ -55,7 +61,7 @@ pub enum Action {
     },
     /// Test decision evaluation with a sample structured query.
     Test {
-        /// Override provider to test ("jev" or "mock").
+        /// Override provider to test ("jev", "kev", "laya", or "mock").
         #[arg(long)]
         provider: Option<String>,
     },
@@ -124,7 +130,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         Action::Auth { key, stdin, check } => {
             handle_auth(ctx, key.as_ref().map(|o| o.as_deref()), *stdin, *check)
         }
-        Action::Setup { preset } => handle_setup(ctx, preset),
+        Action::Setup {
+            preset,
+            provider,
+            endpoint,
+        } => handle_setup(ctx, preset, provider.as_deref(), endpoint.as_deref()),
         Action::Mode { mode } => handle_mode(ctx, mode.as_deref()),
         Action::Test { provider } => handle_test(ctx, provider.as_deref()),
         Action::CheckRisk {
@@ -187,15 +197,35 @@ fn handle_status(ctx: &Context, as_json: bool) -> Result<(), CeError> {
     let _ = tracker.can_execute(); // trigger rollover check
 
     let (provider_box, health): (Option<Box<dyn DecisionProvider>>, _) =
-        if config.provider == "mock" {
-            let mock = MockDecisionProvider::new();
-            let health = mock.check_health()?;
-            (Some(Box::new(mock)), health)
-        } else {
-            let jev = JevProvider::new(config.jev.clone(), None);
-            let health = jev.check_health()?;
-            (Some(Box::new(jev)), health)
+        match config.provider.to_lowercase().as_str() {
+            "mock" => {
+                let mock = MockDecisionProvider::new();
+                let health = mock.check_health()?;
+                (Some(Box::new(mock)), health)
+            }
+            "kev" => {
+                let kev = crate::decisions::KevProvider::new(config.kev.clone());
+                let health = kev.check_health()?;
+                (Some(Box::new(kev)), health)
+            }
+            "laya" | "laya-mlx" => {
+                let laya = crate::decisions::LayaMlxProvider::new(config.laya.clone());
+                let health = laya.check_health()?;
+                (Some(Box::new(laya)), health)
+            }
+            _ => {
+                let jev = JevProvider::new(config.jev.clone(), None);
+                let health = jev.check_health()?;
+                (Some(Box::new(jev)), health)
+            }
         };
+
+    let active_model = match config.provider.to_lowercase().as_str() {
+        "kev" => &config.kev.model,
+        "laya" | "laya-mlx" => &config.laya.model,
+        "mock" => "mock-canned",
+        _ => &config.jev.model,
+    };
 
     let _engine = DecisionEngine::new(provider_box, config.mode);
 
@@ -204,7 +234,7 @@ fn handle_status(ctx: &Context, as_json: bool) -> Result<(), CeError> {
             "enabled": config.enabled,
             "provider": config.provider,
             "mode": config.mode.as_str(),
-            "model": config.jev.model,
+            "model": active_model,
             "has_api_key": resolved_key.is_some(),
             "health": {
                 "available": health.available,
@@ -245,7 +275,7 @@ fn handle_status(ctx: &Context, as_json: bool) -> Result<(), CeError> {
     );
     println!("  Provider:    {}", config.provider);
     println!("  Mode:        {}", config.mode);
-    println!("  Model:       {}", config.jev.model);
+    println!("  Model:       {}", active_model);
 
     match resolved_key.as_deref() {
         Some(_) => println!("  API Key:     configured"),
@@ -384,14 +414,19 @@ fn handle_auth(
     Ok(())
 }
 
-fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
+fn handle_setup(
+    ctx: &Context,
+    preset_name: &str,
+    provider_override: Option<&str>,
+    endpoint_override: Option<&str>,
+) -> Result<(), CeError> {
     let state_path = ctx.config_dir.join("state.json");
     let mut state =
         State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
             .unwrap_or_default();
 
     let clean = preset_name.trim().to_lowercase();
-    let config = match clean.as_str() {
+    let mut config = match clean.as_str() {
         "recommended" => DecisionsConfig {
             enabled: true,
             provider: "jev".into(),
@@ -404,6 +439,8 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 cooloff_secs: 60,
             },
             jev: JevConfig::default(),
+            kev: crate::decisions::KevConfig::default(),
+            laya: crate::decisions::LayaConfig::default(),
             routing: crate::decisions::ModelRoutingConfig {
                 enabled: true,
                 models: crate::decisions::ModelClassCatalog {
@@ -440,6 +477,8 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 cooloff_secs: 60,
             },
             jev: JevConfig::default(),
+            kev: crate::decisions::KevConfig::default(),
+            laya: crate::decisions::LayaConfig::default(),
             routing: crate::decisions::ModelRoutingConfig {
                 enabled: true,
                 models: crate::decisions::ModelClassCatalog {
@@ -464,12 +503,52 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
             },
             analytics: crate::decisions::DecisionAnalyticsConfig::default(),
         },
+        "kev" => DecisionsConfig {
+            enabled: true,
+            provider: "kev".into(),
+            mode: DecisionMode::Active,
+            budget: BudgetConfig::default(),
+            jev: JevConfig::default(),
+            kev: crate::decisions::KevConfig {
+                endpoint: endpoint_override
+                    .unwrap_or("http://127.0.0.1:8009/v1")
+                    .to_string(),
+                ..Default::default()
+            },
+            laya: crate::decisions::LayaConfig::default(),
+            routing: crate::decisions::ModelRoutingConfig::default(),
+            skills: crate::decisions::SkillRoutingConfig::default(),
+            risk: crate::decisions::RiskConfig::default(),
+            readiness: crate::decisions::ReadinessConfig::default(),
+            analytics: crate::decisions::DecisionAnalyticsConfig::default(),
+        },
+        "laya" | "mlx" | "laya-mlx" => DecisionsConfig {
+            enabled: true,
+            provider: "laya-mlx".into(),
+            mode: DecisionMode::Active,
+            budget: BudgetConfig::default(),
+            jev: JevConfig::default(),
+            kev: crate::decisions::KevConfig::default(),
+            laya: crate::decisions::LayaConfig {
+                endpoint: endpoint_override
+                    .unwrap_or("http://127.0.0.1:8080/v1")
+                    .to_string(),
+                ..Default::default()
+            },
+            routing: crate::decisions::ModelRoutingConfig::default(),
+            skills: crate::decisions::SkillRoutingConfig::default(),
+            risk: crate::decisions::RiskConfig::default(),
+            readiness: crate::decisions::ReadinessConfig::default(),
+            analytics: crate::decisions::DecisionAnalyticsConfig::default(),
+        },
         "local" => DecisionsConfig {
             enabled: true,
             provider: "mock".into(),
             mode: DecisionMode::Active,
             budget: BudgetConfig::default(),
             jev: JevConfig::default(),
+            kev: crate::decisions::KevConfig::default(),
+            laya: crate::decisions::LayaConfig::default(),
             routing: crate::decisions::ModelRoutingConfig {
                 enabled: true,
                 models: crate::decisions::ModelClassCatalog {
@@ -502,10 +581,42 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
         }
         _ => {
             return Err(CeError::Usage(format!(
-                "invalid preset '{preset_name}'. Valid presets: recommended, shadow, local, off"
+                "invalid preset '{preset_name}'. Valid presets: recommended, shadow, kev, laya, local, off"
             )));
         }
     };
+
+    if let Some(target_prov) = provider_override {
+        let p_clean = target_prov.trim().to_lowercase();
+        match p_clean.as_str() {
+            "kev" => {
+                config.provider = "kev".into();
+                if let Some(ep) = endpoint_override {
+                    config.kev.endpoint = ep.to_string();
+                }
+            }
+            "laya" | "laya-mlx" => {
+                config.provider = "laya-mlx".into();
+                if let Some(ep) = endpoint_override {
+                    config.laya.endpoint = ep.to_string();
+                }
+            }
+            "jev" => {
+                config.provider = "jev".into();
+                if let Some(ep) = endpoint_override {
+                    config.jev.endpoint = ep.to_string();
+                }
+            }
+            "mock" => {
+                config.provider = "mock".into();
+            }
+            _ => {
+                return Err(CeError::Usage(format!(
+                    "unrecognized provider '{target_prov}'. Valid providers: jev, kev, laya, mock"
+                )));
+            }
+        }
+    }
 
     state.decisions = Some(config.clone());
     let serialized = serde_json::to_string_pretty(&state)
@@ -519,12 +630,31 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
     } else {
         println!("  Provider: {}", config.provider);
         println!("  Mode:     {}", config.mode);
-        println!(
-            "  Budget:   ${:.2} monthly ceiling",
-            config.budget.max_monthly_usd()
-        );
-        println!();
-        println!("Next step: run 'ce-ai decisions auth' or export TYPESAFE_API_KEY.");
+        if config.provider == "kev" {
+            println!("  Endpoint: {}", config.kev.endpoint);
+            println!("  Model:    {}", config.kev.model);
+            println!("  Budget:   $0.00 (unmetered local execution)");
+            println!();
+            println!("Next step: start Kev ('python -m kev.serve --run jaredpalmer/kev-4b --port 8009') then run 'ce-ai decisions test'.");
+        } else if config.provider == "laya" || config.provider == "laya-mlx" {
+            println!("  Endpoint: {}", config.laya.endpoint);
+            println!("  Model:    {}", config.laya.model);
+            println!("  Budget:   $0.00 (unmetered local MLX execution)");
+            if !crate::decisions::LayaMlxProvider::is_apple_silicon() {
+                println!("  Warning:  laya-mlx requires macOS Apple Silicon (aarch64). Consider 'ce-ai decisions setup --provider kev'.");
+            }
+            println!();
+            println!("Next step: start Laya daemon, then run 'ce-ai decisions test'.");
+        } else if config.provider == "mock" {
+            println!("  Budget:   $0.00 (offline testing)");
+        } else {
+            println!(
+                "  Budget:   ${:.2} monthly ceiling",
+                config.budget.max_monthly_usd()
+            );
+            println!();
+            println!("Next step: run 'ce-ai decisions auth' or export TYPESAFE_API_KEY.");
+        }
     }
 
     Ok(())
@@ -591,8 +721,8 @@ fn handle_test(ctx: &Context, provider_override: Option<&str>) -> Result<(), CeE
 
     let target_provider = provider_override.unwrap_or(&config.provider);
 
-    let provider: Box<dyn DecisionProvider> = if target_provider == "mock" {
-        Box::new(
+    let provider: Box<dyn DecisionProvider> = match target_provider.to_lowercase().as_str() {
+        "mock" => Box::new(
             MockDecisionProvider::new()
                 .with_canned_answer(
                     "is_safe",
@@ -609,9 +739,10 @@ fn handle_test(ctx: &Context, provider_override: Option<&str>) -> Result<(), CeE
                         probabilities: std::collections::BTreeMap::new(),
                     },
                 ),
-        )
-    } else {
-        Box::new(JevProvider::new(config.jev, None))
+        ),
+        "kev" => Box::new(crate::decisions::KevProvider::new(config.kev)),
+        "laya" | "laya-mlx" => Box::new(crate::decisions::LayaMlxProvider::new(config.laya)),
+        _ => Box::new(JevProvider::new(config.jev, None)),
     };
 
     let req = DecisionRequest::new(DecisionContext::new("Sample test task from ce-ai CLI"))
@@ -1107,7 +1238,7 @@ mod tests {
             quiet: false,
         };
 
-        handle_setup(&ctx, "recommended").unwrap();
+        handle_setup(&ctx, "recommended", None, None).unwrap();
         let state = State::load(&ctx.config_dir.join("state.json")).unwrap();
         let decisions = state.decisions.unwrap();
         assert!(decisions.risk.enabled);
@@ -1121,6 +1252,20 @@ mod tests {
         assert!(decisions.readiness.enabled);
         assert_eq!(decisions.readiness.thresholds.ready_pct, 80);
         assert_eq!(decisions.readiness.thresholds.warning_pct, 60);
+
+        // Test kev preset
+        handle_setup(&ctx, "kev", None, Some("http://localhost:9999/v1")).unwrap();
+        let state_kev = State::load(&ctx.config_dir.join("state.json")).unwrap();
+        let decisions_kev = state_kev.decisions.unwrap();
+        assert_eq!(decisions_kev.provider, "kev");
+        assert_eq!(decisions_kev.kev.endpoint, "http://localhost:9999/v1");
+
+        // Test laya preset
+        handle_setup(&ctx, "laya", None, None).unwrap();
+        let state_laya = State::load(&ctx.config_dir.join("state.json")).unwrap();
+        let decisions_laya = state_laya.decisions.unwrap();
+        assert_eq!(decisions_laya.provider, "laya-mlx");
+        assert_eq!(decisions_laya.laya.endpoint, "http://127.0.0.1:8080/v1");
     }
 
     #[test]

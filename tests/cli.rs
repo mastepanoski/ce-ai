@@ -9974,7 +9974,82 @@ fn test_cli_decisions_mode_and_preset_off() {
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("Valid presets: recommended, shadow, local, off"));
+    assert!(stderr.contains("Valid presets: recommended, shadow, kev, laya, local, off"));
+}
+
+#[test]
+fn test_cli_decisions_setup_kev_and_laya() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let home = tmp.path().join("home");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+
+    // 1. Setup with --preset kev
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "setup", "--preset", "kev"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Provider: kev"));
+    assert!(stdout.contains("Mode:     active"));
+    assert!(stdout.contains("python -m kev.serve"));
+
+    // Check state.json
+    let state_raw = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    let state_val: serde_json::Value = serde_json::from_str(&state_raw).unwrap();
+    assert_eq!(state_val["decisions"]["provider"], "kev");
+    assert_eq!(
+        state_val["decisions"]["kev"]["endpoint"],
+        "http://127.0.0.1:8009/v1"
+    );
+
+    // 2. Setup with --preset laya and custom endpoint
+    let out = ceai(&config_dir, &home)
+        .args([
+            "decisions",
+            "setup",
+            "--preset",
+            "laya",
+            "--endpoint",
+            "http://127.0.0.1:8008/v1",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Provider: laya-mlx"));
+
+    let state_raw = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    let state_val: serde_json::Value = serde_json::from_str(&state_raw).unwrap();
+    assert_eq!(state_val["decisions"]["provider"], "laya-mlx");
+    assert_eq!(
+        state_val["decisions"]["laya"]["endpoint"],
+        "http://127.0.0.1:8008/v1"
+    );
+
+    // 3. Setup with --provider kev --endpoint override
+    let out = ceai(&config_dir, &home)
+        .args([
+            "decisions",
+            "setup",
+            "--provider",
+            "kev",
+            "--endpoint",
+            "http://localhost:9999/v1",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+
+    let state_raw = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    let state_val: serde_json::Value = serde_json::from_str(&state_raw).unwrap();
+    assert_eq!(state_val["decisions"]["provider"], "kev");
+    assert_eq!(
+        state_val["decisions"]["kev"]["endpoint"],
+        "http://localhost:9999/v1"
+    );
 }
 
 #[test]

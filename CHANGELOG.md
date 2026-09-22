@@ -5,6 +5,20 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.68.0] - 2026-09-22
+
+### Added
+- **Local Decision Engine Providers (Kev & Laya-MLX) (#403)**:
+  - **Universal Local Provider (`KevProvider` in `src/decisions/kev.rs`)**: Implemented unmetered, zero-cost System 1 micro-decision evaluation powered by Jared Palmer's Kev server (`python -m kev.serve --run jaredpalmer/kev-4b --port 8009`), mapping TypeSafe questions (`choice`, `noul`, `score`) to local inference endpoints without external API keys or cloud spend.
+  - **Apple Silicon Native Engine (`LayaMlxProvider` in `src/decisions/laya.rs`)**: Implemented hardware-accelerated Apple Silicon MLX provider delivering sub-20ms System 1 inference on macOS `aarch64`, guarded by an architecture gate that warns and safely falls back on non-Apple-Silicon platforms.
+  - **Engine Factory & Schema Evolution**: Extended `DecisionsConfig` in `src/state/state.rs` with `KevConfig` and `LayaConfig` defaults and wired both providers into the `DecisionEngine::from_config` factory dispatch in `src/decisions/mod.rs`.
+  - **CLI Setup Presets & Provider Flag**:
+    - Added `--preset kev` and `--preset laya` (aliased as `mlx` and `laya-mlx`) to `ce-ai decisions setup`.
+    - Added `--provider <kev|laya>` and `--endpoint <url>` flags for surgical provider configuration and custom ports/hosts.
+  - **Active Provider Connectivity Testing (`ce-ai decisions test`)**: Added `ce-ai decisions test` command to test active provider responsiveness, health, and latency directly from the command line.
+  - **Doctor Health Diagnostics**: Extended `ce-ai doctor` to probe Kev and Laya local endpoints, reporting running status or actionable background daemon launch instructions.
+  - **Documentation & User Guide**: Updated `docs/user-guide/decision-engine-guide.md` with setup walkthroughs, preset matrices, running instructions, and architecture boundaries.
+
 ## [1.67.0] - 2026-09-22
 
 ### Added

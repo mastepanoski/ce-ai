@@ -5,6 +5,8 @@ pub mod analytics;
 pub mod auth;
 pub mod budget;
 pub mod jev;
+pub mod kev;
+pub mod laya;
 pub mod mock;
 pub mod readiness;
 pub mod risk;
@@ -23,6 +25,8 @@ pub use auth::{
 };
 pub use budget::{BudgetConfig, BudgetTracker, CircuitState, FallbackReason, MonthlyLedger};
 pub use jev::{JevConfig, JevProvider, JevWireRequest, JevWireResponse};
+pub use kev::{KevConfig, KevProvider};
+pub use laya::{LayaConfig, LayaMlxProvider};
 pub use mock::{HealthStatus, MockDecisionProvider};
 pub use readiness::{
     ReadinessConfig, ReadinessDimensionScore, ReadinessEvaluationResult, ReadinessEvaluator,
@@ -84,11 +88,15 @@ impl DecisionEngine {
             return Self::new(None, DecisionMode::Off);
         }
 
-        let provider: Option<Box<dyn DecisionProvider>> = if config.provider == "mock" {
-            Some(Box::new(mock::MockDecisionProvider::new()))
-        } else {
-            Some(Box::new(jev::JevProvider::new(config.jev.clone(), None)))
-        };
+        let provider: Option<Box<dyn DecisionProvider>> =
+            match config.provider.to_lowercase().as_str() {
+                "mock" => Some(Box::new(mock::MockDecisionProvider::new())),
+                "kev" => Some(Box::new(kev::KevProvider::new(config.kev.clone()))),
+                "laya" | "laya-mlx" => {
+                    Some(Box::new(laya::LayaMlxProvider::new(config.laya.clone())))
+                }
+                _ => Some(Box::new(jev::JevProvider::new(config.jev.clone(), None))),
+            };
 
         Self::new(provider, config.mode)
     }
