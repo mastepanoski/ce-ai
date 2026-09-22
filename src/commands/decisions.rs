@@ -43,9 +43,14 @@ pub enum Action {
     },
     /// Quick-setup wizard or preset configuration for the Decision Engine.
     Setup {
-        /// Preset configuration: recommended (active Jev + $5 budget), shadow (evaluates without enforcement), or local (mock/offline).
+        /// Preset configuration: recommended (active Jev + $5 budget), shadow (evaluates without enforcement), local (mock/offline), or off/disabled.
         #[arg(long, default_value = "recommended")]
         preset: String,
+    },
+    /// Get or set the operational execution mode (active, shadow, off).
+    Mode {
+        /// Target mode to set: active, shadow, or off. If omitted, displays current mode.
+        mode: Option<String>,
     },
     /// Test decision evaluation with a sample structured query.
     Test {
@@ -98,6 +103,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             handle_auth(ctx, key.as_ref().map(|o| o.as_deref()), *stdin, *check)
         }
         Action::Setup { preset } => handle_setup(ctx, preset),
+        Action::Mode { mode } => handle_mode(ctx, mode.as_deref()),
         Action::Test { provider } => handle_test(ctx, provider.as_deref()),
         Action::CheckRisk {
             tool,
@@ -457,9 +463,15 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
                 thresholds: crate::decisions::ReadinessThresholds::default(),
             },
         },
+        "off" | "disabled" => {
+            let mut cfg = state.decisions.unwrap_or_default();
+            cfg.enabled = false;
+            cfg.mode = DecisionMode::Off;
+            cfg
+        }
         _ => {
             return Err(CeError::Usage(format!(
-                "invalid preset '{preset_name}'. Valid presets: recommended, shadow, local"
+                "invalid preset '{preset_name}'. Valid presets: recommended, shadow, local, off"
             )));
         }
     };
@@ -471,16 +483,73 @@ fn handle_setup(ctx: &Context, preset_name: &str) -> Result<(), CeError> {
     crate::state::write_atomic(&state_path, serialized.as_bytes())?;
 
     println!("Decision Engine configured with preset '{}':", clean);
-    println!("  Provider: {}", config.provider);
-    println!("  Mode:     {}", config.mode);
-    println!(
-        "  Budget:   ${:.2} monthly ceiling",
-        config.budget.max_monthly_usd()
-    );
-    println!();
-    println!("Next step: run 'ce-ai decisions auth' or export TYPESAFE_API_KEY.");
+    if config.mode == DecisionMode::Off || !config.enabled {
+        println!("  Mode:     off (disabled)");
+    } else {
+        println!("  Provider: {}", config.provider);
+        println!("  Mode:     {}", config.mode);
+        println!(
+            "  Budget:   ${:.2} monthly ceiling",
+            config.budget.max_monthly_usd()
+        );
+        println!();
+        println!("Next step: run 'ce-ai decisions auth' or export TYPESAFE_API_KEY.");
+    }
 
     Ok(())
+}
+
+fn handle_mode(ctx: &Context, target_mode: Option<&str>) -> Result<(), CeError> {
+    let state_path = ctx.config_dir.join("state.json");
+    let mut state =
+        State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
+            .unwrap_or_default();
+
+    match target_mode {
+        None => {
+            match &state.decisions {
+                Some(cfg) if cfg.enabled && cfg.mode != DecisionMode::Off => {
+                    println!(
+                        "Decision Engine mode: {} (provider: {})",
+                        cfg.mode, cfg.provider
+                    );
+                }
+                Some(cfg) => {
+                    println!(
+                        "Decision Engine mode: off (disabled, provider: {})",
+                        cfg.provider
+                    );
+                }
+                None => {
+                    println!("Decision Engine mode: off (disabled)");
+                }
+            }
+            Ok(())
+        }
+        Some(mode_str) => {
+            let parsed_mode = DecisionMode::parse(mode_str)?;
+            let mut config = state.decisions.unwrap_or_default();
+            if parsed_mode == DecisionMode::Off {
+                config.enabled = false;
+                config.mode = DecisionMode::Off;
+                println!("Decision Engine mode set to: off (disabled)");
+            } else {
+                config.enabled = true;
+                config.mode = parsed_mode;
+                println!(
+                    "Decision Engine mode set to: {} (provider: {})",
+                    parsed_mode, config.provider
+                );
+            }
+            state.decisions = Some(config);
+
+            let serialized = serde_json::to_string_pretty(&state).map_err(|e| {
+                CeError::State(format!("failed to serialize updated state.json: {e}"))
+            })?;
+            crate::state::write_atomic(&state_path, serialized.as_bytes())?;
+            Ok(())
+        }
+    }
 }
 
 fn handle_test(ctx: &Context, provider_override: Option<&str>) -> Result<(), CeError> {

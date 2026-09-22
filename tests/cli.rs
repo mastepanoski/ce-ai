@@ -9775,3 +9775,110 @@ fn test_cli_decisions_check_readiness() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("readiness advisory:"));
 }
+
+#[test]
+fn test_cli_decisions_mode_and_preset_off() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let home = tmp.path().join("home");
+    let repo_root = tmp.path().join("project");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(&repo_root).unwrap();
+
+    // 1. Initially unconfigured mode prints off
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "mode"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Decision Engine mode: off (disabled)"));
+
+    // 2. Configure local preset (active mode)
+    ceai(&config_dir, &home)
+        .args(["decisions", "setup", "--preset", "local"])
+        .assert()
+        .success();
+
+    // Verify mode is active
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "mode"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Decision Engine mode: active (provider: mock)"));
+
+    // 3. Switch to shadow mode
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "mode", "shadow"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Decision Engine mode set to: shadow (provider: mock)"));
+
+    // Verify current mode is now shadow
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "mode"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Decision Engine mode: shadow (provider: mock)"));
+
+    // 4. Switch to off mode via mode subcommand
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "mode", "off"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Decision Engine mode set to: off (disabled)"));
+
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "mode"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Decision Engine mode: off (disabled"));
+
+    // 5. Test setup --preset off
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "setup", "--preset", "off"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Decision Engine configured with preset 'off'"));
+    assert!(stdout.contains("Mode:     off (disabled)"));
+
+    // 6. Switch back to active mode via mode subcommand
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "mode", "active"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Decision Engine mode set to: active"));
+
+    // 7. Invalid mode argument returns Usage error (exit code 2)
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "mode", "unsupported_mode"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("invalid decision mode"));
+
+    // 8. Invalid preset error mentions off
+    let out = ceai(&config_dir, &home)
+        .args(["decisions", "setup", "--preset", "bogus"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("Valid presets: recommended, shadow, local, off"));
+}

@@ -5,6 +5,16 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.65.0] - 2026-09-21
+
+### Added
+- **Decision Engine Documentation & CLI Ergonomics**:
+  - **Operational Mode Subcommand (`ce-ai decisions mode`)**: Added `ce-ai decisions mode [active|shadow|off]` to inspect current runtime mode or dynamically toggle between `active`, `shadow`, and `off` with atomic state writes (`write_atomic`) without requiring setup re-execution.
+  - **Setup Preset `off` / `disabled`**: Added `--preset off` (and `--preset disabled`) to `ce-ai decisions setup` to cleanly disable the Decision Engine directly from the CLI without manual JSON editing.
+  - **Comprehensive User Guide (`docs/user-guide/decision-engine-guide.md`)**: Authored a complete Diátaxis How-to / Reference guide clarifying the distinction between Setup Presets (`recommended`, `shadow`, `local`, `off`) and Runtime Operational Modes (`active`, `shadow`, `off`), while documenting authentication, status inspection, risk evaluation, readiness advisory, and safety invariants.
+  - **README Documentation Map & Quick Path Integration**: Added `ce-ai decisions` to the Quick Path command table and added `Decision Engine Guide` to the Documentation Map while strictly preserving the `<= 100` lines invariant.
+  - **CLI Integration Tests**: Added test coverage in `tests/cli.rs` for `ce-ai decisions mode [active|shadow|off]` and `ce-ai decisions setup --preset off`.
+
 ## [1.64.0] - 2026-09-19
 
 ### Added

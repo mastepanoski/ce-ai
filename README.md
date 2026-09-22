@@ -48,8 +48,8 @@ ce-ai doctor
 | `ce-ai install [--scope workspace\|--scope global]` | Install per harness or workspace-isolated | [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) |
 | `ce-ai status` / `ce-ai doctor` | Inspect installed harnesses, adoption & health | — |
 | `ce-ai skills list/resolve/doctor` | Query, resolve skills & check registry health | [Skill Registry Guide](docs/user-guide/skill-registry-guide.md) |
-| `ce-ai sync` | Reconcile drift against the SHA256 manifest | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
-| `ce-ai upgrade --to <tag>` | Upgrade the plugin to a release tag | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
+| `ce-ai sync` / `ce-ai upgrade` | Reconcile drift or upgrade plugin to release tag | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
+| `ce-ai decisions [setup\|mode\|…]` | System 1 decision engine, risk checks & model routing | [Decision Engine Guide](docs/user-guide/decision-engine-guide.md) |
 | `ce-ai models set/list/profile …` | Assign models per agent slot, snapshot profiles | [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) |
 | `ce-ai graduate <feature>` | Promote lightweight ODD brief into formal OpenSpec | [ODD Masterclass](docs/user-guide/odd-fast-path-and-graduation-masterclass.md) |
 | `ce-ai uninstall --harness <name>` | Restore pre-install configuration cleanly | [Backup & Uninstall](docs/user-guide/backup-and-uninstall.md) |
@@ -69,6 +69,7 @@ ce-ai doctor
 | 🎓 [Determinism & ce-ai Explained](docs/user-guide/determinism-explained.md) | **Beginner** | Explanation — what ce-ai guarantees, why LLM execution cannot be deterministic |
 | 🎓 [Zero-Step Drift Recovery](docs/user-guide/zero-step-drift-recovery-explained.md) | **Beginner** | Explanation — eliminating 5–8 turns of observation lag via live RepoState sync |
 | ⚡ [ODD Fast-Path Masterclass](docs/user-guide/odd-fast-path-and-graduation-masterclass.md) | Both | Explanation — agile speed vs compound intelligence, mode router & graduation |
+| 🧠 [Decision Engine Guide](docs/user-guide/decision-engine-guide.md) | Both | How-to / Reference — System 1 micro-decisions, risk policies & mode controls |
 | 🔧 [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) | Both | How-to — scopes, non-destructive JSON merging, discovery |
 | 🔄 [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) | Both | How-to — drift repair, upgrades, rollbacks |
 | ⚡ [Skill Registry Guide](docs/user-guide/skill-registry-guide.md) | Both | How-to / Reference — skill index, 4-tier precedence, resolution |
