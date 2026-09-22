@@ -55,3 +55,4 @@ Historical notes:
 - secure-decisions-auth-stdin: archived (33/33 tasks) under criterion (1) on 2026-09-19.
 - decision-engine-docs-and-ergonomics: archived (12/12 tasks) under criterion (1) on 2026-09-22.
 - decision-analytics-and-evaluation: archived (28/28 tasks) under criterion (1) on 2026-09-22.
+- post-merge-archive-prescriptions: archived (20/20 tasks) under criterion (1) on 2026-09-22.
