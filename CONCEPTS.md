@@ -124,3 +124,9 @@ A lightweight execution protocol within `ce-ai` inspired by Gentle AI, designed 
 ### Graduation Bridge
 A seamless promotion command (`ce-ai workflow graduate <feature>`) that mechanically transitions an organic exploratory task (`odd/tasks/<feature>.md`) into a fully structured OpenSpec change package (`openspec/changes/<feature>/{proposal.md, spec.md, tasks.md}`) whenever exploration reveals cross-cutting architectural complexity (> 200 LOC). It maps Problem Statement to proposal, Guardrails to formal criteria, and DoD checklists to work units while preserving checked progress and removing the ODD file to prevent dual-ledger desynchronization.
 
+### Pluggable Decision Engine (System 1)
+A fast, lightweight, probabilistic micro-decision layer in `ce-ai` that sits between rigid deterministic core rules and heavy LLM reasoning (System 2). It provides sub-second evaluations for model routing (selecting between fast, standard, and reasoning model classes), skill resolution, destructive command risk scoring, and workflow readiness advisory, operating under strict budget caps and non-blocking circuit-breaker fallbacks.
+
+### Local Decision Engine Provider (Kev & Laya-MLX)
+Zero-cost, unmetered, privacy-preserving execution backends for the Decision Engine that run on localhost without sending code, prompts, or telemetry to external cloud endpoints. Divided into a universal cross-platform backend (`KevProvider`, serving small quantized decision heads like `kev-4b` on port 8009) and an ultra-low latency Apple Silicon backend (`LayaMlxProvider`, running hardware-accelerated MLX decision heads sub-20ms on macOS `aarch64` port 8008).
+
