@@ -56,3 +56,4 @@ Historical notes:
 - decision-engine-docs-and-ergonomics: archived (12/12 tasks) under criterion (1) on 2026-09-22.
 - decision-analytics-and-evaluation: archived (28/28 tasks) under criterion (1) on 2026-09-22.
 - post-merge-archive-prescriptions: archived (20/20 tasks) under criterion (1) on 2026-09-22.
+- local-decision-providers: archived (26/26 tasks) under criterion (1) on 2026-09-22.
