@@ -401,6 +401,10 @@ pub struct DecisionsConfig {
     #[serde(default)]
     pub jev: crate::decisions::JevConfig,
     #[serde(default)]
+    pub kev: crate::decisions::KevConfig,
+    #[serde(default)]
+    pub laya: crate::decisions::LayaConfig,
+    #[serde(default)]
     pub routing: crate::decisions::ModelRoutingConfig,
     #[serde(default)]
     pub skills: crate::decisions::SkillRoutingConfig,
@@ -424,6 +428,8 @@ impl Default for DecisionsConfig {
             mode: crate::decisions::DecisionMode::Active,
             budget: crate::decisions::BudgetConfig::default(),
             jev: crate::decisions::JevConfig::default(),
+            kev: crate::decisions::KevConfig::default(),
+            laya: crate::decisions::LayaConfig::default(),
             routing: crate::decisions::ModelRoutingConfig::default(),
             skills: crate::decisions::SkillRoutingConfig::default(),
             risk: crate::decisions::RiskConfig::default(),

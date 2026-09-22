@@ -19,16 +19,16 @@ The `ce-ai decisions` subsystem governs the **Pluggable Decision Engine** — a 
 A common point of confusion is the distinction between **Presets** (`--preset`) and **Operational Modes** (`mode`). They operate at different lifecycle levels:
 
 ```
-+-------------------------------------------------------------+
-| CLI Setup Preset (Template):                                |
-|   ce-ai decisions setup --preset <recommended|shadow|local|off> |
-+-------------------------------------------------------------+
++-------------------------------------------------------------------------+
+| CLI Setup Preset (Template):                                            |
+|   ce-ai decisions setup --preset <recommended|shadow|kev|laya|local|off>|
++-------------------------------------------------------------------------+
                               │
                               ▼ writes to state.json
-+-------------------------------------------------------------+
-| Runtime Operational Mode:                                   |
-|   ce-ai decisions mode <active|shadow|off>                  |
-+-------------------------------------------------------------+
++-------------------------------------------------------------------------+
+| Runtime Operational Mode:                                               |
+|   ce-ai decisions mode <active|shadow|off>                              |
++-------------------------------------------------------------------------+
 ```
 
 ### The Matrix
@@ -37,6 +37,8 @@ A common point of confusion is the distinction between **Presets** (`--preset`) 
 | :--- | :--- | :--- | :--- | :--- |
 | **Setup Preset** | `recommended` | `jev` | `active` | Active Jev (TypeSafe AI) evaluations with $5/month ceiling, 100 req/session, 1000ms timeout, and all sub-engines enabled. |
 | | `shadow` | `jev` | `shadow` | Evaluates Jev in background to monitor latency and telemetry without altering deterministic policies. |
+| | `kev` | `kev` | `active` | Local System 1 inference via Kev server (`127.0.0.1:8009`). Zero cost, unmetered, universal platform support. |
+| | `laya` / `mlx` | `laya-mlx` | `active` | Ultra-low latency (<20ms) local Apple Silicon MLX inference daemon (`127.0.0.1:8008`). |
 | | `local` | `mock` | `active` | 100% offline Mock provider for hermetic testing or environments without API keys. |
 | | `off` / `disabled` | *none* | `off` | Completely disables the Decision Engine; zero network calls and zero evaluations. |
 | **Runtime Mode** | `active` | *configured* | `active` | Evaluations actively enforce policies (e.g., risk confirmation, model routing). |
@@ -55,7 +57,19 @@ To provision recommended defaults (Jev provider, $5 monthly cap):
 ce-ai decisions setup --preset recommended
 ```
 
-For offline or hermetic local development:
+For local, zero-cost System 1 evaluation with Kev (universal):
+
+```bash
+ce-ai decisions setup --preset kev
+```
+
+For ultra-low latency Apple Silicon evaluation with Laya-MLX:
+
+```bash
+ce-ai decisions setup --preset laya
+```
+
+For offline or hermetic local testing with canned/mock responses:
 
 ```bash
 ce-ai decisions setup --preset local
@@ -67,8 +81,9 @@ To turn off evaluations entirely:
 ce-ai decisions setup --preset off
 ```
 
-### Step 2: Configure Authentication Credentials
+### Step 2: Configure Credentials (Remote) or Start Daemon (Local)
 
+#### For Cloud Jev (`recommended` / `shadow`)
 `ce-ai` never stores API keys in git-tracked files (`state.json`, `ce-ai.toml`). Keys are resolved in order:
 1. Environment variable: `TYPESAFE_API_KEY` (or fallback `JEV_API_KEY`)
 2. Local secured file: `~/.config/ce-ai/credentials.toml` (Unix permissions `0600`)
@@ -92,9 +107,38 @@ Verify provider connectivity and latency:
 ce-ai decisions auth --check
 ```
 
-### Step 3: Inspect Engine Status & Budget Consumption
+#### For Local Kev (`kev`)
+Kev executes unmetered without API keys. Ensure Kev is running locally on the configured port (default `8009`):
 
-View provider health, latency, monthly spend, and session limits:
+```bash
+# In your Python / virtualenv environment:
+pip install kev
+python -m kev.serve --run jaredpalmer/kev-4b --port 8009
+```
+
+Verify connectivity:
+
+```bash
+ce-ai decisions test
+```
+
+#### For Local Laya-MLX (`laya`)
+Laya provides sub-20ms MLX evaluation on Apple Silicon Macs (macOS `aarch64`):
+
+```bash
+# Start Laya MLX service on port 8008
+laya serve --port 8008
+```
+
+Verify connectivity:
+
+```bash
+ce-ai decisions test
+```
+
+### Step 3: Inspect Engine Status & Health
+
+View provider health, active preset, endpoint, monthly spend, and session limits:
 
 ```bash
 ce-ai decisions status
