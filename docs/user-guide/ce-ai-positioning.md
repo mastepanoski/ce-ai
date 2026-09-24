@@ -67,9 +67,3 @@ For substantial work, CE-AI can coordinate formal OpenSpec artifacts. For routin
 **Organic Driven Development (ODD)** was created by [Alan Buscaglia](https://github.com/Alan-TheGentleman) through [Gentle AI](https://github.com/Gentleman-Programming/gentle-ai). Gentle AI documents it as the everyday path: keep small, understood changes lightweight; retain one recoverable task record when work is substantial; select formal Spec-Driven Development only when it is wanted.
 
 CE-AI does not claim ODD as its own. It adapts ODD as an optional fast path for bounded, tactical work. Its adaptive mode router can keep a small fix light, while its graduation bridge moves work into formal OpenSpec artifacts when the task becomes broader or more consequential. See the [ODD Fast-Path Masterclass](odd-fast-path-and-graduation-masterclass.md) for CE-AI’s implementation details.
-
-## Why this distinction matters
-
-Calling CE-AI an “orchestrator” or leading with its Rust implementation describes mechanics, not the benefit. The useful promise is that coding agents gain an engineering workflow that survives session boundaries and produces trustworthy project knowledge.
-
-For the official Compound Engineering community, the accurate framing is therefore not “another plugin” or “a fork.” It is **an open-source experiment in treating Compound Engineering as the methodology beneath an agentic engineering harness**. That framing creates room for technical feedback without assuming that CE-AI belongs inside the official plugin.

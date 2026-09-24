@@ -11,6 +11,7 @@ The current public entry point leads with implementation terms such as “Rust C
 - Add a simple workflow diagram and an explanatory guide that distinguishes agents, the Compound Engineering plugin, and CE-AI.
 - Credit Compound Engineering and Alan Buscaglia / Gentle AI accurately for their respective methodology contributions.
 - Prepare an English, feedback-first discussion draft for EveryInc/compound-engineering-plugin; it must not ask for integration or propose a PR.
+- Preserve concrete, direct navigation to the existing onboarding, Zero-Step Drift, and operational guides.
 
 ## Out of Scope
 
