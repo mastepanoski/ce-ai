@@ -1,3 +1,9 @@
+---
+title: Reposition Public Messaging
+domain: workflow
+version: 1.0.0
+---
+
 # Specification
 
 ## Requirement: Immediate orientation
@@ -16,7 +22,7 @@
 - WHEN ODD is defined in a user-facing guide or the glossary, THEN it SHALL attribute ODD to Alan Buscaglia / Gentle AI and state that CE-AI adapts it rather than claiming its invention.
 - WHEN Compound Engineering is described, THEN it SHALL identify EveryInc’s official plugin/methodology as the source and avoid suggesting CE-AI replaces it.
 
-## Requirement: Upstream outreach
+## Requirement: Clean public surface
 
-- WHEN maintainers read the prepared discussion draft, THEN it SHALL frame CE-AI as harness-level experimentation, ask for feedback and potential integration points, and avoid requesting addition to the upstream repository.
-- WHEN the draft refers to upstream contribution, THEN it SHALL state that it is intended as an issue-first discussion rather than a PR.
+- WHEN public documentation is published, THEN private community discussion drafts SHALL NOT be included in public repository guides or the README documentation map.
+- WHEN CE-AI is described across documentation, THEN it SHALL consistently use the canonical definition: "CE-AI is not another coding agent. It is an engineering workflow for coding agents."

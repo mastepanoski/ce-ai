@@ -20,7 +20,7 @@ flowchart TD
 ```
 
 ### Supported Harnesses in `ce-ai`:
-`ce-ai` is a **multi-host engineering workflow harness**. It detects, configures, and synchronizes Compound Engineering integrations across:
+`ce-ai` is an **engineering workflow for coding agents** across multiple hosts. It detects, configures, and synchronizes Compound Engineering integrations across:
 
 | Harness Name | Environment Type | How `ce-ai` Integrates |
 | :--- | :--- | :--- |
@@ -127,7 +127,7 @@ CE-AI combines independent projects with different roles. [Compound Engineering]
 
 ```mermaid
 flowchart TD
-    CE_AI["CE-AI: engineering workflow harness"] --> CE["EveryInc Compound Engineering
+    CE_AI["CE-AI: engineering workflow for coding agents"] --> CE["EveryInc Compound Engineering
 methodology and skills"]
     CE_AI --> ODD["Alan Buscaglia / Gentle AI
 Organic Driven Development"]

@@ -6,9 +6,9 @@
 
 | Question | Answer |
 | --- | --- |
-| **What is CE-AI?** | An open-source engineering harness that installs and coordinates a project workflow around the coding agent you already use. |
+| **What is CE-AI?** | An open-source engineering workflow for coding agents that coordinates work, verification, and durable learning around the agent you already use. |
 | **Why does it exist?** | Agents can write code quickly; CE-AI makes scope, specifications, verification, and learned context visible and recoverable across sessions. |
-| **How is it different?** | Claude Code, Codex, and OpenCode are **agents/hosts**. Compound Engineering is the **methodology and skill plugin**. CE-AI is the **project-level workflow harness** around them. |
+| **How is it different?** | Claude Code, Codex, and OpenCode are **agents/hosts**. Compound Engineering is the **methodology and skill plugin**. CE-AI is the **engineering workflow for coding agents** around them. |
 | **What is Compound Engineering?** | EveryInc’s methodology for making each unit of engineering work easier than the last through reusable skills and durable learning. |
 | **What is ODD?** | Organic Driven Development: Alan Buscaglia’s Gentle AI approach for keeping understood work lightweight while retaining recoverable context. CE-AI adapts it as an optional fast path. |
 
@@ -79,7 +79,6 @@ Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <
 | 🧭 [Workflow Panel](docs/user-guide/workflow-panel-native-vs-agent-skills.md) | Beginner | Explanation — native dashboard actions versus agent skills |
 | 📐 [OpenSpec specifications](openspec/specs/) | Senior | Reference — living system specifications and contracts |
 | 🧠 [Solutions Library](docs/solutions/) · [Plans & Audits](docs/plans/) | Contributor | Reference — solved problems, decisions, and delivery history |
-| 💬 [Compound Engineering discussion draft](docs/community/compound-engineering-discussion-draft.md) | Maintainers / contributors | Reference — feedback-first proposal for the EveryInc community |
 
 ## Acknowledgments
 

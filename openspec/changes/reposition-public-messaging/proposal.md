@@ -8,9 +8,8 @@ The current public entry point leads with implementation terms such as “Rust C
 
 - Reframe the README around CE-AI as an engineering workflow for coding agents, not another coding agent.
 - Give a new visitor a concise explanation of CE-AI, Compound Engineering, ODD, the layers in the ecosystem, and a two-minute trial path.
-- Add a simple workflow diagram and an explanatory guide that distinguishes agents, the Compound Engineering plugin, and CE-AI.
 - Credit Compound Engineering and Alan Buscaglia / Gentle AI accurately for their respective methodology contributions.
-- Prepare an English, feedback-first discussion draft for EveryInc/compound-engineering-plugin; it must not ask for integration or propose a PR.
+- Keep private community outreach drafts outside published repository documentation.
 - Preserve concrete, direct navigation to the existing onboarding, Zero-Step Drift, and operational guides.
 
 ## Out of Scope
@@ -24,4 +23,4 @@ The current public entry point leads with implementation terms such as “Rust C
 - A reader can answer the six requested orientation questions from the README and linked explanation in under 30 seconds.
 - The README stays within the repository’s 100-line limit and routes beginners and senior readers clearly.
 - The published terminology is consistent across the README, onboarding tutorial, ODD guide, and conceptual glossary.
-- The discussion draft accurately reflects upstream’s current 36-skill, 14-host positioning and its issue-first contribution policy.
+- All published documentation consistently defines CE-AI as an engineering workflow for coding agents.

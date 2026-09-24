@@ -13,7 +13,7 @@ methodology and reusable skills
           │   distributes skills to coding-agent hosts
           │
           └── CE-AI
-              applies and experiments with the methodology as a project harness
+              coordinates the engineering workflow in a project
               │
               └── agents, LLMs, tools, project artifacts, and verification
 ```
@@ -45,7 +45,7 @@ This is not a claim that one project has more features than another. The project
 | Project adoption, deterministic workflow state, health/drift checks, and artifact visibility | CE-AI | CE-AI makes the process surrounding agent work inspectable and recoverable in a repository. |
 | Lightweight everyday routing | [Gentle AI’s ODD](https://github.com/Gentleman-Programming/gentle-ai/blob/main/docs/intended-usage.md) | CE-AI adapts the approach as an optional fast path and credits its origin. |
 
-As checked on 2026-09-24, the official plugin describes 36 skills across 14 hosts, including newer capabilities such as `ce-explain`, `ce-pov`, Compound Packs, and evolved multi-host support. Those are reasons to seek feedback before any upstream proposal—not reasons for CE-AI to duplicate them.
+As checked on 2026-09-24, the official plugin describes 36 skills across 14 hosts, including newer capabilities such as `ce-explain`, `ce-pov`, Compound Packs, and evolved multi-host support. CE-AI complements those capabilities by orchestrating the project-level workflow rather than duplicating upstream skills.
 
 ## The engineering loop
 
