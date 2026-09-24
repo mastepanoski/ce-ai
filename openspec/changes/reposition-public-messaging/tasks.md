@@ -5,3 +5,5 @@
 - [x] 3. Align the getting-started tutorial, ODD guide, and glossary with that terminology and attribution. **Estimate: ~40 changed lines.**
 - [x] 4. Add an English, feedback-first issue discussion draft for EveryInc’s maintainers. **Estimate: ~60 changed lines.**
 - [ ] 5. Verify Markdown structure, links, README line budget, terminology consistency, and whitespace; re-run the Docker E2E gate when the daemon is available. **Estimate: ~20 changed lines.**
+
+- [x] 6. Restore direct README links to the useful guides, including Zero-Step Drift and all installation methods, and remove maintainer-facing positioning prose from reader guides. **Estimate: ~40 changed lines.**

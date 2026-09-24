@@ -35,11 +35,20 @@ CE-AI complements the official [Compound Engineering plugin](https://github.com/
 > Prerequisite: install one [supported coding-agent host](docs/user-guide/harness-matrix.md) first.
 
 ```bash
+# macOS / Linux
 curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.sh | bash
-cd your-project
-ce-ai install --harness all
-ce-ai init-prj
-ce-ai doctor
+
+# Windows PowerShell
+irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps1 | iex
+
+# Homebrew (macOS / Linux)
+brew install mastepanoski/ce-ai/ce-ai
+
+# From source
+cargo install --path .
+
+# Then, in your project
+cd your-project && ce-ai install --harness all && ce-ai init-prj && ce-ai doctor
 ```
 
 Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <outcome>`. For a guided first run, follow [Getting Started](docs/user-guide/getting-started.md).
@@ -50,12 +59,26 @@ Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <
 | --- | --- | --- |
 | 🌱 [Getting Started](docs/user-guide/getting-started.md) | Beginner | Tutorial — install, adopt a project, and run a first workflow step |
 | 🎓 [CE-AI positioning](docs/user-guide/ce-ai-positioning.md) | Beginner / Senior | Explanation — agents, Compound Engineering, ODD, and CE-AI’s boundary |
-| 🎓 [Compound Workflow Explained](docs/user-guide/compound-engineering-workflow-explained.md) | Beginner | Explanation — how the methodology turns strategy into code and learning |
-| ⚡ [ODD Fast-Path Masterclass](docs/user-guide/odd-fast-path-and-graduation-masterclass.md) | Beginner / Senior | Explanation — the lightweight path and when to graduate to formal artifacts |
+| 🚀 [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) | Beginner | Tutorial — first feature, bug fix, and workflow resumption |
+| 🎓 [Compound Workflow Explained](docs/user-guide/compound-engineering-workflow-explained.md) | Beginner | Explanation — how strategy becomes code and durable learning |
+| 🎓 [Documentation Debt & Hygiene](docs/user-guide/doc-hygiene-and-debt-explained.md) | Beginner | Explanation — keep specifications and guidance current |
 | 📁 [Project Adoption Guide](docs/user-guide/project-adoption-guide.md) | Both | How-to — safely adopt or de-adopt a project |
+| 🎓 [Harnesses, Loops & Context](docs/user-guide/harnesses-loops-and-context-masterclass.md) | Beginner | Explanation — coding-agent hosts, context, and supporting tools |
+| 🎓 [Determinism Explained](docs/user-guide/determinism-explained.md) | Beginner | Explanation — what CE-AI can and cannot guarantee |
+| 🎓 [Zero-Step Drift Recovery](docs/user-guide/zero-step-drift-recovery-explained.md) | Beginner | Explanation — recover current repository state at session start |
+| ⚡ [ODD Fast-Path Masterclass](docs/user-guide/odd-fast-path-and-graduation-masterclass.md) | Beginner / Senior | Explanation — the lightweight path and when to graduate to formal artifacts |
+| 🧠 [Decision Engine Guide](docs/user-guide/decision-engine-guide.md) | Both | How-to / Reference — routing, risk checks, and readiness |
+| 🔧 [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) | Both | How-to — install without overwriting existing configurations |
+| 🔄 [Sync & Upgrade](docs/user-guide/sync-and-upgrade-mechanisms.md) | Both | How-to — reconcile drift, update, and roll back |
+| ⚡ [Skill Registry Guide](docs/user-guide/skill-registry-guide.md) | Both | How-to / Reference — find and resolve available skills |
+| 💾 [Backup & Uninstall](docs/user-guide/backup-and-uninstall.md) | Both | How-to — restore configurations and remove CE-AI safely |
 | 🗂️ [Harness Matrix](docs/user-guide/harness-matrix.md) | Senior | Reference — supported hosts, configuration paths, and integration methods |
 | 🏛️ [Architecture Guide](docs/user-guide/architectural-and-conceptual-guide.md) | Senior | Explanation — deterministic state, adapters, and project artifacts |
-| ➕ [More operational guides](docs/user-guide/) | Both | How-to / Reference — installation, upgrades, skills, decisions, and maintenance |
+| 🎮 [FSM & Checkpoints](docs/user-guide/fsm-and-checkpoints-explained.md) | Senior | Explanation — lifecycle stages and checkpoints |
+| ⚖️ [Checkpoints vs. Memory](docs/user-guide/checkpoints-vs-memory-explained.md) | Beginner | Explanation — why checkpoints differ from session notes |
+| 🧭 [Workflow Panel](docs/user-guide/workflow-panel-native-vs-agent-skills.md) | Beginner | Explanation — native dashboard actions versus agent skills |
+| 📐 [OpenSpec specifications](openspec/specs/) | Senior | Reference — living system specifications and contracts |
+| 🧠 [Solutions Library](docs/solutions/) · [Plans & Audits](docs/plans/) | Contributor | Reference — solved problems, decisions, and delivery history |
 | 💬 [Compound Engineering discussion draft](docs/community/compound-engineering-discussion-draft.md) | Maintainers / contributors | Reference — feedback-first proposal for the EveryInc community |
 
 ## Acknowledgments
