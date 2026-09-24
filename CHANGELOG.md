@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.68.2] - 2026-09-24
+
+### Fixed
+- **TypeSafe AI System One Wire Protocol Migration for Jev Provider**:
+  - Remediated the hallucinated `/decide` endpoint and ad-hoc wire structs in `src/decisions/jev.rs`, migrating `JevProvider` to the canonical TypeSafe AI System One wire protocol (`POST /v1/systemone`).
+  - Centralized canonical System One wire models (`SystemOneWireQuestion`, `SystemOneWireRequest`, `SystemOneWireAnswer`, `SystemOneWireResponse`) and shared translation helpers (`build_systemone_questions`, `parse_systemone_answers`) in `src/decisions/types.rs`, establishing full structural parity across cloud (`jev`) and local (`kev`, `laya`) decision providers.
+  - Re-exported wire types from `src/decisions/kev.rs` and updated `src/decisions/laya.rs` for backward-compatible imports and unified DRY serialization.
+  - Expanded unit test coverage in `src/decisions/tests/jev_tests.rs` covering wire request construction (`noul`, `choice`, `score`), response parsing from `usage` telemetry, and top-level cost indicators.
+- **Companion Tool Initialization Guard in Worktrees (`ce-ai tools init codegraph`)**:
+  - Refined `init_codegraph` in `src/commands/tools.rs` to detect when `.codegraph/` contains only git-tracked metadata (`.gitignore`) from fresh worktrees or checkouts, running `codegraph init` rather than prematurely reporting the index as already initialized.
+
 ## [1.68.1] - 2026-09-23
 
 ### Fixed

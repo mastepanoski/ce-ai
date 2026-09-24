@@ -1,5 +1,7 @@
 use super::*;
-use crate::decisions::types::{DecisionContext, DecisionQuestion, DecisionRequest};
+use crate::decisions::types::{
+    DecisionAnswer, DecisionContext, DecisionQuestion, DecisionRequest, SystemOneWireAnswer,
+};
 
 #[test]
 fn test_jev_config_defaults() {
@@ -63,52 +65,95 @@ fn test_jev_wire_payload_serialization_round_trip() {
         "model_class",
         "Select model class",
         vec!["fast", "reasoning"],
+    ))
+    .with_question(DecisionQuestion::score(
+        "risk_level",
+        "Rate risk score",
+        0.0,
+        1.0,
     ));
 
     let wire = provider.build_wire_payload(req);
     assert_eq!(wire.model, "jev-latest");
-    assert_eq!(wire.task_description, "Audit security of auth module");
-    assert_eq!(wire.workflow_stage.as_deref(), Some("verify"));
-    assert_eq!(wire.execution_mode.as_deref(), Some("compound"));
-    assert_eq!(wire.questions.len(), 2);
+    assert_eq!(wire.questions.len(), 3);
+
+    // Validate state contents
+    let state_obj = wire.state.as_object().expect("state object");
+    assert_eq!(
+        state_obj.get("task").and_then(|v| v.as_str()),
+        Some("Audit security of auth module")
+    );
+    assert_eq!(
+        state_obj.get("stage").and_then(|v| v.as_str()),
+        Some("verify")
+    );
+    assert_eq!(
+        state_obj.get("mode").and_then(|v| v.as_str()),
+        Some("compound")
+    );
+
+    // Validate questions
+    let q_bool = wire.questions.get("needs_audit").unwrap();
+    assert_eq!(q_bool.question_type, "noul");
+    assert_eq!(
+        q_bool.instructions.as_deref(),
+        Some("Needs security review?")
+    );
+
+    let q_choice = wire.questions.get("model_class").unwrap();
+    assert_eq!(q_choice.question_type, "choice");
+    let criteria = q_choice.criteria.as_ref().unwrap().as_object().unwrap();
+    assert!(criteria.contains_key("fast"));
+    assert!(criteria.contains_key("reasoning"));
+
+    let q_score = wire.questions.get("risk_level").unwrap();
+    assert_eq!(q_score.question_type, "score");
 
     let serialized = serde_json::to_string(&wire).expect("serialize wire request");
-    let deserialized: JevWireRequest =
+    let deserialized: SystemOneWireRequest =
         serde_json::from_str(&serialized).expect("deserialize wire request");
     assert_eq!(deserialized.model, "jev-latest");
-    assert_eq!(deserialized.questions.len(), 2);
+    assert_eq!(deserialized.questions.len(), 3);
 }
 
 #[test]
-fn test_jev_wire_response_parsing() {
+fn test_jev_wire_response_parsing_from_usage() {
     let provider = JevProvider::new(JevConfig::default(), Some("ts-test-key".into()));
 
     let sample_json = r#"{
         "model": "jev-latest",
-        "estimated_cost_usd": 0.0003,
+        "latency_ms": 38,
+        "usage": {
+            "estimated_cost_usd": 0.0003
+        },
         "answers": {
             "is_risky": {
-                "kind": "boolean",
-                "value": true,
+                "type": "noul",
+                "noul": 0.94,
                 "confidence": 0.94
             },
             "category": {
-                "kind": "choice",
-                "selected": "security",
+                "type": "choice",
+                "choice": "security",
                 "confidence": 0.89,
                 "probabilities": {
                     "security": 0.89,
                     "refactor": 0.11
                 }
+            },
+            "severity": {
+                "type": "score",
+                "score": 4.5,
+                "confidence": 0.95
             }
         }
     }"#;
 
-    let wire_resp: JevWireResponse =
+    let wire_resp: SystemOneWireResponse =
         serde_json::from_str(sample_json).expect("parse sample response");
-    assert_eq!(wire_resp.answers.len(), 2);
+    assert_eq!(wire_resp.answers.len(), 3);
 
-    let decision_resp = provider.parse_wire_response(wire_resp, 38);
+    let decision_resp = provider.parse_wire_response(wire_resp, 42);
     assert_eq!(decision_resp.provider, "jev");
     assert_eq!(decision_resp.model, "jev-latest");
     assert_eq!(decision_resp.latency_ms, 38);
@@ -126,4 +171,46 @@ fn test_jev_wire_response_parsing() {
         .expect("category answer");
     assert_eq!(ans_choice.as_choice(), Some("security"));
     assert!((ans_choice.confidence() - 0.89).abs() < f64::EPSILON);
+
+    let ans_score = decision_resp
+        .get_answer("severity")
+        .expect("severity answer");
+    assert_eq!(ans_score.as_score(), Some(4.5));
+    assert!((ans_score.confidence() - 0.95).abs() < f64::EPSILON);
+}
+
+#[test]
+fn test_jev_wire_response_parsing_top_level_cost() {
+    let provider = JevProvider::new(JevConfig::default(), Some("ts-test-key".into()));
+    let mut answers = std::collections::BTreeMap::new();
+    answers.insert(
+        "q1".into(),
+        SystemOneWireAnswer {
+            answer_type: Some("noul".into()),
+            noul: Some(0.2),
+            confidence: Some(0.6),
+            ..Default::default()
+        },
+    );
+
+    let wire_resp = SystemOneWireResponse {
+        model: Some("jev-preview".into()),
+        answers,
+        latency_ms: None,
+        usage: None,
+        estimated_cost_usd: Some(0.00015),
+    };
+
+    let resp = provider.parse_wire_response(wire_resp, 50);
+    assert_eq!(resp.model, "jev-preview");
+    assert_eq!(resp.latency_ms, 50);
+    assert_eq!(resp.estimated_cost_usd, Some(0.00015));
+    let ans = resp.get_answer("q1").unwrap();
+    match ans {
+        DecisionAnswer::Boolean { value, confidence } => {
+            assert!(!*value);
+            assert_eq!(*confidence, 0.6);
+        }
+        _ => panic!("expected boolean answer"),
+    }
 }

@@ -3,13 +3,15 @@
 //! Connects to a locally running Kev server (e.g. `python -m kev.serve --run jaredpalmer/kev-4b --port 8009`)
 //! or remote self-hosted instance.
 
-use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
 use crate::decisions::types::{
-    DecisionAnswer, DecisionQuestion, DecisionRequest, DecisionResponse,
+    build_systemone_questions, parse_systemone_answers, DecisionRequest, DecisionResponse,
+};
+pub use crate::decisions::types::{
+    SystemOneWireAnswer, SystemOneWireQuestion, SystemOneWireRequest, SystemOneWireResponse,
 };
 use crate::decisions::{DecisionProvider, HealthStatus};
 use crate::error::CeError;
@@ -33,55 +35,6 @@ impl Default for KevConfig {
             timeout_ms: 2000,
         }
     }
-}
-
-/// System One wire question schema accepted by Kev.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SystemOneWireQuestion {
-    #[serde(rename = "type")]
-    pub question_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub instructions: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub criteria: Option<serde_json::Value>,
-}
-
-/// System One wire request payload.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SystemOneWireRequest {
-    pub state: serde_json::Value,
-    pub model: String,
-    pub questions: BTreeMap<String, SystemOneWireQuestion>,
-}
-
-/// System One wire answer schema returned by Kev.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SystemOneWireAnswer {
-    #[serde(rename = "type", default)]
-    pub answer_type: Option<String>,
-    #[serde(default)]
-    pub noul: Option<f64>,
-    #[serde(default)]
-    pub choice: Option<String>,
-    #[serde(default)]
-    pub score: Option<f64>,
-    #[serde(default)]
-    pub confidence: Option<f64>,
-    #[serde(default)]
-    pub probabilities: Option<BTreeMap<String, f64>>,
-}
-
-/// System One wire response payload.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SystemOneWireResponse {
-    #[serde(default)]
-    pub model: Option<String>,
-    #[serde(default)]
-    pub answers: BTreeMap<String, SystemOneWireAnswer>,
-    #[serde(default)]
-    pub latency_ms: Option<u64>,
-    #[serde(default)]
-    pub usage: Option<serde_json::Value>,
 }
 
 /// Provider client implementation for Kev local decision engine.
@@ -108,55 +61,7 @@ impl KevProvider {
 
     /// Translates domain `DecisionRequest` into System One wire payload.
     pub fn build_wire_payload(&self, request: DecisionRequest) -> SystemOneWireRequest {
-        let mut questions = BTreeMap::new();
-
-        for q in request.questions {
-            match q {
-                DecisionQuestion::Boolean { id, question } => {
-                    questions.insert(
-                        id,
-                        SystemOneWireQuestion {
-                            question_type: "noul".into(),
-                            instructions: Some(question),
-                            criteria: None,
-                        },
-                    );
-                }
-                DecisionQuestion::Choice {
-                    id,
-                    question,
-                    options,
-                } => {
-                    let mut criteria_map = serde_json::Map::new();
-                    for opt in options {
-                        criteria_map.insert(opt, serde_json::Value::Null);
-                    }
-                    questions.insert(
-                        id,
-                        SystemOneWireQuestion {
-                            question_type: "choice".into(),
-                            instructions: Some(question),
-                            criteria: Some(serde_json::Value::Object(criteria_map)),
-                        },
-                    );
-                }
-                DecisionQuestion::Score {
-                    id,
-                    question,
-                    min: _,
-                    max: _,
-                } => {
-                    questions.insert(
-                        id,
-                        SystemOneWireQuestion {
-                            question_type: "score".into(),
-                            instructions: Some(question),
-                            criteria: Some(serde_json::json!(["low", "medium", "high"])),
-                        },
-                    );
-                }
-            }
-        }
+        let questions = build_systemone_questions(request.questions);
 
         // Build state: structured metadata or plain task description
         let mut state_obj = serde_json::Map::new();
@@ -191,43 +96,7 @@ impl KevProvider {
         wire: SystemOneWireResponse,
         measured_latency_ms: u64,
     ) -> DecisionResponse {
-        let mut answers = BTreeMap::new();
-
-        for (id, ans) in wire.answers {
-            if let Some(choice) = ans.choice {
-                let conf = ans.confidence.unwrap_or(1.0);
-                let probs = ans.probabilities.unwrap_or_default();
-                answers.insert(
-                    id,
-                    DecisionAnswer::Choice {
-                        selected: choice,
-                        confidence: conf,
-                        probabilities: probs,
-                    },
-                );
-            } else if let Some(noul_val) = ans.noul {
-                let value = noul_val >= 0.5;
-                let conf = ans
-                    .confidence
-                    .unwrap_or_else(|| (noul_val - 0.5).abs() * 2.0);
-                answers.insert(
-                    id,
-                    DecisionAnswer::Boolean {
-                        value,
-                        confidence: conf,
-                    },
-                );
-            } else if let Some(score_val) = ans.score {
-                let conf = ans.confidence.unwrap_or(1.0);
-                answers.insert(
-                    id,
-                    DecisionAnswer::Score {
-                        score: score_val,
-                        confidence: conf,
-                    },
-                );
-            }
-        }
+        let answers = parse_systemone_answers(wire.answers);
 
         DecisionResponse {
             answers,
@@ -335,7 +204,8 @@ impl DecisionProvider for KevProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decisions::types::DecisionContext;
+    use crate::decisions::types::{DecisionAnswer, DecisionContext, DecisionQuestion};
+    use std::collections::BTreeMap;
 
     #[test]
     fn test_kev_config_default() {
@@ -424,6 +294,7 @@ mod tests {
             answers,
             latency_ms: Some(112),
             usage: None,
+            ..Default::default()
         };
 
         let resp = provider.parse_wire_response(wire_resp, 115);

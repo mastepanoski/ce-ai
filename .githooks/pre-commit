@@ -77,7 +77,7 @@ echo -e "${GREEN}✓ Formatting and Clippy checks passed cleanly (0 warnings).${
 # -----------------------------------------------------------------------------
 echo "--> Step 4/4: Executing test suite (cargo test)..."
 
-if ! cargo test; then
+if ! env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_PREFIX -u GIT_WORK_TREE cargo test; then
     echo -e "${RED}[FAIL] cargo test failed. Fix failing tests before committing.${RESET}"
     exit 1
 fi
