@@ -264,6 +264,155 @@ impl DecisionResponse {
     }
 }
 
+/// System One wire question schema accepted by TypeSafe AI System One compatible engines.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SystemOneWireQuestion {
+    #[serde(rename = "type")]
+    pub question_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub criteria: Option<serde_json::Value>,
+}
+
+/// System One wire request payload.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemOneWireRequest {
+    pub state: serde_json::Value,
+    pub model: String,
+    pub questions: BTreeMap<String, SystemOneWireQuestion>,
+}
+
+/// System One wire answer schema returned by TypeSafe AI System One compatible engines.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SystemOneWireAnswer {
+    #[serde(rename = "type", default)]
+    pub answer_type: Option<String>,
+    #[serde(default)]
+    pub noul: Option<f64>,
+    #[serde(default)]
+    pub choice: Option<String>,
+    #[serde(default)]
+    pub score: Option<f64>,
+    #[serde(default)]
+    pub confidence: Option<f64>,
+    #[serde(default)]
+    pub probabilities: Option<BTreeMap<String, f64>>,
+}
+
+/// System One wire response payload.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SystemOneWireResponse {
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub answers: BTreeMap<String, SystemOneWireAnswer>,
+    #[serde(default)]
+    pub latency_ms: Option<u64>,
+    #[serde(default)]
+    pub usage: Option<serde_json::Value>,
+    #[serde(default)]
+    pub estimated_cost_usd: Option<f64>,
+}
+
+/// Translates domain `DecisionQuestion`s into System One wire questions.
+pub fn build_systemone_questions(
+    questions: Vec<DecisionQuestion>,
+) -> BTreeMap<String, SystemOneWireQuestion> {
+    let mut map = BTreeMap::new();
+    for q in questions {
+        match q {
+            DecisionQuestion::Boolean { id, question } => {
+                map.insert(
+                    id,
+                    SystemOneWireQuestion {
+                        question_type: "noul".into(),
+                        instructions: Some(question),
+                        criteria: None,
+                    },
+                );
+            }
+            DecisionQuestion::Choice {
+                id,
+                question,
+                options,
+            } => {
+                let mut criteria_map = serde_json::Map::new();
+                for opt in options {
+                    criteria_map.insert(opt, serde_json::Value::Null);
+                }
+                map.insert(
+                    id,
+                    SystemOneWireQuestion {
+                        question_type: "choice".into(),
+                        instructions: Some(question),
+                        criteria: Some(serde_json::Value::Object(criteria_map)),
+                    },
+                );
+            }
+            DecisionQuestion::Score {
+                id,
+                question,
+                min: _,
+                max: _,
+            } => {
+                map.insert(
+                    id,
+                    SystemOneWireQuestion {
+                        question_type: "score".into(),
+                        instructions: Some(question),
+                        criteria: Some(serde_json::json!(["low", "medium", "high"])),
+                    },
+                );
+            }
+        }
+    }
+    map
+}
+
+/// Translates a map of `SystemOneWireAnswer` into domain `DecisionAnswer`s.
+pub fn parse_systemone_answers(
+    wire_answers: BTreeMap<String, SystemOneWireAnswer>,
+) -> BTreeMap<String, DecisionAnswer> {
+    let mut answers = BTreeMap::new();
+    for (id, ans) in wire_answers {
+        if let Some(choice) = ans.choice {
+            let conf = ans.confidence.unwrap_or(1.0);
+            let probs = ans.probabilities.unwrap_or_default();
+            answers.insert(
+                id,
+                DecisionAnswer::Choice {
+                    selected: choice,
+                    confidence: conf,
+                    probabilities: probs,
+                },
+            );
+        } else if let Some(noul_val) = ans.noul {
+            let value = noul_val >= 0.5;
+            let conf = ans
+                .confidence
+                .unwrap_or_else(|| (noul_val - 0.5).abs() * 2.0);
+            answers.insert(
+                id,
+                DecisionAnswer::Boolean {
+                    value,
+                    confidence: conf,
+                },
+            );
+        } else if let Some(score_val) = ans.score {
+            let conf = ans.confidence.unwrap_or(1.0);
+            answers.insert(
+                id,
+                DecisionAnswer::Score {
+                    score: score_val,
+                    confidence: conf,
+                },
+            );
+        }
+    }
+    answers
+}
+
 #[cfg(test)]
 #[path = "tests/types_tests.rs"]
 mod tests;

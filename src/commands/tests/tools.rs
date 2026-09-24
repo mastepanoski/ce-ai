@@ -109,6 +109,7 @@ fn test_tools_init_codegraph_when_already_initialized() {
     let tmp = TempDir::new().unwrap();
     let codegraph_dir = tmp.path().join(".codegraph");
     std::fs::create_dir_all(&codegraph_dir).unwrap();
+    std::fs::write(codegraph_dir.join("codegraph.db"), b"").unwrap();
 
     let ctx = Context {
         config_dir: tmp.path().to_path_buf(),

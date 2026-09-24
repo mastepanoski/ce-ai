@@ -208,7 +208,7 @@ fn init_codegraph(ctx: &Context, path: Option<&Path>) -> Result<(), CeError> {
     };
 
     let codegraph_dir = target_path.join(".codegraph");
-    if codegraph_dir.exists() {
+    if is_codegraph_initialized(&codegraph_dir) {
         if !ctx.quiet {
             println!(
                 "tools: codegraph index (.codegraph/) is already initialized at '{}'",
@@ -269,6 +269,27 @@ fn init_codegraph(ctx: &Context, path: Option<&Path>) -> Result<(), CeError> {
             "failed to probe 'codegraph --version': {e}"
         ))),
     }
+}
+
+fn is_codegraph_initialized(codegraph_dir: &Path) -> bool {
+    if !codegraph_dir.exists() {
+        return false;
+    }
+    if codegraph_dir.join("codegraph.db").exists() {
+        return true;
+    }
+    // If .codegraph/ contains only .gitignore (e.g. from fresh git checkout/worktree),
+    // it has not been indexed yet.
+    if let Ok(entries) = std::fs::read_dir(codegraph_dir) {
+        let files: Vec<_> = entries
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name())
+            .collect();
+        if files.len() == 1 && files[0] == ".gitignore" {
+            return false;
+        }
+    }
+    true
 }
 
 fn is_in_path(name: &str) -> bool {

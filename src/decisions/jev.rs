@@ -1,12 +1,15 @@
 //! Jev (TypeSafe AI) HTTP client provider for the Decision Engine.
 
-use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
 use crate::decisions::types::{
-    DecisionAnswer, DecisionQuestion, DecisionRequest, DecisionResponse,
+    build_systemone_questions, parse_systemone_answers, DecisionRequest, DecisionResponse,
+    SystemOneWireRequest, SystemOneWireResponse,
+};
+pub use crate::decisions::types::{
+    SystemOneWireRequest as JevWireRequest, SystemOneWireResponse as JevWireResponse,
 };
 use crate::decisions::{DecisionProvider, HealthStatus};
 use crate::error::CeError;
@@ -30,29 +33,6 @@ impl Default for JevConfig {
             timeout_ms: 1000,
         }
     }
-}
-
-/// Jev wire request schema.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JevWireRequest {
-    pub model: String,
-    pub task_description: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub workflow_stage: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub execution_mode: Option<String>,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub metadata: BTreeMap<String, String>,
-    pub questions: Vec<DecisionQuestion>,
-}
-
-/// Jev wire response schema.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JevWireResponse {
-    pub answers: BTreeMap<String, DecisionAnswer>,
-    pub model: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub estimated_cost_usd: Option<f64>,
 }
 
 /// Provider client implementation for Jev / TypeSafe AI.
@@ -86,26 +66,56 @@ impl JevProvider {
         self.api_key.is_some() || crate::decisions::auth::resolve_api_key(None).is_some()
     }
 
-    /// Serializes a domain `DecisionRequest` into the Jev wire protocol.
-    pub fn build_wire_payload(&self, request: DecisionRequest) -> JevWireRequest {
-        JevWireRequest {
+    /// Serializes a domain `DecisionRequest` into the System One wire protocol.
+    pub fn build_wire_payload(&self, request: DecisionRequest) -> SystemOneWireRequest {
+        let questions = build_systemone_questions(request.questions);
+        let mut state_obj = serde_json::Map::new();
+        state_obj.insert(
+            "task".into(),
+            serde_json::Value::String(request.context.task_description),
+        );
+        if let Some(stage) = request.context.workflow_stage {
+            state_obj.insert("stage".into(), serde_json::Value::String(stage));
+        }
+        if let Some(mode) = request.context.execution_mode {
+            state_obj.insert("mode".into(), serde_json::Value::String(mode));
+        }
+        if !request.context.metadata.is_empty() {
+            let mut meta_map = serde_json::Map::new();
+            for (k, v) in request.context.metadata {
+                meta_map.insert(k, serde_json::Value::String(v));
+            }
+            state_obj.insert("metadata".into(), serde_json::Value::Object(meta_map));
+        }
+
+        SystemOneWireRequest {
+            state: serde_json::Value::Object(state_obj),
             model: self.config.model.clone(),
-            task_description: request.context.task_description,
-            workflow_stage: request.context.workflow_stage,
-            execution_mode: request.context.execution_mode,
-            metadata: request.context.metadata,
-            questions: request.questions,
+            questions,
         }
     }
 
-    /// Parses a Jev wire response into domain `DecisionResponse`.
-    pub fn parse_wire_response(&self, wire: JevWireResponse, latency_ms: u64) -> DecisionResponse {
+    /// Parses a System One wire response into domain `DecisionResponse`.
+    pub fn parse_wire_response(
+        &self,
+        wire: SystemOneWireResponse,
+        latency_ms: u64,
+    ) -> DecisionResponse {
+        let answers = parse_systemone_answers(wire.answers);
+        let estimated_cost_usd = wire.estimated_cost_usd.or_else(|| {
+            wire.usage.as_ref().and_then(|u| {
+                u.get("estimated_cost_usd")
+                    .and_then(|c| c.as_f64())
+                    .or_else(|| u.get("cost_usd").and_then(|c| c.as_f64()))
+            })
+        });
+
         DecisionResponse {
-            answers: wire.answers,
+            answers,
             provider: "jev".into(),
-            model: wire.model,
-            latency_ms,
-            estimated_cost_usd: wire.estimated_cost_usd,
+            model: wire.model.unwrap_or_else(|| self.config.model.clone()),
+            latency_ms: wire.latency_ms.unwrap_or(latency_ms),
+            estimated_cost_usd,
             fallback_used: false,
             shadow_mode: false,
         }
@@ -132,7 +142,12 @@ impl DecisionProvider for JevProvider {
             }
         };
 
-        let url = format!("{}/decide", self.config.endpoint.trim_end_matches('/'));
+        let trimmed = self.config.endpoint.trim_end_matches('/');
+        let url = if trimmed.ends_with("/v1") {
+            format!("{trimmed}/systemone")
+        } else {
+            format!("{trimmed}/v1/systemone")
+        };
         let wire_req = self.build_wire_payload(request);
 
         let payload = serde_json::to_string(&wire_req)
@@ -169,7 +184,7 @@ impl DecisionProvider for JevProvider {
             )));
         }
 
-        let wire_resp: JevWireResponse = serde_json::from_str(&body)
+        let wire_resp: SystemOneWireResponse = serde_json::from_str(&body)
             .map_err(|e| CeError::Network(format!("invalid JSON response from Jev API: {e}")))?;
 
         Ok(self.parse_wire_response(wire_resp, latency_ms))
