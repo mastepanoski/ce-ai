@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.68.3] - 2026-09-24
+
+### Fixed
+- **Documentation Alignment & Private Discussion Draft Exclusion**:
+  - Removed private upstream community discussion draft from published repository documentation and eliminated its entry from the `README.md` documentation map.
+  - Aligned all documentation, user guides, masterclasses, and OpenSpec contracts with the canonical definition: "CE-AI is not another coding agent. It is an engineering workflow for coding agents."
+  - Added target domain frontmatter (`domain: workflow`) to `openspec/changes/reposition-public-messaging/spec.md`, resolving `ce-ai doctor` audit warnings.
+
 ## [1.68.2] - 2026-09-24
 
 ### Fixed
