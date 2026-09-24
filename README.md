@@ -1,99 +1,67 @@
-# `ce-ai` — Compound Engineering CLI Orchestrator & Workflow FSM Engine
+# CE-AI — The engineering workflow for coding agents
 
-`ce-ai` is a fast, safe Rust CLI for orchestrating the **[Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin)** across 10 native AI agent harnesses (`opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `fx`) plus custom fallback mode. It governs the **7-stage Compound Engineering Flywheel** via a stage-gated FSM (deterministic bookkeeping, atomic disk writes, automated documentation debt diagnostics, and validated checkpoints).
+**CE-AI is not another coding agent. It is an engineering workflow for coding agents.** It gives Claude Code, Codex, OpenCode, Cursor, and other supported hosts a durable way to turn an idea into verified work—and make each completed change improve the next one.
 
-> [!NOTE]
-> `ce-ai` orchestrates distributions of the open-source **[Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin)** — a suite of specialized skills, roles, and workflow guidelines for AI coding assistants.
+## The 30-second version
 
-## Quick Path
+| Question | Answer |
+| --- | --- |
+| **What is CE-AI?** | An open-source engineering harness that installs and coordinates a project workflow around the coding agent you already use. |
+| **Why does it exist?** | Agents can write code quickly; CE-AI makes scope, specifications, verification, and learned context visible and recoverable across sessions. |
+| **How is it different?** | Claude Code, Codex, and OpenCode are **agents/hosts**. Compound Engineering is the **methodology and skill plugin**. CE-AI is the **project-level workflow harness** around them. |
+| **What is Compound Engineering?** | EveryInc’s methodology for making each unit of engineering work easier than the last through reusable skills and durable learning. |
+| **What is ODD?** | Organic Driven Development: Alan Buscaglia’s Gentle AI approach for keeping understood work lightweight while retaining recoverable context. CE-AI adapts it as an optional fast path. |
 
-**1. Install the binary** (pick one):
+```text
+Idea → Explore → Specify → Plan → Implement → Validate → Learn → Compound
+```
+
+“Compound” means that verified decisions and lessons become inputs for future work—not a forgotten chat transcript.
+
+## How the pieces fit
+
+```text
+Coding agents and hosts (Claude Code, Codex, OpenCode, Cursor, …)
+                              │ execute work
+Compound Engineering ─────────┤ supplies methodology and reusable skills
+                              │
+CE-AI ────────────────────────┘ makes the workflow inspectable, adaptive, and durable in a project
+```
+
+CE-AI complements the official [Compound Engineering plugin](https://github.com/EveryInc/compound-engineering-plugin); it does not replace it or compete with coding agents. See [CE-AI positioning](docs/user-guide/ce-ai-positioning.md) for the full explanation.
+
+## Try it in two minutes
+
+> Prerequisite: install one [supported coding-agent host](docs/user-guide/harness-matrix.md) first.
 
 ```bash
-# macOS / Linux
 curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.sh | bash
-
-# Windows PowerShell
-irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps1 | iex
-
-# Homebrew (macOS & Linux) — auto-taps mastepanoski/ce-ai
-brew install mastepanoski/ce-ai/ce-ai
-
-# From source
-cargo install --path .
-```
-
-Every release publishes `SHA256SUMS.txt` alongside binaries — verify downloads before running (ISO/IEC 27002).
-
-**2. Install the plugin into your detected AI harness(es)** (add `--dry-run` first if you want to preview it with no writes):
-
-```bash
+cd your-project
 ce-ai install --harness all
-```
-
-**3. Verify system health:**
-
-```bash
+ce-ai init-prj
 ce-ai doctor
 ```
 
-**4. Adopt your project and take your first step** — new here? The [Getting Started guide](docs/user-guide/getting-started.md) walks through `ce-ai init-prj` and your very first slash command (typed inside your AI chat, not the terminal) end to end. Already comfortable? Jump to the [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) for the full 7-stage cycle.
+Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <outcome>`. For a guided first run, follow [Getting Started](docs/user-guide/getting-started.md).
 
-> **First install hitting `403 Forbidden`?** GitHub allows 60 unauth requests/hour per IP. `ce-ai install/upgrade` queries `api.github.com` — without a token you can hit the limit. Set `CE_AI_GITHUB_TOKEN=ghp_xxx` (or `GITHUB_TOKEN` / `gh auth login`) or pin a release: `ce-ai upgrade --to v1.26.0` / `ce-ai install --source <path>`.
-
-| Command | Purpose | Full guide |
-| :--- | :--- | :--- |
-| `ce-ai init-prj [path] [--tier full\|minimal]` | Adopt project with marker-delimited `AGENTS.md` block | [Project Adoption Guide](docs/user-guide/project-adoption-guide.md) |
-| `ce-ai deinit-prj [path]` | Surgically restore pre-adoption file state | [Project Adoption Guide](docs/user-guide/project-adoption-guide.md) |
-| `ce-ai install [--scope workspace\|--scope global]` | Install per harness or workspace-isolated | [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) |
-| `ce-ai status` / `ce-ai doctor` | Inspect installed harnesses, adoption & health | — |
-| `ce-ai skills list/resolve/doctor` | Query, resolve skills & check registry health | [Skill Registry Guide](docs/user-guide/skill-registry-guide.md) |
-| `ce-ai sync` / `ce-ai upgrade` | Reconcile drift or upgrade plugin to release tag | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
-| `ce-ai decisions [setup\|mode\|…]` | System 1 decision engine, risk checks & model routing | [Decision Engine Guide](docs/user-guide/decision-engine-guide.md) |
-| `ce-ai models set/list/profile …` | Assign models per agent slot, snapshot profiles | [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) |
-| `ce-ai graduate <feature>` | Promote lightweight ODD brief into formal OpenSpec | [ODD Masterclass](docs/user-guide/odd-fast-path-and-graduation-masterclass.md) |
-| `ce-ai uninstall --harness <name>` | Restore pre-install configuration cleanly | [Backup & Uninstall](docs/user-guide/backup-and-uninstall.md) |
-| `ce-ai archive` / `ce-ai spec` | Archive features, roll up history & manage living specs | — |
-| `ce-ai self-update` | Update ce-ai CLI binary to latest release | [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) |
-
-## Documentation Map
+## Documentation map
 
 | Document | Audience | Intent |
-| :--- | :--- | :--- |
-| 🌱 [Getting Started](docs/user-guide/getting-started.md) | **Absolute beginner** | Tutorial — zero to your first slash command, no assumed knowledge |
-| 🚀 [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) | **Beginner** | Tutorial — greenfield setup, first feature, bug fix, resumption |
-| 🎓 [Compound Workflow Explained](docs/user-guide/compound-engineering-workflow-explained.md) | **Beginner** | Explanation — strategy to code, 6-level hierarchy, OpenSpec vs Brainstorm |
-| 🎓 [Documentation Debt & Hygiene](docs/user-guide/doc-hygiene-and-debt-explained.md) | **Beginner** | Explanation — preventing AI hallucinations, OpenSpec lifecycle & archive compaction |
-| 📁 [Project Adoption Guide](docs/user-guide/project-adoption-guide.md) | Both | How-to — non-destructive AGENTS.md adoption, de-init, tiers |
-| 🎓 [Harnesses, Loops & Context Masterclass](docs/user-guide/harnesses-loops-and-context-masterclass.md) | **Beginner** | Explanation — what a harness is, MCP sidecars, token economics |
-| 🎓 [Determinism & ce-ai Explained](docs/user-guide/determinism-explained.md) | **Beginner** | Explanation — what ce-ai guarantees, why LLM execution cannot be deterministic |
-| 🎓 [Zero-Step Drift Recovery](docs/user-guide/zero-step-drift-recovery-explained.md) | **Beginner** | Explanation — eliminating 5–8 turns of observation lag via live RepoState sync |
-| ⚡ [ODD Fast-Path Masterclass](docs/user-guide/odd-fast-path-and-graduation-masterclass.md) | Both | Explanation — agile speed vs compound intelligence, mode router & graduation |
-| 🧠 [Decision Engine Guide](docs/user-guide/decision-engine-guide.md) | Both | How-to / Reference — System 1 micro-decisions, risk policies & mode controls |
-| 🔧 [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) | Both | How-to — scopes, non-destructive JSON merging, discovery |
-| 🔄 [Sync & Upgrade Mechanisms](docs/user-guide/sync-and-upgrade-mechanisms.md) | Both | How-to — drift repair, upgrades, rollbacks |
-| ⚡ [Skill Registry Guide](docs/user-guide/skill-registry-guide.md) | Both | How-to / Reference — skill index, 4-tier precedence, resolution |
-| 💾 [Backup & Uninstall](docs/user-guide/backup-and-uninstall.md) | Both | How-to — backups, clean uninstall, state cleanup |
-| 🗂️ [Harness Matrix](docs/user-guide/harness-matrix.md) | Reference | Reference — all supported harnesses (10 native + custom), config paths, merge strategies |
-| 🏛️ [Architectural & Conceptual Guide](docs/user-guide/architectural-and-conceptual-guide.md) | **Senior** | Explanation — adapter traits, scope hierarchy, atomic writes |
-| 🎮 [FSM & Checkpoints Masterclass](docs/user-guide/fsm-and-checkpoints-explained.md) | **Senior** | Explanation — 7-stage cycle, savegames, sub-loops |
-| ⚖️ [Checkpoints vs. Memory & Planning Files](docs/user-guide/checkpoints-vs-memory-explained.md) | **Beginner** | Explanation — why checkpoints are a validated CLI write, not an Engram/handoff note or a `task_progress.md` |
-| 🧭 [Workflow Panel: Native vs Agent Skills](docs/user-guide/workflow-panel-native-vs-agent-skills.md) | **Beginner** | Explanation — why the TUI dashboard runs some actions and only points to others |
-| 📐 [OpenSpec specifications](openspec/specs/) | **Senior** | Reference — living system specifications & domain contracts |
-| 🧠 [Solutions Library](docs/solutions/) · [Plans & Audits](docs/plans/) | Contributor | Reference — solved problems, architecture decisions, delivery history |
-
-## Security, Governance & Quality Gates
-
-- **Security policy**: [`SECURITY.md`](./SECURITY.md) — ISO/IEC 27001/27002, NIST CSF 2.0, vulnerability disclosure.
-- **AI governance**: [`AI_POLICY.md`](./AI_POLICY.md) — ISO/IEC 42001, NIST AI RMF 1.0.
-- **Disclaimer**: [`DISCLAIMER.md`](./DISCLAIMER.md) — AI-co-created, experimental software under active development.
-- **Contributing**: [`CONTRIBUTING.md`](./CONTRIBUTING.md) · Code of Conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) · Docs style guide: [`docs/references/docs-styling.md`](./docs/references/docs-styling.md).
-- **Verification & CI**: `cargo test`, `make e2e`, `clippy -D warnings`, `cargo audit`, multi-platform CI.
+| --- | --- | --- |
+| 🌱 [Getting Started](docs/user-guide/getting-started.md) | Beginner | Tutorial — install, adopt a project, and run a first workflow step |
+| 🎓 [CE-AI positioning](docs/user-guide/ce-ai-positioning.md) | Beginner / Senior | Explanation — agents, Compound Engineering, ODD, and CE-AI’s boundary |
+| 🎓 [Compound Workflow Explained](docs/user-guide/compound-engineering-workflow-explained.md) | Beginner | Explanation — how the methodology turns strategy into code and learning |
+| ⚡ [ODD Fast-Path Masterclass](docs/user-guide/odd-fast-path-and-graduation-masterclass.md) | Beginner / Senior | Explanation — the lightweight path and when to graduate to formal artifacts |
+| 📁 [Project Adoption Guide](docs/user-guide/project-adoption-guide.md) | Both | How-to — safely adopt or de-adopt a project |
+| 🗂️ [Harness Matrix](docs/user-guide/harness-matrix.md) | Senior | Reference — supported hosts, configuration paths, and integration methods |
+| 🏛️ [Architecture Guide](docs/user-guide/architectural-and-conceptual-guide.md) | Senior | Explanation — deterministic state, adapters, and project artifacts |
+| ➕ [More operational guides](docs/user-guide/) | Both | How-to / Reference — installation, upgrades, skills, decisions, and maintenance |
+| 💬 [Compound Engineering discussion draft](docs/community/compound-engineering-discussion-draft.md) | Maintainers / contributors | Reference — feedback-first proposal for the EveryInc community |
 
 ## Acknowledgments
 
-`ce-ai` takes deep inspiration from the open-source ecosystem: [`gentle-ai`](https://github.com/Gentleman-Programming), [`Engram`](https://github.com/Gentleman-Programming/engram), [`CodeGraph`](https://github.com/colbymchenry/codegraph), [`Context7`](https://github.com/upstash/context7), [`RTK`](https://github.com/rtk-ai/rtk), and [`Sequential Thinking`](https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking).
+CE-AI builds on [EveryInc’s Compound Engineering](https://github.com/EveryInc/compound-engineering-plugin). [Organic Driven Development (ODD)](https://github.com/Gentleman-Programming/gentle-ai/blob/main/docs/intended-usage.md) was created by [Alan Buscaglia](https://github.com/Alan-TheGentleman) through [Gentle AI](https://github.com/Gentleman-Programming/gentle-ai); CE-AI adapts it as an optional workflow path. It also draws on [Engram](https://github.com/Gentleman-Programming/engram), [CodeGraph](https://github.com/colbymchenry/codegraph), [Context7](https://github.com/upstash/context7), [RTK](https://github.com/rtk-ai/rtk), and [Sequential Thinking](https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking).
 
-## License
+## Project links
 
-Distributed under the [MIT License](./LICENSE).
+[Security](SECURITY.md) · [AI policy](AI_POLICY.md) · [Contributing](CONTRIBUTING.md) · [Documentation style](docs/references/docs-styling.md) · [MIT License](LICENSE)
