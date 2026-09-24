@@ -29,11 +29,11 @@
   - [x] Run `make e2e`.
   - [x] Verification: 100% green test suite.
 
-- [ ] **Work Unit 5: Version Bump, Changelog, Knowledge Capture & Release** (~30 LOC)
+- [x] **Work Unit 5: Version Bump, Changelog, Knowledge Capture & Release** (~30 LOC)
   - [x] Bump version in `Cargo.toml` to `1.68.2` and update `Cargo.lock`.
   - [x] Add release entry in `CHANGELOG.md` following Keep a Changelog.
   - [x] Create solution document in `docs/solutions/`.
-  - [ ] Commit, push branch `fix/jev-systemone-wire-protocol`, create PR (`gh pr create`).
-  - [ ] Watch CI (`gh pr checks --watch`) and merge.
-  - [ ] Tag `v1.68.2`, create GitHub Release (`gh release create`).
-  - [ ] Post-merge lifecycle: pull main, archive OpenSpec change package (`ce-ai archive fix-jev-systemone-wire-protocol`), submit archive PR.
+  - [x] Commit, push branch `fix/jev-systemone-wire-protocol`, create PR (`gh pr create`).
+  - [x] Watch CI (`gh pr checks --watch`) and merge.
+  - [x] Tag `v1.68.2`, create GitHub Release (`gh release create`).
+  - [x] Post-merge lifecycle: pull main, archive OpenSpec change package (`ce-ai archive fix-jev-systemone-wire-protocol`), submit archive PR.
