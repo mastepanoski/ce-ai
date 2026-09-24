@@ -59,3 +59,4 @@ Historical notes:
 - local-decision-providers: archived (26/26 tasks) under criterion (1) on 2026-09-22.
 - fix-journal-linear-test-timing: archived (14/14 tasks) under criterion (1) on 2026-09-24.
 - fix-jev-systemone-wire-protocol: archived (33/33 tasks) under criterion (1) on 2026-09-24.
+- reposition-public-messaging: archived (6/6 tasks) under criterion (1) on 2026-09-24.
