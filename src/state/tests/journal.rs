@@ -265,12 +265,13 @@ fn journal_arm_complexity_is_strictly_linear() {
     let total_appended = final_size - std::fs::metadata(&j_path).unwrap().len();
     assert_eq!(total_appended, 0, "final size should match end of stream");
 
-    // 4. Wall time for 500 arms with 500 physical fsyncs must finish well within 10s
+    // 4. Wall time for 500 arms with 500 physical fsyncs must finish well within 30s
     // (on macOS APFS / Linux runners, 500 fsyncs take ~1-3s in debug build;
+    // on Windows NTFS CI runners, fsync/FlushFileBuffers can take ~8-12s under shared I/O load;
     // quadratic serialization previously took >10 minutes).
     assert!(
-        elapsed.as_secs() < 10,
-        "500 arm() calls took {:?}, expected < 10s for linear complexity",
+        elapsed.as_secs() < 30,
+        "500 arm() calls took {:?}, expected < 30s for linear complexity (quadratic took >10m)",
         elapsed
     );
 
