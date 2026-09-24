@@ -5,6 +5,13 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.68.1] - 2026-09-23
+
+### Fixed
+- **Journal Linear Complexity Test Wall-Clock Calibration on Windows CI**:
+  - Relaxed the wall-clock assertion in `state::journal::tests::journal_arm_complexity_is_strictly_linear` (`src/state/tests/journal.rs`) from `< 10` to `< 30` seconds to accommodate transient disk I/O latency and `FlushFileBuffers` overhead on virtualized GitHub Actions Windows runners (`windows-latest`).
+  - Preserved all mathematical bounds on $O(1)$ write amplification (`max_delta < 3_000`) and $O(N)$ linear journal size (`final_size < 1_500_000`), maintaining full regression protection against quadratic serialization without false-positive CI failures.
+
 ## [1.68.0] - 2026-09-22
 
 ### Added
