@@ -1,3 +1,4 @@
+<!-- Diátaxis Quadrant: Explanation | Audience: Beginner / Senior -->
 # 🎓 Masterclass: Harnesses, Agent Loops & Context Engineering
 
 Welcome to the **Harnesses, Agent Loops & Context Engineering Masterclass**! This guide is designed specifically for newcomers to explain how AI editors (Harnesses), autonomous execution cycles (Agent Loops), and context optimization mechanics work together inside **`ce-ai`** and **Compound Engineering**.
@@ -19,7 +20,7 @@ flowchart TD
 ```
 
 ### Supported Harnesses in `ce-ai`:
-`ce-ai` is a **Multi-Harness Orchestrator**. It detects, configures, and synchronizes Compound Engineering plugins across:
+`ce-ai` is a **multi-host engineering workflow harness**. It detects, configures, and synchronizes Compound Engineering integrations across:
 
 | Harness Name | Environment Type | How `ce-ai` Integrates |
 | :--- | :--- | :--- |
@@ -120,34 +121,37 @@ flowchart TD
 
 ---
 
-## 5. Ecosystem Acknowledgments & Inspiration
+## 5. Ecosystem Credits and Boundaries
 
-`ce-ai` and **Compound Engineering** build upon pioneering open-source projects in the **`gentle-ai`** ecosystem:
+CE-AI combines independent projects with different roles. [Compound Engineering](https://github.com/EveryInc/compound-engineering-plugin) is EveryInc’s official methodology and skill plugin; it is not a Gentle AI project. [Organic Driven Development (ODD)](https://github.com/Gentleman-Programming/gentle-ai/blob/main/docs/intended-usage.md) was created by [Alan Buscaglia](https://github.com/Alan-TheGentleman) through Gentle AI. CE-AI adapts ODD as an optional path and uses Compound Engineering as its methodological foundation.
 
 ```mermaid
 flowchart TD
-    GENTLE["gentle-ai Ecosystem (Foundational Inspiration)"] --> CE_AI["ce-ai & Compound Engineering"]
-    CE_AI --> ENGRAM["Engram (Persistent Memory Sidecar)"]
-    CE_AI --> CODEGRAPH["CodeGraph (Blast-Radius & Call-Graph Indexer)"]
-    CE_AI --> CONTEXT7["Context7 (Modern Library & Docs Retrieval)"]
-    CE_AI --> RTK["RTK (Rust Token Killer Output Filter)"]
-    CE_AI --> SEQ["Sequential Thinking (Structured Reasoning Protocol)"]
+    CE_AI["CE-AI: engineering workflow harness"] --> CE["EveryInc Compound Engineering
+methodology and skills"]
+    CE_AI --> ODD["Alan Buscaglia / Gentle AI
+Organic Driven Development"]
+    CE_AI --> ENGRAM["Engram
+Persistent memory"]
+    CE_AI --> CODEGRAPH["CodeGraph
+Codebase intelligence"]
+    CE_AI --> CONTEXT7["Context7
+Library documentation"]
+    CE_AI --> RTK["RTK
+Terminal-output reduction"]
+    CE_AI --> SEQ["Sequential Thinking
+Structured reasoning"]
 ```
 
-### Key Ecosystem Tools:
+### Key ecosystem tools
 
-1. **[`gentle-ai`](https://github.com/Gentleman-Programming)**:
-   - The foundational suite and primary inspiration behind OpenSpec, Spec-Driven Development, and the Compound Engineering architecture.
-2. **[`Engram`](https://github.com/Gentleman-Programming/engram)**:
-   - Persistent memory sidecar powered by SQLite + FTS5 full-text search. Stores architecture decisions, bug fixes, and user preferences across compaction cycles and sessions.
-3. **[`CodeGraph`](https://github.com/colbymchenry/codegraph)**:
-   - Codebase intelligence sidecar. Indexes AST symbols, function callers, callees, and blast-radius impacts before broad filesystem searches.
-4. **[`Context7`](https://github.com/upstash/context7)**:
-   - Real-time documentation retrieval engine providing up-to-date framework APIs, libraries, and best-practice guidance for AI agents.
-5. **[`RTK / Rust Token Killer`](https://github.com/rtk-ai/rtk)**:
-   - CLI Token Reduction Engine. Intercepts raw terminal streams (`cargo test`, `git status`, `docker ps`), stripping noise and compressing text by **60% to 90%** before hitting LLM context.
-6. **[`Sequential Thinking`](https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking)**:
-   - Structured reasoning protocol that enables AI agents to decompose complex problems, form hypotheses, reflect on test outcomes, and refine solutions step-by-step.
+1. **[Compound Engineering](https://github.com/EveryInc/compound-engineering-plugin)**: EveryInc’s methodology and multi-host skill plugin. CE-AI complements it with project-level workflow state and artifacts; it does not replace it.
+2. **[Gentle AI](https://github.com/Gentleman-Programming/gentle-ai)**: The home of ODD, created by Alan Buscaglia. ODD informs CE-AI’s lightweight, recoverable execution path.
+3. **[Engram](https://github.com/Gentleman-Programming/engram)**: Persistent memory sidecar powered by SQLite and FTS5 for decisions, discoveries, bug fixes, and preferences across sessions.
+4. **[CodeGraph](https://github.com/colbymchenry/codegraph)**: Codebase intelligence for AST symbols, callers, callees, and blast-radius analysis.
+5. **[Context7](https://github.com/upstash/context7)**: Current library and framework documentation retrieval.
+6. **[RTK](https://github.com/rtk-ai/rtk)**: Terminal-output reduction for preserving context capacity.
+7. **[Sequential Thinking](https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking)**: Structured reasoning support for hypotheses and refinement.
 
 ---
 

@@ -1,12 +1,17 @@
-# 🎓 Masterclass: Organic-Driven Development (ODD) Fast-Path & The Graduation Bridge
+<!-- Diátaxis Quadrant: Explanation | Audience: Beginner / Senior -->
+# 🎓 Masterclass: Organic Driven Development (ODD) Fast-Path & The Graduation Bridge
 
 Welcome to this masterclass! Whether you are an engineer managing rapid bug fixes or a systems architect steering multi-quarter platform migrations, balancing **developer velocity** and **architectural rigor** is a central challenge in modern software engineering.
 
 When working with autonomous AI coding agents, this tension becomes acute. AI agents move fast, but if left unguided they produce code without memory, tests, or architectural coherence. Conversely, forcing an AI agent through a 7-stage formal specification process for a 3-line configuration fix introduces unnecessary friction.
 
-This guide explains how `ce-ai` harmonizes these two worlds by uniting **Organic-Driven Development (ODD)**—pioneered by Gentle AI—with the **7-stage Compound Engineering Flywheel**, powered by an automated **Turn-0 Adaptive Mode Router** and the **Graduation Bridge**.
+This guide explains how `ce-ai` harmonizes these two worlds by uniting **Organic Driven Development (ODD)**—created by [Alan Buscaglia](https://github.com/Alan-TheGentleman) through [Gentle AI](https://github.com/Gentleman-Programming/gentle-ai)—with the **7-stage Compound Engineering Flywheel**, powered by an automated **Turn-0 Adaptive Mode Router** and the **Graduation Bridge**.
 
 ---
+
+## Attribution and CE-AI’s boundary
+
+Organic Driven Development (ODD) was created by [Alan Buscaglia](https://github.com/Alan-TheGentleman) through [Gentle AI](https://github.com/Gentleman-Programming/gentle-ai). CE-AI adapts ODD as an optional workflow path; it does not claim to have invented it. ODD keeps understood work light while preserving recoverable context. Compound Engineering remains the methodology that gives substantial work a compounding learning loop. See [CE-AI positioning](ce-ai-positioning.md) for the relationship among agents, the official Compound Engineering plugin, and CE-AI.
 
 ## 1. The Core Dilemma: Agility vs. Compound Intelligence
 
@@ -19,7 +24,7 @@ Consider two vessels navigating an ocean:
 
 | Dimension | Organic Track (ODD) | Compound Track (Compound Engineering) |
 | :--- | :--- | :--- |
-| **Origin & Philosophy** | Gentle AI (Frictionless, lightweight, emergent) | Compound Engineering (Formal, stage-gated, compounding) |
+| **Origin & Philosophy** | Alan Buscaglia / Gentle AI (lightweight, recoverable) | Compound Engineering (Formal, stage-gated, compounding) |
 | **Primary Scope** | Bug fixes, chores, spikes, small tasks (< 200 LOC) | Greenfield features, multi-file refactors, architecture changes |
 | **Artifact Footprint** | Single file: `odd/tasks/<feature>.md` | Full directory: `openspec/changes/<feature>/` (5 files) |
 | **Lifecycle Model** | Linear execution (`probe ➔ execute ➔ gate`) | 7-stage FSM (`Ideation ➔ OpenSpec ➔ Plan ➔ Work ➔ Verify ➔ Compound ➔ Ship`) |
@@ -233,7 +238,7 @@ flowchart LR
 
 ## Conclusion
 
-The combination of Organic-Driven Development and the Compound Engineering Flywheel gives your engineering team the best of both worlds:
+The combination of Organic Driven Development and the Compound Engineering Flywheel gives your engineering team the best of both worlds:
 - **Maximum speed and zero friction** for daily chores, bug fixes, and exploration.
 - **Complete structural safety, architectural memory, and governance** for strategic systems work.
 - **A seamless, lossless bridge** between the two whenever small ideas grow into large architectures.

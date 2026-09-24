@@ -14,7 +14,7 @@ Before touching a terminal, get this distinction straight — it is the #1 sourc
 | **`ce-ai`** | A command-line program (a Rust binary) | Your **terminal** (bash/zsh/PowerShell) |
 | **Compound Engineering** | A methodology — a set of skills like `/ce-brainstorm`, `/ce-plan`, `/ce-work` | Your **AI chat window** (Claude Code, Cursor, OpenCode, …) |
 
-`ce-ai` never writes code or talks to an LLM. Its only job is to **install and wire up** the Compound Engineering skills so your AI harness can see and run them. Once that's done, `ce-ai` steps back — you drive everything else by typing `/ce-...` commands *inside your AI tool's chat*, not in the terminal.
+`ce-ai` does not replace your coding agent or independently generate code. It installs and adopts the Compound Engineering workflow, then keeps project-level workflow state, artifacts, and health checks visible across sessions. You still drive the coding agent by typing `/ce-...` commands *inside your AI tool's chat*, not in the terminal.
 
 > ⚠️ The single most common newbie mistake: typing `/ce-brainstorm` into the terminal. It will fail — it isn't a shell command. It only exists inside your AI harness's chat.
 
@@ -98,7 +98,7 @@ ce-ai doctor    → confirms both are wired up correctly
 /ce-brainstorm  → the first thing YOU type, inside the chat, to start real work
 ```
 
-Everything after this point — turning that brainstorm into a spec, a plan, working code, a reviewed PR — is the full 7-stage cycle. Continue with the [Quick Start Workflow Guide](quick-start-workflow-guide.md), which picks up exactly here.
+Everything after this point — turning that brainstorm into a spec, a plan, working code, a reviewed PR, and reusable learning — is the full 7-stage cycle. For the agent/plugin/harness distinction, see [CE-AI positioning](ce-ai-positioning.md). Continue with the [Quick Start Workflow Guide](quick-start-workflow-guide.md), which picks up exactly here.
 
 ---
 
