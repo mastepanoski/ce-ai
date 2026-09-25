@@ -4,7 +4,7 @@ This guide presents a deep dive into the **software architecture, design pattern
 
 ---
 
-## 1. Multi-Harness Orchestration Architecture
+## 1. Multi-Harness Workflow Integration Architecture
 
 ### 📐 Architectural Concept
 `ce-ai` is engineered around **complete adapter decoupling** via the `HarnessAdapter` trait in Rust.

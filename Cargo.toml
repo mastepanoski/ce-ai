@@ -2,7 +2,7 @@
 name = "ce-ai"
 version = "1.68.3"
 edition = "2021"
-description = "CLI for managing the compound-engineering plugin across AI harnesses"
+description = "Workflow orchestration and governance for Compound Engineering across AI coding agents"
 license = "MIT"
 
 [dependencies]

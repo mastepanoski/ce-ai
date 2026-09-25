@@ -6,9 +6,9 @@ Welcome to the beginner's Quick Start guide! Whether you are building a new feat
 
 ---
 
-## 💡 The Core Philosophy: Orchestrator + Methodology
+## 💡 The Core Philosophy: Workflow Orchestration + Methodology
 
-- **`ce-ai`**: The engineering workflow for coding agents. It gives your coding agent a durable way to turn ideas into verified work and make each completed change improve the next one, managing host configurations, scope isolation, and workflow state persistence (`ce-ai workflow`). See [CE-AI positioning](ce-ai-positioning.md).
+- **`ce-ai`**: Open-source workflow orchestration and governance for Compound Engineering across AI coding agents. It gives your coding agent a durable way to turn ideas into verified work and make each completed change improve the next one, managing host configurations, scope isolation, and workflow state persistence (`ce-ai workflow`). See [CE-AI positioning](ce-ai-positioning.md).
 - **Compound Engineering**: The engineering methodology (skills and guidelines) that ensures every task builds compounding knowledge so your codebase becomes cleaner, safer, and easier to maintain over time.
 
 ---
