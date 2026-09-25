@@ -48,7 +48,9 @@ irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps
 
 brew install mastepanoski/ce-ai/ce-ai
 
-# From source: cargo install --path .
+# From source
+
+cargo install --path .
 
 # In your project: install plugin, adopt workflow, and verify setup
 cd your-project && ce-ai install --harness all && ce-ai init-prj && ce-ai doctor
