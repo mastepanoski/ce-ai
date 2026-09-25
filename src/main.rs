@@ -1,4 +1,4 @@
-//! ce-ai: compound-engineering plugin manager CLI entry point (CC-1, CC-2).
+//! ce-ai: Workflow orchestration and governance for Compound Engineering across AI coding agents.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used))]
@@ -11,7 +11,11 @@ use ce_ai::commands::{registry::Commands, Context};
 use ce_ai::error::result_exit_code;
 
 #[derive(Parser)]
-#[command(name = "ce-ai", about = "compound-engineering plugin manager", version)]
+#[command(
+    name = "ce-ai",
+    about = "Workflow orchestration and governance for Compound Engineering across AI coding agents",
+    version
+)]
 struct Cli {
     /// ce-ai data dir (state.json, backups, cache); defaults to ~/.ce-ai.
     #[arg(long, global = true)]

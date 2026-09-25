@@ -1,6 +1,6 @@
-# CE-AI — Compound Engineering Orchestration & Workflow Governance
+# CE-AI — Compound Engineering Workflow Orchestration & Governance
 
-**CE-AI is not another coding agent, a harness replacement, or a fork of Compound Engineering.** It is an open-source orchestration and workflow-governance layer: Compound Engineering defines the engineering workflow and skills; `ce-ai` makes that workflow operable, stateful, governed, and portable across AI coding harnesses.
+**Open-source workflow orchestration and governance for Compound Engineering across AI coding agents.** Turn ideas into verified work, preserve engineering context, and make each change improve the next. CE-AI is not a coding agent, a harness replacement, or an agent runtime: Claude Code, Codex, Cursor, and OpenCode execute the probabilistic work; `ce-ai` governs the engineering workflow, state transitions, drift auditing, and multi-harness asset synchronization.
 
 ## Why CE-AI?
 
@@ -8,7 +8,7 @@ A developer familiar with [Compound Engineering](https://github.com/EveryInc/com
 
 The Compound Engineering Plugin provides the skills and workflow methodology (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`). `ce-ai` provides the operational and governance layer around them:
 
-- **Multi-harness orchestration**: Installs, synchronizes, and drift-audits plugin assets across 10 native harnesses (Claude Code, OpenCode, Cursor, Codex, Copilot, AGY, Kimi, Grok, Pi, FX) with atomic writes and automatic backups.
+- **Multi-harness workflow integration**: Installs, synchronizes, and drift-audits plugin assets across 10 native harnesses (Claude Code, OpenCode, Cursor, Codex, Copilot, AGY, Kimi, Grok, Pi, FX) with atomic writes and automatic backups.
 - **Workflow FSM & stage validation**: Validates state transitions across 7 development stages so agents cannot silently skip verification or compound learning.
 - **Checkpoints & drift recovery**: Snapshots progress before context compactions and synchronizes disk reality (`RepoState`) upon resumption.
 - **Project adoption**: Injects tamper-evident, SHA256-verified workflow contracts into project rule files (`ce-ai init-prj`).
@@ -24,7 +24,7 @@ Compound Engineering (EveryInc)
         │ skills + engineering workflow
         ▼
       ce-ai
- orchestration + workflow governance
+ workflow orchestration + governance
         │
         ▼
  AI coding harnesses

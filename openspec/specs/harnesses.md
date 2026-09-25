@@ -9,7 +9,7 @@ last_updated: "2026-09-15"
 
 ## 1. Overview & Architectural Boundaries
 
-`ce-ai` acts as an orchestration and lifecycle manager across 12 AI coding harnesses: `opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `deepseek`, `fx`, and `custom`. It enforces clean separation between harness-managed assets and user-owned configuration.
+`ce-ai` acts as a workflow integration and asset lifecycle manager across 12 AI coding harnesses: `opencode`, `claude`, `pi`, `cursor`, `copilot`, `codex`, `grok`, `kimi`, `agy`, `deepseek`, `fx`, and `custom`. It enforces clean separation between harness-managed assets and user-owned configuration.
 
 ## 2. Capabilities & Requirements
 
