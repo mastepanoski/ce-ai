@@ -1,34 +1,37 @@
-# CE-AI — The engineering workflow for coding agents
+# CE-AI — Compound Engineering CLI Orchestrator & Workflow FSM Engine
 
-**CE-AI is not another coding agent. It is an engineering workflow for coding agents.** It gives Claude Code, Codex, OpenCode, Cursor, and other supported hosts a durable way to turn an idea into verified work—and make each completed change improve the next one.
+**CE-AI is not another coding agent, a harness replacement, or a fork of Compound Engineering.** It is an open-source orchestration and workflow-governance layer: Compound Engineering defines the engineering workflow and skills; `ce-ai` makes that workflow operable, stateful, governed, and portable across AI coding harnesses.
 
-## The 30-second version
+## Why CE-AI?
 
-| Question | Answer |
-| --- | --- |
-| **What is CE-AI?** | An open-source engineering workflow for coding agents that coordinates work, verification, and durable learning around the agent you already use. |
-| **Why does it exist?** | Agents can write code quickly; CE-AI makes scope, specifications, verification, and learned context visible and recoverable across sessions. |
-| **How is it different?** | Claude Code, Codex, and OpenCode are **agents/hosts**. Compound Engineering is the **methodology and skill plugin**. CE-AI is the **engineering workflow for coding agents** around them. |
-| **What is Compound Engineering?** | EveryInc’s methodology for making each unit of engineering work easier than the last through reusable skills and durable learning. |
-| **What is ODD?** | Organic Driven Development: Alan Buscaglia’s Gentle AI approach for keeping understood work lightweight while retaining recoverable context. CE-AI adapts it as an optional fast path. |
+A developer familiar with [Compound Engineering](https://github.com/EveryInc/compound-engineering-plugin) will ask: *why isn't the plugin itself enough?*
 
-```text
-Idea → Explore → Specify → Plan → Implement → Validate → Learn → Compound
-```
+The Compound Engineering Plugin provides the skills and workflow methodology (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`). `ce-ai` provides the operational and governance harness around them:
 
-“Compound” means that verified decisions and lessons become inputs for future work—not a forgotten chat transcript.
+- **Multi-harness orchestration**: Installs, synchronizes, and drift-audits plugin assets across 10 native harnesses (Claude Code, OpenCode, Cursor, Codex, Copilot, AGY, Kimi, Grok, Pi, FX) with atomic writes and automatic backups.
+- **Workflow FSM & stage validation**: Validates state transitions across 7 development stages so agents cannot silently skip verification or compound learning.
+- **Checkpoints & drift recovery**: Snapshots progress before context compactions and synchronizes disk reality (`RepoState`) upon resumption.
+- **Project adoption**: Injects tamper-evident, SHA256-verified workflow contracts into project rule files (`ce-ai init-prj`).
+- **Skill registry & model profiles**: Discovers skills across hosts, manages workspace isolation, and handles role-scoped model assignments.
+
+> **Key principle**: Workflow bookkeeping and state transitions can be deterministic; agent execution remains probabilistic. `ce-ai` governs the state and contracts so probabilistic agent work stays verifiable.
 
 ## How the pieces fit
 
 ```text
-Coding agents and hosts (Claude Code, Codex, OpenCode, Cursor, …)
-                              │ execute work
-Compound Engineering ─────────┤ supplies methodology and reusable skills
-                              │
-CE-AI ────────────────────────┘ makes the workflow inspectable, adaptive, and durable in a project
+Compound Engineering (EveryInc)
+        │
+        │ skills + engineering workflow
+        ▼
+      ce-ai
+ orchestration + workflow governance
+        │
+        ▼
+ AI coding harnesses
+ Claude Code / Codex / Cursor / OpenCode / Copilot / AGY / …
 ```
 
-CE-AI complements the official [Compound Engineering plugin](https://github.com/EveryInc/compound-engineering-plugin); it does not replace it or compete with coding agents. See [CE-AI positioning](docs/user-guide/ce-ai-positioning.md) for the full explanation.
+CE-AI complements the official [Compound Engineering plugin](https://github.com/EveryInc/compound-engineering-plugin); it does not replace it or compete with coding agents. See [CE-AI positioning](docs/user-guide/ce-ai-positioning.md) for the full architectural breakdown.
 
 ## Try it in two minutes
 
@@ -41,17 +44,21 @@ curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/ins
 # Windows PowerShell
 irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps1 | iex
 
-# Homebrew (macOS / Linux)
-brew install mastepanoski/ce-ai/ce-ai
+# Homebrew: brew install mastepanoski/ce-ai/ce-ai | From source: cargo install --path .
 
-# From source
-cargo install --path .
-
-# Then, in your project
+# In your project: install plugin, adopt workflow, and verify setup
 cd your-project && ce-ai install --harness all && ce-ai init-prj && ce-ai doctor
 ```
 
 Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <outcome>`. For a guided first run, follow [Getting Started](docs/user-guide/getting-started.md).
+
+## The 7-stage workflow & FSM
+
+```text
+Ideation → OpenSpec → Plan → Work/TDD → Verify → Compound → Ship
+```
+
+`ce-ai` enforces this flywheel so verified decisions compound into `docs/solutions/` instead of vanishing in chat history. For formal changes, it coordinates [OpenSpec](openspec/specs/); for routine tactical tasks, it provides an optional fast path via Organic Driven Development (ODD, by Alan Buscaglia / Gentle AI).
 
 ## Documentation map
 
