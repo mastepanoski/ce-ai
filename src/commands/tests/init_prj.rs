@@ -223,3 +223,20 @@ fn test_reconcile_project_harness_hooks_injects_claude_when_not_delegating() {
     assert!(claude_content.contains(crate::harness::claude::CE_MANAGED_BEGIN));
     assert!(claude_content.contains("## Managed Block"));
 }
+
+#[test]
+fn test_render_block_content_includes_self_explaining_pr_directives() {
+    let full = render_block_content(AdoptionTier::Full);
+    assert!(full.contains("### 🚀 Self-Explaining Pull Requests & Review Readiness"));
+    assert!(full.contains("What It Ruled Out"));
+    assert!(full.contains("Which Rule Decided It"));
+    assert!(full.contains("Upfront Evidence"));
+    assert!(full.contains("Pre-Review Automated Checks"));
+    assert!(full.contains("Reviewer Routing"));
+
+    let minimal = render_block_content(AdoptionTier::Minimal);
+    assert!(minimal.contains("Ensure PRs explain what was ruled out, which rule decided it, and attach verification evidence upfront in collapsible blocks."));
+
+    let orchestrator = render_block_content(AdoptionTier::Orchestrator);
+    assert!(orchestrator.contains("Enforce self-explaining PRs: mandate that subagents document rejected alternatives, governing rules, and attach empirical verification evidence in collapsible blocks before requesting review."));
+}

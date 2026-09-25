@@ -106,6 +106,12 @@ changed lines per review cycle.
 
 Volume triggers splitting and review-burden handling only. Risk classification stays evidence-based — authentication, payments, data-loss surfaces, shell/process execution — regardless of line count.
 
+### Self-Explaining PRs & Upfront Evidence Sizing
+
+Pull requests must explain what was ruled out, which rule decided it, and attach verification evidence upfront:
+- **Strict 400-Line Code Boundary Preserved**: Atomic changes are required for clear self-explanation. A focused change (≤ 400 LOC) keeps the decision surface narrow and reviewable; large PRs make explaining rejected alternatives noisy and ineffective. The 400 LOC code review boundary is NOT relaxed.
+- **Collapsible Evidence in PR Descriptions**: Verification evidence attached directly to PR bodies (test logs, terminal output, reproduction traces) must use markdown `<details><summary>` disclosure widgets. Collapsible evidence respects the ~100–150 line description cognitive budget without bloating git diff lines (`git diff --numstat` tracks code files only).
+
 ### Source Constants
 
 Guard trigger conditions live in the SDD orchestrator asset (`internal/assets/hermes/sdd-orchestrator.md`: `400-line budget risk: High`, `estimated changed lines exceed 400`).

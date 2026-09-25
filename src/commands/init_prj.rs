@@ -19,7 +19,7 @@ pub const GITIGNORE_END_MARKER: &str = "# END CE-AI MANAGED BLOCK";
 
 /// Managed block schema version, shared by the on-disk header and the
 /// `state.json` adoption entry so the two cannot drift apart.
-pub const BLOCK_VERSION: u32 = 5;
+pub const BLOCK_VERSION: u32 = 6;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -96,6 +96,14 @@ Before creating PRs or writing feature code, agents MUST verify `openspec/change
 ### Single Source of Truth Rule
 Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into the OpenSpec files above (`proposal.md`, `exploration.md`) and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with OpenSpec. Ideation artifacts are retained by default as the permanent raw-history record OpenSpec intentionally does not duplicate; "disposable" never means deleting them. Skip ideation skills entirely when requirements and approach are already clear.
 
+### 🚀 Self-Explaining Pull Requests & Review Readiness
+When creating Pull Requests (Stage 7), agents MUST ensure the change explains itself:
+- **What It Ruled Out**: State rejected alternatives and discarded trade-offs (distilled from `exploration.md`).
+- **Which Rule Decided It**: Cite the specific invariant, rule, architectural boundary, or compliance constraint (from `AGENTS.md` or `design.md`) that determined the solution.
+- **Upfront Evidence**: Attach empirical validation proof (test run summaries, CLI logs, reproduction traces, or browser check results) directly to the PR body using collapsible `<details><summary>` blocks (`not asked for later`).
+- **Pre-Review Automated Checks**: Run and verify 100% green status across all local linters, unit tests, and browser/E2E checks BEFORE requesting human review or marking the PR ready.
+- **Reviewer Routing**: Identify domain owners or `CODEOWNERS` and assign appropriate reviewers.
+
 ### 🧹 Post-Merge Lifecycle & Clean State
 Immediately after merging a PR on `main`, agents MUST run `ce-ai workflow status` and archive completed OpenSpec changes via `ce-ai archive <feature>` to seal change packages and maintain zero workflow drift."#
         }
@@ -105,6 +113,7 @@ Immediately after merging a PR on `main`, agents MUST run `ce-ai workflow status
 AI agents operating on this codebase should follow structured planning and verification:
 - Validate scope boundaries before making changes.
 - Ensure all unit, integration, and linter tests pass before committing.
+- Ensure PRs explain what was ruled out, which rule decided it, and attach verification evidence upfront in collapsible blocks.
 - Document key technical learnings and post-mortem fixes."#
         }
         AdoptionTier::Orchestrator => {
@@ -114,6 +123,7 @@ Orchestrator agents MUST delegate domain tasks to specialized subagents:
 - Use `ce-brainstorm` for scope exploration.
 - Use `ce-plan` for implementation unit breakdown.
 - Use `ce-code-review` before opening Pull Requests.
+- Enforce self-explaining PRs: mandate that subagents document rejected alternatives, governing rules, and attach empirical verification evidence in collapsible blocks before requesting review.
 - Enforce strict PR CI status check gates before merging.
 - Post-merge, ensure completed OpenSpec changes are sealed via `ce-ai archive <feature>`.
 - Ideation outputs (`docs/brainstorms/`, `docs/ideation/`) are disposable inputs: distill them into the specs before delegation; never maintain them in parallel; retain them as raw history instead of deleting them."#

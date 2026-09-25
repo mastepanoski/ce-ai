@@ -101,6 +101,7 @@ src/
    - Direct commits and pushes to `main` are strictly forbidden for feature development, refactoring, and bug fixes.
    - Agents MUST create feature branches (`feature/<name>` or `fix/<name>`), push to origin, and open a Pull Request (`gh pr create`).
    - PRs must wait for 100% green GitHub Actions CI status checks before merging.
+   - Every PR description MUST be self-explaining: explicitly declare what was ruled out, which rule decided it, attach empirical verification evidence in collapsible blocks upfront, and verify all automated checks pass before requesting review.
 
 8. **Documentation Style Compliance (Diátaxis + Cognitive Load)**:
    - ALL documentation changes (`README.md`, `docs/`, guides) MUST follow the project style guide at [`docs/references/docs-styling.md`](./docs/references/docs-styling.md).
@@ -135,6 +136,14 @@ OpenSpec is authored **progressively**: Stage 2 writes `proposal.md`, `explorati
 
 ### Single Source of Truth Rule
 Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into the OpenSpec files above (`proposal.md`, `exploration.md`) and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with OpenSpec — that duplicates work and burns tokens. Ideation artifacts are retained by default as the permanent raw-history record that OpenSpec deliberately does not duplicate — "disposable" never means deleting them; removal is an ordinary reversible git decision, never a workflow step. Skip ideation skills entirely when requirements and approach are already clear.
+
+### Stage 7 PR & Review Readiness Directives ("A Change That Explains Itself")
+When creating Pull Requests (`ce-commit-push-pr`), agents MUST ensure the change explains itself:
+- **What It Ruled Out**: State rejected alternatives and discarded trade-offs (distilled from OpenSpec `exploration.md`).
+- **Which Rule Decided It**: Cite the specific invariant, rule, architectural boundary, or compliance constraint (from `AGENTS.md` or `design.md`) that determined the solution.
+- **Upfront Evidence**: Attach empirical validation proof (test run summaries, CLI logs, reproduction traces, or browser check results) directly to the PR body using collapsible `<details><summary>` blocks (`not asked for later`).
+- **Pre-Review Automated Checks**: Run and verify 100% green status across all local linters, unit tests, and browser/E2E checks BEFORE requesting human review or marking the PR ready.
+- **Reviewer Routing**: Identify domain owners or `CODEOWNERS` and assign appropriate reviewers.
 
 ## ✅ Definition of Done (DoD) & Technical Justifications
 
@@ -181,6 +190,8 @@ Before declaring any task or issue completed, an AI agent MUST satisfy all crite
   - *Justification*: Outdated docs create user confusion, improper CLI usage, and support overhead. Any schema, command, or flag change requires updating `README.md`, `SECURITY.md`, `CHANGELOG.md`, or CLI `--help` strings.
 - [ ] **Conventional Commits & Clean Git History**:
   - *Justification*: Clear commit messages provide auditability, enable automated changelog generation, and allow easy regression bisecting.
+- [ ] **Self-Explaining Pull Request & Upfront Evidence**:
+  - *Justification*: Human review is the primary cognitive bottleneck. Stating what was ruled out, which rule decided it, and attaching empirical evidence upfront in collapsible blocks minimizes back-and-forth and prevents unverified claims.
 
 ---
 
@@ -193,11 +204,12 @@ Before declaring any task or issue completed, an AI agent MUST satisfy all crite
 - [ ] All GitHub Actions CI jobs pass green across Linux, macOS, and Windows.
 - [ ] Definition of Done (DoD) criteria fully satisfied.
 
-<!-- ce-ai:block begin v=5 tier=minimal sha256=ad726d9a497b691cad4562bf17c1c44f3c7e17e6544931e4cacaa508d3f1134f -->
+<!-- ce-ai:block begin v=6 tier=minimal sha256=0b96d6153224fe2d8db634928e94010079841528114282b9273966896e9041f2 -->
 ## 🔄 Compound Engineering Workflow Guidelines
 
 AI agents operating on this codebase should follow structured planning and verification:
 - Validate scope boundaries before making changes.
 - Ensure all unit, integration, and linter tests pass before committing.
+- Ensure PRs explain what was ruled out, which rule decided it, and attach verification evidence upfront in collapsible blocks.
 - Document key technical learnings and post-mortem fixes.
 <!-- ce-ai:block end -->
