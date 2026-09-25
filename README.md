@@ -1,4 +1,4 @@
-# CE-AI — Compound Engineering CLI Orchestrator & Workflow FSM Engine
+# CE-AI — Compound Engineering Orchestration & Workflow Governance
 
 **CE-AI is not another coding agent, a harness replacement, or a fork of Compound Engineering.** It is an open-source orchestration and workflow-governance layer: Compound Engineering defines the engineering workflow and skills; `ce-ai` makes that workflow operable, stateful, governed, and portable across AI coding harnesses.
 
@@ -6,7 +6,7 @@
 
 A developer familiar with [Compound Engineering](https://github.com/EveryInc/compound-engineering-plugin) will ask: *why isn't the plugin itself enough?*
 
-The Compound Engineering Plugin provides the skills and workflow methodology (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`). `ce-ai` provides the operational and governance harness around them:
+The Compound Engineering Plugin provides the skills and workflow methodology (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`). `ce-ai` provides the operational and governance layer around them:
 
 - **Multi-harness orchestration**: Installs, synchronizes, and drift-audits plugin assets across 10 native harnesses (Claude Code, OpenCode, Cursor, Codex, Copilot, AGY, Kimi, Grok, Pi, FX) with atomic writes and automatic backups.
 - **Workflow FSM & stage validation**: Validates state transitions across 7 development stages so agents cannot silently skip verification or compound learning.
@@ -58,7 +58,7 @@ Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <
 Ideation → OpenSpec → Plan → Work/TDD → Verify → Compound → Ship
 ```
 
-`ce-ai` enforces this flywheel so verified decisions compound into `docs/solutions/` instead of vanishing in chat history. For formal changes, it coordinates [OpenSpec](openspec/specs/); for routine tactical tasks, it provides an optional fast path via Organic Driven Development (ODD, by Alan Buscaglia / Gentle AI).
+`ce-ai` governs progression through this flywheel by validating stage transitions and workflow state, ensuring verified decisions compound into `docs/solutions/` instead of vanishing in chat history. For formal changes, it coordinates [OpenSpec](openspec/specs/); for routine tactical tasks, it provides an optional fast path via Organic Driven Development (ODD, by Alan Buscaglia / Gentle AI).
 
 ## Documentation map
 
