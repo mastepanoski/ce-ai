@@ -60,3 +60,4 @@ Historical notes:
 - fix-journal-linear-test-timing: archived (14/14 tasks) under criterion (1) on 2026-09-24.
 - fix-jev-systemone-wire-protocol: archived (33/33 tasks) under criterion (1) on 2026-09-24.
 - reposition-public-messaging: archived (6/6 tasks) under criterion (1) on 2026-09-24.
+- self-explaining-pr-directives: archived (16/16 tasks) under criterion (1) on 2026-09-25.
