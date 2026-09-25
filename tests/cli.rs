@@ -13,7 +13,7 @@ use tempfile::TempDir;
 /// embeds a block header must derive from this constant: a stale hardcoded
 /// version flips classifier branches after a bump (see
 /// docs/solutions/test-failures/adoption-block-version-bump-test-coordination-2026-08-25.md).
-const CUR_BLOCK_VERSION: u32 = 5;
+const CUR_BLOCK_VERSION: u32 = 6;
 
 fn block_begin_prefix(tier: &str) -> String {
     format!("<!-- ce-ai:block begin v={CUR_BLOCK_VERSION} tier={tier}")
@@ -2394,7 +2394,7 @@ fn init_prj_minimal_block_matches_v1_bytes() {
     let inner_body = agents_text[..end].trim_end_matches(['\n', '\r']);
     let inner_body = &inner_body[body_start..];
 
-    let expected_v1_body = "## 🔄 Compound Engineering Workflow Guidelines\n\nAI agents operating on this codebase should follow structured planning and verification:\n- Validate scope boundaries before making changes.\n- Ensure all unit, integration, and linter tests pass before committing.\n- Document key technical learnings and post-mortem fixes.";
+    let expected_v1_body = "## 🔄 Compound Engineering Workflow Guidelines\n\nAI agents operating on this codebase should follow structured planning and verification:\n- Validate scope boundaries before making changes.\n- Ensure all unit, integration, and linter tests pass before committing.\n- Ensure PRs explain what was ruled out, which rule decided it, and attach verification evidence upfront in collapsible blocks.\n- Document key technical learnings and post-mortem fixes.";
     assert_eq!(inner_body, expected_v1_body);
 }
 
@@ -2660,6 +2660,58 @@ fn init_prj_upgrades_stale_v2_block_to_v3_orchestrator_tier() {
         serde_json::from_str(&fs::read_to_string(config_dir.join("state.json")).unwrap()).unwrap();
     assert_eq!(state_val["projects"][0]["block_version"], CUR_BLOCK_VERSION);
     assert_eq!(state_val["projects"][0]["created_file"], true);
+}
+
+#[test]
+fn init_prj_upgrades_stale_v5_block_to_v6_with_self_explaining_directives() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("v5-adopted-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    let user_head = "# My Project\n\nCustom notes.\n\n";
+    let v5_block = "<!-- ce-ai:block begin v=5 tier=full sha256=abcdef123456 -->\n## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement\n\nLegacy v5 content.\n<!-- ce-ai:block end -->";
+    fs::write(
+        &agents_file,
+        format!("{}{}{}", user_head, v5_block, "\nTrailing notes.\n"),
+    )
+    .unwrap();
+
+    // Doctor reports stale version v=5
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("stale block version v=5"))
+        .stdout(predicate::str::contains(
+            "re-run ce-ai init-prj --tier full to upgrade",
+        ));
+
+    // Re-running init-prj upgrades to v6
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let updated_text = fs::read_to_string(&agents_file).unwrap();
+    assert!(updated_text.starts_with(user_head));
+    assert!(!updated_text.contains("Legacy v5 content."));
+    assert!(updated_text.contains(&block_begin_prefix("full")));
+    assert!(updated_text.contains("Self-Explaining Pull Requests & Review Readiness"));
+    assert!(updated_text.contains("What It Ruled Out"));
+    assert!(updated_text.contains("Which Rule Decided It"));
+    assert!(updated_text.contains("Upfront Evidence"));
+    assert!(updated_text.contains("Pre-Review Automated Checks"));
+
+    let state_val: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(config_dir.join("state.json")).unwrap()).unwrap();
+    assert_eq!(state_val["projects"][0]["block_version"], 6);
 }
 
 #[test]
