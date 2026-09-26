@@ -43,7 +43,7 @@ Relying on uncoordinated state mutations where `opencode.json` and `state.json` 
 
 ## Solution
 
-A comprehensive multi-layered reconciliation architecture was implemented across `src/commands/install.rs`, `src/commands/doctor.rs`, `src/commands/sync.rs`, and `src/tui/app.rs`:
+A comprehensive multi-layered reconciliation architecture was implemented across `src/commands/install.rs`, `src/commands/doctor.rs`, `src/commands/sync.rs`, and `src/commands/models.rs`:
 
 ### 1. Default Assignment Initialization on Install (`src/commands/install.rs`)
 During `ce-ai install`, if `state.model_assignments` is empty, `State::default_model_assignments()` is called to populate documented default assignments prior to writing state.
@@ -119,8 +119,8 @@ for (slot, assignment) in &state.model_assignments {
 state.save(&state_path)?;
 ```
 
-### 4. Interactive Dashboard Navigation (`src/tui/app.rs`)
-Added interactive slot navigation and status rendering in the Ratatui TUI dashboard to reflect live slot states and allow seamless model updates.
+### 4. Interactive Model Management (`src/commands/models.rs`)
+Added slot navigation and status rendering in `src/commands/models.rs` (originally surfaced via `<src/tui/app.rs>`) to reflect live slot states and allow seamless model updates.
 
 ## Why This Works
 

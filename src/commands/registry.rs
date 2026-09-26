@@ -134,11 +134,11 @@ impl CeCommand for Commands {
     }
 }
 
-/// Registry dispatch — thin wrapper used by `main.rs` and `tui`.
+/// Registry dispatch — thin wrapper used by `main.rs`.
 /// Keeps `main.rs` at ~15 lines (KTD1).
 pub fn dispatch(ctx: &Context, command: Option<Commands>) -> Result<(), CeError> {
     match command {
         Some(cmd) => cmd.run(ctx),
-        None => crate::tui::run_interactive(ctx),
+        None => status::run(ctx),
     }
 }

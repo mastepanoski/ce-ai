@@ -38,8 +38,7 @@ All AI agent operations on this repository MUST strictly follow:
 
 ```
 src/
-├── main.rs            # CLI entry point, Clap subcommand parser, TUI dispatch
-├── tui.rs             # Full-screen Ratatui & Crossterm interactive dashboard
+├── main.rs            # CLI entry point, Clap subcommand parser, command dispatch
 ├── error.rs           # CeError enum, exit code mapping (Usage=2, State=3, IO=4, Network=5, Verification=6)
 ├── state/             # State management
 │   ├── state.rs       # state.json schema & ModelAssignment structs

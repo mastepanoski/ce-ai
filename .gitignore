@@ -3,6 +3,7 @@
 .atl/
 .pi/
 .codegraph/
+.serena/
 tui-screenshots/
 *.png
 *.snap.png

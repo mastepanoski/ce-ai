@@ -167,12 +167,6 @@ doctor found 1 finding(s)
 
 ---
 
-### Interactive TUI Shortcut
-
-In the full-screen interactive dashboard (`ce-ai`), press **`[I]`** at any time to trigger project adoption for the current workspace.
-
----
-
 ## 🎯 Real-World Scenarios
 
 ### Scenario A: Adopting a Brand New (Greenfield) Project
