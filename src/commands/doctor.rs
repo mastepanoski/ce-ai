@@ -259,6 +259,43 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         );
     }
 
+    // Update Notifier Health & Status Probe (#425)
+    let notifier_cfg = state.update_notifier();
+    let env_disabled = std::env::var("CE_NO_UPDATE_NOTIFIER")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    if !notifier_cfg.enabled {
+        println!("doctor-info: update-notifier: disabled via state.json config");
+    } else if env_disabled {
+        println!("doctor-info: update-notifier: disabled via CE_NO_UPDATE_NOTIFIER");
+    } else {
+        match crate::source::update_notifier::read_cache(&ctx.config_dir) {
+            Some(cache) => {
+                let current_version = env!("CARGO_PKG_VERSION");
+                if crate::source::update_notifier::is_newer_version(
+                    &cache.latest_version,
+                    current_version,
+                ) {
+                    println!(
+                        "doctor-info: update-notifier: update available: v{current_version} -> {} (last checked: {}, run 'ce-ai self-update' to upgrade)",
+                        cache.latest_tag, cache.last_checked_at
+                    );
+                } else {
+                    println!(
+                        "doctor-info: update-notifier: up to date at v{current_version} (last checked: {})",
+                        cache.last_checked_at
+                    );
+                }
+            }
+            None => {
+                println!(
+                    "doctor-info: update-notifier: enabled (check interval: {}h, no cached release yet)",
+                    notifier_cfg.interval_hours
+                );
+            }
+        }
+    }
+
     // Claude Code Native Plugin Marketplace Divergence Probe (#327)
     let claude_dir = HarnessKind::Claude.harness_dir(&home_dir);
     let cwd = std::env::current_dir().unwrap_or_else(|_| repo_root.clone());

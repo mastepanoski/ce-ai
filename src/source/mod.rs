@@ -8,3 +8,4 @@ pub mod cache;
 pub mod registry;
 pub mod release;
 pub mod tools_registry;
+pub mod update_notifier;

@@ -1081,3 +1081,51 @@ fn test_doctor_warns_on_archive_compaction_threshold() {
         "doctor must exit 0 with compaction warning, got: {res:?}"
     );
 }
+
+#[test]
+fn test_doctor_reports_update_notifier_status() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    let ctx = Context {
+        config_dir: root.join("config"),
+        opencode_config_dir: root.join("opencode"),
+        workspace_root: Some(root.to_path_buf()),
+        dry_run: false,
+        verbose: false,
+        quiet: false,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+
+    let mut state = State::new();
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    // 1. Initial state with no cache
+    let args = Args::default();
+    assert!(run(&ctx, &args).is_ok());
+
+    // 2. State with cached newer version
+    let cache = crate::source::update_notifier::UpdateCheckCache {
+        last_checked_at: "2026-09-26T01:00:00Z".to_string(),
+        latest_version: "9.99.0".to_string(),
+        latest_tag: "v9.99.0".to_string(),
+        release_url: "https://example.com/release".to_string(),
+    };
+    crate::source::update_notifier::write_cache(&ctx.config_dir, &cache).unwrap();
+    assert!(run(&ctx, &args).is_ok());
+
+    // 3. Disabled via config
+    state.update_notifier = Some(crate::state::state::UpdateNotifierConfig {
+        enabled: false,
+        interval_hours: 24,
+    });
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+    assert!(run(&ctx, &args).is_ok());
+}

@@ -5,6 +5,17 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.70.0] - 2026-09-26
+
+### Added
+- **Automated Background Update Notifier for ce-ai CLI & Harness Releases (#425)**:
+  - **Throttled Atomic Cache Persistence (`src/source/update_notifier.rs`)**: Added caching of release metadata (`last_checked_at`, `latest_version`, `latest_tag`, `release_url`) at `<config_dir>/cache/update_check.json` using `write_atomic` and a configurable check interval (default: 24 hours, configurable via `state.json` `"update_notifier": { "enabled": true, "interval_hours": 24 }`).
+  - **Non-Blocking Detached Background Worker**: Automatically spawns a detached background thread with a 3-second timeout when the cache is missing or stale, ensuring zero latency impact on primary command execution and failing completely closed without terminal errors or delays if offline or rate-limited.
+  - **Non-Intrusive Terminal Banner on `stderr`**: Renders a formatted Unicode box banner to `stderr` upon process completion when a newer version is detected, guaranteeing standard output pipelines (e.g. `ce-ai ... | jq`) remain completely uncorrupted.
+  - **Multi-Variable Suppression & Opt-Out Hierarchy**: Automatically suppresses update checking and banner output when `stderr` is not an interactive terminal (`!std::io::stderr().is_terminal()`), running in CI environments (`CI=true`, `GITHUB_ACTIONS=true`), passing `--quiet` / `-q`, setting `CE_NO_UPDATE_NOTIFIER=1`, or disabling via `state.json`.
+  - **Tooling & Doctor Integration**: Added update notifier health and version freshness probe to `ce-ai doctor`, and wired `ce-ai self-update --check` to refresh the cached release metadata synchronously.
+  - **Comprehensive Test Suite**: Added unit tests in `src/source/tests/update_notifier.rs` and CLI integration tests in `tests/cli.rs` verifying banner appearance on `stderr`, clean `stdout`, and suppression across all opt-out variables.
+
 ## [1.69.1] - 2026-09-25
 
 ### Fixed
