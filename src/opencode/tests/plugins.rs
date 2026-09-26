@@ -45,6 +45,116 @@ fn install_loader_falls_back_to_builtin_when_missing() {
     assert!(content.contains("ce-ai"));
 }
 
+// ---- V1/V2 loader content validity (opencode-v2-plugin-loader) ----
+
+/// The exact pre-V2 canonical loader shape: default export of an async
+/// function returning a hooks object. OpenCode V2 fails it with
+/// "Plugin must export a default definition with an id and an effect or
+/// setup function", so ce-ai must classify it as outdated/stale.
+const V1_LOADER_FIXTURE: &str = r#"import { spawnSync } from "child_process";
+
+export const CompoundEngineeringPlugin = async ({ client }) => {
+  return {
+    event: async ({ event }) => {
+      if (event && event.type === "session.created") {
+        // handled
+      }
+    },
+  };
+};
+
+export default CompoundEngineeringPlugin;
+"#;
+
+/// Minimal V2 loader shape: default export with `id` + `setup(ctx)` and the
+/// SessionStart `session.created` marker.
+const V2_LOADER_FIXTURE: &str = r#"export default {
+  id: "compound-engineering",
+  async setup(ctx) {
+    void ctx.event.subscribe(() => {});
+    // handles session.created and session.idle
+    return () => {};
+  },
+};
+"#;
+
+#[test]
+fn rejects_v1_function_export_loader() {
+    assert!(!is_valid_loader_content(V1_LOADER_FIXTURE));
+    // Even though it mentions session.created, the absence of the V2
+    // `setup` signature makes it stale.
+    assert!(V1_LOADER_FIXTURE.contains("session.created"));
+}
+
+#[test]
+fn accepts_v2_setup_loader_and_builtin() {
+    assert!(is_valid_loader_content(V2_LOADER_FIXTURE));
+    // The embedded canonical loader must keep passing its own validity gate.
+    assert!(is_valid_loader_content(BUILTIN_LOADER));
+}
+
+#[test]
+fn accepts_legacy_ce_loader_function_exports() {
+    // #325 loader-safety: function-export stubs (test fixtures, Dockerfile.e2e,
+    // and newer-function-export fixtures like the v9 upgrade tarball) must
+    // never be regressed by an older builtin.
+    assert!(is_valid_loader_content(
+        "export default function ceLoader() {}"
+    ));
+    assert!(is_valid_loader_content(
+        "export default function ceLoaderV9() { /* session.created */ }\n"
+    ));
+}
+
+#[test]
+fn resolve_loader_bytes_substitutes_builtin_for_v1_source() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("v1-source");
+    let loader_src = source.join(".opencode/plugins/compound-engineering.js");
+    std::fs::create_dir_all(loader_src.parent().unwrap()).unwrap();
+    std::fs::write(&loader_src, V1_LOADER_FIXTURE).unwrap();
+
+    let bytes = resolve_loader_bytes(&source);
+    let text = String::from_utf8(bytes).unwrap();
+    assert!(
+        text.contains("setup"),
+        "V2 builtin substituted for V1 source"
+    );
+    assert_eq!(text, BUILTIN_LOADER);
+}
+
+#[test]
+fn resolve_loader_bytes_uses_v2_source_as_is() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("v2-source");
+    let loader_src = source.join(".opencode/plugins/compound-engineering.js");
+    std::fs::create_dir_all(loader_src.parent().unwrap()).unwrap();
+    std::fs::write(&loader_src, V2_LOADER_FIXTURE).unwrap();
+
+    let bytes = resolve_loader_bytes(&source);
+    assert_eq!(bytes, V2_LOADER_FIXTURE.as_bytes());
+}
+
+#[test]
+fn has_session_start_plugin_false_for_v1_loader_on_disk() {
+    let dir = tempdir().unwrap();
+    let config_dir = dir.path().join("opencode-config");
+    let loader_path = plugin_entry(&config_dir);
+    std::fs::create_dir_all(loader_path.parent().unwrap()).unwrap();
+    std::fs::write(&loader_path, V1_LOADER_FIXTURE).unwrap();
+    let entry = loader_path.display().to_string();
+    std::fs::write(
+        config_dir.join("opencode.json"),
+        serde_json::json!({ "plugin": [entry] }).to_string(),
+    )
+    .unwrap();
+
+    assert!(
+        !has_session_start_plugin(&config_dir),
+        "V1-format loader must be reported outdated so doctor can surface it"
+    );
+}
+
 #[test]
 fn ensures_and_removes_session_start_plugin_lifecycle() {
     let dir = tempdir().unwrap();

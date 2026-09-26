@@ -29,13 +29,21 @@ pub fn skills_path(config_dir: &Path) -> PathBuf {
     config_dir.join(MANAGED_DIR).join("skills")
 }
 
-/// Whether `content` is a recognized-valid OpenCode plugin loader: it either
-/// carries the SessionStart `session.created` hook, or matches the legacy
-/// `ceLoader` stub used before the hook existed. Anything else (e.g. an
-/// upstream release tarball that predates the hook) is stale/incompatible.
+/// Whether `content` is a recognized-valid OpenCode plugin loader.
+///
+/// OpenCode V2 requires a default export shaped as a definition with an `id`
+/// and a `setup`/`effect` function; V1 function-style exports no longer load
+/// (OpenCode fails them with "Plugin must export a default definition with an
+/// id and an effect or setup function"). A loader is therefore only trusted
+/// when it carries the SessionStart `session.created` hook AND the V2 `setup`
+/// signature. Legacy `ceLoader` function exports (unit-test fixtures,
+/// Dockerfile.e2e, and historical/newer function-export releases such as the
+/// v9 upgrade tarball) remain recognized on their own to preserve the #325
+/// loader-safety guarantee: sync and upgrade must never regress a newer
+/// function-export loader.
 fn is_valid_loader_content(content: &str) -> bool {
-    content.contains("session.created")
-        || content.starts_with("export default function ceLoader() {}")
+    (content.contains("session.created") && content.contains("setup"))
+        || content.starts_with("export default function ceLoader")
 }
 
 /// Resolves the OpenCode plugin loader bytes for a given source tree,

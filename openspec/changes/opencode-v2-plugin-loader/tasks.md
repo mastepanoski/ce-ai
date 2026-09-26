@@ -1,0 +1,24 @@
+# Tasks: OpenCode V2 Plugin Loader
+
+- [x] 1. Port the canonical loader to the V2 plugin API (~150 LOC changed, `.opencode/plugins/compound-engineering.js`)
+  - [x] 1.1 Rewrite the default export as `{ id: "compound-engineering", async setup(ctx) }`
+  - [x] 1.2 Register discovered skills via `ctx.skill.transform` (get → update/add, idempotent)
+  - [x] 1.3 Register skill commands via `ctx.command.transform` (skip pre-existing names, `prompt.text` as `$ARGUMENTS`, pass `delivery`)
+  - [x] 1.4 Replace `event` hook with `ctx.event.subscribe` + AbortController cleanup; `session.created` → `ctx.session.synthetic`, `session.idle` → checkpoint side effect
+  - [x] 1.5 Replace `experimental.chat.system.transform` / `experimental.session.compacting` with `ctx.session.hook("context"/"compaction")` injecting into `event.system`
+  - [x] 1.6 Verify with Node ESM import: `default.id` + `typeof default.setup`
+- [x] 2. Tighten loader validity detection (~10 LOC changed, `src/opencode/plugins.rs`)
+  - [x] 2.1 Require `session.created` AND `setup`, preserving the standalone legacy `export default function ceLoader` branch (#325); update doc comment
+  - [x] 2.2 Add unit tests: V1 file rejected, V2 file accepted, `ceLoader*` stubs accepted, builtin substitution, `has_session_start_plugin` false for on-disk V1 loader (~80 LOC, `src/opencode/tests/plugins.rs`)
+- [x] 3. Update documentation references to the V1 hooks (~40 LOC across 4 files)
+  - [x] 3.1 `docs/solutions/architecture/2026-09-02-opencode-plugin-session-start-and-compaction-drift-delivery.md`
+  - [x] 3.2 `docs/user-guide/zero-step-drift-recovery-explained.md`
+  - [x] 3.3 `docs/user-guide/fsm-and-checkpoints-explained.md` + `harnesses-loops-and-context-masterclass.md`
+- [x] 4. Versioning & changelog (~15 LOC)
+  - [x] 4.1 Bump `Cargo.toml` to 1.72.1; add `CHANGELOG.md` [1.72.1] Fixed entry
+- [x] 5. Verification gates
+  - [x] 5.1 Isolated OpenCode v2.0.18 load check: A/B proof — V2 loader loads clean (0 errors, session exit 0), V1 loader reproduces the exact failure (`failed to load plugin ... must export a default definition`) in an XDG-isolated sandbox
+  - [x] 5.2 `cargo fmt --check` — clean
+  - [x] 5.3 `cargo clippy --all-targets --all-features -- -D warnings` — no issues
+  - [x] 5.4 `cargo test` — 546 lib + 215 CLI integration pass; the only failures are a pre-existing environmental class (doctor branch-protection probe `gh` 404 on the private repo + parallel-run poison cascade) identical on `main` (verified via stash + main baseline diff)
+  - [x] 5.5 `make e2e` — all 10 Docker gates passed (439s)
