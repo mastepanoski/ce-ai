@@ -65,3 +65,4 @@ Historical notes:
 - update-notifier: archived (11/11 tasks) under criterion (1) on 2026-09-26.
 - upstream-bug-reporter: archived (13/13 tasks) under criterion (1) on 2026-09-26.
 - retire-ratatui-tui: archived (23/23 tasks) under criterion (1) on 2026-09-26.
+- managed-block-turn0-and-stage2-accuracy: archived (17/17 tasks) under criterion (1) on 2026-09-26.
