@@ -5,6 +5,14 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.72.3] - 2026-09-26
+
+### Added
+- **CI PR Size Budget Fork Exception Fallback & OpenSpec Exemption (`.github/workflows/ci.yml`, `CONTRIBUTING.md`, `.github/PULL_REQUEST_TEMPLATE.md`):**
+  - **Fork-Friendly PR Description Fallback**: PRs exceeding the 400-line code review boundary can now be unblocked by including a `### Size Exception` section, `Size-Exception:` directive, or `<!-- size-exception -->` comment in the PR description, eliminating permission failures for external fork contributors who lack GitHub repo label permissions (`AddLabelsToLabelable`).
+  - **OpenSpec & Documentation Exemption from Code Budget**: Updated line-counting logic to exclude `openspec/changes/**` and `docs/**` from the 400 LOC code review limit per `CONTRIBUTING.md` §2 counting contract, tracking and displaying Code lines and Docs/OpenSpec lines separately.
+  - **Actionable Error & Notice Messages**: When code changes exceed 400 lines without an exception, the CI error message now provides explicit, fork-friendly instructions on how to add the rationale to the PR body.
+
 ## [1.72.2] - 2026-09-26
 
 ### Fixed

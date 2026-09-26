@@ -85,33 +85,57 @@ jobs:
         id: size
         run: |
           BASE="${{ github.event.pull_request.base.sha }}"
-          # Exclude lockfiles and binary files per CONTRIBUTING.md §2 counting contract.
-          ADDED=$(git diff --numstat "$BASE"...HEAD -- ':!Cargo.lock' ':!*.lock' | awk '{a+=$1} END {print a+0}')
-          DELETED=$(git diff --numstat "$BASE"...HEAD -- ':!Cargo.lock' ':!*.lock' | awk '{d+=$2} END {print d+0}')
-          TOTAL=$((ADDED + DELETED))
+          # Exclude lockfiles, openspec changes, and docs per CONTRIBUTING.md §2 counting contract.
+          CODE_ADDED=$(git diff --numstat "$BASE"...HEAD -- ':!Cargo.lock' ':!*.lock' ':!openspec/changes/**' ':!docs/**' | awk '{a+=$1} END {print a+0}')
+          CODE_DELETED=$(git diff --numstat "$BASE"...HEAD -- ':!Cargo.lock' ':!*.lock' ':!openspec/changes/**' ':!docs/**' | awk '{d+=$2} END {print d+0}')
+          CODE_TOTAL=$((CODE_ADDED + CODE_DELETED))
+
+          DOCS_ADDED=$(git diff --numstat "$BASE"...HEAD -- 'openspec/changes/**' 'docs/**' | awk '{a+=$1} END {print a+0}')
+          DOCS_DELETED=$(git diff --numstat "$BASE"...HEAD -- 'openspec/changes/**' 'docs/**' | awk '{d+=$2} END {print d+0}')
+          DOCS_TOTAL=$((DOCS_ADDED + DOCS_DELETED))
+
+          TOTAL=$((CODE_TOTAL + DOCS_TOTAL))
+
+          echo "code_total=$CODE_TOTAL" >> "$GITHUB_OUTPUT"
+          echo "docs_total=$DOCS_TOTAL" >> "$GITHUB_OUTPUT"
           echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+
           {
             echo "## PR Size Budget"
             echo ""
-            echo "| Metric | Count |"
-            echo "|---|---|"
-            echo "| Added | $ADDED |"
-            echo "| Deleted | $DELETED |"
-            echo "| **Total** | **$TOTAL** |"
+            echo "| Metric | Code | Docs & OpenSpec | Total |"
+            echo "|---|---|---|---|"
+            echo "| Added | $CODE_ADDED | $DOCS_ADDED | $((CODE_ADDED + DOCS_ADDED)) |"
+            echo "| Deleted | $CODE_DELETED | $DOCS_DELETED | $((CODE_DELETED + DOCS_DELETED)) |"
+            echo "| **Total** | **$CODE_TOTAL** | **$DOCS_TOTAL** | **$TOTAL** |"
             echo ""
-            if [ "$TOTAL" -gt 400 ]; then
-              echo "> ⚠️ Exceeds the 400-line review boundary. Split into chained slices or request a \`size:exception\` label."
+            if [ "$CODE_TOTAL" -gt 400 ]; then
+              echo "> ⚠️ Code changes exceed the 400-line review boundary ($CODE_TOTAL LOC). Add a \`### Size Exception\` section to your PR body or request a maintainer add the \`size:exception\` label."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check boundary
         run: |
-          TOTAL=${{ steps.size.outputs.total }}
-          if [ "$TOTAL" -gt 400 ]; then
+          CODE_TOTAL=${{ steps.size.outputs.code_total }}
+          if [ "$CODE_TOTAL" -gt 400 ]; then
             HAS_LABEL=$(gh pr view "${{ github.event.pull_request.number }}" --json labels --jq '[.labels[].name] | contains(["size:exception"])')
-            if [ "$HAS_LABEL" != "true" ]; then
-              echo "::error::PR exceeds the 400-line review boundary ($TOTAL lines) without a size:exception label. Split into chained slices or request an exception."
+            PR_BODY=$(gh pr view "${{ github.event.pull_request.number }}" --json body --jq '.body // ""')
+
+            # Check for size exception directive in PR description (essential for external fork contributors)
+            HAS_BODY_EXEMPTION=false
+            if echo "$PR_BODY" | grep -Ei -q '(^#{1,4}[[:space:]]*size[[:space:]]+exception|<!--[[:space:]]*size[-:]exception|\b(size[-:]exception):|(\*\*|_)size[[:space:]]+exception(\*\*|_):?)'; then
+              HAS_BODY_EXEMPTION=true
+            fi
+
+            if [ "$HAS_LABEL" != "true" ] && [ "$HAS_BODY_EXEMPTION" != "true" ]; then
+              echo "::error::PR code changes exceed the 400-line review boundary ($CODE_TOTAL LOC). If this change cannot be sliced further, add a '### Size Exception' section with rationale to the PR description, or request a maintainer add the 'size:exception' label."
               exit 1
+            fi
+
+            if [ "$HAS_BODY_EXEMPTION" = "true" ]; then
+              echo "Size exception granted via PR description directive."
+            elif [ "$HAS_LABEL" = "true" ]; then
+              echo "Size exception granted via size:exception label."
             fi
           fi
         env:
