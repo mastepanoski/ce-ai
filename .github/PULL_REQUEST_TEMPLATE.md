@@ -17,7 +17,7 @@
 
 - Forecast: ~___ added / ___ deleted across ___ files
 - Within the 400-line review boundary? yes / no
-  - If no: chained split or approved `size:exception` linked here:
+  - If no: chained split or `size:exception` justification (label or '### Size Exception' section below):
 - Pure-documentation change? (exempt from correction-budget accounting) yes/no
 
 ## 🏷️ Type of Change

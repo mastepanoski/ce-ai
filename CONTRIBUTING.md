@@ -82,7 +82,7 @@ These boundaries apply equally to human and AI-agent contributors. Documentation
 ### Counting Contract
 
 - Sum added + deleted lines across non-binary files (`numstat` binary rows report `-` and are skipped).
-- Excluded from the budget: lockfiles (`Cargo.lock`) and any path declared as generated/vendored in `.gitattributes`. Whitespace-only churn does not count.
+- Excluded from the code budget: lockfiles (`Cargo.lock`, `*.lock`), pure documentation (`docs/**`), and OpenSpec specification packages (`openspec/changes/**`). Whitespace-only churn does not count.
 
 ### Bounded Correction Policy
 
@@ -120,7 +120,10 @@ Adopted from Gentle AI v2.4.0 (`Gentleman-Programming/gentle-ai`): `LargeChangeL
 
 ### Enforcement Status
 
-Documentation-first. A fast-follow CI job will compute numstat totals per PR and gate above-boundary changes behind a `size:exception` label; until then the PR-template forecast is mandatory.
+The CI workflow `pr-size-budget` (`.github/workflows/ci.yml`) enforces the 400-line code review boundary against pull requests.
+- **Exemptions**: Code changes exceeding 400 lines require either:
+  1. The `size:exception` GitHub label (applied by maintainers), OR
+  2. A documented `### Size Exception` section (or `Size-Exception:` / `<!-- size-exception -->` directive) in the PR description detailing why the change cannot be sliced further. This provides a self-service exception mechanism for external fork contributors who lack repository label management permissions.
 
 ---
 
