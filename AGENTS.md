@@ -19,6 +19,7 @@ All AI agents MUST enforce these hard invariants deterministically at every sess
 10. **Post-Merge Lifecycle & Clean State**: Immediately after merging a PR, switch to `main`, run `git pull`, delete merged local branches (`git branch -d`), prune remotes (`git fetch --prune`), remove turn-created temporary worktrees, and run `ce-ai workflow status`. If any completed OpenSpec changes exist, the AI agent MUST run `ce-ai archive <feature>` (and submit the corresponding archive PR) so the repository FSM is left at `✓ Ready (100%)` with zero unarchived change warnings before concluding.
 11. **Zero AI Attribution & No Co-Author Trailers**: AI agents MUST NEVER add "Co-Authored-By", AI attribution trailers, or "Generated with [Agent]" footers/badges to git commit messages or PR descriptions. All commits MUST use clean Conventional Commits only.
 12. **Monotonic Concept Accretion**: `CONCEPTS.md` MUST NEVER suffer destructive deletion or blind overwrite. Agents MUST use surgical edits (`Edit`/append), execute a mandatory pre-read, and verify changes with `ce-ai doc lint --strict`.
+13. **Strict Bug Triage Boundary**: NEVER file or propose `ce-ai report-bug` for errors in the host project's domain code or test failures. Upstream bug reporting is strictly reserved for internal `ce-ai` binary/harness crashes and command failures, requiring user consent and zero-token leak sanitization.
 
 ---
 
@@ -119,6 +120,11 @@ src/
    - Agents MUST use surgical in-place editing (`Edit` / `replace_file_content` / append) and NEVER perform full-file `Write` overwrites that truncate existing terms.
    - All modifications must be verified via `scripts/validate-concepts.py` or `ce-ai doc lint --strict`, ensuring existing entries grow monotonically.
    - Reports must state empirical before/after entry counts (e.g. `N entries (was M, +X added, 0 removed)`).
+
+11. **Strict Upstream Bug Triage Boundary**:
+   - AI agents operating in consumer projects MUST strictly distinguish between project application bugs and `ce-ai` internal tool defects.
+   - Project-level code, tests, and application logic bugs MUST be diagnosed and resolved locally using Compound Engineering workflows (`ce-debug` / `ce-work`).
+   - Upstream bug reporting (`ce-ai report-bug`) is EXCLUSIVELY reserved for internal `ce-ai` runtime errors, panics, unexpected CLI failures, and harness sync failures, subject to explicit user consent and zero-leak sanitization.
 
 ---
 

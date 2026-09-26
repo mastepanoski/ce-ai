@@ -3,6 +3,7 @@
 
 pub mod archive;
 pub mod binary_release;
+pub mod bug_reporter;
 pub mod builtin_skills;
 pub mod cache;
 pub mod registry;
