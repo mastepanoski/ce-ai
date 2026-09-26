@@ -143,3 +143,7 @@ A non-blocking, throttled background notification architecture within `ce-ai` th
 ### Upstream Bug Triage Boundary
 A strict operational and architectural boundary separating consumer project issues from `ce-ai` internal tool defects. Project-level code, domain business logic, and failing unit/integration tests must be diagnosed and resolved locally within the host repository using Compound Engineering workflows (`ce-debug` / `ce-work`). Upstream bug reporting via `ce-ai report-bug` is strictly reserved for internal `ce-ai` binary crashes, CLI panics, and harness synchronization anomalies. All upstream bug submissions enforce ISO/IEC 27001 zero-data-leakage privacy filters (scrubbing home directories, absolute project roots, credentials, and API secrets) and require explicit user consent via interactive terminal prompts or non-interactive confirmation flags.
 
+### Hook-Aware Turn-0 Context Injection
+A zero-step conversational context delivery pattern where `ce-ai init-prj` auto-configures harness-native lifecycle hooks (`SessionStart` in Claude, Cursor, Codex, Copilot, Pi; `PreInvocation` in Antigravity) to execute `ce-ai workflow resume --json` automatically before an agent's first turn. Injected operating directives explicitly instruct agents to treat existing turn-0 FSM state as current, eliminating redundant CLI re-executions while preserving manual execution as a fallback for unsupported harnesses or mid-session drift.
+
+

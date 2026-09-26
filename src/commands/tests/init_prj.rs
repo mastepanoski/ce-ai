@@ -240,3 +240,30 @@ fn test_render_block_content_includes_self_explaining_pr_directives() {
     let orchestrator = render_block_content(AdoptionTier::Orchestrator);
     assert!(orchestrator.contains("Enforce self-explaining PRs: mandate that subagents document rejected alternatives, governing rules, and attach empirical verification evidence in collapsible blocks before requesting review."));
 }
+
+#[test]
+fn test_render_block_content_turn_0_and_progressive_openspec() {
+    let full = render_block_content(AdoptionTier::Full);
+
+    // Turn-0: Hook-aware conditional instructions
+    assert!(full.contains("### ⚡ Turn-0 Session Directives (Zero-Step Drift Recovery)"));
+    assert!(full.contains("`ce-ai` auto-installs a SessionStart hook on supported harnesses that runs `ce-ai workflow resume --json`"));
+    assert!(full.contains("If that state is already present at session start, treat it as current — do NOT re-run the command."));
+    assert!(full
+        .contains("Only run `ce-ai workflow resume` yourself when no such context was injected"));
+
+    // Stage 2: Progressive OpenSpec authoring
+    assert!(full.contains("### Stage 2 OpenSpec Enforcement Requirements"));
+    assert!(full.contains("OpenSpec is authored progressively. Before writing feature code, agents MUST verify `openspec/changes/<feature_name>/` contains the frozen Stage 2 contract:"));
+    assert!(full.contains("`tasks.md` (the executable task checklist) is generated from that frozen contract in Stage 3 — do not require it before Stage 2 is complete, but do not open a PR without it."));
+
+    // Verify tasks.md is NOT listed under the Stage 2 contract bullet points
+    let stage2_section = full
+        .split("### Stage 2 OpenSpec Enforcement Requirements")
+        .nth(1)
+        .unwrap()
+        .split("### Single Source of Truth Rule")
+        .next()
+        .unwrap();
+    assert!(!stage2_section.contains("- `tasks.md`:"));
+}

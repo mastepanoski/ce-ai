@@ -19,7 +19,7 @@ pub const GITIGNORE_END_MARKER: &str = "# END CE-AI MANAGED BLOCK";
 
 /// Managed block schema version, shared by the on-disk header and the
 /// `state.json` adoption entry so the two cannot drift apart.
-pub const BLOCK_VERSION: u32 = 6;
+pub const BLOCK_VERSION: u32 = 7;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -81,17 +81,16 @@ All AI agents MUST follow the 7-stage Compound Engineering development cycle:
 ➔ `[Stage 7: Git Shipping]`
 
 ### ⚡ Turn-0 Session Directives (Zero-Step Drift Recovery)
-At the start of EVERY new session or after context compaction, before running any task or reading historical chat assumptions, the AI agent MUST run:
-`ce-ai workflow resume`
-to synchronize live Git working tree state, active branch, manifest SHA256 integrity, and active OpenSpec progress.
+`ce-ai` auto-installs a SessionStart hook on supported harnesses that runs `ce-ai workflow resume --json` and injects live FSM state (Git working tree, active branch, manifest SHA256 integrity, OpenSpec progress) into context before your first turn. If that state is already present at session start, treat it as current — do NOT re-run the command. Only run `ce-ai workflow resume` yourself when no such context was injected (harness without hook support, or the hook is disabled) or when you suspect the injected state has gone stale mid-session (e.g. after a `git` operation you didn't make through your own tool calls).
 
 ### Stage 2 OpenSpec Enforcement Requirements
-Before creating PRs or writing feature code, agents MUST verify `openspec/changes/<feature_name>/` contains:
+OpenSpec is authored progressively. Before writing feature code, agents MUST verify `openspec/changes/<feature_name>/` contains the frozen Stage 2 contract:
 - `proposal.md`: Problem statement, in-scope/out-of-scope boundaries, and success criteria.
 - `exploration.md`: Technical investigation and architectural tradeoffs.
 - `design.md`: Technical design, system architecture, structs, and API/CLI contracts.
 - `spec.md`: Formal requirements using `WHEN ... THEN ...` format and explicit acceptance criteria.
-- `tasks.md`: Atomic, executable task checklist with TDD verification steps.
+
+`tasks.md` (the executable task checklist) is generated from that frozen contract in Stage 3 — do not require it before Stage 2 is complete, but do not open a PR without it.
 
 ### Single Source of Truth Rule
 Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into the OpenSpec files above (`proposal.md`, `exploration.md`) and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with OpenSpec. Ideation artifacts are retained by default as the permanent raw-history record OpenSpec intentionally does not duplicate; "disposable" never means deleting them. Skip ideation skills entirely when requirements and approach are already clear.
