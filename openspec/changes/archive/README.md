@@ -64,3 +64,4 @@ Historical notes:
 - prevent-concepts-clobber: archived (19/19 tasks) under criterion (1) on 2026-09-26.
 - update-notifier: archived (11/11 tasks) under criterion (1) on 2026-09-26.
 - upstream-bug-reporter: archived (13/13 tasks) under criterion (1) on 2026-09-26.
+- retire-ratatui-tui: archived (23/23 tasks) under criterion (1) on 2026-09-26.
