@@ -34,6 +34,7 @@ fn state_with(slot: &str) -> State {
         gate_receipts: BTreeMap::new(),
         doc_hygiene: None,
         decisions: None,
+        update_notifier: None,
     }
 }
 
@@ -1038,4 +1039,40 @@ fn test_state_set_execution_mode_for_branch() {
         .current_workflow_for_branch(root, Some("fix/parser"))
         .unwrap();
     assert_eq!(updated.execution_mode, Some(ExecutionMode::Organic));
+}
+
+#[test]
+fn test_update_notifier_config_defaults_and_round_trip() {
+    use crate::state::state::UpdateNotifierConfig;
+
+    let default_cfg = UpdateNotifierConfig::default();
+    assert!(default_cfg.enabled);
+    assert_eq!(default_cfg.interval_hours, 24);
+
+    let json = r#"{"enabled": false, "interval_hours": 12}"#;
+    let cfg: UpdateNotifierConfig = serde_json::from_str(json).unwrap();
+    assert!(!cfg.enabled);
+    assert_eq!(cfg.interval_hours, 12);
+
+    let state = State::new();
+    assert!(state.update_notifier().enabled);
+    assert_eq!(state.update_notifier().interval_hours, 24);
+}
+
+#[test]
+fn test_update_notifier_merge_overrides() {
+    use crate::state::state::UpdateNotifierConfig;
+
+    let mut global = State::new();
+    assert!(global.update_notifier().enabled);
+
+    let mut local = State::new();
+    local.update_notifier = Some(UpdateNotifierConfig {
+        enabled: false,
+        interval_hours: 48,
+    });
+
+    global.merge_overrides(local);
+    assert!(!global.update_notifier().enabled);
+    assert_eq!(global.update_notifier().interval_hours, 48);
 }

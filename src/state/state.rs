@@ -478,6 +478,30 @@ pub struct State {
     pub doc_hygiene: Option<DocHygieneConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decisions: Option<DecisionsConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update_notifier: Option<UpdateNotifierConfig>,
+}
+
+/// Configuration for the automated background update notifier (Issue #425).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateNotifierConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_update_check_interval_hours")]
+    pub interval_hours: u64,
+}
+
+fn default_update_check_interval_hours() -> u64 {
+    24
+}
+
+impl Default for UpdateNotifierConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            interval_hours: default_update_check_interval_hours(),
+        }
+    }
 }
 fn default_version() -> u32 {
     1
@@ -885,11 +909,19 @@ impl State {
         if local_state.doc_hygiene.is_some() {
             self.doc_hygiene = local_state.doc_hygiene;
         }
+        if local_state.update_notifier.is_some() {
+            self.update_notifier = local_state.update_notifier;
+        }
     }
 
     /// Returns the effective documentation hygiene configuration, falling back to defaults if not set.
     pub fn doc_hygiene(&self) -> DocHygieneConfig {
         self.doc_hygiene.unwrap_or_default()
+    }
+
+    /// Returns the effective update notifier configuration, falling back to defaults if not set.
+    pub fn update_notifier(&self) -> UpdateNotifierConfig {
+        self.update_notifier.clone().unwrap_or_default()
     }
 
     /// Loads global state and applies local `.ce-ai.json` overrides if present.

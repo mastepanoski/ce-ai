@@ -10409,3 +10409,85 @@ fn test_cli_decisions_stats_and_compare() {
     assert_eq!(stats_json["total_runs"], 4);
     assert_eq!(stats_json["shadow_count"], 1);
 }
+
+#[test]
+fn test_cli_update_notifier_banner_and_suppression() {
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let config_dir = home.join(".ce-ai");
+    fs::create_dir_all(&config_dir).unwrap();
+
+    let cache = serde_json::json!({
+        "last_checked_at": chrono::Utc::now().to_rfc3339(),
+        "latest_version": "99.0.0",
+        "latest_tag": "v99.0.0",
+        "release_url": "https://github.com/mastepanoski/ce-ai/releases/tag/v99.0.0"
+    });
+    let cache_dir = config_dir.join("cache");
+    fs::create_dir_all(&cache_dir).unwrap();
+    fs::write(
+        cache_dir.join("update_check.json"),
+        serde_json::to_vec_pretty(&cache).unwrap(),
+    )
+    .unwrap();
+
+    // 1. With CE_FORCE_UPDATE_NOTIFIER=1, banner prints to stderr, NOT stdout
+    let out = ceai(&config_dir, &home)
+        .env("CE_FORCE_UPDATE_NOTIFIER", "1")
+        .args(["status"])
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stderr.contains("Update available: ce-ai v"),
+        "stderr must contain update banner, got: {stderr}"
+    );
+    assert!(stderr.contains("v99.0.0"));
+    assert!(
+        !stdout.contains("Update available: ce-ai"),
+        "stdout must not contain update banner, got: {stdout}"
+    );
+
+    // 2. CE_NO_UPDATE_NOTIFIER=1 suppresses notification even when forced
+    let out = ceai(&config_dir, &home)
+        .env("CE_FORCE_UPDATE_NOTIFIER", "1")
+        .env("CE_NO_UPDATE_NOTIFIER", "1")
+        .args(["status"])
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !stderr.contains("Update available: ce-ai"),
+        "CE_NO_UPDATE_NOTIFIER=1 must suppress banner, got: {stderr}"
+    );
+
+    // 3. -q / --quiet suppresses notification
+    let out = ceai(&config_dir, &home)
+        .env("CE_FORCE_UPDATE_NOTIFIER", "1")
+        .args(["--quiet", "status"])
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !stderr.contains("Update available: ce-ai"),
+        "--quiet must suppress banner, got: {stderr}"
+    );
+
+    // 4. Default non-terminal / piped execution suppresses notification
+    let out = ceai(&config_dir, &home).args(["status"]).output().unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !stderr.contains("Update available: ce-ai"),
+        "non-terminal must suppress banner, got: {stderr}"
+    );
+
+    // 5. doctor reports cached update availability on stdout
+    let out = ceai(&config_dir, &home).args(["doctor"]).output().unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("doctor-info: update-notifier: update available: v"),
+        "doctor must report update available, got: {stdout}"
+    );
+    assert!(stdout.contains("v99.0.0"));
+}

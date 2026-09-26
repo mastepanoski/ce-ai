@@ -48,9 +48,26 @@ fn main() {
             std::process::exit(err.exit_code());
         }
     };
+    let is_self_update = matches!(cli.command, Some(Commands::SelfUpdate(_)));
+
+    let state = ce_ai::state::state::State::load_with_workspace_overrides(
+        &ctx.config_dir.join("state.json"),
+        ctx.workspace_root.as_deref(),
+    )
+    .unwrap_or_default();
+
+    if !is_self_update {
+        ce_ai::source::update_notifier::maybe_trigger_background_check(&ctx, &state);
+    }
+
     let result = ce_ai::commands::registry::dispatch(&ctx, cli.command);
     if let Err(err) = &result {
         eprintln!("error: {err}");
     }
+
+    if !is_self_update {
+        ce_ai::source::update_notifier::maybe_print_update_notification(&ctx, &state);
+    }
+
     std::process::exit(result_exit_code(&result));
 }

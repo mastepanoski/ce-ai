@@ -77,6 +77,18 @@ pub fn run_internal(
         None => resolve_latest_cli_release(&client, token.as_deref())?,
     };
 
+    // Refresh update notifier cache on explicit checks or upgrades (#425)
+    let update_cache = crate::source::update_notifier::UpdateCheckCache {
+        last_checked_at: chrono::Utc::now().to_rfc3339(),
+        latest_version: release.version.clone(),
+        latest_tag: release.tag.clone(),
+        release_url: format!(
+            "https://github.com/mastepanoski/ce-ai/releases/tag/{}",
+            release.tag
+        ),
+    };
+    let _ = crate::source::update_notifier::write_cache(&ctx.config_dir, &update_cache);
+
     let current_version = env!("CARGO_PKG_VERSION");
     let cmp = compare_cli_versions(&release.version, current_version);
     let is_newer = cmp == std::cmp::Ordering::Greater;
