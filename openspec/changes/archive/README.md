@@ -63,3 +63,4 @@ Historical notes:
 - self-explaining-pr-directives: archived (16/16 tasks) under criterion (1) on 2026-09-25.
 - prevent-concepts-clobber: archived (19/19 tasks) under criterion (1) on 2026-09-26.
 - update-notifier: archived (11/11 tasks) under criterion (1) on 2026-09-26.
+- upstream-bug-reporter: archived (13/13 tasks) under criterion (1) on 2026-09-26.
