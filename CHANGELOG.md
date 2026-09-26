@@ -5,6 +5,19 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.71.0] - 2026-09-26
+
+### Added
+- **Intelligent Upstream Bug Detection, Deduplication & Reporting with User Consent (#426)**:
+  - **New Subcommand `ce-ai report-bug` (`src/commands/report_bug.rs`)**: Added command supporting `--title`, `--error`, `--harness`, `--dry-run`, `--json`, `--web`, and `-y`/`--yes`.
+  - **ISO/IEC 27001 Multi-Pass Privacy Sanitization (`src/source/bug_reporter.rs`)**: Anonymizes user home directories (`~`) and project workspace roots (`<project-root>`), handles macOS `/private` symlink variations, and redacts GitHub PATs (`ghp_*`, `github_pat_*`), OpenAI/API tokens (`sk-*`), Bearer tokens, private keys (`BEGIN ... PRIVATE KEY`), and generic `key=`/`secret=` credentials. Sanitizes command invocations, error logs, and issue titles.
+  - **Intelligent Upstream Deduplication**: Queries `mastepanoski/ce-ai` issues via the `gh` CLI matching the error signature to prevent filing duplicate reports, presenting existing matching issue numbers, states, and links.
+  - **Sovereign User Consent Gate**: Mandates explicit user consent via an interactive prompt with options to submit via `gh`, open pre-filled browser draft, view sanitized markdown preview, or dismiss. Non-interactive streams gracefully fall back to web URLs without blocking.
+  - **Pre-Filled Web Issue URL Generation**: Generates standard GitHub new issue URLs conforming to `.github/ISSUE_TEMPLATE/bug_report.yml` with RFC 3986 percent encoding for zero-install web browser reporting.
+  - **GitHub CLI Status Detection & Guided Setup**: Detects whether `gh` is installed and authenticated, providing platform-tailored installation and login commands (`gh auth login`).
+  - **Operational Directives & Triage Boundary**: Added Hard Invariant #13 and Mandatory Constraint #11 to `AGENTS.md`, and defined `Upstream Bug Triage Boundary` in `CONCEPTS.md`, enforcing strict domain separation between host project bugs (resolved via `ce-debug`) and internal `ce-ai` tool errors.
+  - **Comprehensive Test Suite**: Added 7 unit tests in `src/source/tests/bug_reporter.rs` and CLI integration tests in `tests/cli.rs` validating `--dry-run`, `--json`, path anonymization, token redaction, and `gh` fallbacks.
+
 ## [1.70.0] - 2026-09-26
 
 ### Added

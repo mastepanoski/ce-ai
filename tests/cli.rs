@@ -10491,3 +10491,107 @@ fn test_cli_update_notifier_banner_and_suppression() {
     );
     assert!(stdout.contains("v99.0.0"));
 }
+
+#[test]
+fn test_cli_report_bug_dry_run_and_json_sanitization() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("test-workspace");
+    fs::create_dir_all(&prj_dir).unwrap();
+    git_cmd()
+        .args(["init"])
+        .current_dir(&prj_dir)
+        .output()
+        .unwrap();
+
+    let fake_token = format!("{}{}", "ghp_", "1234567890abcdef1234567890abcdef1234");
+    let fake_secret = "secret=supersecret123";
+    let error_msg = format!(
+        "Failed in {} with token {} and {}",
+        prj_dir.display(),
+        fake_token,
+        fake_secret
+    );
+
+    // 1. Dry run output verification
+    let out = ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args([
+            "report-bug",
+            "--title",
+            "Crashing harness bug",
+            "--error",
+            &error_msg,
+            "--harness",
+            "opencode",
+            "--dry-run",
+        ])
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("== [Sanitized Bug Report Draft (Dry Run)] =="));
+    assert!(stdout.contains("Title: Crashing harness bug"));
+    assert!(stdout.contains("<project-root>"));
+    assert!(stdout.contains("[REDACTED_GH_TOKEN]"));
+    assert!(stdout.contains("[REDACTED]"));
+    assert!(!stdout.contains(&fake_token));
+    assert!(!stdout.contains("supersecret123"));
+
+    // 2. JSON mode verification
+    let out_json = ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args(["report-bug", "--error", &error_msg, "--json"])
+        .output()
+        .unwrap();
+
+    let json_str = String::from_utf8_lossy(&out_json.stdout);
+    assert!(out_json.status.success());
+    let bundle_val: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+    assert_eq!(bundle_val["target_harness"], "All Harnesses");
+    assert!(bundle_val["error_message"]
+        .as_str()
+        .unwrap()
+        .contains("<project-root>"));
+    assert!(bundle_val["error_message"]
+        .as_str()
+        .unwrap()
+        .contains("[REDACTED_GH_TOKEN]"));
+    assert!(!json_str.contains(&fake_token));
+    assert!(!json_str.contains("supersecret123"));
+
+    // 3. Non-interactive fallback displays web submission URL
+    let out_non_interactive = ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args(["report-bug", "--error", "Non-interactive tool failure"])
+        .output()
+        .unwrap();
+
+    let non_interactive_stdout = String::from_utf8_lossy(&out_non_interactive.stdout);
+    assert!(out_non_interactive.status.success());
+    assert!(non_interactive_stdout.contains("Web submission URL:"));
+    assert!(non_interactive_stdout.contains("https://github.com/mastepanoski/ce-ai/issues/new"));
+}
+
+#[test]
+fn test_cli_report_bug_web_and_yes_fallbacks() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("test-workspace");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    // --yes flag with empty PATH triggers gh-not-installed fallback with web URL
+    let out = ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .env("PATH", "")
+        .args(["report-bug", "--error", "Fatal internal crash", "-y"])
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(stdout.contains("GitHub CLI (gh) is not authenticated or not installed."));
+    assert!(stdout.contains("Direct web submission URL:"));
+    assert!(stdout.contains("https://github.com/mastepanoski/ce-ai/issues/new"));
+}

@@ -10,7 +10,8 @@ use clap::Subcommand;
 
 use crate::commands::{
     audit, backups, decisions, deinit_prj, doc, doctor, gate, guard, init_prj, install, models,
-    self_update, skills, status, sync, tools, uninstall, upgrade, usage, workflow, Context,
+    report_bug, self_update, skills, status, sync, tools, uninstall, upgrade, usage, workflow,
+    Context,
 };
 use crate::error::CeError;
 
@@ -89,6 +90,9 @@ pub enum Commands {
     Doc(doc::DocArgs),
     /// Pluggable Decision Engine: fast probabilistic System 1 classification, model routing, and safety checks.
     Decisions(decisions::Args),
+    /// Intelligent upstream bug detection, deduplication, and reporting with user consent.
+    #[command(name = "report-bug")]
+    ReportBug(report_bug::Args),
 }
 
 impl CeCommand for Commands {
@@ -125,6 +129,7 @@ impl CeCommand for Commands {
             },
             Commands::Spec(args) => crate::commands::spec::run_spec(ctx, args),
             Commands::Doc(args) => doc::run_doc(ctx, args),
+            Commands::ReportBug(args) => report_bug::run(ctx, args),
         }
     }
 }
