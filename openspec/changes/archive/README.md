@@ -67,3 +67,4 @@ Historical notes:
 - retire-ratatui-tui: archived (23/23 tasks) under criterion (1) on 2026-09-26.
 - managed-block-turn0-and-stage2-accuracy: archived (17/17 tasks) under criterion (1) on 2026-09-26.
 - opencode-v2-plugin-loader: archived (22/22 tasks) under criterion (1) on 2026-09-26.
+- ci-pr-size-exception-fallback: archived (14/14 tasks) under criterion (1) on 2026-09-26.
