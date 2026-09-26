@@ -5,6 +5,15 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.72.2] - 2026-09-26
+
+### Fixed
+- **OpenCode V2 Plugin Loader Compatibility (`.opencode/plugins/compound-engineering.js`, `src/opencode/plugins.rs`):**
+  - **Root Cause**: The canonical plugin loader still used the OpenCode V1 plugin shape (default-exported async function returning a hooks object). OpenCode V2 fails such plugins with `Plugin must export a default definition with an id and an effect or setup function` (err_c926271d), breaking Turn-0 RepoState drift delivery, skill command registration, and compaction-time state injection for every OpenCode V2 user.
+  - **V2 Port**: The loader now default-exports `{ id: "compound-engineering", setup(ctx) }` and registers everything through the V2 context: skills via `ctx.skill.transform` (idempotent), skill commands via `ctx.command.transform` (preserving the `Load and execute the <skill> skill.` template with `$ARGUMENTS` expansion and user-command precedence), `session.created`/`session.idle` handling via `ctx.event.subscribe` (with `ctx.session.synthetic` replacing the retired `noReply` prompt idiom), and system-context state injection via `ctx.session.hook("context")` + `ctx.session.hook("compaction")` (replacing `experimental.chat.system.transform` / `experimental.session.compacting`).
+  - **Stale Loader Self-Repair**: `is_valid_loader_content` now requires the V2 `setup` signature in addition to the `session.created` marker, so `install`, `sync`, and `ensure_session_start_plugin` converge V1-format loaders to the embedded V2 builtin and `doctor` reports them as outdated. Legacy `ceLoader` function exports remain valid, preserving the #325 guarantee that sync/upgrade never regress a newer loader.
+  - **Tests**: Added unit coverage for V1 rejection, V2 acceptance, `ceLoader*` stub acceptance, builtin substitution, and `has_session_start_plugin` reporting V1 on-disk loaders as outdated.
+
 ## [1.72.1] - 2026-09-26
 
 ### Changed
