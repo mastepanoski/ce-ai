@@ -1469,6 +1469,7 @@ fn test_doc_debt_no_git_unknown_tri_state() {
         stale_pending: ProbeStatus::Clean,
         solution_drift: ProbeStatus::Clean,
         archive_compaction: ProbeStatus::Clean,
+        concepts_drift: ProbeStatus::Clean,
     };
 
     assert!(!report.git_available);
@@ -2024,6 +2025,7 @@ fn test_doc_debt_report_summary_line_formatting() {
         stale_pending: ProbeStatus::Clean,
         solution_drift: ProbeStatus::Clean,
         archive_compaction: ProbeStatus::Clean,
+        concepts_drift: ProbeStatus::Clean,
     };
     assert_eq!(report_clean_git.summary_line(), "doc debt: clean");
 
@@ -2034,6 +2036,7 @@ fn test_doc_debt_report_summary_line_formatting() {
         stale_pending: ProbeStatus::Clean,
         solution_drift: ProbeStatus::Clean,
         archive_compaction: ProbeStatus::Clean,
+        concepts_drift: ProbeStatus::Clean,
     };
     assert_eq!(
         report_clean_no_git.summary_line(),
@@ -2070,6 +2073,7 @@ fn test_doc_debt_report_summary_line_formatting() {
             missing_frontmatter_fields: vec![],
         }]),
         archive_compaction: ProbeStatus::Clean,
+        concepts_drift: ProbeStatus::Clean,
     };
     assert_eq!(
         report_findings_git.summary_line(),
@@ -2097,6 +2101,7 @@ fn test_doc_debt_report_summary_line_formatting() {
             threshold: 30,
             oldest_package: Some("legacy-pkg".into()),
         }),
+        concepts_drift: ProbeStatus::Clean,
     };
     assert_eq!(
         report_findings_no_git.summary_line(),
@@ -2141,6 +2146,133 @@ fn test_probe_doc_debt_coordination_and_repo_state() {
     let debt = repo_state.doc_debt.unwrap();
     assert!(debt.has_debt());
     assert!(debt.summary_line().contains("1 unarchived (open subtasks)"));
+}
+
+#[test]
+fn test_extract_concepts_terms_and_scrub_parsing() {
+    let markdown = r#"
+# Concepts
+
+> Shared domain vocabulary.
+
+## Overview
+Should be ignored.
+
+## TermA
+First concept.
+
+### TermB
+Second concept.
+
+- **TermC**: Third concept in bold list format.
+- Not a bold term: ignored.
+
+<!-- scrub: OldTerm1, OldTerm2 -->
+<!-- retired: OldTerm3 -->
+"#;
+
+    let (entries, scrubbed) = extract_concepts_terms(markdown);
+    assert_eq!(entries.len(), 3);
+    assert!(entries.contains("TermA"));
+    assert!(entries.contains("TermB"));
+    assert!(entries.contains("TermC"));
+    assert!(!entries.contains("Overview"));
+    assert!(!entries.contains("Concepts"));
+
+    assert_eq!(scrubbed.len(), 3);
+    assert!(scrubbed.contains("OldTerm1"));
+    assert!(scrubbed.contains("OldTerm2"));
+    assert!(scrubbed.contains("OldTerm3"));
+}
+
+#[test]
+fn test_probe_concepts_drift_monotonic_accretion_and_clobber() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+
+    // 1. Missing CONCEPTS.md is clean
+    let clean_res = probe_concepts_drift(root, true);
+    assert!(clean_res.is_clean());
+
+    // 2. Initialize a git repo with CONCEPTS.md
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(root)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(root)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(root)
+        .output()
+        .unwrap();
+
+    let concepts_file = root.join("CONCEPTS.md");
+    std::fs::write(
+        &concepts_file,
+        "# Concepts\n\n## Alpha\nAlpha def\n\n## Beta\nBeta def\n",
+    )
+    .unwrap();
+
+    // Untracked/uncommitted CONCEPTS.md with no HEAD is clean
+    let untracked_res = probe_concepts_drift(root, true);
+    assert!(untracked_res.is_clean());
+
+    // Commit initial CONCEPTS.md
+    std::process::Command::new("git")
+        .args(["add", "CONCEPTS.md"])
+        .current_dir(root)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["commit", "-m", "init concepts"])
+        .current_dir(root)
+        .output()
+        .unwrap();
+
+    // Same content as HEAD is clean
+    let committed_res = probe_concepts_drift(root, true);
+    assert!(committed_res.is_clean());
+
+    // Add a new concept (accretion) -> clean
+    std::fs::write(
+        &concepts_file,
+        "# Concepts\n\n## Alpha\nAlpha def\n\n## Beta\nBeta def\n\n## Gamma\nGamma def\n",
+    )
+    .unwrap();
+    let accreted_res = probe_concepts_drift(root, true);
+    assert!(accreted_res.is_clean());
+
+    // Clobber Beta (delete Beta without scrub tag) -> Debt finding
+    std::fs::write(
+        &concepts_file,
+        "# Concepts\n\n## Alpha\nAlpha def\n\n## Gamma\nGamma def\n",
+    )
+    .unwrap();
+    let clobbered_res = probe_concepts_drift(root, true);
+    assert!(clobbered_res.is_debt());
+    if let ProbeStatus::Debt(finding) = clobbered_res {
+        assert_eq!(finding.path, "CONCEPTS.md");
+        assert_eq!(finding.head_entries_count, 2);
+        assert_eq!(finding.current_entries_count, 2);
+        assert_eq!(finding.deleted_entries, vec!["Beta"]);
+        assert_eq!(finding.added_entries, vec!["Gamma"]);
+    } else {
+        panic!("expected debt finding for clobbered concepts");
+    }
+
+    // Scrub Beta deliberately -> clean
+    std::fs::write(
+        &concepts_file,
+        "# Concepts\n\n<!-- scrub: Beta -->\n\n## Alpha\nAlpha def\n\n## Gamma\nGamma def\n",
+    )
+    .unwrap();
+    let scrubbed_res = probe_concepts_drift(root, true);
+    assert!(scrubbed_res.is_clean());
 }
 
 #[test]

@@ -5,6 +5,20 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.69.1] - 2026-09-25
+
+### Fixed
+- **Monotonic Accretion Guard & Anti-Clobber Protection for CONCEPTS.md in Vocabulary Capture (#424)**:
+  - **Portable Mechanical Guard (`scripts/validate-concepts.py`)**: Added a zero-dependency Python 3 script that extracts concept headings and bold term entries, compares the current working-tree `CONCEPTS.md` against git `HEAD` (handling macOS `/var` -> `/private/var` symlinks via `os.path.realpath`), and detects destructive shrinkage. Fails with exit code 1 if unscrubbed entries from `HEAD` were deleted, while honoring intentional removals marked with `<!-- scrub: <Term> -->` or `<!-- retired: <Term> -->` and providing `--allow-shrink` and `--json` modes.
+  - **Native Rust Diagnostic & Verification Probes (`probe_concepts_drift`)**: Added `probe_concepts_drift` and `ConceptsDriftFinding` to `src/commands/workflow.rs`, integrating concepts drift directly into `DocDebtReport` and Turn-0 FSM summary lines.
+  - **CLI Doc Lint Gate Integration (`ce-ai doc lint`)**: Updated `run_doc_lint` in `src/commands/doc.rs` to audit `CONCEPTS.md` alongside `docs/solutions/`. In `--strict` mode, exits with code 6 (`CeError::Verification`) upon detecting concepts shrinkage, and emits machine-readable multi-probe JSON reports with `--json`.
+  - **Doctor Health Warning (`ce-ai doctor`)**: Wired non-blocking `doctor-warn` alerts when `CONCEPTS.md` suffers destructive shrinkage from `HEAD`, providing actionable remediation guidance.
+  - **Agent Operational Directives & Invariants**:
+    - Added Hard Invariant #12 and Mandatory Constraint #10 to `AGENTS.md`, obligating agents to pre-read `CONCEPTS.md` and use surgical edits (`Edit` / `replace_file_content` / append) rather than destructive full-file `Write`.
+    - Defined `Monotonic Concept Accretion` in `CONCEPTS.md`.
+    - Hardened Phase 2.4 in `ce-compound` (`SKILL.md` and `assembly.md`) to mandate pre-reading, surgical edits, running `validate-concepts.py`, and reporting empirical diff counts.
+  - **Comprehensive Test Coverage**: Added unit tests in `src/commands/tests/workflow.rs` for term extraction, scrub parsing, and drift probing, as well as full CLI end-to-end integration tests in `tests/cli.rs`.
+
 ## [1.69.0] - 2026-09-25
 
 ### Added
