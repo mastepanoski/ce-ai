@@ -1,6 +1,6 @@
 [package]
 name = "ce-ai"
-version = "1.72.1"
+version = "1.72.2"
 edition = "2021"
 description = "Workflow orchestration and governance for Compound Engineering across AI coding agents"
 license = "MIT"

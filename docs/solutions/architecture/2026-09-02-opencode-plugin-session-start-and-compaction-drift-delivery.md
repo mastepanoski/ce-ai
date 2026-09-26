@@ -20,28 +20,23 @@ In `ce-ai v1.31.0`, Turn-0 `RepoState` drift synchronization was guaranteed auto
 ## Technical Solution
 
 ### 1. Canonical OpenCode Plugin (`.opencode/plugins/compound-engineering.js`)
-We implemented a canonical plugin exporting `CompoundEngineeringPlugin` and `default` that integrates with OpenCode's event-driven runtime:
-1. **Dynamic Skill Discovery & Command Registration (`config` hook):**
-   Parses `SKILL.md` frontmatter from `../../skills` and populates `config.skills.paths` and `config.command`.
-2. **Deterministic Turn-0 Resumption (`event` hook):**
-   Subscribes to `event.type === 'session.created'`. Resolves the session identifier (`event.properties?.info?.id || event.properties?.sessionID || event.sessionID`), runs `ce-ai workflow resume` within the session's workspace directory, and delivers live state context via:
+We implemented a canonical OpenCode **V2** plugin (default export `{ id: "compound-engineering", setup(ctx) }`; V1 function exports no longer load under OpenCode V2) that integrates with the server runtime:
+1. **Dynamic Skill & Command Registration (`setup` transforms):**
+   Parses `SKILL.md` frontmatter from `../../skills` and registers each skill via `ctx.skill.transform` (`Skill.Info { id, name, description, path, content }`, idempotent via `editor.get` → `update`/`add`). Every `user-invocable` skill also gets a slash command via `ctx.command.transform` whose `execute` submits the preserved V1 template (`Load and execute the \`<name>\` skill.\n\n$ARGUMENTS`, arguments := `prompt.text`) through `ctx.session.prompt`; names already present in `ctx.command.list()` keep precedence.
+2. **Deterministic Turn-0 Resumption (`ctx.event.subscribe`):**
+   Subscribes to the public event stream (aborted via `AbortController` on unload). On `event.type === 'session.created'` it resolves the top-level `event.sessionID`, runs `ce-ai workflow resume` within `ctx.location.directory`, and delivers live state context via:
    ```javascript
-   await client.session.prompt({
-     path: { id: sessionId },
-     body: {
-       noReply: true,
-       parts: [{ type: "text", text: stateOutput }],
-     },
-   });
+   await ctx.session.synthetic({ sessionID, text: stateOutput });
    ```
-3. **Compaction Survival (`experimental.session.compacting` hook):**
-   Appends live `RepoState` to `output.context` before OpenCode synthesizes its continuation summary.
-4. **Prompt Transformation (`experimental.chat.system.transform` hook):**
-   Provides an additional layer of state delivery into system context where supported.
+   `synthetic` is the V2-native context-only message (the replacement for the retired V1 `client.session.prompt({ noReply: true })` idiom).
+3. **Compaction Survival (`ctx.session.hook("context")` + `ctx.session.hook("compaction")`):**
+   Appends live `RepoState` to `event.system` for every agent-loop request and every checkpoint-summary request, so canonical drift status survives context compaction and is re-injected fresh on the first post-compaction model call.
+4. **Turn-End Checkpoints (`session.idle`):**
+   Runs `ce-ai workflow resume` on every `session.idle` event to evaluate 7-stage FSM progression (output discarded; side effect only).
 
 ### 2. Embedded Builtin Loader & Decoupled Reliability
 To eliminate external dependencies on upstream release tarballs (`everyinc/compound-engineering-plugin`), `src/opencode/plugins.rs` embeds the canonical loader via `include_str!("../../.opencode/plugins/compound-engineering.js")`.
-- `install_loader`: If the source loader lacks `session.created`, it automatically uses `BUILTIN_LOADER`.
+- `install_loader`: If the source loader fails content validation (must carry the `session.created` SessionStart marker AND the V2 `setup` signature — V1 function exports are classified as stale so OpenCode V2's "must export a default definition with an id and an effect or setup function" error cannot recur), it automatically uses `BUILTIN_LOADER`. Legacy `ceLoader` function exports remain valid per the #325 loader-safety guarantee (sync/upgrade never regress a newer loader).
 - `ensure_session_start_plugin`: Idempotently writes `BUILTIN_LOADER` using `write_atomic` and registers the plugin in `opencode.json`.
 - `remove_session_start_plugin`: Surgically strips managed entries (`plugin`, `skills.paths`, `agent`) and cleans up the file if no user configurations remain, preserving custom user configurations.
 

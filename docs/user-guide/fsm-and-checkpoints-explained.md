@@ -303,7 +303,7 @@ In adopted projects (`ce-ai init-prj`), `ce-ai` configures native lifecycle hook
 - **GitHub Copilot**: `sessionStart`, `postToolUse` in `.github/hooks/hooks.json`
 - **Antigravity**: `PreInvocation`, `Stop` in `.agents/hooks.json`
 - **Pi**: `before_agent_start`, `agent_end`, `session_before_compact` in `.pi/extensions/compound-engineering.ts` (`v=2`)
-- **OpenCode**: `session.created`, `session.idle`, `compacting` plugin hooks in `.opencode/plugins/compound-engineering.js`
+- **OpenCode**: `session.created`, `session.idle` event subscriptions plus `context`/`compaction` session hooks in `.opencode/plugins/compound-engineering.js` (OpenCode V2 plugin API)
 
 These hooks execute at turn boundaries and before context compaction, evaluating repository state through `infer_stage_from_repo`:
 - **Stage 1 (Ideation)**: `docs/brainstorms/*.md` or `docs/ideation/*.md` present without OpenSpec changes.

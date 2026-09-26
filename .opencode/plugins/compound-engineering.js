@@ -27,34 +27,40 @@ function parseFrontmatter(content) {
   return fields;
 }
 
+/**
+ * Discovers CE skills in `skillsDir`. Every directory holding a SKILL.md
+ * becomes a registered OpenCode skill; `user-invocable: false` entries are
+ * still registered as skills but receive no slash command (V1 loader parity).
+ */
 function loadSkills() {
-  const commands = {};
+  const skills = [];
   let entries;
   try {
     entries = fs.readdirSync(skillsDir);
   } catch {
-    return commands;
+    return skills;
   }
   for (const entry of entries) {
+    const file = path.join(skillsDir, entry, "SKILL.md");
     let content;
     try {
-      content = fs.readFileSync(path.join(skillsDir, entry, "SKILL.md"), "utf8");
+      content = fs.readFileSync(file, "utf8");
     } catch {
       continue;
     }
     const fields = parseFrontmatter(content);
     if (!fields || !fields.name) continue;
-    if (fields["user-invocable"] === "false") continue;
-    const command = {
-      template: `Load and execute the \`${fields.name}\` skill.\n\n$ARGUMENTS`,
-    };
-    if (fields.description) command.description = fields.description;
-    commands[fields.name] = command;
+    skills.push({
+      id: fields.name,
+      name: fields.name,
+      description: fields.description || "",
+      userInvocable: fields["user-invocable"] !== "false",
+      file,
+      content,
+    });
   }
-  return commands;
+  return skills;
 }
-
-const skillCommands = loadSkills();
 
 /**
  * Executes `ce-ai workflow resume` in the session's workspace directory.
@@ -77,65 +83,116 @@ function getRepoState(cwd) {
   return null;
 }
 
-export const CompoundEngineeringPlugin = async ({ project, client, $, directory, worktree }) => {
-  const cwd = directory || worktree || process.cwd();
+function skillDefinition(skill) {
+  const definition = {
+    id: skill.id,
+    name: skill.name,
+    path: skill.file,
+    content: skill.content,
+  };
+  if (skill.description) definition.description = skill.description;
+  return definition;
+}
 
-  return {
-    config: async (config) => {
-      config.skills = config.skills || {};
-      config.skills.paths = config.skills.paths || [];
-      if (!config.skills.paths.includes(skillsDir)) {
-        config.skills.paths.push(skillsDir);
-      }
-      config.command = config.command || {};
-      for (const [name, cmd] of Object.entries(skillCommands)) {
-        if (!(name in config.command)) {
-          config.command[name] = cmd;
+/**
+ * OpenCode V2 plugin definition. V2 requires a default export carrying an
+ * `id` and a `setup(ctx)` function; hooks, transforms, and subscriptions are
+ * registered on the context instead of being returned from a plugin function
+ * (see https://opencode.ai/v2/docs/build/plugins/migrate-v1).
+ */
+export default {
+  id: "compound-engineering",
+
+  async setup(ctx) {
+    const cwd = (ctx.location && ctx.location.directory) || process.cwd();
+    const skills = loadSkills();
+
+    // Skills: register every discovered SKILL.md. Idempotent when the same
+    // id was already provided (e.g. via the managed `skills.paths` config).
+    await ctx.skill.transform((editor) => {
+      for (const skill of skills) {
+        if (editor.get(skill.id)) {
+          editor.update(skill.id, (existing) => {
+            existing.name = skill.name;
+            existing.path = skill.file;
+            existing.content = skill.content;
+            if (skill.description) existing.description = skill.description;
+          });
+        } else {
+          editor.add(skillDefinition(skill));
         }
       }
-    },
+    });
 
-    event: async ({ event }) => {
-      if (event && event.type === "session.created") {
-        const sessionId =
-          event.properties?.info?.id ||
-          event.properties?.sessionID ||
-          event.sessionID;
+    // Commands: one invocable slash command per user-invocable skill,
+    // preserving the V1 template semantics (`$ARGUMENTS` := prompt text).
+    // Names already taken (e.g. user-configured commands) keep precedence.
+    const existingCommands = new Set();
+    try {
+      const available = await ctx.command.list();
+      for (const command of Array.isArray(available) ? available : []) {
+        if (command && command.name) existingCommands.add(command.name);
+      }
+    } catch {
+      // Registry read is best-effort; registration below still applies.
+    }
+    await ctx.command.transform((editor) => {
+      for (const skill of skills) {
+        if (!skill.userInvocable || existingCommands.has(skill.id)) continue;
+        editor.add({
+          name: skill.id,
+          ...(skill.description ? { description: skill.description } : {}),
+          execute: async ({ sessionID, prompt, delivery }) => {
+            const args = (prompt && typeof prompt.text === "string" && prompt.text) || "";
+            const text = `Load and execute the \`${skill.id}\` skill.\n\n${args}`.trimEnd();
+            await ctx.session.prompt({ sessionID, text, delivery });
+          },
+        });
+      }
+    });
 
-        const stateOutput = getRepoState(cwd);
-        if (sessionId && stateOutput && client && client.session && typeof client.session.prompt === "function") {
-          try {
-            await client.session.prompt({
-              path: { id: sessionId },
-              body: {
-                noReply: true,
-                parts: [{ type: "text", text: stateOutput }],
-              },
-            });
-          } catch {
-            // Non-blocking: continue normal session execution if prompt injection fails
+    // State delivery into assembled model requests: the agent loop
+    // ("context") and checkpoint summaries ("compaction"). Fresh state is
+    // therefore present on the first post-compaction request as well.
+    const injectSystemState = (event) => {
+      const stateOutput = getRepoState(cwd);
+      if (stateOutput && event && Array.isArray(event.system)) {
+        event.system.push({ type: "text", text: stateOutput });
+      }
+    };
+    await ctx.session.hook("context", injectSystemState);
+    await ctx.session.hook("compaction", injectSystemState);
+
+    // Session lifecycle: Turn-0 state injection (synthetic context message,
+    // the V2 replacement for noReply prompts) and turn-end FSM checkpoints.
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+          if (event.type === "session.created") {
+            const sessionId =
+              event.sessionID ||
+              (event.properties &&
+                (event.properties.sessionID ||
+                  (event.properties.info && event.properties.info.id)));
+            const stateOutput = getRepoState(cwd);
+            if (sessionId && stateOutput) {
+              try {
+                await ctx.session.synthetic({ sessionID: sessionId, text: stateOutput });
+              } catch {
+                // Non-blocking: continue normal session execution if injection fails
+              }
+            }
+          } else if (event.type === "session.idle") {
+            // Turn-end auto-checkpoint: invoke ce-ai workflow resume to evaluate stage progression
+            getRepoState(cwd);
           }
         }
-      } else if (event && event.type === "session.idle") {
-        // Turn-end auto-checkpoint: invoke ce-ai workflow resume to evaluate stage progression
-        getRepoState(cwd);
+      } catch {
+        // Subscription aborted during plugin unload.
       }
-    },
+    })();
 
-    "experimental.session.compacting": async (input, output) => {
-      const stateOutput = getRepoState(cwd);
-      if (stateOutput && output && Array.isArray(output.context)) {
-        output.context.push(stateOutput);
-      }
-    },
-
-    "experimental.chat.system.transform": async (input, output) => {
-      const stateOutput = getRepoState(cwd);
-      if (stateOutput && output && Array.isArray(output.system)) {
-        output.system.push(stateOutput);
-      }
-    },
-  };
+    return () => controller.abort();
+  },
 };
-
-export default CompoundEngineeringPlugin;
