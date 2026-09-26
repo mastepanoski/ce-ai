@@ -1581,10 +1581,13 @@ fn doctor_reports_sibling_worktree_info() {
 // ---- CLI completion (CC-1) ----
 
 #[test]
-fn cli_without_subcommand_exits_usage_code_2() {
+fn cli_without_subcommand_prints_status_and_exits_0() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
-    ceai(&config_dir, &home).assert().failure().code(2);
+    ceai(&config_dir, &home)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("installed: none"));
 }
 
 #[test]

@@ -45,11 +45,9 @@ curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/ins
 irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps1 | iex
 
 # Homebrew
-
 brew install mastepanoski/ce-ai/ce-ai
 
 # From source
-
 cargo install --path .
 
 # In your project: install plugin, adopt workflow, and verify setup
@@ -89,7 +87,6 @@ Ideation → OpenSpec → Plan → Work/TDD → Verify → Compound → Ship
 | 🏛️ [Architecture Guide](docs/user-guide/architectural-and-conceptual-guide.md) | Senior | Explanation — deterministic state, adapters, and project artifacts |
 | 🎮 [FSM & Checkpoints](docs/user-guide/fsm-and-checkpoints-explained.md) | Senior | Explanation — lifecycle stages and checkpoints |
 | ⚖️ [Checkpoints vs. Memory](docs/user-guide/checkpoints-vs-memory-explained.md) | Beginner | Explanation — why checkpoints differ from session notes |
-| 🧭 [Workflow Panel](docs/user-guide/workflow-panel-native-vs-agent-skills.md) | Beginner | Explanation — native dashboard actions versus agent skills |
 | 📐 [OpenSpec specifications](openspec/specs/) | Senior | Reference — living system specifications and contracts |
 | 🧠 [Solutions Library](docs/solutions/) · [Plans & Audits](docs/plans/) | Contributor | Reference — solved problems, decisions, and delivery history |
 

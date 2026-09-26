@@ -33,9 +33,9 @@ The recovery engine implements snapshot listing and targeted restoration with th
 - Subcommands `ce-ai backups list` and `ce-ai backups restore <target_id>` accept a target harness filter flag `-t, --harness <name>`.
 - Using `-t` (short for target harness) avoids flag collision with Clap's standard `-h, --help` option, ensuring clean user experience across shells.
 
-### 3. Interactive TUI Backup Dashboard (`src/tui/app.rs`)
-- A dedicated `MenuTab::Backups` panel renders an ASCII table of historical backups sorted newest-first.
-- Users can switch harness targets using `◄`/`►` or `h`/`l` keys, navigate snapshots with `Up`/`Down` arrows, and trigger point-in-time restoration instantly via `[Enter]` or `r`.
+### 3. Backup Management and Recovery (`src/commands/backups.rs`)
+- Point-in-time configuration recovery via `src/commands/backups.rs` (originally surfaced via `<src/tui/app.rs>`).
+- Users can list snapshots sorted newest-first, filter by harness, and trigger atomic restoration.
 
 ## Why This Matters
 - Prevents configuration loss or corruption when experimenting with custom plugins or sync rules across multiple harnesses.

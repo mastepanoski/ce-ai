@@ -31,7 +31,7 @@ An **Atomic Write** (`write_atomic`) is a safety mechanism used when writing fil
 
 ## 1. Sync & Reconcile Mechanism (`ce-ai sync`)
 
-The `ce-ai sync` command (or the `Sync & Reconcile` tab in the TUI) is responsible for **guaranteeing managed asset integrity** and repairing any accidental modifications or deleted files (drift) across your AI tools (`OpenCode`, `Claude Code`, `Pi`, `Cursor`, `Copilot`, `Kimi`, `Antigravity`, etc.).
+The `ce-ai sync` command is responsible for **guaranteeing managed asset integrity** and repairing any accidental modifications or deleted files (drift) across your AI tools (`OpenCode`, `Claude Code`, `Pi`, `Cursor`, `Copilot`, `Kimi`, `Antigravity`, etc.).
 
 ### 🛠️ Step-by-Step Sync Workflow
 
@@ -150,13 +150,13 @@ the same states.
 
 ## 2. Upgrade Release Mechanism (`ce-ai upgrade`)
 
-The `ce-ai upgrade` command (or the `Upgrade Release` tab in the TUI) fetches the **latest official release of the Compound Engineering Plugin published on GitHub** and safely updates all active host harnesses.
+The `ce-ai upgrade` command fetches the **latest official release of the Compound Engineering Plugin published on GitHub** and safely updates all active host harnesses.
 
 ### 🚀 Step-by-Step Upgrade Workflow
 
 ```mermaid
 flowchart TD
-    A[Start: ce-ai upgrade / TUI Upgrade Release] --> B[Step 1: Query GitHub Release API]
+    A[Start: ce-ai upgrade] --> B[Step 1: Query GitHub Release API]
     B --> C[Step 2: Download & Cache SHA256 Release Tarball]
     C --> D[Step 3: Extract Tarball Safely Anti Zip-Slip]
     D --> E[Step 4: Convert Local Sources to GitHub Release]
@@ -197,7 +197,6 @@ flowchart TD
 | :--- | :--- | :--- |
 | **Purpose** | Repair drift, recover deleted or modified files. | Update plugin to a newer GitHub release. |
 | **Data Source** | Currently registered source tree (local or cache). | Queries and downloads latest GitHub Releases. |
-| **TUI Usage** | Press **`[Enter]`** in `Sync & Reconcile` tab. | Press **`[Enter]`** in `Upgrade Release` tab. |
 | **Result** | Files 100% identical to currently installed version. | Files updated to latest official GitHub release tag. |
 
 ---

@@ -9,4 +9,3 @@ pub mod harness;
 pub mod opencode;
 pub mod source;
 pub mod state;
-pub mod tui;

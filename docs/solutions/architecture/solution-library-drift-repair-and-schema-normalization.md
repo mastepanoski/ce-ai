@@ -22,7 +22,7 @@ As `ce-ai` evolved through rapid iterations and architectural refactorings (such
      - `applies_when`: One-sentence semantic trigger providing search agents with clear indexing context.
 
 2. **Dead Path Remediation**:
-   - Pointed all references to the decomposed TUI monolith to the active modular modules (`src/tui/app.rs` or `src/tui/render.rs`).
+   - Pointed all references to decomposed modules to their active locations (or historical tags `<src/tui/app.rs>` / `<src/tui/render.rs>`).
    - Updated references to superseded harness modules to active dispatchers (`src/harness/mod.rs`).
    - Clarified sub-module test paths to point to existing test files (`src/harness/tests/mod_tests.rs`).
 

@@ -32,9 +32,9 @@ tags:
 
 ## Solution Architecture
 
-### 1. Multi-Harness Host Probing (`src/harness/mod.rs`, `src/commands/status.rs`, `src/tui/app.rs`)
+### 1. Multi-Harness Host Probing (`src/harness/mod.rs`, `src/commands/status.rs`)
 - Added `is_ce_installed` and `detect_ce_installed_harnesses` to `HarnessKind`.
-- Updated `ce-ai status` and TUI `Status & Harnesses` tab to probe host-detected agent harnesses alongside `state.json` entries.
+- Updated `ce-ai status` to probe host-detected agent harnesses alongside `state.json` entries.
 
 ### 2. Upgrade Resolution & Local Source Conversion (`src/commands/upgrade.rs`)
 - Removed the blocking early-return guard for `source: local`.

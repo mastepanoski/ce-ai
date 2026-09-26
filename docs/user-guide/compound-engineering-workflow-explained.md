@@ -108,8 +108,8 @@ Progress is tracked at **two complementary levels**:
 ```mermaid
 flowchart LR
     TASK_LEVEL["1. Task & Code Level: openspec/changes/feature/tasks.md"]
-    WORKFLOW_LEVEL["2. Workflow Orchestration Level: ce-ai status / TUI Workflow FSM"]
+    WORKFLOW_LEVEL["2. Workflow Orchestration Level: ce-ai workflow status"]
 ```
 
 1. **Granular Task & Code Progress**: Followed directly in `openspec/changes/<feature_name>/tasks.md`. As `ce-work` completes TDD tasks, checkboxes are marked `- [x]`. (Checkbox marks inside `docs/plans/*.md` bodies are not progress state — the OpenSpec ledger and git history are. If code changes exist but `tasks.md` remains unmarked, `ce-ai` flags a non-blocking desync warning across `workflow resume`, `status`, `checkpoint`, and `doctor`.)
-2. **High-Level Workflow Progress**: Followed using `ce-ai status` or the **Workflow (FSM)** tab in the `ce-ai` TUI dashboard, showing which of the 7 stages the project is currently executing.
+2. **High-Level Workflow Progress**: Followed using `ce-ai workflow status` (or `ce-ai status`), showing which of the 7 stages the project is currently executing.

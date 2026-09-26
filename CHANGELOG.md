@@ -5,6 +5,22 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.72.0] - 2026-09-26
+
+### Removed
+- **Retired Full-Screen Ratatui TUI Subsystem (#435)**:
+  - **Pruned Subsystem**: Completely deleted `src/tui/` (~1,835 LOC across 8 files) and removed `pub mod tui;` from `src/lib.rs`.
+  - **Dependency Manifest Pruning**: Purged `ratatui = "0.30"` and `crossterm = "0.28"` from `Cargo.toml`, removing 11 transitive dependencies (`ratatui-core`, `ratatui-crossterm`, `ratatui-widgets`, `ratatui-macros`, `ratatui-termina`, `ratatui-termwiz`, `crossterm`, `crossterm_winapi`, `lru`) and eliminating previous Dependabot vulnerability alerts.
+  - **Eliminated Terminal Fragility**: Removed raw-mode and alternate-screen buffer management (`RawModeGuard`), eliminating any risk of leaving the user's terminal state corrupted on unexpected panics or process interrupts.
+
+### Changed
+- **Deterministic Bare CLI Dispatch (`src/commands/registry.rs`)**:
+  - Running `ce-ai` without a subcommand now invokes `status::run(ctx)`, instantly printing a rich, non-blocking summary of installed harnesses, drift status, adopted project rules, and git state.
+  - Exits with `0` (Success) in both interactive terminals and non-interactive subshell pipelines, eliminating the previous non-TTY usage error exit (`exit code 2`).
+- **Documentation & User Guide Alignment**:
+  - Removed obsolete guide `docs/user-guide/workflow-panel-native-vs-agent-skills.md`.
+  - Updated `README.md`, `AGENTS.md`, and user guides (`compound-engineering-workflow-explained.md`, `harnesses-loops-and-context-masterclass.md`, `project-adoption-guide.md`, `sync-and-upgrade-mechanisms.md`) to reflect the streamlined, agent-first CLI architecture.
+
 ## [1.71.0] - 2026-09-26
 
 ### Added
