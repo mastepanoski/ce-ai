@@ -688,6 +688,15 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         );
     }
 
+    if let crate::commands::workflow::ProbeStatus::Debt(concepts) = &doc_debt.concepts_drift {
+        println!(
+            "doctor-warn: {} suffered destructive shrinkage (-{} entries from HEAD: {}) — run 'git checkout CONCEPTS.md' or re-compound with surgical Edit",
+            concepts.path,
+            concepts.deleted_entries.len(),
+            concepts.deleted_entries.join(", ")
+        );
+    }
+
     // Living System Specifications Health Probe (living-system-specs-promotion)
     let spec_warnings = crate::commands::spec::probe_specs_health(&repo_root);
     for warn in &spec_warnings {

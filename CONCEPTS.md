@@ -130,3 +130,6 @@ A fast, lightweight, probabilistic micro-decision layer in `ce-ai` that sits bet
 ### Local Decision Engine Provider (Kev & Laya-MLX)
 Zero-cost, unmetered, privacy-preserving execution backends for the Decision Engine that run on localhost without sending code, prompts, or telemetry to external cloud endpoints. Divided into a universal cross-platform backend (`KevProvider`, serving small quantized decision heads like `kev-4b` on port 8009) and an ultra-low latency Apple Silicon backend (`LayaMlxProvider`, running hardware-accelerated MLX decision heads sub-20ms on macOS `aarch64` port 8008).
 
+### Monotonic Concept Accretion
+A strict glossary retention invariant guaranteeing that `CONCEPTS.md` only grows cumulatively over time across compounding runs and agent sessions. Modifying agents must perform surgical in-place edits (`Edit` / `replace_file_content` / append) rather than full-file writes (`Write`), ensuring pre-existing domain terms and section headings are never inadvertently discarded or overwritten. The invariant is mechanically verified across tools: `scripts/validate-concepts.py` and `ce-ai doc lint` audit working tree concepts against git `HEAD`, failing with verification error if entries are removed without an explicit scrub directive (`<!-- scrub: <Term> -->`).
+

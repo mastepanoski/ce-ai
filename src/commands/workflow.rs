@@ -934,6 +934,16 @@ pub struct SolutionDriftFinding {
     pub missing_frontmatter_fields: Vec<String>,
 }
 
+/// Destructive shrinkage / clobber finding for CONCEPTS.md.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConceptsDriftFinding {
+    pub path: String,
+    pub head_entries_count: usize,
+    pub current_entries_count: usize,
+    pub deleted_entries: Vec<String>,
+    pub added_entries: Vec<String>,
+}
+
 /// Umbrella report aggregating documentation technical debt findings across probes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DocDebtReport {
@@ -942,6 +952,7 @@ pub struct DocDebtReport {
     pub stale_pending: ProbeStatus<Vec<StalePendingFinding>>,
     pub solution_drift: ProbeStatus<Vec<SolutionDriftFinding>>,
     pub archive_compaction: ProbeStatus<ArchiveCompactionFinding>,
+    pub concepts_drift: ProbeStatus<ConceptsDriftFinding>,
 }
 
 impl DocDebtReport {
@@ -950,6 +961,7 @@ impl DocDebtReport {
             || self.stale_pending.is_debt()
             || self.solution_drift.is_debt()
             || self.archive_compaction.is_debt()
+            || self.concepts_drift.is_debt()
     }
 
     pub fn summary_line(&self) -> String {
@@ -1019,6 +1031,13 @@ impl DocDebtReport {
             ));
         }
 
+        if let ProbeStatus::Debt(concepts) = &self.concepts_drift {
+            parts.push(format!(
+                "concepts clobber ({} deleted)",
+                concepts.deleted_entries.len()
+            ));
+        }
+
         if !self.git_available && !parts.iter().any(|p| p.contains("[git: n/a]")) {
             parts.push("[git: n/a]".to_string());
         }
@@ -1035,6 +1054,7 @@ impl Default for DocDebtReport {
             stale_pending: ProbeStatus::Clean,
             solution_drift: ProbeStatus::Clean,
             archive_compaction: ProbeStatus::Clean,
+            concepts_drift: ProbeStatus::Clean,
         }
     }
 }
@@ -1977,6 +1997,7 @@ pub fn probe_doc_debt(
         probe_stale_pending_openspecs(repo_root, config.stale_spec_days, git_available);
     let solution_drift = probe_solution_drift(repo_root, config);
     let archive_compaction = probe_archive_compaction(repo_root, config);
+    let concepts_drift = probe_concepts_drift(repo_root, git_available);
 
     DocDebtReport {
         git_available,
@@ -1984,6 +2005,7 @@ pub fn probe_doc_debt(
         stale_pending,
         solution_drift,
         archive_compaction,
+        concepts_drift,
     }
 }
 
@@ -2389,6 +2411,132 @@ fn check_solution_dead_paths(repo_root: &Path, content: &str) -> Vec<String> {
     dead.sort();
     dead.dedup();
     dead
+}
+
+/// Extracts concept terms and scrubbed/retired directives from CONCEPTS.md content.
+pub fn extract_concepts_terms(
+    content: &str,
+) -> (
+    std::collections::BTreeSet<String>,
+    std::collections::BTreeSet<String>,
+) {
+    let mut entries = std::collections::BTreeSet::new();
+    let mut scrubbed = std::collections::BTreeSet::new();
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        // Check for scrub / retired comments: <!-- scrub: Term1, Term2 -->
+        if let Some(scrub_start) = trimmed.find("<!--") {
+            if let Some(scrub_end) = trimmed[scrub_start..].find("-->") {
+                let comment = &trimmed[scrub_start + 4..scrub_start + scrub_end];
+                let comment_lower = comment.to_lowercase();
+                if let Some(pos) = comment_lower.find("scrub:") {
+                    let terms = &comment[pos + 6..];
+                    for t in terms.split(',') {
+                        let clean = t.trim();
+                        if !clean.is_empty() {
+                            scrubbed.insert(clean.to_string());
+                        }
+                    }
+                } else if let Some(pos) = comment_lower.find("retired:") {
+                    let terms = &comment[pos + 8..];
+                    for t in terms.split(',') {
+                        let clean = t.trim();
+                        if !clean.is_empty() {
+                            scrubbed.insert(clean.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Heading lines: ## Term or ### Term
+        if trimmed.starts_with("## ") || trimmed.starts_with("### ") || trimmed.starts_with("#### ")
+        {
+            let heading = trimmed.trim_start_matches('#').trim();
+            let heading_lower = heading.to_lowercase();
+            if heading_lower != "concepts"
+                && heading_lower != "overview"
+                && heading_lower != "table of contents"
+                && heading_lower != "introduction"
+                && heading_lower != "glossary"
+            {
+                entries.insert(heading.to_string());
+            }
+        } else if trimmed.starts_with("- **") || trimmed.starts_with("* **") {
+            // Bullet entries: - **Term**:
+            if let Some(end_bold) = trimmed[4..].find("**:") {
+                let term = trimmed[4..4 + end_bold].trim();
+                let term_lower = term.to_lowercase();
+                if term_lower != "concepts"
+                    && term_lower != "overview"
+                    && term_lower != "table of contents"
+                    && term_lower != "introduction"
+                    && term_lower != "glossary"
+                {
+                    entries.insert(term.to_string());
+                }
+            }
+        }
+    }
+
+    (entries, scrubbed)
+}
+
+/// Probes whether CONCEPTS.md has suffered destructive shrinkage against git HEAD.
+pub fn probe_concepts_drift(
+    repo_root: &Path,
+    git_available: bool,
+) -> ProbeStatus<ConceptsDriftFinding> {
+    let concepts_path = repo_root.join("CONCEPTS.md");
+    if !concepts_path.is_file() {
+        return ProbeStatus::Clean;
+    }
+
+    let current_content = match std::fs::read_to_string(&concepts_path) {
+        Ok(c) => c,
+        Err(_) => return ProbeStatus::Clean,
+    };
+
+    let (current_entries, scrubbed) = extract_concepts_terms(&current_content);
+
+    if !git_available {
+        return ProbeStatus::Clean;
+    }
+
+    let head_output = match git_probe(repo_root, &["show", "HEAD:CONCEPTS.md"]) {
+        Some(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
+        _ => return ProbeStatus::Clean, // Not in HEAD (newly created file)
+    };
+
+    let (head_entries, _) = extract_concepts_terms(&head_output);
+
+    let mut deleted = Vec::new();
+    for head_entry in &head_entries {
+        if !current_entries.contains(head_entry) && !scrubbed.contains(head_entry) {
+            deleted.push(head_entry.clone());
+        }
+    }
+
+    let mut added = Vec::new();
+    for current_entry in &current_entries {
+        if !head_entries.contains(current_entry) {
+            added.push(current_entry.clone());
+        }
+    }
+
+    if deleted.is_empty() {
+        ProbeStatus::Clean
+    } else {
+        ProbeStatus::Debt(ConceptsDriftFinding {
+            path: "CONCEPTS.md".to_string(),
+            head_entries_count: head_entries.len(),
+            current_entries_count: current_entries.len(),
+            deleted_entries: deleted,
+            added_entries: added,
+        })
+    }
 }
 
 /// Criterion met for archiving an OpenSpec change package.

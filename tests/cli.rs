@@ -9116,6 +9116,123 @@ date: "2026-09-10"
 }
 
 #[test]
+fn test_cli_doc_lint_concepts_accretion_and_clobber() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let proj = tmp.path().join("repo");
+    fs::create_dir_all(&proj).unwrap();
+
+    // 1. Initialize git repo
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    // 2. Commit initial CONCEPTS.md with Alpha and Beta
+    let concepts_path = proj.join("CONCEPTS.md");
+    fs::write(
+        &concepts_path,
+        "# Concepts\n\n## Alpha\nAlpha concept.\n\n## Beta\nBeta concept.\n",
+    )
+    .unwrap();
+    std::process::Command::new("git")
+        .args(["add", "CONCEPTS.md"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["commit", "-m", "init concepts"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    // Clean run: CONCEPTS.md matches HEAD
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "lint"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "CONCEPTS.md accreted monotonically",
+        ));
+
+    // Accrete Gamma: clean
+    fs::write(
+        &concepts_path,
+        "# Concepts\n\n## Alpha\nAlpha concept.\n\n## Beta\nBeta concept.\n\n## Gamma\nGamma concept.\n",
+    )
+    .unwrap();
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "lint", "--strict"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "CONCEPTS.md accreted monotonically",
+        ));
+
+    // Clobber Beta: delete Beta without scrub tag
+    fs::write(
+        &concepts_path,
+        "# Concepts\n\n## Alpha\nAlpha concept.\n\n## Gamma\nGamma concept.\n",
+    )
+    .unwrap();
+
+    // Non-strict emits warning on stderr, exit 0
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "lint"])
+        .assert()
+        .success()
+        .stderr(predicates::str::contains("[concepts-clobber]"))
+        .stderr(predicates::str::contains("entry 'Beta' missing"));
+
+    // Strict fails with code 6
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "lint", "--strict"])
+        .assert()
+        .code(6)
+        .stderr(predicates::str::contains("[concepts-clobber]"))
+        .stderr(predicates::str::contains("entry 'Beta' missing"));
+
+    // Deliberate scrub of Beta restores clean status
+    fs::write(
+        &concepts_path,
+        "# Concepts\n\n<!-- scrub: Beta -->\n\n## Alpha\nAlpha concept.\n\n## Gamma\nGamma concept.\n",
+    )
+    .unwrap();
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "lint", "--strict"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "CONCEPTS.md accreted monotonically",
+        ));
+
+    // JSON format emits machine-readable report
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "lint", "--json"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("\"concepts\": {"))
+        .stdout(predicates::str::contains("\"status\": \"clean\""));
+}
+
+#[test]
 fn test_cli_odd_mode_router_and_graduation_lifecycle() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));

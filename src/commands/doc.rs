@@ -648,28 +648,47 @@ fn run_doc_lint(repo_root: &Path, strict: bool, json: bool) -> Result<(), CeErro
     };
 
     let status = crate::commands::workflow::probe_solution_drift(repo_root, &config);
+    let git_available = repo_root.join(".git").exists()
+        || crate::commands::workflow::git_probe(repo_root, &["rev-parse", "--git-dir"])
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+    let concepts_status = crate::commands::workflow::probe_concepts_drift(repo_root, git_available);
+
+    let has_debt = status.is_debt() || concepts_status.is_debt();
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&status)?);
-        if strict && status.is_debt() {
+        #[derive(Serialize)]
+        struct DocLintJsonReport<'a> {
+            solutions: &'a crate::commands::workflow::ProbeStatus<
+                Vec<crate::commands::workflow::SolutionDriftFinding>,
+            >,
+            concepts: &'a crate::commands::workflow::ProbeStatus<
+                crate::commands::workflow::ConceptsDriftFinding,
+            >,
+        }
+        let report = DocLintJsonReport {
+            solutions: &status,
+            concepts: &concepts_status,
+        };
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        if strict && has_debt {
             return Err(CeError::Verification(
-                "solution library drift findings detected in strict mode".to_string(),
+                "solution library or concepts drift findings detected in strict mode".to_string(),
             ));
         }
         return Ok(());
     }
 
-    match status {
+    match &status {
         crate::commands::workflow::ProbeStatus::Clean => {
             println!("doc lint: all solutions have valid frontmatter and resolvable source paths");
-            Ok(())
         }
         crate::commands::workflow::ProbeStatus::Debt(findings) => {
             eprintln!(
                 "doc lint: {} finding(s) detected in docs/solutions/:",
                 findings.len()
             );
-            for f in &findings {
+            for f in findings {
                 for dead_path in &f.dead_paths {
                     eprintln!(
                         "  [dead-path] {}: references non-existent path '{dead_path}'",
@@ -684,19 +703,49 @@ fn run_doc_lint(repo_root: &Path, strict: bool, json: bool) -> Result<(), CeErro
                     );
                 }
             }
-
-            if strict {
-                Err(CeError::Verification(
-                    "solution library drift findings detected in strict mode".to_string(),
-                ))
-            } else {
-                Ok(())
-            }
         }
         crate::commands::workflow::ProbeStatus::Unknown => {
             println!("doc lint: solutions check indeterminate");
-            Ok(())
         }
+    }
+
+    match &concepts_status {
+        crate::commands::workflow::ProbeStatus::Clean => {
+            if repo_root.join("CONCEPTS.md").is_file() {
+                println!(
+                    "doc lint: CONCEPTS.md accreted monotonically without destructive shrinkage"
+                );
+            }
+        }
+        crate::commands::workflow::ProbeStatus::Debt(finding) => {
+            eprintln!(
+                "doc lint: destructive shrinkage detected in {}: {} heading(s) deleted from HEAD without scrub tag:",
+                finding.path,
+                finding.deleted_entries.len()
+            );
+            for deleted in &finding.deleted_entries {
+                eprintln!(
+                    "  [concepts-clobber] {}: entry '{deleted}' missing from current file",
+                    finding.path
+                );
+            }
+            eprintln!(
+                "  empirical diff: {} entries present (was {}, +{} added, -{} removed)",
+                finding.current_entries_count,
+                finding.head_entries_count,
+                finding.added_entries.len(),
+                finding.deleted_entries.len()
+            );
+        }
+        crate::commands::workflow::ProbeStatus::Unknown => {}
+    }
+
+    if strict && has_debt {
+        Err(CeError::Verification(
+            "solution library or concepts drift findings detected in strict mode".to_string(),
+        ))
+    } else {
+        Ok(())
     }
 }
 

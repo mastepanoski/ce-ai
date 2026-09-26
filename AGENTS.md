@@ -18,6 +18,7 @@ All AI agents MUST enforce these hard invariants deterministically at every sess
 9. **Mandatory Versioning & CHANGELOG**: Every merged feature/fix MUST bump SemVer in `Cargo.toml`, update `CHANGELOG.md`, tag release (`vX.Y.Z`), and create a GitHub Release. Homebrew distribution is owned exclusively by the `mastepanoski/homebrew-ce-ai` tap (self-updating); no formula is maintained in this repository.
 10. **Post-Merge Lifecycle & Clean State**: Immediately after merging a PR, switch to `main`, run `git pull`, delete merged local branches (`git branch -d`), prune remotes (`git fetch --prune`), remove turn-created temporary worktrees, and run `ce-ai workflow status`. If any completed OpenSpec changes exist, the AI agent MUST run `ce-ai archive <feature>` (and submit the corresponding archive PR) so the repository FSM is left at `✓ Ready (100%)` with zero unarchived change warnings before concluding.
 11. **Zero AI Attribution & No Co-Author Trailers**: AI agents MUST NEVER add "Co-Authored-By", AI attribution trailers, or "Generated with [Agent]" footers/badges to git commit messages or PR descriptions. All commits MUST use clean Conventional Commits only.
+12. **Monotonic Concept Accretion**: `CONCEPTS.md` MUST NEVER suffer destructive deletion or blind overwrite. Agents MUST use surgical edits (`Edit`/append), execute a mandatory pre-read, and verify changes with `ce-ai doc lint --strict`.
 
 ---
 
@@ -112,6 +113,12 @@ src/
 9. **Zero AI Attribution & No Co-Author Trailers**:
    - AI agents MUST NEVER add "Co-Authored-By", agent attribution trailers, or "Generated with [Agent]" footers/badges to git commit messages or PR descriptions.
    - All commits MUST use clean Conventional Commits only.
+
+10. **Monotonic Concept Accretion & Anti-Clobber Protection (`CONCEPTS.md`)**:
+   - During Stage 6 (`ce-compound` / Vocabulary Capture), agents MUST read `CONCEPTS.md` immediately before editing.
+   - Agents MUST use surgical in-place editing (`Edit` / `replace_file_content` / append) and NEVER perform full-file `Write` overwrites that truncate existing terms.
+   - All modifications must be verified via `scripts/validate-concepts.py` or `ce-ai doc lint --strict`, ensuring existing entries grow monotonically.
+   - Reports must state empirical before/after entry counts (e.g. `N entries (was M, +X added, 0 removed)`).
 
 ---
 
