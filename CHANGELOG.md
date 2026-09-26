@@ -5,6 +5,15 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.72.1] - 2026-09-26
+
+### Changed
+- **Managed Adoption Block Turn-0 Directives & Progressive OpenSpec Accuracy**:
+  - **Hook-Aware Conditional Turn-0 Directives (`render_block_content(AdoptionTier::Full)`)**: Replaced unconditional command to run `ce-ai workflow resume` with hook-aware instructions acknowledging auto-installed `SessionStart` hooks across Claude, Cursor, Codex, Copilot, Pi, and Antigravity. Instructs agents to treat pre-injected context as current and only run `ce-ai workflow resume` if context was absent or suspected stale.
+  - **Progressive OpenSpec Authoring Alignment**: Updated Stage 2 OpenSpec Enforcement Requirements in `render_block_content(AdoptionTier::Full)` to clarify that Stage 2 freezes the contract (`proposal.md`, `exploration.md`, `design.md`, `spec.md`), while `tasks.md` is derived subsequently in Stage 3 (`ce-plan`) prior to opening a PR.
+  - **Managed Block Version Bump (`BLOCK_VERSION: 7`)**: Bumped `BLOCK_VERSION` 6 $\to$ 7 in `src/commands/init_prj.rs` and lockstep test constant `CUR_BLOCK_VERSION: 7` in `tests/cli.rs`.
+  - **Test Suite Synchronization**: Added unit and integration tests verifying clean staleness reporting for `v=6` blocks and seamless upgrade to `v=7` retaining custom user rules and CRLF line endings.
+
 ## [1.72.0] - 2026-09-26
 
 ### Removed

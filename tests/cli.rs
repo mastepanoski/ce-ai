@@ -13,7 +13,7 @@ use tempfile::TempDir;
 /// embeds a block header must derive from this constant: a stale hardcoded
 /// version flips classifier branches after a bump (see
 /// docs/solutions/test-failures/adoption-block-version-bump-test-coordination-2026-08-25.md).
-const CUR_BLOCK_VERSION: u32 = 6;
+const CUR_BLOCK_VERSION: u32 = 7;
 
 fn block_begin_prefix(tier: &str) -> String {
     format!("<!-- ce-ai:block begin v={CUR_BLOCK_VERSION} tier={tier}")
@@ -2714,7 +2714,58 @@ fn init_prj_upgrades_stale_v5_block_to_v6_with_self_explaining_directives() {
 
     let state_val: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(config_dir.join("state.json")).unwrap()).unwrap();
-    assert_eq!(state_val["projects"][0]["block_version"], 6);
+    assert_eq!(state_val["projects"][0]["block_version"], CUR_BLOCK_VERSION);
+}
+
+#[test]
+fn init_prj_upgrades_stale_v6_block_to_v7_with_turn0_and_progressive_openspec() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("v6-adopted-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    let user_head = "# My Project\n\nCustom notes.\n\n";
+    let v6_block = "<!-- ce-ai:block begin v=6 tier=full sha256=abcdef123456 -->\n## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement\n\nLegacy v6 content.\n<!-- ce-ai:block end -->";
+    fs::write(
+        &agents_file,
+        format!("{}{}{}", user_head, v6_block, "\nTrailing notes.\n"),
+    )
+    .unwrap();
+
+    // Doctor reports stale version v=6
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("stale block version v=6"))
+        .stdout(predicate::str::contains(
+            "re-run ce-ai init-prj --tier full to upgrade",
+        ));
+
+    // Re-running init-prj upgrades to v7
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let updated_text = fs::read_to_string(&agents_file).unwrap();
+    assert!(updated_text.starts_with(user_head));
+    assert!(!updated_text.contains("Legacy v6 content."));
+    assert!(updated_text.contains(&block_begin_prefix("full")));
+    assert!(updated_text.contains("SessionStart hook on supported harnesses"));
+    assert!(updated_text.contains("do NOT re-run the command"));
+    assert!(updated_text.contains("OpenSpec is authored progressively"));
+    assert!(updated_text.contains("frozen Stage 2 contract"));
+
+    let state_val: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(config_dir.join("state.json")).unwrap()).unwrap();
+    assert_eq!(state_val["projects"][0]["block_version"], CUR_BLOCK_VERSION);
 }
 
 #[test]
@@ -5419,7 +5470,11 @@ fn init_prj_full_tier_contains_turn_zero_directive() {
 
     let agents_text = fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap();
     assert!(agents_text.contains("### ⚡ Turn-0 Session Directives (Zero-Step Drift Recovery)"));
+    assert!(agents_text.contains("SessionStart hook on supported harnesses"));
+    assert!(agents_text.contains("do NOT re-run the command"));
     assert!(agents_text.contains("ce-ai workflow resume"));
+    assert!(agents_text.contains("OpenSpec is authored progressively"));
+    assert!(agents_text.contains("frozen Stage 2 contract"));
 }
 
 #[test]
