@@ -61,3 +61,4 @@ Historical notes:
 - fix-jev-systemone-wire-protocol: archived (33/33 tasks) under criterion (1) on 2026-09-24.
 - reposition-public-messaging: archived (6/6 tasks) under criterion (1) on 2026-09-24.
 - self-explaining-pr-directives: archived (16/16 tasks) under criterion (1) on 2026-09-25.
+- prevent-concepts-clobber: archived (19/19 tasks) under criterion (1) on 2026-09-26.
