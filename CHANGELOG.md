@@ -5,6 +5,11 @@ All notable changes to `ce-ai` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Documentation
+- Corrected spec-driven-vs-chat-tdd-explained.md: Experiment 004 now reports both exercises with per-comparison ratios, reflects the author's conclusion that H2 (better design with TDD) is not supported, scopes the O(1)/O(n) claim, and reframes TDD as an implementation technique within bounded units.
+
 ## [1.72.3] - 2026-09-26
 
 ### Added
