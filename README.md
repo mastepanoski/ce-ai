@@ -8,8 +8,8 @@ A developer familiar with [Compound Engineering](https://github.com/EveryInc/com
 
 The Compound Engineering Plugin provides the skills and workflow methodology (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`). `ce-ai` provides the operational and governance layer around them:
 
-- **Multi-harness workflow integration**: Installs, synchronizes, and drift-audits plugin assets across 10 native harnesses (Claude Code, OpenCode, Cursor, Codex, Copilot, AGY, Kimi, Grok, Pi, FX) with atomic writes and automatic backups.
-- **Workflow FSM & stage validation**: Validates state transitions across 7 development stages so agents cannot silently skip verification or compound learning.
+- **Multi-harness workflow integration**: Installs, synchronizes, and drift-audits plugin assets across 10 native harnesses (Claude Code, OpenCode, Cursor, Codex, Copilot, AGY, Kimi, Grok, Pi, FX) with atomic writes and per-harness pre-mutation backups.
+- **Workflow FSM & stage tracking**: Records and validates legal transitions across 7 development stages; teams supply the test and knowledge-capture evidence required by their workflow.
 - **Checkpoints & drift recovery**: Snapshots progress before context compactions and synchronizes disk reality (`RepoState`) upon resumption.
 - **Project adoption**: Injects tamper-evident, SHA256-verified workflow contracts into project rule files (`ce-ai init-prj`).
 - **Skill registry & model profiles**: Discovers skills across hosts, manages workspace isolation, and handles role-scoped model assignments.
@@ -62,7 +62,7 @@ Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <
 Ideation → OpenSpec → Plan → Work/TDD → Verify → Compound → Ship
 ```
 
-`ce-ai` governs progression through this flywheel by validating stage transitions and workflow state, ensuring verified decisions compound into `docs/solutions/` instead of vanishing in chat history. For formal changes, it coordinates [OpenSpec](openspec/specs/); for routine tactical tasks, it provides an optional fast path via Organic Driven Development (ODD, by Alan Buscaglia / Gentle AI).
+`ce-ai` governs progression through this flywheel by validating stage transitions and surfacing repository state. Teams attach empirical verification and capture decisions in `docs/solutions/`; for formal changes it coordinates [OpenSpec](openspec/specs/), while routine tactical tasks can use Organic Driven Development (ODD, by Alan Buscaglia / Gentle AI).
 
 ## Documentation map
 

@@ -166,7 +166,7 @@ If you need to stop working and continue hours or days later:
    ce-ai workflow resume
    ```
 3. **What Happens Behind the Scenes**:
-   - `ce-ai` reads `state.json` and queries Engram persistent memory (`mem_context` / `mem_search`) to restore your exact 7-stage phase, active task string, and OpenSpec checklist state—allowing you to pick up with 100% zero context loss.
+   - `ce-ai` reads `state.json` and re-probes repository, manifest, and OpenSpec state to restore the recorded phase, active task string, and current checklist context. Engram retrieval, when configured in a harness, remains separate from this command.
 
 ---
 

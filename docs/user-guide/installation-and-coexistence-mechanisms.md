@@ -20,16 +20,16 @@ Before reading the installation steps, here are simple explanations for key term
 **`state.json`** is `ce-ai`'s central management state file located at `~/.ce-ai/state.json`. It keeps track of all installed harnesses on your machine, their active versions, last sync timestamps, and agent model assignments (`ce-brainstorm`, `ce-plan`, etc.).
 
 ### What is an Automatic Pre-Mutation Backup?
-Before `ce-ai` makes any changes to your AI tools' configuration files (like `.claude.json` or `opencode.json`), it creates an exact, timestamped copy of your existing file under `~/.ce-ai/backups/`. If you ever uninstall or need to revert, `ce-ai` uses this backup to restore your system to its exact pre-installation state.
+Before `ce-ai` makes any changes to your AI tools' configuration files (like `.claude.json` or `opencode.json`), it creates an exact, timestamped copy of your existing file under `~/.ce-ai/backups/`. On uninstall, `ce-ai` uses the matching harness snapshot to restore the pre-install configuration.
 
 ### What is Non-Destructive Config Merging?
-"Non-destructive" means `ce-ai` **never deletes or overwrites** your custom settings, API keys, MCP servers, or official application plugins. Instead, it reads your existing JSON configuration file, adds or updates *only* the `compound-engineering` plugin and skill entries, and re-saves the file cleanly.
+"Non-destructive" means `ce-ai` preserves unrelated custom settings, API keys, MCP servers, and official application plugins. It writes CE-managed entries and keeps a pre-install backup so uninstall can restore the exact prior configuration. A user entry that deliberately uses a CE companion name (for example `codegraph`) is temporarily replaced while CE is installed, then restored from that snapshot during uninstall.
 
 ---
 
 ## 1. Step-by-Step Installation Pipeline (`ce-ai install`)
 
-When executing `ce-ai install --harness claude` (or `--all`), `ce-ai` executes a strict 6-step pipeline ensuring **zero data loss**.
+When executing `ce-ai install --harness claude` (or `--all`), `ce-ai` executes a six-step pipeline with a pre-mutation configuration snapshot.
 
 ```mermaid
 flowchart TD
@@ -52,7 +52,7 @@ flowchart TD
 #### Step 2: Automatic Pre-Mutation Backup (`~/.ce-ai/backups/`)
 - Before writing any files or modifying configuration on disk, `ce-ai` checks if pre-existing harness configuration files (e.g., `.claude.json` or `opencode.json`) exist.
 - If present, it creates an immutable, timestamped backup copy inside `~/.ce-ai/backups/<timestamp>/`.
-- This guarantees that running `ce-ai uninstall` or restoring a backup reverts your system to its exact pre-installation state.
+- This lets `ce-ai uninstall` restore the exact pre-installation configuration snapshot for the harness.
 
 #### Step 3: Atomic Disk Asset Copy
 - Copies skills (`skills/`) and loader scripts into the user's managed directory (`~/.config/opencode/compound-engineering/` or harness-specific directories).
@@ -74,7 +74,7 @@ flowchart TD
 
 ## 2. Coexistence with Official Harness Setups (Claude Code, Cursor, OpenCode, etc.)
 
-`ce-ai` adheres to the **Total User Configuration Preservation Principle** (ISO/IEC 27001 compliance). It NEVER deletes, overwrites, or clobbers user settings or native official application configurations.
+`ce-ai` preserves unrelated user settings and native configuration. CE-owned companion keys may be updated during installation; the per-harness pre-install snapshot is restored on uninstall.
 
 ### 🤖 1. Coexistence in Claude Code (`.claude.json` / `~/.claude/`)
 - **Strategy**: Safe JSON Config Merger (`ensure_plugin_and_skills`).
@@ -124,7 +124,7 @@ flowchart TD
 
 ## 🛡️ Summary of Safety Guarantees
 
-1. **Zero Destructive Overwrites**: No official application plugin or custom user configuration is ever deleted.
-2. **Clean Uninstallation (`ce-ai uninstall`)**: Uninstallation removes only `ce-ai` managed assets or restores the original pre-install backup created in Step 2.
+1. **Scoped Configuration Mutation**: CE writes only managed entries and preserves unrelated configuration.
+2. **Clean Uninstallation (`ce-ai uninstall`)**: Uninstallation restores the original pre-install backup created in Step 2 when one exists, or removes CE-managed entries otherwise.
 3. **Auditability**: Every change is tracked in `install-manifest.json` with per-file SHA256 hashes.
 4. **Git Repository Cleanliness**: Machine-local workspace installations are automatically excluded via `.gitignore` sentinels.

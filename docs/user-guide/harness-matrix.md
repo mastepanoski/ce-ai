@@ -28,11 +28,11 @@
 
 ## Safety Guarantees
 
-Every strategy is backed by the same guarantees:
+For supported installations with an existing harness configuration, `ce-ai` provides these safeguards:
 
-- Pre-mutation timestamped backups in `~/.ce-ai/backups/` before any config write.
+- A timestamped per-harness pre-mutation backup in `~/.ce-ai/backups/`.
 - SHA256 manifest indexing per installed file for drift detection.
-- Atomic writes (`write_atomic`: tempfile + rename) — a crashed process never leaves a half-written config.
-- Clean restoration via `ce-ai uninstall --harness <name>`.
+- Atomic writes (`write_atomic`: tempfile + rename) for managed configuration writes.
+- On uninstall, restoration of the matching pre-install snapshot when one exists; otherwise, removal of CE-managed entries.
 
 See [Backup & Uninstall](backup-and-uninstall.md) for the full lifecycle.

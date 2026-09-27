@@ -88,7 +88,7 @@ AI-assisted development in `ce-ai` is governed by a **Finite State Machine (FSM)
 $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \xrightarrow{3} \text{Work/TDD} \xrightarrow{4} \text{Verify} \xrightarrow{5} \text{Compound} \xrightarrow{6} \text{Ship}$$
 
 ### 💡 Architectural Rationale
-- **Compound Engineering Alignment**: Compound Engineering dictates that software development must act as a self-reinforcing flywheel: every solved bug, design decision, and feature must compound knowledge over time. The FSM strictly mandates **Stage 6: Compound (`ce-compound`)**, ensuring agents document learnings in `docs/solutions/` and `CONCEPTS.md` before any task can close.
+- **Compound Engineering Alignment**: Compound Engineering uses a self-reinforcing flywheel: solved bugs, design decisions, and features should compound knowledge over time. The FSM records Stage 6: Compound (`ce-compound`); the team workflow supplies the documentation evidence in `docs/solutions/` and `CONCEPTS.md`.
 - **FSM Sub-Loops & Diagnostic Interrupts**:
   - *Idea Discovery Sub-Loop (`ce-ideate` in Stage 1)*: Generates and ranks candidate directions into a `docs/ideation/` dossier (no code, no requirements) before transitioning to `ce-brainstorm` for structured requirements framing; the chosen idea and rejected alternatives distill into OpenSpec's `exploration.md`.
   - *Diagnostic Interrupt Sub-Loop (`ce-debug` in Stage 4/5)*: Triggered on test failure or bug detection. Freezes task state, enters an iterative diagnosis loop (hypothesis ➔ log extraction ➔ minimal reproducer ➔ root cause fix), and once verified, transitions control back to `ce-work` or `Verify` while tagging `ce-compound` if a non-obvious learning was uncovered.
@@ -96,7 +96,7 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
 - **Determinism over Probability**: Code generation with LLMs is inherently probabilistic. Without an FSM enforcing formal specifications (`OpenSpec`), plans (`Plan`), and test-driven verification (`TDD`), execution degrades into superficial patches.
 - **Checkpointing, Cross-Session Resumption & Multi-Harness Handoffs**:
   - *Problem*: During long-running tasks or multi-harness workflows, an LLM's context window undergoes compaction or a developer switches editors (e.g. from Claude Code to Cursor or Antigravity).
-  - *Solution*: `ce-ai workflow checkpoint` atomically serializes the FSM phase and active subtask to disk. Any harness running `ce-ai workflow resume` reads the shared disk state (`state.json` + Engram memory) and seamlessly continues work with 100% zero context loss.
+  - *Solution*: `ce-ai workflow checkpoint` atomically serializes the FSM phase and active subtask to disk. `ce-ai workflow resume` re-probes local repository, manifest, and OpenSpec state alongside that checkpoint; configured memory sidecars remain a separate harness concern.
 - **Git Worktree Scope Isolation (`ce-worktree`)**:
   - *Problem*: Concurrent feature development across multiple Git worktrees can pollute shared configs or CodeGraph indices.
   - *Solution*: `ce-ai install --scope workspace` inside a worktree isolates managed skills (`./.opencode/`, `./.claude/`) to that worktree's path, while independent `.codegraph/` indices prevent call-graph corruption across worktrees.
@@ -123,7 +123,7 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
      - **Remove**: Stale or deprecated assets.
 
 3. **User Configuration Preservation Principle**:
-   - Non-destructive JSON mergers ensure `ce-ai` never deletes or clobbers custom user keys, third-party plugins, or MCP servers.
+   - Targeted JSON mergers preserve unrelated user keys, third-party plugins, and MCP servers. CE-managed companion-name entries are restored from the per-harness pre-install snapshot during uninstall.
 
 ---
 

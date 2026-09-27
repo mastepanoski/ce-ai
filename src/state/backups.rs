@@ -116,6 +116,27 @@ pub fn backup_file(root: &Path, source: &Path) -> Result<PathBuf, CeError> {
     Ok(dest)
 }
 
+/// Copies a native harness configuration into a timestamped backup with an
+/// explicit harness identity when its filename is otherwise ambiguous.
+///
+/// Kimi and FX use `mcp.json`, while AGY uses `mcp_config.json`; retaining the
+/// identity in the backup filename lets listing and uninstall select the
+/// correct snapshot even when a user overrides the harness home directory.
+pub fn backup_harness_file(root: &Path, harness: &str, source: &Path) -> Result<PathBuf, CeError> {
+    let harness = harness.trim().to_ascii_lowercase();
+    if !matches!(harness.as_str(), "kimi" | "agy" | "fx") {
+        return backup_file(root, source);
+    }
+
+    let raw_name = source
+        .file_name()
+        .ok_or_else(|| CeError::Runtime("backup source has no file name".to_string()))?
+        .to_string_lossy();
+    let dest = root.join(backup_ts()).join(format!("{harness}-{raw_name}"));
+    write_atomic(&dest, &std::fs::read(source)?)?;
+    Ok(dest)
+}
+
 /// Lists all historical backup snapshots under `root`, optionally filtered by harness target.
 pub fn list_backups(
     root: &Path,

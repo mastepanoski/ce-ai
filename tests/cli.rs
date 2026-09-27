@@ -4052,10 +4052,15 @@ fn uninstall_kimi_harness_cleans_native_dir_artifacts_and_preserves_user_configs
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
     let source = ce_source(tmp.path());
 
-    // Pre-populate user config
+    // A user-owned entry can use the same name as a CE companion. The
+    // pre-install snapshot, rather than name-based removal, must win.
     let initial_json = r#"{
       "user_setting": "enabled",
       "mcpServers": {
+        "codegraph": {
+          "command": "my-custom-codegraph",
+          "args": ["--user-owned"]
+        },
         "user_custom": {
           "command": "my-custom-cmd",
           "args": ["run"]
@@ -4067,6 +4072,7 @@ fn uninstall_kimi_harness_cleans_native_dir_artifacts_and_preserves_user_configs
     fs::write(kimi_dir.join("mcp.json"), initial_json).unwrap();
 
     ceai(&config_dir, &home)
+        .env_remove("KIMI_CODE_HOME")
         .args([
             "install",
             "--harness",
@@ -4078,19 +4084,14 @@ fn uninstall_kimi_harness_cleans_native_dir_artifacts_and_preserves_user_configs
         .success();
 
     ceai(&config_dir, &home)
+        .env_remove("KIMI_CODE_HOME")
         .args(["uninstall", "--harness", "kimi"])
         .assert()
         .success();
 
     let kimi_config = home.join(".kimi-code/mcp.json");
     assert!(kimi_config.exists());
-    let content = fs::read_to_string(&kimi_config).unwrap();
-    let config: serde_json::Value = serde_json::from_str(&content).unwrap();
-    assert_eq!(config["user_setting"].as_str().unwrap(), "enabled");
-    let mcp = config["mcpServers"].as_object().unwrap();
-    assert!(mcp.contains_key("user_custom"));
-    assert!(!mcp.contains_key("codegraph"));
-    assert!(!mcp.contains_key("engram"));
+    assert_eq!(fs::read_to_string(&kimi_config).unwrap(), initial_json);
     assert!(!home.join(".kimi-code/skills").exists());
     assert!(!home.join(".config/opencode").exists());
 

@@ -17,7 +17,7 @@ use crate::source::cache::{managed_tree, record_tarball_provenance, Cache};
 use crate::source::release::{
     pinned_version_and_url, resolve_github_token, resolve_latest_release,
 };
-use crate::state::backups::backup_file;
+use crate::state::backups::{backup_file, backup_harness_file};
 use crate::state::state::{ReleaseProvenance, State};
 use crate::state::write_atomic;
 
@@ -219,8 +219,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
         // Apply: back up the existing config, then copy managed files (OI-1, OI-3).
         let backup = if needs_backup {
-            Some(backup_file(
+            Some(backup_harness_file(
                 &ctx.config_dir.join("backups"),
+                &harness_kind.to_string(),
                 &target_config,
             )?)
         } else {

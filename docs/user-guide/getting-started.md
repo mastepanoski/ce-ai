@@ -29,7 +29,7 @@ Before touching a terminal, get this distinction straight — it is the #1 sourc
 
 ## 3. Install the `ce-ai` binary
 
-Pick one (full options in the [README](../../README.md#quick-path)):
+Pick one (full options in the [README](../../README.md#try-it-in-two-minutes)):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.sh | bash

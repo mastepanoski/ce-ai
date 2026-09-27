@@ -2,15 +2,19 @@
 
 > **Intent**: How-to — back up, restore, and cleanly remove `ce-ai` and the Compound Engineering plugin without data loss. For installation, see the [Installation & Coexistence Guide](installation-and-coexistence-mechanisms.md).
 
-`ce-ai` is built with a zero-data-loss guarantee for host harness configurations across all supported harnesses (see [Harness Matrix](harness-matrix.md)).
+`ce-ai` creates a per-harness pre-install backup before mutating an existing host configuration and restores that snapshot during uninstall (see [Harness Matrix](harness-matrix.md)). Keep an independent backup for configuration changes made outside this lifecycle.
 
 ## Automatic Pre-Mutation Backups
 
-Before any file write or configuration update during `install` or `models set`, `ce-ai`:
+Before mutating an existing harness configuration during `install`, `ce-ai`:
 
 1. Checks whether pre-existing harness configs exist (e.g. `opencode.json`, `.claude.json`, `.cursorrules`).
 2. Creates a timestamped backup copy inside `~/.ce-ai/backups/<utc-timestamp>/`.
 3. Registers the backup path in the managed manifest (`install-manifest.json`).
+
+`models set` writes the targeted agent model atomically and records an
+append-only **model-profile snapshot**; it does not create a harness-config
+backup.
 
 ## Atomic Uninstall (`ce-ai uninstall`)
 

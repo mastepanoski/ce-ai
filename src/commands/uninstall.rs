@@ -206,13 +206,6 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 for tool in &["codegraph", "engram", "context7", "rtk"] {
                     crate::harness::agy::unregister_agy_mcp_server(&target_config, tool)?;
                 }
-                let legacy_json = config_dir.join("antigravity-cli").join("antigravity.json");
-                if legacy_json.exists() {
-                    crate::state::report_best_effort_remove(
-                        &legacy_json,
-                        std::fs::remove_file(&legacy_json),
-                    );
-                }
             } else if harness_kind == HarnessKind::Claude {
                 for tool in &["codegraph", "engram", "context7", "rtk"] {
                     crate::harness::claude::unregister_claude_mcp_server(&target_config, tool)?;
@@ -237,6 +230,19 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 crate::opencode::plugins::remove_session_start_plugin(&config_dir)?;
             } else if target_config.is_file() {
                 std::fs::remove_file(&target_config)?;
+            }
+
+            // The legacy Antigravity artifact is CE-managed independently of
+            // the MCP config backup. Restore may short-circuit the Agy
+            // unregister branch above, so cleanup must remain outside it.
+            if harness_kind == HarnessKind::Agy {
+                let legacy_json = config_dir.join("antigravity-cli").join("antigravity.json");
+                if legacy_json.exists() {
+                    crate::state::report_best_effort_remove(
+                        &legacy_json,
+                        std::fs::remove_file(&legacy_json),
+                    );
+                }
             }
 
             if crate::harness::rtk::is_rtk_supported(harness_kind) {
