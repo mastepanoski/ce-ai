@@ -2,7 +2,10 @@ use std::fs;
 use std::path::Path;
 use tempfile::tempdir;
 
-use crate::state::backups::{backup_file, list_backups, restore_backup_by_id, restore_latest};
+use crate::state::backups::{
+    backup_file, backup_harness_file, list_backups, newest_backup_for_harness,
+    restore_backup_by_id, restore_latest,
+};
 
 fn write_file(root: &Path, rel: &str, content: &str) {
     let path = root.join(rel);
@@ -19,6 +22,44 @@ fn backup_creates_timestamped_dir_with_copy() {
     assert!(dest.starts_with(dir.path().join("backups")));
     assert_eq!(fs::read_to_string(&dest).unwrap(), r#"{"version":1}"#);
     assert_eq!(fs::read_to_string(&source).unwrap(), r#"{"version":1}"#);
+}
+
+#[test]
+fn native_ambiguous_config_backups_preserve_harness_identity() {
+    let dir = tempdir().unwrap();
+    let backups = dir.path().join("backups");
+    let fixtures = [
+        ("kimi", ".kimi-code/mcp.json"),
+        ("agy", ".gemini/config/mcp_config.json"),
+        ("fx", ".fx/mcp.json"),
+    ];
+
+    for (harness, relative_path) in fixtures {
+        let source = dir.path().join(relative_path);
+        write_file(dir.path(), relative_path, r#"{"mcpServers":{"keep":{}}}"#);
+        let backup = backup_harness_file(&backups, harness, &source).unwrap();
+        assert!(backup
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with(&format!("{harness}-"))));
+
+        let discovered = list_backups(&backups, Some(harness)).unwrap();
+        assert!(discovered.iter().any(|entry| entry.path == backup));
+
+        write_file(
+            dir.path(),
+            relative_path,
+            r#"{"mcpServers":{"codegraph":{"command":"ce"}}}"#,
+        );
+        let selected = newest_backup_for_harness(&backups, harness)
+            .unwrap()
+            .expect("native backup must be selectable for restoration");
+        restore_backup_by_id(&backups, &selected.id, &source).unwrap();
+        assert_eq!(
+            fs::read_to_string(&source).unwrap(),
+            r#"{"mcpServers":{"keep":{}}}"#
+        );
+    }
 }
 
 #[test]

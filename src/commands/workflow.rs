@@ -59,7 +59,7 @@ pub enum Action {
         #[arg(long, value_name = "MODE")]
         mode: Option<String>,
     },
-    /// Resume workflow from exact checkpoint using Engram memory and OpenSpec state.
+    /// Resume workflow from local checkpoint, repository, and OpenSpec state.
     Resume {
         /// Output machine-readable JSON format.
         #[arg(long)]

@@ -84,7 +84,7 @@ flowchart TD
    - `ce-ai` surfaces missing or stale specs rather than hiding them (`workflow resume` reports proposal/spec/tasks presence; `doctor` flags adoption drift), but the gate is advisory for the LLM — enforced by policy and review, not by the CLI refusing to run.
 
 3. **Self-Reinforcing Quality**:
-   - Each completed FSM cycle enriches Engram persistent memory and `docs/solutions/`. In subsequent sessions, agents query these artifacts via `ce-ai tools` and `mem_search`, surfacing known failure modes before they repeat.
+   - Each completed FSM cycle should enrich `docs/solutions/`. Teams that run Engram separately may also save and retrieve durable learnings through its MCP tools; `ce-ai` does not perform those memory calls.
 
 #### The 7 Stages & Skill Alignment Matrix:
 
@@ -175,7 +175,7 @@ flowchart TD
     D --> E{Context Compaction or Crash?}
     E -->|Yes| F[New Agent Session / Re-hydration]
     F --> G[Run: ce-ai workflow resume]
-    G --> H[Resumes at Task 4.3 with 100% Zero Data Loss]
+    G --> H[Resumes with recorded state and fresh local probes]
 ```
 
 ### 🧠 Why AI Needs Checkpoints: Context Compaction
@@ -348,7 +348,7 @@ flowchart TD
 | **New Feature / Enhancement** | Stage 1 (`ce-brainstorm`) | Stages 1 ➔ 2 ➔ 3 ➔ 4 ➔ 5 ➔ 6 ➔ 7 | Formal OpenSpec (`proposal`, `spec`, `tasks`) + Plan + TDD + Solution + PR |
 | **Bug Fix / Crash Repair** | Stage 4 (`ce-debug`) | Stage 4 (Direct Entry) ➔ 5 ➔ 6 ➔ 7 | Bypasses feature briefs; reproduces test ➔ applies fix ➔ tags `ce-compound` |
 | **Approach Uncertain** | Stage 0/1 (`ce-ideate`) | Idea Discovery Sub-Loop ➔ Stage 1 (`ce-brainstorm`) ➔ Stage 2 | Ranked dossier in `docs/ideation/`; chosen idea + rejected alternatives distill into `exploration.md` |
-| **Session Interruption & Resume** | Any Stage | Resumes at exact checkpoint | Atomic disk writes (`state.json`) + Engram persistent memory re-hydration |
+| **Session Interruption & Resume** | Any Stage | Re-probes the local checkpoint and repository context | Atomic disk writes (`state.json`) + local repository/OpenSpec probes |
 | **Multi-Harness Handoff** | Any Stage | Harness-Agnostic State Traversal | Shared disk state allows Claude Code to ideate, Cursor to edit, and AGY to ship |
 | **Git Worktree Isolation** | Worktree Root | Workspace-Scoped Traversal | `install --scope workspace` isolates state and CodeGraph per worktree |
 | **Docs / Research Fast-Track** | Stage 1 or Stage 6 | Targeted Pass | Bypasses code implementation; mutates `docs/solutions/` or research summary directly |
@@ -362,7 +362,7 @@ flowchart TD
 | :--- | :--- | :--- |
 | `ce-ai workflow status` | Checking the Map | Queries current FSM stage, active subtask, and variant capability status. |
 | `ce-ai workflow checkpoint` | Saving Your Game | Persists stage name, task string, and timestamp atomically to disk. |
-| `ce-ai workflow resume` | Reloading Your Save | Re-hydrates state and Engram memory across sessions, handoffs, or compactions. |
+| `ce-ai workflow resume` | Reloading Your Save | Re-hydrates local checkpoint, repository, manifest, and OpenSpec context. |
 
 ---
 

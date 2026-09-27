@@ -112,9 +112,9 @@ flowchart TD
    - On session start or context compaction, `ce-ai workflow resume` re-hydrates canonical Git branch, working tree state, manifest integrity, and OpenSpec progress.
    - Delivered automatically via native lifecycle hooks in Claude Code (`.claude/settings.json` `SessionStart`), OpenCode (`session.created` / `session.idle` event subscriptions + `context`/`compaction` system-context hooks in the `.opencode/plugins/compound-engineering.js` V2 plugin), GitHub Copilot CLI (`.github/hooks/hooks.json` `sessionStart`), OpenAI Codex CLI (`.codex/config.toml` `SessionStart`), Pi (`.pi/extensions/compound-engineering.ts` `before_agent_start`), Cursor (`.cursor/hooks.json` `sessionStart`), and Google Antigravity CLI (`.agents/hooks.json` `PreInvocation`, deduplicated per session). Kimi, Grok, DeepSeek, and Fx have no native context-injection hook (see [Zero-Step Drift Recovery Explained](zero-step-drift-recovery-explained.md#4-delivery-architecture-automated-hooks-vs-prompt-directives)) and remain governed by the Turn-0 prompt directive in `AGENTS.md`.
 
-2. **Engram Memory Persistence**:
-   - Session summaries and technical findings are saved outside the LLM context in Engram's SQLite database.
-   - Agents query memory via `mem_context` or `mem_search`, instantly recalling past solutions regardless of token limits.
+2. **Optional external Engram persistence**:
+   - A separately installed Engram sidecar can save session summaries and technical findings outside the LLM context in its SQLite database.
+   - Configured agents can query it via `mem_context` or `mem_search`; this is separate from `ce-ai workflow resume`.
 
 3. **CLI Token Reduction via RTK**:
    - Intercepts verbose terminal outputs (`cargo test`, `git status`, `docker ps`), stripping noise and preserving context capacity.

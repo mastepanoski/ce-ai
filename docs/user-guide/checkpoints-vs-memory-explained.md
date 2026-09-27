@@ -37,7 +37,7 @@ Three properties fall out of that, and none of them are available to a memory wr
 
 ## 3. Why Engram is a different (complementary) tool, not a substitute
 
-Engram's `mem_search` / `mem_context` are for **durable, semantic knowledge** — "we hit this bug before," "this pattern works," "the user prefers X" — retrieved by *meaning*, across sessions and even across projects. That is genuinely valuable, and it already has a place in the 7-stage cycle: **Stage 6 (`ce-compound`)** is where a finished cycle's discoveries get written to `docs/solutions/` and enrich Engram memory.
+Engram, when installed and configured separately, provides `mem_search` / `mem_context` for **durable, semantic knowledge** — "we hit this bug before," "this pattern works," "the user prefers X" — retrieved by *meaning*, across sessions and even across projects. That is genuinely valuable, and it complements the 7-stage cycle: **Stage 6 (`ce-compound`)** is where a finished cycle's discoveries can be written to `docs/solutions/` and saved to Engram by the configured agent. The `ce-ai` binary does not call Engram itself.
 
 What Engram (or a "handoff" note built on top of it) cannot do is answer "is it legal for this project to be at Stage 5 right now?" — because that requires validating against the FSM's transition rules, and a freeform memory write has no schema to validate against. Nothing stops an agent from writing a handoff that says "ready to ship" while `tasks.md` shows two items still unchecked. Stage 6 knowledge capture happens **after** a checkpoint records *where* you are — it captures *why* things happened, not *where* you are in the cycle.
 

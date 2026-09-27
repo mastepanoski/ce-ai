@@ -229,7 +229,7 @@ flowchart LR
 | Command | Action | Track |
 | :--- | :--- | :--- |
 | `ce-ai workflow resume` | Automatically probes Turn-0 mode and resumes context | Both |
-| `ce-ai gate check` | Verifies DoD, tests, and diff size (observe-only) | Both |
+| `ce-ai gate check` | Checks required OpenSpec artifacts; emits an Organic diff-size advisory (observe-only) | Both |
 | `ce-ai graduate <feature>` | Promotes an ODD brief into a formal OpenSpec change | Bridge |
 | `ce-ai workflow status` | Inspects current FSM stage and active feature | Both |
 | `ce-ai workflow checkpoint` | Records verified FSM stage transitions in `state.json` | Compound |
