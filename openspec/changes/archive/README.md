@@ -68,3 +68,4 @@ Historical notes:
 - managed-block-turn0-and-stage2-accuracy: archived (17/17 tasks) under criterion (1) on 2026-09-26.
 - opencode-v2-plugin-loader: archived (22/22 tasks) under criterion (1) on 2026-09-26.
 - ci-pr-size-exception-fallback: archived (14/14 tasks) under criterion (1) on 2026-09-26.
+- fix-audit-claims-alignment: archived (4/4 tasks) under criterion (1) on 2026-09-27.
