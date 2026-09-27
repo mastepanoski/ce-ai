@@ -149,3 +149,9 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
 | **External Persistence** | Sidecars & MCP (Engram / CodeGraph) | Context window saturation and memory loss between sessions. |
 | **Checkpoint-Validated Flow** | Workflow FSM & Checkpointing | Probabilistic instability and state loss post context compaction. |
 | **Fault Tolerance** | Atomic Writes & SHA256 Manifest Indexing | File corruption during process crashes or unbuffered overwrites. |
+
+---
+
+## 7. Why Spec-Driven Development Beats Chat-Based Micro-TDD
+
+For a deep dive into the empirical evidence, token economics, and transformer attention physics that justify CE-AI's 7-stage workflow over naive conversational micro-TDD, see [Why Spec-Driven Development Beats Chat-Based Micro-TDD](spec-driven-vs-chat-tdd-explained.md).
