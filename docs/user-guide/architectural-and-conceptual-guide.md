@@ -152,6 +152,6 @@ $$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \x
 
 ---
 
-## 7. Why Spec-Driven Development Beats Chat-Based Micro-TDD
+## 7. Spec-Driven Planning and Bounded TDD vs. Conversational Micro-TDD
 
-For a deep dive into the empirical evidence, token economics, and transformer attention physics that justify CE-AI's 7-stage workflow over naive conversational micro-TDD, see [Why Spec-Driven Development Beats Chat-Based Micro-TDD](spec-driven-vs-chat-tdd-explained.md).
+For a deep dive into the empirical evidence, context economics, and workflow architecture that justify CE-AI's 7-stage workflow over naive conversational micro-TDD, see [Spec-Driven Planning with Bounded Work Units](spec-driven-vs-chat-tdd-explained.md).
