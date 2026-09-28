@@ -25,47 +25,110 @@ Before touching a terminal, get this distinction straight — it is the #1 sourc
 Before adopting the workflow, make sure you have:
 1. **One supported AI harness** installed (e.g. Claude Code, Cursor, OpenCode, GitHub Copilot CLI). See the [Harness Matrix](harness-matrix.md).
 2. **Git** and a project repository.
-3. **Companion Tools (Recommended for memory & codebase graph)**:
-   - **Engram**: SQLite + FTS5 persistent memory server. Allows agents to retain architecture decisions, bug fixes, and preferences across sessions (`mem_save`, `mem_context`).
+3. **Companion Developer Tools (Recommended for memory & codebase graph)**:
+   - **Engram**: SQLite + FTS5 persistent memory server. Keeps architecture decisions, bug fixes, and preferences across sessions (`mem_save`, `mem_context`).
    - **CodeGraph**: AST symbol, call-graph, and blast-radius indexer (`codegraph_explore`). Gives agents accurate structural codebase knowledge instead of guessing.
    - **RTK (Rust Token Killer)**: Terminal output compressor. Intercepts verbose outputs (`cargo test`, `git status`, `docker`) to cut token usage by 60–90%.
 
-### Installing Companion Tools:
+---
 
-- **macOS / Linux**:
-  ```bash
-  # Engram & RTK (Homebrew)
-  brew install gentleman-programming/tap/engram rtk
-  # CodeGraph (Standalone script)
-  curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
-  ```
+## 3. Installation by Operating System & Package Manager
 
-- **Windows**:
-  ```powershell
-  # Engram (via Go)
-  go install github.com/Gentleman-Programming/engram/cmd/engram@latest
-  # CodeGraph (PowerShell installer)
-  irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | iex
-  # RTK (via Cargo)
-  cargo install rtk
-  ```
+Install `ce-ai` and the companion tools using the standard package manager or installer for your platform:
+
+### 🐧 Linux (Debian, Ubuntu, Fedora, Arch, Alpine, etc.)
+
+Linux developers can choose between direct standalone scripts, language package managers (`cargo`, `go`), or Homebrew (Linuxbrew):
+
+```bash
+# 1. Install ce-ai (official multi-platform shell installer)
+curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.sh | bash
+
+# 2. Install CodeGraph (self-contained Node.js runtime, zero dependencies required)
+curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
+
+# 3. Install Engram (persistent memory)
+# Option A: via Go
+go install github.com/Gentleman-Programming/engram/cmd/engram@latest
+# Option B: via direct binary release (x86_64 / aarch64 musl)
+curl -fsSL https://github.com/Gentleman-Programming/engram/releases/latest/download/engram-linux-amd64.tar.gz | tar -xz -C ~/.local/bin
+
+# 4. Install RTK (terminal token compressor)
+# Option A: via Cargo
+cargo install rtk
+# Option B: via standalone installer script
+curl -fsSL https://www.rtk-ai.app/install.sh | sh
+
+# Alternative for Linuxbrew users:
+# brew install mastepanoski/ce-ai/ce-ai gentleman-programming/tap/engram rtk
+```
 
 ---
 
-## 3. Install the `ce-ai` binary
+### 🪟 Windows (PowerShell, Winget, Go & Cargo)
 
-Pick one:
+On Windows, use native PowerShell one-liners, `cargo`, and `go`:
+
+```powershell
+# 1. Install ce-ai (official PowerShell installer)
+irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps1 | iex
+
+# 2. Install CodeGraph (official PowerShell installer)
+irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | iex
+
+# 3. Install Engram (persistent memory)
+# Option A: via Go (recommended)
+go install github.com/Gentleman-Programming/engram/cmd/engram@latest
+# Option B: download engram.exe from GitHub Releases and place in your PATH:
+# https://github.com/Gentleman-Programming/engram/releases
+
+# 4. Install RTK (terminal token compressor)
+cargo install rtk
+```
+
+---
+
+### 🍏 macOS (Standalone Scripts, Go/Cargo, or Homebrew)
+
+Choose between standalone scripts (zero package managers required) or Homebrew:
+
+#### Option A: Without Homebrew (Standalone Scripts, Go & Cargo)
 
 ```bash
-# Homebrew (macOS / Linux)
-brew install mastepanoski/ce-ai/ce-ai
-
-# Or standalone script (macOS / Linux)
+# 1. Install ce-ai (official shell installer)
 curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.sh | bash
 
-# Windows PowerShell
-irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps1 | iex
+# 2. Install CodeGraph (standalone script)
+curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
+
+# 3. Install Engram (via Go or GitHub release binary)
+go install github.com/Gentleman-Programming/engram/cmd/engram@latest
+
+# 4. Install RTK (via Cargo or install script)
+cargo install rtk
 ```
+
+#### Option B: With Homebrew
+
+```bash
+# Install ce-ai, Engram, and RTK
+brew install mastepanoski/ce-ai/ce-ai gentleman-programming/tap/engram rtk
+
+# Install CodeGraph
+curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
+```
+
+---
+
+### 📊 Package Manager & Tool Matrix Summary
+
+| Platform / Tool | `ce-ai` | `codegraph` | `engram` | `rtk` |
+| :--- | :--- | :--- | :--- | :--- |
+| **Linux (Standalone)** | `curl .../install.sh \| bash` | `curl .../install.sh \| sh` | `go install` or release tarball | `cargo install rtk` or curl script |
+| **Linux (Linuxbrew)** | `brew install .../ce-ai` | `curl .../install.sh \| sh` | `brew install .../engram` | `brew install rtk` |
+| **Windows** | `irm .../install.ps1 \| iex` | `irm .../install.ps1 \| iex` | `go install` or `engram.exe` | `cargo install rtk` |
+| **macOS (Standalone)** | `curl .../install.sh \| bash` | `curl .../install.sh \| sh` | `go install` or release tarball | `cargo install rtk` |
+| **macOS (Homebrew)** | `brew install .../ce-ai` | `curl .../install.sh \| sh` | `brew install .../engram` | `brew install rtk` |
 
 ---
 
