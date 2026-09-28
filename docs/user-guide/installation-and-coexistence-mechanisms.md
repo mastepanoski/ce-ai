@@ -29,7 +29,7 @@ Before `ce-ai` makes any changes to your AI tools' configuration files (like `.c
 
 ## 1. Step-by-Step Installation Pipeline (`ce-ai install`)
 
-When executing `ce-ai install --harness claude` (or `--all`), `ce-ai` executes a six-step pipeline with a pre-mutation configuration snapshot.
+When executing `ce-ai install --harness claude` (or `ce-ai install --harness all`), `ce-ai` executes a six-step pipeline with a pre-mutation configuration snapshot.
 
 ```mermaid
 flowchart TD

@@ -31,6 +31,20 @@ fn guard_disable_cleans_flag() {
 }
 
 #[test]
+fn guard_disable_rejects_a_different_harness_scope_without_mutating_state() {
+    let (_tmp, ctx) = test_ctx();
+    run_guard_enable(&ctx, "junior", Some("claude")).unwrap();
+
+    let err = run_guard_disable(&ctx, Some("codex")).unwrap_err();
+    assert!(matches!(err, CeError::Usage(_)));
+
+    let state = State::load(&ctx.state_path()).unwrap();
+    let guard = state.guardrail.expect("guardrail should remain configured");
+    assert!(guard.enabled);
+    assert_eq!(guard.harness.as_deref(), Some("claude"));
+}
+
+#[test]
 fn guard_invalid_level_fails_fast() {
     let (_tmp, ctx) = test_ctx();
     let err = run_guard_enable(&ctx, "extreme", None).unwrap_err();

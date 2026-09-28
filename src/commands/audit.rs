@@ -1,5 +1,4 @@
-//! `ce-ai audit`: multi-harness, capability-based audit engine for token efficiency
-//! and context quality.
+//! `ce-ai audit`: local configuration-hygiene heuristics for harnesses and repositories.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

@@ -1,5 +1,8 @@
 //! `ce-ai usage`: capture, report, hours.
 
+use chrono::{DateTime, Utc};
+
+use crate::capture::ledger::UsageRecord;
 use crate::commands::Context;
 use crate::error::CeError;
 
@@ -11,16 +14,20 @@ pub struct Args {
 
 #[derive(clap::Subcommand)]
 pub enum UsageCommand {
-    /// Capture usage from local harness sources into the ledger.
+    /// Capture usage from local Claude Code transcripts into the ledger.
     Sync,
-    /// Aggregate ledger entries with filters.
+    /// Render ledger entries with optional inclusive RFC 3339 date filters.
     Report {
+        /// Include records at or after this RFC 3339 timestamp.
         #[arg(long)]
         from: Option<String>,
+        /// Include records at or before this RFC 3339 timestamp.
         #[arg(long)]
         to: Option<String>,
+        /// Output grouping; only `record` is currently supported.
         #[arg(long)]
         by: Option<String>,
+        /// Render matching records as JSON.
         #[arg(long)]
         json: bool,
     },
@@ -63,11 +70,12 @@ fn sync(ctx: &Context) -> Result<(), CeError> {
 
 fn report(
     ctx: &Context,
-    _from: Option<&str>,
-    _to: Option<&str>,
-    _by: Option<&str>,
+    from: Option<&str>,
+    to: Option<&str>,
+    by: Option<&str>,
     json: bool,
 ) -> Result<(), CeError> {
+    validate_group_by(by)?;
     let shard_dir = crate::capture::ledger::shard_dir(&ctx.config_dir);
     if !shard_dir.exists() {
         println!("no usage data");
@@ -80,6 +88,7 @@ fn report(
             all.extend(crate::capture::ledger::read_shard(&p)?);
         }
     }
+    let all = filter_records(all, from, to)?;
     if all.is_empty() {
         println!("no usage data");
         return Ok(());
@@ -105,6 +114,72 @@ fn report(
     Ok(())
 }
 
+/// Validates the report rendering mode. Aggregated groupings are not yet
+/// implemented, so accepting them would make the CLI promise a no-op.
+fn validate_group_by(by: Option<&str>) -> Result<(), CeError> {
+    match by.map(str::trim).filter(|value| !value.is_empty()) {
+        None | Some("record") => Ok(()),
+        Some(value) => Err(CeError::Usage(format!(
+            "unsupported usage report grouping '{value}'. Only 'record' is currently supported"
+        ))),
+    }
+}
+
+/// Filters ledger records by an inclusive RFC 3339 interval.
+fn filter_records(
+    records: Vec<UsageRecord>,
+    from: Option<&str>,
+    to: Option<&str>,
+) -> Result<Vec<UsageRecord>, CeError> {
+    let from = parse_bound(from, "--from")?;
+    let to = parse_bound(to, "--to")?;
+
+    if let (Some(from), Some(to)) = (from, to) {
+        if from > to {
+            return Err(CeError::Usage(
+                "--from must be earlier than or equal to --to".into(),
+            ));
+        }
+    }
+
+    let filtered = records
+        .into_iter()
+        .filter_map(|record| {
+            let timestamp = match DateTime::parse_from_rfc3339(&record.timestamp) {
+                Ok(value) => value.with_timezone(&Utc),
+                Err(err) => {
+                    eprintln!(
+                        "warning: skipping usage record with invalid timestamp '{}': {err}",
+                        record.timestamp
+                    );
+                    return None;
+                }
+            };
+            if from.is_some_and(|bound| timestamp < bound)
+                || to.is_some_and(|bound| timestamp > bound)
+            {
+                None
+            } else {
+                Some(record)
+            }
+        })
+        .collect();
+    Ok(filtered)
+}
+
+fn parse_bound(raw: Option<&str>, flag: &str) -> Result<Option<DateTime<Utc>>, CeError> {
+    raw.map(|value| {
+        DateTime::parse_from_rfc3339(value)
+            .map(|parsed| parsed.with_timezone(&Utc))
+            .map_err(|err| {
+                CeError::Usage(format!(
+                    "invalid {flag} RFC 3339 timestamp '{value}': {err}"
+                ))
+            })
+    })
+    .transpose()
+}
+
 fn git_user() -> Result<String, CeError> {
     let out = std::process::Command::new("git")
         .args(["config", "user.name"])
@@ -117,3 +192,7 @@ fn git_user() -> Result<String, CeError> {
     }
     Ok(std::env::var("USER").unwrap_or_else(|_| "unknown".into()))
 }
+
+#[cfg(test)]
+#[path = "tests/usage.rs"]
+mod tests;

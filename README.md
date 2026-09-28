@@ -88,7 +88,7 @@ Ideation → OpenSpec → Plan → Work/TDD → Verify → Compound → Ship
 | 🏛️ [Architecture Guide](docs/user-guide/architectural-and-conceptual-guide.md) | Senior | Explanation — deterministic state, adapters, and project artifacts |
 | 🎮 [FSM & Checkpoints](docs/user-guide/fsm-and-checkpoints-explained.md) · [vs. Memory](docs/user-guide/checkpoints-vs-memory-explained.md) | Both | Explanation — lifecycle stages, checkpoints, and session memory |
 | 🎓 [Spec-Driven vs. Chat TDD](docs/user-guide/spec-driven-vs-chat-tdd-explained.md) | Senior | Explanation — context economics, workflow granularity, and bounded TDD |
-| 📐 [OpenSpec specifications](openspec/specs/) | Senior | Reference — living system specifications and contracts |
+| 📖 [CLI reference](docs/user-guide/cli-reference.md) · 📐 [OpenSpec specifications](openspec/specs/) | Senior | Reference — current commands, boundaries, and living contracts |
 | 🧠 [Solutions Library](docs/solutions/) · [Plans & Audits](docs/plans/) | Contributor | Reference — solved problems, decisions, and delivery history |
 
 ## Acknowledgments

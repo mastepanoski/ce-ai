@@ -1,9 +1,9 @@
-//! Observe-only gate check for agent tool write monitoring (Spike #333).
+//! OpenSpec contract gate for agent tool write monitoring (Spike #333).
 //!
 //! Evaluates whether active Stage 4 (`ce-work`) tool invocations have approved
 //! OpenSpec contracts (`proposal.md`, `spec.md`, `tasks.md`), isolating edge cases
-//! (`mtime_fallback`, `worktree_uncommitted`, `stale_cycle_guard`), and recording
-//! structured telemetry without ever interrupting or blocking execution.
+//! (`mtime_fallback`, `worktree_uncommitted`, `stale_cycle_guard`), recording
+//! structured telemetry, and enforcing the contract unless observe mode is set.
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -77,7 +77,7 @@ pub struct GateStats {
 /// Subcommands for the `gate` command group.
 #[derive(Subcommand, Debug, Clone)]
 pub enum GateCommands {
-    /// Observe and record gate telemetry for agent tool writes (Spike #333)
+    /// Check OpenSpec contract and record telemetry for agent code writes (Spike #333)
     Check(GateCheckArgs),
 }
 
@@ -92,7 +92,7 @@ pub struct GateCheckArgs {
     #[arg(long)]
     pub path: Option<String>,
 
-    /// Gate evaluation mode: enforce (blocking) or observe (advisory)
+    /// Gate mode: enforce (default, blocking) or observe (advisory)
     #[arg(long)]
     pub mode: Option<String>,
 
@@ -471,7 +471,8 @@ pub fn evaluate_gate_decision(
 
 /// Main execution routine for `ce-ai gate check`.
 ///
-/// Never blocks execution; errors during logging are safely ignored and exit code is always 0.
+/// Enforce mode blocks incomplete Stage 4 contracts; observe mode records a
+/// would-block event. Telemetry write failures remain best effort.
 pub fn run_gate_check(ctx: &Context, args: &GateCheckArgs) -> Result<(), CeError> {
     // 1. Emergency kill-switch check: immediate no-op
     if is_gate_kill_switched(args.disabled) {
