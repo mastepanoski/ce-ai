@@ -38,20 +38,16 @@ CE-AI complements the official [Compound Engineering plugin](https://github.com/
 > Prerequisite: install one [supported coding-agent host](docs/user-guide/harness-matrix.md) first.
 
 ```bash
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.sh | bash
+# 1. Install companion tools (persistent memory, codebase graph, token reduction)
+brew install gentleman-programming/tap/engram rtk # or go/cargo; Windows: see Getting Started
+curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
 
-# Windows PowerShell
-irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps1 | iex
-
-# Homebrew
+# 2. Install ce-ai (Homebrew, or: curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.sh | bash)
 brew install mastepanoski/ce-ai/ce-ai
 
-# From source
-cargo install --path .
-
-# In your project: install plugin, adopt workflow, and verify setup
-cd your-project && ce-ai install --harness all && ce-ai init-prj && ce-ai doctor
+# 3. In your project: initialize graph, install plugin & sidecars, adopt, and verify
+cd your-project && codegraph init
+ce-ai install --harness all && ce-ai init-prj && ce-ai doctor
 ```
 
 Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <outcome>`. For a guided first run, follow [Getting Started](docs/user-guide/getting-started.md).
