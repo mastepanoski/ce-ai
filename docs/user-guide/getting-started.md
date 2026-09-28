@@ -20,31 +20,73 @@ Before touching a terminal, get this distinction straight — it is the #1 sourc
 
 ---
 
-## 2. Prerequisites
+## 2. Prerequisites & Companion Tools
 
-- One of the [supported AI harnesses](harness-matrix.md) already installed (e.g. Claude Code, Cursor, OpenCode, GitHub Copilot CLI). If you don't have one yet, install any one of them first — `ce-ai` has nothing to plug into otherwise.
-- Git installed, and a project directory (an existing repo, or an empty folder you're about to turn into one).
+Before adopting the workflow, make sure you have:
+1. **One supported AI harness** installed (e.g. Claude Code, Cursor, OpenCode, GitHub Copilot CLI). See the [Harness Matrix](harness-matrix.md).
+2. **Git** and a project repository.
+3. **Companion Tools (Recommended for memory & codebase graph)**:
+   - **Engram**: SQLite + FTS5 persistent memory server. Allows agents to retain architecture decisions, bug fixes, and preferences across sessions (`mem_save`, `mem_context`).
+   - **CodeGraph**: AST symbol, call-graph, and blast-radius indexer (`codegraph_explore`). Gives agents accurate structural codebase knowledge instead of guessing.
+   - **RTK (Rust Token Killer)**: Terminal output compressor. Intercepts verbose outputs (`cargo test`, `git status`, `docker`) to cut token usage by 60–90%.
+
+### Installing Companion Tools:
+
+- **macOS / Linux**:
+  ```bash
+  # Engram & RTK (Homebrew)
+  brew install gentleman-programming/tap/engram rtk
+  # CodeGraph (Standalone script)
+  curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
+  ```
+
+- **Windows**:
+  ```powershell
+  # Engram (via Go)
+  go install github.com/Gentleman-Programming/engram/cmd/engram@latest
+  # CodeGraph (PowerShell installer)
+  irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | iex
+  # RTK (via Cargo)
+  cargo install rtk
+  ```
 
 ---
 
 ## 3. Install the `ce-ai` binary
 
-Pick one (full options in the [README](../../README.md#try-it-in-two-minutes)):
+Pick one:
 
 ```bash
+# Homebrew (macOS / Linux)
+brew install mastepanoski/ce-ai/ce-ai
+
+# Or standalone script (macOS / Linux)
 curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.sh | bash
+
+# Windows PowerShell
+irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps1 | iex
 ```
 
 ---
 
-## 4. Go to your project and install the skills into your harness
+## 4. Go to your project, index the codebase, and install skills
 
 ```bash
 cd my-project   # an existing repo, or: mkdir my-project && cd my-project && git init
+
+# 1. Initialize CodeGraph index for structural navigation
+codegraph init
+
+# 2. Install CE skills and auto-register companion MCP servers in your harnesses
 ce-ai install --harness all
 ```
 
-This copies the Compound Engineering skill files (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`, …) into every AI harness `ce-ai` detects on your machine, so they show up as slash commands. Only want one harness? Use its name instead of `all` (e.g. `--harness claude`) — see the [Harness Matrix](harness-matrix.md) for every supported value.
+This step:
+- Builds the local `.codegraph/` index so agents can query callers, callees, and symbol references.
+- Copies the Compound Engineering skill files (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`, …) into every detected harness.
+- Automatically registers `engram` and `codegraph` MCP sidecars in each supported harness configuration.
+
+Only want one harness? Use its name instead of `all` (e.g. `--harness claude`) — see the [Harness Matrix](harness-matrix.md).
 
 ---
 
@@ -62,18 +104,24 @@ This is a **separate, complementary step** from `install`: it writes a governanc
 
 ```bash
 ce-ai doctor
+ce-ai tools status
 ```
 
-A healthy first run looks roughly like this — no `!` warnings, adoption marked `ok`:
+A healthy first run confirms your harnesses, project adoption, and companion tools:
 
 ```text
+== [Companion Tools, Memory Sidecars & Token Reducers Status] ==
+  ✅ codegraph    [MCP Server & CLI] (CodeGraph Codebase Indexer) : v1.4.1 (ok)
+  ✅ engram       [MCP Server      ] (Engram Persistent Memory Server) : v2.2.1 (ok)
+  ✅ rtk          [CLI Pre-Processor] (RTK CLI Token Reduction Engine) : v0.50.0 (ok)
+
 == [Harness Health] ==
   claude: installed, skills registered, session-start hook: ok
 == [Project Adoption] ==
   AGENTS.md: adopted (tier: full, SHA256 verified)
 ```
 
-If a harness you expected isn't listed, it means `ce-ai` didn't detect it on this machine — run `ce-ai status` for details, or see [Installation & Coexistence](installation-and-coexistence-mechanisms.md).
+If a tool or harness needs attention, `ce-ai tools status` and `ce-ai doctor` provide copy-paste remediation commands. See [Installation & Coexistence](installation-and-coexistence-mechanisms.md).
 
 ---
 
