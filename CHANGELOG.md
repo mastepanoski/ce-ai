@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.72.4] - 2026-09-27
+
+### Fixed
+- Preserve harness identity in Kimi, AGY, and FX configuration backups so uninstall restores the matching pre-install snapshot instead of relying on ambiguous native filenames. This prevents a user-owned MCP entry with a CE companion name from being removed.
+- Remove AGY's CE-managed legacy artifact even when uninstall restores a matching configuration snapshot.
+
 ### Documentation
 - Corrected spec-driven-vs-chat-tdd-explained.md: Experiment 004 now reports both exercises with per-comparison ratios, reflects the author's conclusion that H2 (better design with TDD) is not supported, scopes the O(1)/O(n) claim, and reframes TDD as an implementation technique within bounded units.
 
