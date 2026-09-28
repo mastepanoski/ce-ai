@@ -4,9 +4,7 @@
 
 ## Why CE-AI?
 
-A developer familiar with [Compound Engineering](https://github.com/EveryInc/compound-engineering-plugin) will ask: *why isn't the plugin itself enough?*
-
-The Compound Engineering Plugin provides the skills and workflow methodology (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`). `ce-ai` provides the operational and governance layer around them:
+A developer familiar with [Compound Engineering](https://github.com/EveryInc/compound-engineering-plugin) will ask: *why isn't the plugin itself enough?* The plugin provides the skills and workflow methodology (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`); `ce-ai` provides the operational and governance layer around them:
 
 - **Multi-harness workflow integration**: Installs, synchronizes, and drift-audits plugin assets across 10 native harnesses (Claude Code, OpenCode, Cursor, Codex, Copilot, AGY, Kimi, Grok, Pi, FX) with atomic writes and per-harness pre-mutation backups.
 - **Workflow FSM & stage tracking**: Records and validates legal transitions across 7 development stages; teams supply the test and knowledge-capture evidence required by their workflow.
@@ -38,19 +36,26 @@ CE-AI complements the official [Compound Engineering plugin](https://github.com/
 > Prerequisite: install one [supported coding-agent host](docs/user-guide/harness-matrix.md) first.
 
 ```bash
-# 1. Install companion tools (persistent memory, codebase graph, token reduction)
-brew install gentleman-programming/tap/engram rtk # or go/cargo; Windows: see Getting Started
+# Linux / Unix (Standalone scripts, Go & Cargo)
+curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
+go install github.com/Gentleman-Programming/engram/cmd/engram@latest && cargo install rtk
+
+# Windows (PowerShell, Go & Cargo)
+irm https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | iex
+go install github.com/Gentleman-Programming/engram/cmd/engram@latest; cargo install rtk
+
+# macOS / Homebrew
+brew install mastepanoski/ce-ai/ce-ai gentleman-programming/tap/engram rtk
 curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
 
-# 2. Install ce-ai (Homebrew, or: curl -fsSL https://raw.githubusercontent.com/mastepanoski/ce-ai/main/scripts/install.sh | bash)
-brew install mastepanoski/ce-ai/ce-ai
-
-# 3. In your project: initialize graph, install plugin & sidecars, adopt, and verify
+# In your project: initialize graph, install plugin & companions, adopt, and verify
 cd your-project && codegraph init
 ce-ai install --harness all && ce-ai init-prj && ce-ai doctor
 ```
 
-Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <outcome>`. For a guided first run, follow [Getting Started](docs/user-guide/getting-started.md).
+Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <outcome>`. For package manager alternatives and detailed steps, see [Getting Started](docs/user-guide/getting-started.md).
 
 ## The 7-stage workflow & FSM
 
