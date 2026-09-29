@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.72.5] - 2026-09-28
+
+### Fixed
+- Make `usage report --from` and `--to` apply inclusive RFC 3339 date filters, and reject unsupported `--by` values instead of accepting no-op filters.
+- Prevent `guard disable --harness <name>` from silently disabling a differently scoped guard configuration.
+
+### Changed
+- Align `gate`, `guard`, `tools`, `usage`, and `audit` help with their delivered boundaries: Stage 4 gate enforcement is the default; guard is persisted configuration; tools registers MCP definitions without downloading binaries; usage capture is Claude Code-only; and audit is heuristic configuration hygiene.
+
+### Documentation
+- Add a CLI reference, correct invalid workspace-install, archive, and decision-route examples, and explain the gate's distinct enforcement and Organic advisory behavior.
+
 ## [1.72.4] - 2026-09-27
 
 ### Fixed

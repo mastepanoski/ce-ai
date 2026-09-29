@@ -43,13 +43,13 @@ pub enum Commands {
     Doctor(doctor::Args),
     /// Backup listing and point-in-time config recovery.
     Backups(backups::BackupsArgs),
-    /// Companion developer sidecars and memory tools manager (Engram, CodeGraph, Context7, RTK).
+    /// Companion MCP registration and readiness checks (does not install third-party binaries).
     Tools(tools::Args),
-    /// Usage analytics: token capture and reporting.
+    /// Claude Code usage capture and ledger reporting.
     Usage(usage::Args),
     /// Workflow FSM & progress recovery system across 7 development stages.
     Workflow(workflow::Args),
-    /// Multi-harness token-efficiency and context-quality audit engine.
+    /// Configuration-hygiene audit using local repository and harness heuristics.
     Audit(audit::Args),
     /// Adopt a project repository by injecting managed Compound Engineering workflow blocks into AGENTS.md.
     #[command(name = "init-prj")]
@@ -75,9 +75,9 @@ pub enum Commands {
         /// Target project directory path (default: current working directory)
         path: Option<PathBuf>,
     },
-    /// Pedagogical Guardrail Mode for junior developer oversight (Issue #114).
+    /// Persist and inspect pedagogical guardrail configuration (Issue #114).
     Guard(guard::Args),
-    /// Observe-only gate check for agent tool write monitoring (Spike #333).
+    /// OpenSpec contract gate for agent code writes; enforcement is the default.
     #[command(subcommand)]
     Gate(gate::GateCommands),
     /// Archive completed OpenSpec change packages to openspec/changes/archive/ (alias for workflow archive).

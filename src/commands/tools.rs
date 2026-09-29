@@ -1,4 +1,4 @@
-//! `ce-ai tools`: detection, installation, and management of companion sidecars
+//! `ce-ai tools`: detection, MCP registration, and management of companion sidecars
 //! (Engram, CodeGraph, Context7, RTK), version freshness, and skill suggestions.
 
 use crate::commands::Context;
@@ -20,7 +20,7 @@ pub struct Args {
 pub enum Action {
     /// Check installation, version freshness, and health status of companion tools.
     Status,
-    /// Install or provision a specific companion tool (engram, codegraph, context7, rtk).
+    /// Register a companion MCP definition; does not download its binary.
     Install {
         /// Name of tool (engram, codegraph, context7, rtk).
         tool: String,
@@ -61,11 +61,14 @@ pub fn status(ctx: &Context) -> Result<(), CeError> {
             FreshnessStatus::Ok { version } => format!("v{version} (ok)"),
             FreshnessStatus::Outdated { current, expected } => {
                 format!(
-                    "v{current} (outdated -> v{expected} available; run '{}')",
+                    "v{current} (outdated -> v{expected} expected; update via the tool's package manager, then run '{}' to register MCP)",
                     info.install_cmd
                 )
             }
-            FreshnessStatus::Missing => format!("not found (suggested: '{}')", info.install_cmd),
+            FreshnessStatus::Missing => format!(
+                "not found (install via the tool's package manager, then run '{}' to register MCP)",
+                info.install_cmd
+            ),
             FreshnessStatus::Offline { current } => format!("v{current} (offline)"),
         };
 
@@ -118,11 +121,11 @@ fn install_tool(ctx: &Context, tool: &str) -> Result<(), CeError> {
 
     let server_def = serde_json::json!({ "command": cmd, "args": args });
 
-    println!("tools: provisioning companion tool '{tool_lower}'...");
+    println!("tools: registering companion MCP definition for '{tool_lower}'...");
 
     if ctx.dry_run {
         println!(
-            "tools: [dry-run] would merge '{tool_lower}' MCP server definition into opencode.json"
+            "tools: [dry-run] would merge '{tool_lower}' MCP server definition into opencode.json (without installing its binary)"
         );
         return Ok(());
     }

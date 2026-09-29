@@ -246,7 +246,7 @@ Rationale:         Concurrency refactoring requires deep reasoning and invariant
 | `ce-ai decisions test` | Run hermetic evaluation probe | `--provider <jev\|mock>` |
 | `ce-ai decisions check-risk` | Evaluate tool execution policy | `--task`, `--verbose`, `--json` |
 | `ce-ai decisions check-readiness` | Assess stage or task DoD readiness | `--stage`, `--task`, `--verbose`, `--json` |
-| `ce-ai decisions route` | Compute model recommendation | `--task`, `--verbose`, `--json` |
+| `ce-ai decisions route <task>` | Compute model recommendation | positional `<task>`, `--verbose`, `--json` |
 
 ---
 

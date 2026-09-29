@@ -124,7 +124,7 @@ When no documentation debt exists, it reports:
 
 | Diagnostic Output | What it means | How to fix |
 | :--- | :--- | :--- |
-| `doctor-warn: openspec change 'feat' is complete with open subtasks` | Code is finished, but checklist has open subtasks. | Run `ce-ai archive <feat> --auto-mark` |
+| `doctor-warn: openspec change 'feat' is complete with open subtasks` | Code is finished, but checklist has open subtasks. | Complete `tasks.md`, then run `ce-ai archive <feat>`. |
 | `doctor-warn: openspec change 'feat' has been pending for 34 days...` | Spec has been inactive for longer than `stale_spec_days`. | Resume the work, shelve it, or run `ce-ai archive <feat> --status "superseded"` |
 | `doctor-warn: solution '...' references non-existent path 'src/...'` | A solution file references a deleted or moved source file. | Update the path in the solution or run `/ce-compound-refresh` |
 | `doctor-warn: solution '...' missing required YAML frontmatter: ...` | Solution file is missing required metadata fields. | Add the missing YAML key (`title`, `category`, `problem_type`, `tags`, `applies_when`) |

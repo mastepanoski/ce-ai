@@ -187,6 +187,11 @@ Recommendation: Run 'ce-ai graduate fix-auth-race' to promote to formal OpenSpec
 > **Why is the 200 LOC ceiling observe-only and non-blocking?**
 > A gate that hard-fails an urgent bugfix because it changed 205 lines causes developers to bypass tooling (`--no-verify`, disabling hooks). In accordance with ISO 42001 and NIST AI RMF governance principles, `ce-ai` treats the 200 LOC ceiling as an **empirically observed risk indicator**, not a bureaucratic blocker. The system informs the engineer and the agent, providing a one-command graduation path without halting emergency remediation.
 
+This advisory does not make the whole command observe-only. For a Stage 4 code
+write, `ce-ai gate check` defaults to `enforce`: it blocks when the active
+OpenSpec change lacks `proposal.md`, `spec.md`, or `tasks.md`. Pass
+`--mode observe` to record a would-block result instead.
+
 ---
 
 ## 6. Pedagogical Anti-Patterns & FAQs
@@ -229,7 +234,7 @@ flowchart LR
 | Command | Action | Track |
 | :--- | :--- | :--- |
 | `ce-ai workflow resume` | Automatically probes Turn-0 mode and resumes context | Both |
-| `ce-ai gate check` | Checks required OpenSpec artifacts; emits an Organic diff-size advisory (observe-only) | Both |
+| `ce-ai gate check` | Enforces required Stage 4 OpenSpec artifacts by default; the Organic diff-size advisory is observe-only | Both |
 | `ce-ai graduate <feature>` | Promotes an ODD brief into a formal OpenSpec change | Bridge |
 | `ce-ai workflow status` | Inspects current FSM stage and active feature | Both |
 | `ce-ai workflow checkpoint` | Records verified FSM stage transitions in `state.json` | Compound |

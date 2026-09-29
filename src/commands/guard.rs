@@ -1,7 +1,6 @@
-//! Pedagogical Guardrail Mode (`ce-ai guard`) management (Issue #114).
+//! Pedagogical guardrail configuration (`ce-ai guard`) management (Issue #114).
 //!
-//! Provides opt-in oversight for junior developers preventing vibe coding,
-//! supporting ISO/IEC 42001 and NIST AI RMF 1.0 human-in-the-loop requirements.
+//! Persists an opt-in configuration marker for status and doctor reporting.
 
 use clap::{Parser, Subcommand};
 
@@ -17,9 +16,9 @@ pub struct Args {
 
 #[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
 pub enum GuardCommands {
-    /// Enable pedagogical guardrail mode for junior developer oversight
+    /// Persist pedagogical guardrail configuration for status reporting
     Enable {
-        /// Oversight intensity: junior (default, batched) or strict (per-module)
+        /// Stored configuration label: junior (default) or strict
         #[arg(long, default_value = "junior")]
         level: String,
 
@@ -27,13 +26,13 @@ pub enum GuardCommands {
         #[arg(long)]
         harness: Option<String>,
     },
-    /// Disable pedagogical guardrail mode cleanly
+    /// Disable persisted pedagogical guardrail configuration
     Disable {
-        /// Target specific harness (defaults to global state)
+        /// Require the configured harness scope to match before disabling
         #[arg(long)]
         harness: Option<String>,
     },
-    /// Report current guardrail status and integrity
+    /// Report persisted guardrail configuration and status
     Status {
         /// Emit machine-readable JSON
         #[arg(long)]
@@ -52,7 +51,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 }
 
-/// Enables pedagogical guardrail mode.
+/// Enables the persisted pedagogical guardrail configuration marker.
 pub fn run_guard_enable(
     ctx: &Context,
     level_str: &str,
@@ -90,7 +89,7 @@ pub fn run_guard_enable(
 }
 
 /// Disables pedagogical guardrail mode cleanly.
-pub fn run_guard_disable(ctx: &Context, _harness: Option<&str>) -> Result<(), CeError> {
+pub fn run_guard_disable(ctx: &Context, harness: Option<&str>) -> Result<(), CeError> {
     let state_path = ctx.state_path();
 
     if ctx.dry_run {
@@ -99,6 +98,18 @@ pub fn run_guard_disable(ctx: &Context, _harness: Option<&str>) -> Result<(), Ce
     }
 
     let mut state = State::load(&state_path)?;
+    if let Some(requested_harness) = harness {
+        let configured_harness = state
+            .guardrail
+            .as_ref()
+            .and_then(|guard| guard.harness.as_deref());
+        if configured_harness != Some(requested_harness) {
+            return Err(CeError::Usage(format!(
+                "cannot disable guardrail for harness '{requested_harness}': configured scope is '{}'",
+                configured_harness.unwrap_or("global")
+            )));
+        }
+    }
     if let Some(guard) = &mut state.guardrail {
         guard.enabled = false;
         guard.updated_at = chrono::Utc::now().to_rfc3339();
