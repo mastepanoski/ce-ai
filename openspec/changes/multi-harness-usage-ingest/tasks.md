@@ -18,7 +18,7 @@
   - Implement `src/harness/usage/pi.rs` mapping Pi agent session turn statistics.
   - *Verification*: Unit tests verify accurate token mappings from static fixtures.
 
-- [ ] **Unit 4 (~130 LOC):** `ce-ai usage sync` multi-harness dispatch & CLI flag
+- [x] **Unit 4 (~130 LOC):** `ce-ai usage sync` multi-harness dispatch & CLI flag
   - Add optional `--harness <name|all>` argument to `UsageCommand::Sync` in `src/commands/usage.rs`.
   - Iterate through active adapters, query `is_available`, ingest records, and output per-harness summaries.
   - Ensure deduplication idempotency via `dedup_key`.
