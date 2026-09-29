@@ -12,7 +12,7 @@
   - Handle missing token fields gracefully without creating artificial zero-token records.
   - *Verification*: Unit tests in `src/harness/usage/opencode.rs` verify extraction from fixtures and edge-case handling.
 
-- [ ] **Unit 3 (~180 LOC):** Codex and Pi usage ingestion adapters & fixtures
+- [x] **Unit 3 (~180 LOC):** Codex and Pi usage ingestion adapters & fixtures
   - Create test fixtures for Codex (`tests/fixtures/usage/codex/session.jsonl`) and Pi (`tests/fixtures/usage/pi/session.json`).
   - Implement `src/harness/usage/codex.rs` mapping OpenAI tokens, cache, and reasoning breakdown.
   - Implement `src/harness/usage/pi.rs` mapping Pi agent session turn statistics.

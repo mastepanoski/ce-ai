@@ -6,7 +6,9 @@ use crate::capture::ledger::UsageRecord;
 use crate::error::CeError;
 
 pub mod claude;
+pub mod codex;
 pub mod opencode;
+pub mod pi;
 
 /// Common interface for ingesting local usage metrics from AI coding harnesses.
 pub trait UsageAdapter: Send + Sync {
@@ -31,6 +33,8 @@ pub fn all_adapters() -> Vec<Box<dyn UsageAdapter>> {
     vec![
         Box::new(claude::ClaudeUsageAdapter),
         Box::new(opencode::OpenCodeUsageAdapter),
+        Box::new(codex::CodexUsageAdapter),
+        Box::new(pi::PiUsageAdapter),
     ]
 }
 
@@ -49,9 +53,11 @@ mod tests {
     #[test]
     fn test_all_adapters_contains_registered_adapters() {
         let adapters = all_adapters();
-        assert_eq!(adapters.len(), 2);
+        assert_eq!(adapters.len(), 4);
         assert_eq!(adapters[0].harness_name(), "claude");
         assert_eq!(adapters[1].harness_name(), "opencode");
+        assert_eq!(adapters[2].harness_name(), "codex");
+        assert_eq!(adapters[3].harness_name(), "pi");
     }
 
     #[test]
@@ -61,6 +67,10 @@ mod tests {
         assert!(get_adapter("CLAUDE").is_some());
         assert!(get_adapter("opencode").is_some());
         assert!(get_adapter("OpenCode").is_some());
+        assert!(get_adapter("codex").is_some());
+        assert!(get_adapter("CODEX").is_some());
+        assert!(get_adapter("pi").is_some());
+        assert!(get_adapter("PI").is_some());
         assert!(get_adapter("nonexistent").is_none());
     }
 }
