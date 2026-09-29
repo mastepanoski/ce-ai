@@ -1,6 +1,6 @@
 # Tasks: Optimize Cargo Build Cache and Artifact Storage
 
-- [ ] **Unit 1 (~20 LOC):** Configure compact dev/test profiles in `Cargo.toml`
+- [x] **Unit 1 (~20 LOC):** Configure compact dev/test profiles in `Cargo.toml`
   - Add `[profile.dev]` with `debug = "line-tables-only"` and `incremental = false`.
   - Add `[profile.test]` with `debug = "line-tables-only"` and `incremental = false`.
   - *Verification*: `cargo check` and `cargo test --lib` build without warnings and produce compact artifacts.
