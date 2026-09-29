@@ -6,6 +6,7 @@ use crate::capture::ledger::UsageRecord;
 use crate::error::CeError;
 
 pub mod claude;
+pub mod opencode;
 
 /// Common interface for ingesting local usage metrics from AI coding harnesses.
 pub trait UsageAdapter: Send + Sync {
@@ -27,7 +28,10 @@ pub trait UsageAdapter: Send + Sync {
 
 /// Returns all registered usage adapters.
 pub fn all_adapters() -> Vec<Box<dyn UsageAdapter>> {
-    vec![Box::new(claude::ClaudeUsageAdapter)]
+    vec![
+        Box::new(claude::ClaudeUsageAdapter),
+        Box::new(opencode::OpenCodeUsageAdapter),
+    ]
 }
 
 /// Resolves an adapter by its harness name.
@@ -43,10 +47,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_all_adapters_contains_claude() {
+    fn test_all_adapters_contains_registered_adapters() {
         let adapters = all_adapters();
-        assert!(!adapters.is_empty());
+        assert_eq!(adapters.len(), 2);
         assert_eq!(adapters[0].harness_name(), "claude");
+        assert_eq!(adapters[1].harness_name(), "opencode");
     }
 
     #[test]
@@ -54,6 +59,8 @@ mod tests {
         assert!(get_adapter("claude").is_some());
         assert!(get_adapter("Claude").is_some());
         assert!(get_adapter("CLAUDE").is_some());
+        assert!(get_adapter("opencode").is_some());
+        assert!(get_adapter("OpenCode").is_some());
         assert!(get_adapter("nonexistent").is_none());
     }
 }

@@ -6,7 +6,7 @@
   - Provide an adapter registry iterator in `src/harness/usage/mod.rs`.
   - *Verification*: `cargo test --test usage` confirms existing Claude usage ingestion tests pass.
 
-- [ ] **Unit 2 (~160 LOC):** OpenCode usage ingestion adapter & fixtures
+- [x] **Unit 2 (~160 LOC):** OpenCode usage ingestion adapter & fixtures
   - Create realistic test fixture in `tests/fixtures/usage/opencode/session.json`.
   - Implement `src/harness/usage/opencode.rs` parsing OpenCode session JSON events.
   - Handle missing token fields gracefully without creating artificial zero-token records.
