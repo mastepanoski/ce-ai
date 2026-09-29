@@ -70,3 +70,4 @@ Historical notes:
 - ci-pr-size-exception-fallback: archived (14/14 tasks) under criterion (1) on 2026-09-26.
 - fix-audit-claims-alignment: archived (4/4 tasks) under criterion (1) on 2026-09-27.
 - fix-cli-audit-alignment: archived (4/4 tasks) under criterion (1) on 2026-09-29.
+- multi-harness-usage-ingest: archived (5/5 tasks) under criterion (1) on 2026-09-29.
