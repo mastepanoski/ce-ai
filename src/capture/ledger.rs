@@ -65,7 +65,7 @@ pub fn append_records(
     new_records: &[UsageRecord],
 ) -> Result<usize, CeError> {
     let existing = read_shard(&shard_path(config_dir, author))?;
-    let seen: std::collections::HashSet<String> = existing.iter().map(dedup_key).collect();
+    let mut seen: std::collections::HashSet<String> = existing.iter().map(dedup_key).collect();
     let path = shard_path(config_dir, author);
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -79,6 +79,7 @@ pub fn append_records(
         }
         let line = format!("{}\n", serde_json::to_string(rec)?);
         append_line_atomic(&path, line.as_bytes())?;
+        seen.insert(key);
         appended += 1;
     }
     Ok(appended)

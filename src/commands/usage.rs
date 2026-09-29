@@ -46,24 +46,29 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 fn sync(ctx: &Context) -> Result<(), CeError> {
     let author = git_user()?;
     let home = std::env::var("HOME").unwrap_or_default();
-    let claude_projects = std::path::PathBuf::from(&home).join(".claude/projects");
+    let home_path = std::path::Path::new(&home);
 
-    let records = crate::harness::usage::claude::read_usage(&claude_projects, None, &author, None)?;
+    let mut total_records = 0;
+    for adapter in crate::harness::usage::all_adapters() {
+        if !adapter.is_available(home_path) {
+            continue;
+        }
+        let records = adapter.read_usage(home_path, &author, None, None)?;
+        if !records.is_empty() {
+            let count = crate::capture::ledger::append_records(&ctx.config_dir, &author, &records)?;
+            total_records += count;
+        }
+    }
 
-    if records.is_empty() {
+    if total_records == 0 {
         if !ctx.quiet {
             println!("usage: no new records");
         }
         return Ok(());
     }
 
-    let typed: Vec<crate::capture::ledger::UsageRecord> = records
-        .into_iter()
-        .filter_map(|v| serde_json::from_value(v).ok())
-        .collect();
-    let count = crate::capture::ledger::append_records(&ctx.config_dir, &author, &typed)?;
     if !ctx.quiet {
-        println!("usage: captured {count} record(s) for {author}");
+        println!("usage: captured {total_records} record(s) for {author}");
     }
     Ok(())
 }

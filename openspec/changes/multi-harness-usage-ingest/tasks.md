@@ -1,6 +1,6 @@
 # Tasks: Multi-Harness Usage Ingestion Adapters
 
-- [ ] **Unit 1 (~120 LOC):** `UsageAdapter` trait & Claude refactoring
+- [x] **Unit 1 (~120 LOC):** `UsageAdapter` trait & Claude refactoring
   - Define `UsageAdapter` trait in `src/harness/usage/mod.rs`.
   - Refactor `src/harness/usage/claude.rs` to implement `UsageAdapter`.
   - Provide an adapter registry iterator in `src/harness/usage/mod.rs`.
