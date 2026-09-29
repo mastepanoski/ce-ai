@@ -10654,3 +10654,49 @@ fn test_cli_report_bug_web_and_yes_fallbacks() {
     assert!(stdout.contains("Direct web submission URL:"));
     assert!(stdout.contains("https://github.com/mastepanoski/ce-ai/issues/new"));
 }
+
+#[test]
+fn test_cli_usage_sync_unknown_harness_fails_with_usage_code() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    let out = ceai(&config_dir, &home)
+        .args(["usage", "sync", "--harness", "nonexistent"])
+        .output()
+        .unwrap();
+
+    assert_eq!(out.status.code(), Some(2)); // CeError::Usage exit code 2
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("unsupported harness 'nonexistent'"));
+}
+
+#[test]
+fn test_cli_usage_sync_idempotent_multi_harness() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    // Set up mock OpenCode session
+    let opencode_sessions = home.join(".local/share/opencode/sessions");
+    fs::create_dir_all(&opencode_sessions).unwrap();
+    let opencode_fixture =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/usage/opencode/session.json");
+    fs::copy(&opencode_fixture, opencode_sessions.join("session.json")).unwrap();
+
+    // First sync captures records
+    let out1 = ceai(&config_dir, &home)
+        .args(["usage", "sync"])
+        .output()
+        .unwrap();
+    assert!(out1.status.success());
+    let stdout1 = String::from_utf8_lossy(&out1.stdout);
+    assert!(stdout1.contains("usage: captured 1 record(s)"));
+
+    // Second sync should find no new records (idempotent)
+    let out2 = ceai(&config_dir, &home)
+        .args(["usage", "sync"])
+        .output()
+        .unwrap();
+    assert!(out2.status.success());
+    let stdout2 = String::from_utf8_lossy(&out2.stdout);
+    assert!(stdout2.contains("usage: no new records"));
+}

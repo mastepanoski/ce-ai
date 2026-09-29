@@ -26,6 +26,19 @@
 | `custom` | `~/.ce-ai/custom_harness.json` or `--plugins-dir/--skills-dir/--rules-file` | User-Configured Directory Install; surgical manifest-driven uninstall |
 | `deepseek` | *De-scoped* (`dsh` developer preview) | Returns `CeError::Usage` (exit code 2) guiding user to native adapters |
 
+## Usage Telemetry Ingestion Matrix
+
+`ce-ai usage sync` captures local turn-level token and model telemetry from supported coding harnesses into the author's local usage ledger (`~/.ce-ai/usage/<author>.jsonl`):
+
+| Harness Identifier | Transcript Location | Supported Telemetry |
+| :--- | :--- | :--- |
+| `claude` | `~/.claude/projects/` | Input, output, cache read/write |
+| `opencode` | `~/.local/share/opencode/sessions/` or `~/.config/opencode/sessions/` | Input, output, cache read/write, reasoning |
+| `codex` | `~/.codex/sessions/*.jsonl` | Input, output, cache read (`cached_tokens`), reasoning |
+| `pi` | `~/.pi/agent/sessions/*.json` | Input, output, cache read/write, reasoning |
+
+Use `ce-ai usage sync --harness <name>` to scope capture to a single harness, or `ce-ai usage sync` (or `--harness all`) to discover and ingest across all available harnesses.
+
 ## Safety Guarantees
 
 For supported installations with an existing harness configuration, `ce-ai` provides these safeguards:

@@ -60,3 +60,26 @@ fn report_rejects_unsupported_grouping_instead_of_ignoring_it() {
     ));
     assert!(validate_group_by(Some("record")).is_ok());
 }
+
+#[test]
+fn resolve_target_adapters_handles_all_and_individual_harnesses() {
+    let all = resolve_target_adapters(None).unwrap();
+    assert_eq!(all.len(), 4);
+
+    let all_explicit = resolve_target_adapters(Some("all")).unwrap();
+    assert_eq!(all_explicit.len(), 4);
+
+    for name in &["claude", "opencode", "codex", "pi"] {
+        let single = resolve_target_adapters(Some(name)).unwrap();
+        assert_eq!(single.len(), 1);
+        assert_eq!(single[0].harness_name(), *name);
+    }
+}
+
+#[test]
+fn resolve_target_adapters_rejects_unknown_harness() {
+    let res = resolve_target_adapters(Some("unsupported_ai"));
+    assert!(
+        matches!(res, Err(CeError::Usage(msg)) if msg.contains("unsupported harness 'unsupported_ai'"))
+    );
+}

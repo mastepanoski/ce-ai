@@ -1,0 +1,31 @@
+{
+  "id": "pi-sess-500",
+  "workspace": "/Users/testuser/projects/web/pi-project",
+  "model": "claude-3-5-sonnet",
+  "turns": [
+    {
+      "id": "turn-01",
+      "timestamp": "2026-09-28T16:00:00Z",
+      "model": "claude-3-5-sonnet",
+      "usage": {
+        "input_tokens": 1800,
+        "output_tokens": 520,
+        "cache_read": 600,
+        "cache_write": 150,
+        "reasoning": 80
+      }
+    },
+    {
+      "id": "turn-02",
+      "timestamp": "2026-09-28T16:05:00Z",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0
+      }
+    },
+    {
+      "id": "turn-03",
+      "timestamp": "2026-09-28T16:10:00Z"
+    }
+  ]
+}

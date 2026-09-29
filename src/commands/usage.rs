@@ -14,8 +14,12 @@ pub struct Args {
 
 #[derive(clap::Subcommand)]
 pub enum UsageCommand {
-    /// Capture usage from local Claude Code transcripts into the ledger.
-    Sync,
+    /// Capture usage from local AI coding harness transcripts into the ledger.
+    Sync {
+        /// Restrict sync to a specific harness (e.g. "claude", "opencode", "codex", "pi", or "all").
+        #[arg(long)]
+        harness: Option<String>,
+    },
     /// Render ledger entries with optional inclusive RFC 3339 date filters.
     Report {
         /// Include records at or after this RFC 3339 timestamp.
@@ -36,36 +40,59 @@ pub enum UsageCommand {
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     let cmd = &args.command;
     match cmd {
-        UsageCommand::Sync => sync(ctx),
+        UsageCommand::Sync { harness } => sync(ctx, harness.as_deref()),
         UsageCommand::Report { from, to, by, json } => {
             report(ctx, from.as_deref(), to.as_deref(), by.as_deref(), *json)
         }
     }
 }
 
-fn sync(ctx: &Context) -> Result<(), CeError> {
+fn sync(ctx: &Context, harness_filter: Option<&str>) -> Result<(), CeError> {
     let author = git_user()?;
     let home = std::env::var("HOME").unwrap_or_default();
-    let claude_projects = std::path::PathBuf::from(&home).join(".claude/projects");
+    let home_path = std::path::Path::new(&home);
 
-    let records = crate::harness::usage::claude::read_usage(&claude_projects, None, &author, None)?;
+    let adapters = resolve_target_adapters(harness_filter)?;
 
-    if records.is_empty() {
+    let mut total_records = 0;
+    for adapter in adapters {
+        if !adapter.is_available(home_path) {
+            continue;
+        }
+        let records = adapter.read_usage(home_path, &author, None, None)?;
+        if !records.is_empty() {
+            let count = crate::capture::ledger::append_records(&ctx.config_dir, &author, &records)?;
+            total_records += count;
+        }
+    }
+
+    if total_records == 0 {
         if !ctx.quiet {
             println!("usage: no new records");
         }
         return Ok(());
     }
 
-    let typed: Vec<crate::capture::ledger::UsageRecord> = records
-        .into_iter()
-        .filter_map(|v| serde_json::from_value(v).ok())
-        .collect();
-    let count = crate::capture::ledger::append_records(&ctx.config_dir, &author, &typed)?;
     if !ctx.quiet {
-        println!("usage: captured {count} record(s) for {author}");
+        println!("usage: captured {total_records} record(s) for {author}");
     }
     Ok(())
+}
+
+fn resolve_target_adapters(
+    filter: Option<&str>,
+) -> Result<Vec<Box<dyn crate::harness::usage::UsageAdapter>>, CeError> {
+    match filter.map(str::trim).filter(|s| !s.is_empty()) {
+        None | Some("all") => Ok(crate::harness::usage::all_adapters()),
+        Some(name) => {
+            let adapter = crate::harness::usage::get_adapter(name).ok_or_else(|| {
+                CeError::Usage(format!(
+                    "unsupported harness '{name}'. Supported harnesses: claude, opencode, codex, pi, all"
+                ))
+            })?;
+            Ok(vec![adapter])
+        }
+    }
 }
 
 fn report(

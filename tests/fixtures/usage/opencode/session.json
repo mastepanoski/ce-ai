@@ -1,0 +1,46 @@
+{
+  "id": "session-oc-9876",
+  "title": "Build feature X",
+  "workspace": "/Users/testuser/projects/web/sample-app",
+  "createdAt": "2026-09-28T10:00:00Z",
+  "messages": [
+    {
+      "id": "msg-001",
+      "role": "user",
+      "timestamp": "2026-09-28T10:01:00Z",
+      "content": "Add unit tests"
+    },
+    {
+      "id": "msg-002",
+      "role": "assistant",
+      "timestamp": "2026-09-28T10:01:30Z",
+      "model": "claude-3-5-sonnet",
+      "tokens": {
+        "input": 1250,
+        "output": 420,
+        "cache_read": 300,
+        "cache_write": 100,
+        "reasoning": 60
+      }
+    },
+    {
+      "id": "msg-003",
+      "role": "assistant",
+      "timestamp": "2026-09-28T10:05:00Z",
+      "model": "claude-3-5-sonnet",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "reasoning": 0
+      }
+    },
+    {
+      "id": "msg-004",
+      "role": "assistant",
+      "timestamp": "2026-09-28T10:06:00Z",
+      "model": "claude-3-5-sonnet"
+    }
+  ]
+}
