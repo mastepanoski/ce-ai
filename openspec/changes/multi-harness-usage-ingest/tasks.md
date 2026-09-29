@@ -24,7 +24,7 @@
   - Ensure deduplication idempotency via `dedup_key`.
   - *Verification*: Integration tests in `tests/commands/usage.rs` covering multi-harness sync, scoped sync, and invalid harness rejection.
 
-- [ ] **Unit 5 (~60 LOC):** Documentation, CLI help strings & release preparation
+- [x] **Unit 5 (~60 LOC):** Documentation, CLI help strings & release preparation
   - Update `ce-ai usage sync --help` descriptions in `src/commands/usage.rs`.
   - Update `docs/user-guide/harness-matrix.md` and `CHANGELOG.md` with multi-harness usage support.
   - *Verification*: `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test`, `make e2e`, and `ce-ai doc lint --strict`.

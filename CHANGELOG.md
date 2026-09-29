@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.73.0] - 2026-09-29
+
+### Added
+- **Multi-Harness Usage Ingestion (`ce-ai usage sync`)**:
+  - Implemented `UsageAdapter` extensible trait in `src/harness/usage/` for local usage transcript ingestion.
+  - Added native ingestion adapters for OpenCode (`~/.local/share/opencode/sessions/`, `~/.config/opencode/sessions/`), OpenAI Codex CLI (`~/.codex/sessions/*.jsonl`), and Pi agent (`~/.pi/agent/sessions/*.json`), expanding usage telemetry beyond Claude Code.
+  - Added `--harness <name|all>` argument to `ce-ai usage sync` to scope transcript ingestion to a specific harness or discover across all available harnesses.
+  - Handled token breakdown mappings for OpenAI reasoning and prompt cached tokens (`cached_tokens`), and ensured turns without token metrics are gracefully skipped without manufacturing artificial zero-token records.
+
 ## [1.72.5] - 2026-09-28
 
 ### Fixed
