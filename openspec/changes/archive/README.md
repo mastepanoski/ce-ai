@@ -72,3 +72,4 @@ Historical notes:
 - fix-cli-audit-alignment: archived (4/4 tasks) under criterion (1) on 2026-09-29.
 - multi-harness-usage-ingest: archived (5/5 tasks) under criterion (1) on 2026-09-29.
 - optimize-cargo-build-cache: archived (2/2 tasks) under criterion (1) on 2026-09-30.
+- opencode-v2-dual-loader: archived (4/4 tasks) under criterion (1) on 2026-09-30.
