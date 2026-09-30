@@ -1,6 +1,6 @@
 # Tasks: OpenCode V1/V2 Dual Plugin Loader, Version-Aware Detection & Native Commands
 
-- [ ] **Unit 1 (~180 LOC):** Dual plugin loader in `.opencode/plugins/compound-engineering.js`
+- [x] **Unit 1 (~180 LOC):** Dual plugin loader in `.opencode/plugins/compound-engineering.js`
   - Implement dual export: V1 `CompoundEngineeringPlugin` (named and `default.server`) and V2 `default.setup(ctx)` with `id: "compound-engineering"`.
   - Add dynamic `skillsDir` resolution checking candidate paths (`../../skills`, `../compound-engineering/skills`, `../skills`).
   - Preserve `spawnSync` + `getRepoState()` workflow resume injection across `session.created`, `session.idle`, `context`, and `compaction`.
