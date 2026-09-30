@@ -61,7 +61,11 @@ fn reinstall_does_not_duplicate_entries() {
     ensure_plugin_and_skills(&path, &entry, &skills).unwrap();
 
     let config = read_json(&path);
-    assert_eq!(config["plugin"].as_array().unwrap().len(), 1);
+    let plugins = config
+        .get("plugins")
+        .or_else(|| config.get("plugin"))
+        .expect("plugin or plugins key present");
+    assert_eq!(plugins.as_array().unwrap().len(), 1);
     assert_eq!(config["skills"]["paths"].as_array().unwrap().len(), 1);
 }
 
@@ -94,8 +98,60 @@ fn creates_plugin_and_skills_arrays_when_missing() {
     ensure_plugin_and_skills(&path, &entry, &skills).unwrap();
 
     let config = read_json(&path);
-    assert_eq!(config["plugin"], serde_json::json!([entry]));
+    let plugins = config
+        .get("plugins")
+        .or_else(|| config.get("plugin"))
+        .expect("plugin or plugins key present");
+    assert_eq!(plugins, &serde_json::json!([entry]));
     assert_eq!(config["skills"]["paths"], serde_json::json!([skills]));
+}
+
+#[test]
+fn merges_into_existing_plugins_key_v2() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("opencode.json");
+    write_json(
+        &path,
+        serde_json::json!({
+            "plugins": ["user-plugin-v2"],
+        }),
+    );
+    let entry = loader_entry(dir.path());
+    ensure_plugin_and_skills(&path, &entry, &skills_path(dir.path())).unwrap();
+
+    let config = read_json(&path);
+    assert!(
+        config.get("plugin").is_none(),
+        "does not create redundant V1 plugin key"
+    );
+    let plugins = config["plugins"].as_array().expect("plugins is an array");
+    assert_eq!(plugins.len(), 2);
+    assert_eq!(plugins[0], "user-plugin-v2");
+    assert_eq!(plugins[1], entry);
+}
+
+#[test]
+fn merges_into_existing_plugin_key_v1() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("opencode.json");
+    write_json(
+        &path,
+        serde_json::json!({
+            "plugin": ["user-plugin-v1"],
+        }),
+    );
+    let entry = loader_entry(dir.path());
+    ensure_plugin_and_skills(&path, &entry, &skills_path(dir.path())).unwrap();
+
+    let config = read_json(&path);
+    assert!(
+        config.get("plugins").is_none(),
+        "does not create redundant V2 plugins key"
+    );
+    let plugins = config["plugin"].as_array().expect("plugin is an array");
+    assert_eq!(plugins.len(), 2);
+    assert_eq!(plugins[0], "user-plugin-v1");
+    assert_eq!(plugins[1], entry);
 }
 
 #[test]
@@ -132,6 +188,21 @@ fn non_array_plugin_key_hard_fails_instead_of_clobbering() {
 }
 
 #[test]
+fn non_array_plugins_key_hard_fails_instead_of_clobbering() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("opencode.json");
+    write_json(&path, serde_json::json!({ "plugins": "not-an-array" }));
+
+    let err = ensure_plugin_and_skills(&path, "plugin-entry", "skills-path").unwrap_err();
+    assert!(err.to_string().contains("plugins"));
+    assert_eq!(
+        read_json(&path)["plugins"],
+        "not-an-array",
+        "user config preserved"
+    );
+}
+
+#[test]
 fn register_mcp_server_creates_block_and_preserves_malformed_failures() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("opencode.json");
@@ -157,7 +228,12 @@ fn in_memory_config_store_works_with_ensure_and_register() {
     let mutation =
         ensure_plugin_and_skills_with_store(&store, path, "/virtual/plugin.js", "/virtual/skills")
             .unwrap();
-    assert_eq!(mutation.keys, vec!["plugin", "skills.paths"]);
+    let key = if mutation.keys[0] == "plugins" {
+        "plugins"
+    } else {
+        "plugin"
+    };
+    assert_eq!(mutation.keys, vec![key, "skills.paths"]);
 
     register_mcp_server_with_store(
         &store,
@@ -168,7 +244,7 @@ fn in_memory_config_store_works_with_ensure_and_register() {
     .unwrap();
 
     let cfg = store.read_config(path).unwrap();
-    assert_eq!(cfg["plugin"], serde_json::json!(["/virtual/plugin.js"]));
+    assert_eq!(cfg[key], serde_json::json!(["/virtual/plugin.js"]));
     assert_eq!(
         cfg["skills"]["paths"],
         serde_json::json!(["/virtual/skills"])

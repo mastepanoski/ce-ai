@@ -33,9 +33,14 @@ fn install_config_store_port_mutates_without_filesystem() {
     )
     .unwrap();
 
-    assert_eq!(mutation.keys, vec!["plugin", "skills.paths"]);
+    let key = if mutation.keys[0] == "plugins" {
+        "plugins"
+    } else {
+        "plugin"
+    };
+    assert_eq!(mutation.keys, vec![key, "skills.paths"]);
     let cfg = store.read_config(path).unwrap();
-    assert_eq!(cfg["plugin"], serde_json::json!(["/virtual/plugin.js"]));
+    assert_eq!(cfg[key], serde_json::json!(["/virtual/plugin.js"]));
 }
 
 #[test]

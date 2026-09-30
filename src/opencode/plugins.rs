@@ -29,26 +29,194 @@ pub fn skills_path(config_dir: &Path) -> PathBuf {
     config_dir.join(MANAGED_DIR).join("skills")
 }
 
-/// Whether `content` is a recognized-valid OpenCode plugin loader.
+/// Represents the detected OpenCode major version.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenCodeVersion {
+    V1,
+    V2,
+    Unknown,
+}
+
+/// Detects the OpenCode major version by executing `opencode --version`.
+pub fn detect_opencode_version() -> OpenCodeVersion {
+    if let Ok(output) = std::process::Command::new("opencode")
+        .arg("--version")
+        .output()
+    {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            return parse_opencode_version(&stdout);
+        }
+    }
+    OpenCodeVersion::Unknown
+}
+
+/// Parses an OpenCode version string into an `OpenCodeVersion`.
+pub fn parse_opencode_version(version_str: &str) -> OpenCodeVersion {
+    for part in version_str.split_whitespace() {
+        let clean = part.strip_prefix('v').unwrap_or(part);
+        if let Some(major) = clean.split('.').next() {
+            if major == "2" {
+                return OpenCodeVersion::V2;
+            } else if major == "1" {
+                return OpenCodeVersion::V1;
+            }
+        }
+    }
+    OpenCodeVersion::Unknown
+}
+
+/// Absolute path of the autodiscovered plugin loader in `<config>/plugins/` (OpenCode V2).
+pub fn autodiscovered_plugin_entry(config_dir: &Path) -> PathBuf {
+    config_dir.join("plugins").join("compound-engineering.js")
+}
+
+/// Marker comment indicating a command file is managed by `ce-ai`.
+pub const MANAGED_COMMAND_MARKER: &str = "<!-- ce-ai:managed-command -->";
+
+/// Extracts `(description, user_invocable)` from YAML frontmatter in `SKILL.md`.
+pub fn extract_skill_metadata(content: &str) -> (Option<String>, bool) {
+    let mut lines = content.lines();
+    if lines.next().map(|l| l.trim()) != Some("---") {
+        return (None, true);
+    }
+    let mut description = None;
+    let mut user_invocable = true;
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed == "---" {
+            break;
+        }
+        if let Some(rest) = trimmed.strip_prefix("description:") {
+            let val = rest.trim();
+            let clean = val.trim_matches('"').trim_matches('\'');
+            description = Some(clean.to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("user-invocable:") {
+            let val = rest.trim().trim_matches('"').trim_matches('\'');
+            if val.eq_ignore_ascii_case("false") {
+                user_invocable = false;
+            }
+        }
+    }
+    (description, user_invocable)
+}
+
+/// Materializes user-invocable skills as native OpenCode command files under `<config_dir>/commands/`.
+/// Returns the number of managed command files ensured.
+pub fn ensure_managed_commands(config_dir: &Path) -> Result<usize, CeError> {
+    let skills_dir = skills_path(config_dir);
+    if !skills_dir.is_dir() {
+        return Ok(0);
+    }
+    let cmd_dir = config_dir.join("commands");
+    if !cmd_dir.exists() {
+        std::fs::create_dir_all(&cmd_dir)?;
+    }
+
+    let mut written = 0;
+    let entries = std::fs::read_dir(&skills_dir)?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            let skill_id = match path.file_name().and_then(|n| n.to_str()) {
+                Some(name) => name.to_string(),
+                None => continue,
+            };
+            let skill_file = path.join("SKILL.md");
+            if !skill_file.is_file() {
+                continue;
+            }
+            let Ok(content) = std::fs::read_to_string(&skill_file) else {
+                continue;
+            };
+            let (desc_opt, user_invocable) = extract_skill_metadata(&content);
+            if !user_invocable {
+                continue;
+            }
+            let desc = desc_opt.unwrap_or_else(|| format!("Load and execute {skill_id} skill"));
+            let command_file = cmd_dir.join(format!("{skill_id}.md"));
+            let command_content = format!(
+                "---\ndescription: \"{}\"\n---\n\n{}\n\nLoad and execute the `{}` skill.\n\n$ARGUMENTS\n",
+                desc.replace('"', "\\\""),
+                MANAGED_COMMAND_MARKER,
+                skill_id
+            );
+            let needs_write = match std::fs::read_to_string(&command_file) {
+                Ok(existing) => existing != command_content,
+                Err(_) => true,
+            };
+            if needs_write {
+                crate::state::write_atomic(&command_file, command_content.as_bytes())?;
+            }
+            written += 1;
+        }
+    }
+    Ok(written)
+}
+
+/// Removes `ce-ai` managed command files under `<config_dir>/commands/`, preserving custom user commands.
+/// Returns the count of files removed.
+pub fn remove_managed_commands(config_dir: &Path) -> Result<usize, CeError> {
+    let cmd_dir = config_dir.join("commands");
+    if !cmd_dir.is_dir() {
+        return Ok(0);
+    }
+    let mut removed = 0;
+    let entries = std::fs::read_dir(&cmd_dir)?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                if content.contains(MANAGED_COMMAND_MARKER) {
+                    crate::state::report_best_effort_remove(&path, std::fs::remove_file(&path));
+                    removed += 1;
+                }
+            }
+        }
+    }
+    if let Ok(mut remaining) = std::fs::read_dir(&cmd_dir) {
+        if remaining.next().is_none() {
+            crate::state::report_best_effort_remove(&cmd_dir, std::fs::remove_dir(&cmd_dir));
+        }
+    }
+    Ok(removed)
+}
+
+/// Whether `content` is a recognized-valid OpenCode plugin loader for the detected OpenCode version.
+pub fn is_valid_loader_content(content: &str) -> bool {
+    is_valid_loader_content_for(content, detect_opencode_version())
+}
+
+/// Validates plugin loader content against a target OpenCode major version.
 ///
 /// OpenCode V2 requires a default export shaped as a definition with an `id`
-/// and a `setup`/`effect` function; V1 function-style exports no longer load
-/// (OpenCode fails them with "Plugin must export a default definition with an
-/// id and an effect or setup function"). A loader is therefore only trusted
-/// when it carries the SessionStart `session.created` hook AND the V2 `setup`
-/// signature. Legacy `ceLoader` function exports (unit-test fixtures,
-/// Dockerfile.e2e, and historical/newer function-export releases such as the
-/// v9 upgrade tarball) remain recognized on their own to preserve the #325
-/// loader-safety guarantee: sync and upgrade must never regress a newer
-/// function-export loader.
-fn is_valid_loader_content(content: &str) -> bool {
-    (content.contains("session.created") && content.contains("setup"))
-        || content.starts_with("export default function ceLoader")
+/// and a `setup`/`effect` function; V1 function-style exports no longer load.
+/// Legacy `ceLoader` function exports remain recognized on their own to preserve
+/// the #325 loader-safety guarantee.
+pub fn is_valid_loader_content_for(content: &str, target_version: OpenCodeVersion) -> bool {
+    if content.starts_with("export default function ceLoader") {
+        return true; // legacy test fixture guarantee (#325)
+    }
+
+    if !content.contains("session.created") {
+        return false;
+    }
+
+    let is_v1_shape = content.contains("CompoundEngineeringPlugin") || content.contains("server:");
+    let is_v2_shape =
+        content.contains("setup") && (content.contains("id:") || content.contains("Plugin.define"));
+    let is_dual_shape = is_v1_shape && is_v2_shape;
+
+    match target_version {
+        OpenCodeVersion::V2 => is_v2_shape,
+        OpenCodeVersion::V1 => is_v1_shape,
+        OpenCodeVersion::Unknown => is_dual_shape || is_v2_shape,
+    }
 }
 
 /// Resolves the OpenCode plugin loader bytes for a given source tree,
 /// validating that the source's own loader is still recognized (see
-/// `is_valid_loader_content`). When it isn't, falls back to
+/// `is_valid_loader_content_for`). When it isn't, falls back to
 /// `BUILTIN_LOADER`, the loader embedded in this `ce-ai` binary. Shared by
 /// `install_loader` (fresh installs) and the sync engine's drift-repair
 /// path, so neither can regress an already-correct installed loader to a
@@ -57,7 +225,7 @@ pub fn resolve_loader_bytes(source_root: &Path) -> Vec<u8> {
     let src = source_root.join(SOURCE_LOADER_PATH);
     match std::fs::read(&src) {
         Ok(b) => match std::str::from_utf8(&b) {
-            Ok(s) if is_valid_loader_content(s) => b,
+            Ok(s) if is_valid_loader_content_for(s, OpenCodeVersion::V2) => b,
             Ok(_) => BUILTIN_LOADER.as_bytes().to_vec(),
             Err(_) => b,
         },
@@ -82,15 +250,23 @@ pub fn install_loader(source_root: &Path, config_dir: &Path) -> Result<ManifestF
 }
 
 /// Returns true if the OpenCode plugin loader exists, contains the
-/// `session.created` hook, and is registered in `opencode.json`.
+/// `session.created` hook and valid shape, and is registered in `opencode.json`.
 pub fn has_session_start_plugin(config_dir: &Path) -> bool {
     let loader_path = plugin_entry(config_dir);
-    if !loader_path.exists() {
-        return false;
-    }
-    let Ok(content) = std::fs::read_to_string(&loader_path) else {
+    let auto_loader_path = autodiscovered_plugin_entry(config_dir);
+
+    let content = if loader_path.exists() {
+        std::fs::read_to_string(&loader_path).ok()
+    } else if auto_loader_path.exists() {
+        std::fs::read_to_string(&auto_loader_path).ok()
+    } else {
+        None
+    };
+
+    let Some(content) = content else {
         return false;
     };
+
     if !is_valid_loader_content(&content) {
         return false;
     }
@@ -107,20 +283,36 @@ pub fn has_session_start_plugin(config_dir: &Path) -> bool {
     };
 
     let expected_entry = loader_path.display().to_string();
-    val.get("plugin")
-        .and_then(|p| p.as_array())
-        .map(|arr| arr.iter().any(|v| v.as_str() == Some(&expected_entry)))
-        .unwrap_or(false)
+    let auto_entry = auto_loader_path.display().to_string();
+
+    let has_entry_in = |key: &str| -> bool {
+        val.get(key)
+            .and_then(|p| p.as_array())
+            .map(|arr| {
+                arr.iter().any(|v| {
+                    v.as_str()
+                        .map(|s| s == expected_entry || s == auto_entry)
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(false)
+    };
+
+    has_entry_in("plugins") || has_entry_in("plugin")
 }
 
 /// Ensures that the canonical OpenCode plugin loader is installed at
 /// `plugin_entry(config_dir)` and registered in `opencode.json`.
+/// When OpenCode V2 is detected, also ensures the autodiscovered plugin path
+/// and managed command markdown files under `commands/`.
 /// Returns `Ok(true)` if modified, `Ok(false)` if already up to date.
 pub fn ensure_session_start_plugin(config_dir: &Path) -> Result<bool, CeError> {
     let mut changed = false;
     let loader_path = plugin_entry(config_dir);
+    let version = detect_opencode_version();
+
     let needs_loader_write = match std::fs::read_to_string(&loader_path) {
-        Ok(s) => !s.contains("session.created"),
+        Ok(s) => !is_valid_loader_content_for(&s, version),
         Err(_) => true,
     };
 
@@ -130,6 +322,22 @@ pub fn ensure_session_start_plugin(config_dir: &Path) -> Result<bool, CeError> {
         }
         crate::state::write_atomic(&loader_path, BUILTIN_LOADER.as_bytes())?;
         changed = true;
+    }
+
+    // On OpenCode V2, also ensure autodiscovery location in plugins/
+    if version == OpenCodeVersion::V2 {
+        let auto_loader = autodiscovered_plugin_entry(config_dir);
+        let needs_auto_write = match std::fs::read_to_string(&auto_loader) {
+            Ok(s) => !is_valid_loader_content_for(&s, version),
+            Err(_) => true,
+        };
+        if needs_auto_write {
+            if let Some(parent) = auto_loader.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            crate::state::write_atomic(&auto_loader, BUILTIN_LOADER.as_bytes())?;
+            changed = true;
+        }
     }
 
     let config_file = config_dir.join("opencode.json");
@@ -148,15 +356,23 @@ pub fn ensure_session_start_plugin(config_dir: &Path) -> Result<bool, CeError> {
         .ok_or_else(|| CeError::Runtime("opencode.json root must be an object".into()))?;
 
     let entry_str = loader_path.display().to_string();
+    let target_key = if root.contains_key("plugins") {
+        "plugins"
+    } else if root.contains_key("plugin") || version == OpenCodeVersion::V1 {
+        "plugin"
+    } else {
+        "plugins"
+    };
+
     let plugins = root
-        .entry("plugin")
+        .entry(target_key)
         .or_insert_with(|| serde_json::json!([]));
     if !plugins.is_array() {
         *plugins = serde_json::json!([]);
     }
-    let arr = plugins
-        .as_array_mut()
-        .ok_or_else(|| CeError::Runtime("`plugin` in opencode.json is not an array".into()))?;
+    let arr = plugins.as_array_mut().ok_or_else(|| {
+        CeError::Runtime(format!("`{target_key}` in opencode.json is not an array"))
+    })?;
 
     if !arr.iter().any(|v| v.as_str() == Some(&entry_str)) {
         arr.push(serde_json::Value::String(entry_str));
@@ -171,6 +387,9 @@ pub fn ensure_session_start_plugin(config_dir: &Path) -> Result<bool, CeError> {
             .map_err(|e| CeError::Runtime(format!("failed to serialize opencode.json: {e}")))?;
         crate::state::write_atomic(&config_file, serialized.as_bytes())?;
     }
+
+    // Materialize managed commands for V2 and general availability
+    let _ = ensure_managed_commands(config_dir)?;
 
     Ok(changed)
 }
@@ -188,27 +407,58 @@ pub fn remove_session_start_plugin(config_dir: &Path) -> Result<bool, CeError> {
         changed = true;
     }
 
+    let auto_loader = autodiscovered_plugin_entry(config_dir);
+    if auto_loader.exists() {
+        crate::state::report_best_effort_remove(&auto_loader, std::fs::remove_file(&auto_loader));
+        changed = true;
+    }
+
+    let plugins_dir = config_dir.join("plugins");
+    if plugins_dir.is_dir() {
+        if let Ok(mut it) = std::fs::read_dir(&plugins_dir) {
+            if it.next().is_none() {
+                crate::state::report_best_effort_remove(
+                    &plugins_dir,
+                    std::fs::remove_dir(&plugins_dir),
+                );
+            }
+        }
+    }
+
+    let cmd_removed = remove_managed_commands(config_dir)?;
+    if cmd_removed > 0 {
+        changed = true;
+    }
+
     let config_file = config_dir.join("opencode.json");
     if config_file.exists() {
         if let Ok(text) = std::fs::read_to_string(&config_file) {
             if let Ok(mut config) = serde_json::from_str::<serde_json::Value>(&text) {
                 let entry_str = loader_path.display().to_string();
-                if let Some(plugins) = config.get_mut("plugin").and_then(|p| p.as_array_mut()) {
-                    let prev_len = plugins.len();
-                    plugins.retain(|v| v.as_str() != Some(&entry_str));
-                    if plugins.len() != prev_len {
-                        changed = true;
+                let auto_entry_str = auto_loader.display().to_string();
+
+                for key in &["plugin", "plugins"] {
+                    if let Some(plugins) = config.get_mut(*key).and_then(|p| p.as_array_mut()) {
+                        let prev_len = plugins.len();
+                        plugins.retain(|v| {
+                            v.as_str()
+                                .map(|s| s != entry_str && s != auto_entry_str)
+                                .unwrap_or(true)
+                        });
+                        if plugins.len() != prev_len {
+                            changed = true;
+                        }
                     }
-                }
-                if config
-                    .get("plugin")
-                    .and_then(|p| p.as_array())
-                    .map(|a| a.is_empty())
-                    .unwrap_or(false)
-                {
-                    if let Some(obj) = config.as_object_mut() {
-                        obj.remove("plugin");
-                        changed = true;
+                    if config
+                        .get(*key)
+                        .and_then(|p| p.as_array())
+                        .map(|a| a.is_empty())
+                        .unwrap_or(false)
+                    {
+                        if let Some(obj) = config.as_object_mut() {
+                            obj.remove(*key);
+                            changed = true;
+                        }
                     }
                 }
 

@@ -1,3 +1,11 @@
+---
+title: "OpenCode V1/V2 Dual Plugin Loader, Version Detection & Native Commands"
+domain: harnesses
+version: 1.74.0
+last_updated: "2026-09-30"
+dependencies: [opencode, state, doctor]
+---
+
 # Specification: OpenCode V1/V2 Dual Plugin Loader, Version Detection & Native Commands
 
 ## WHEN `ce-ai doctor` checks OpenCode plugin health

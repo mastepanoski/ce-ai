@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.74.0] - 2026-09-30
+
+### Fixed
+- **OpenCode V1/V2 Dual Plugin Loader Compatibility (`.opencode/plugins/compound-engineering.js`)**:
+  - Implemented dual export shape supporting both OpenCode V1 (`CompoundEngineeringPlugin` named and `default.server`) and OpenCode V2 (`default.setup(ctx)` with `id: "compound-engineering"`), resolving `PluginModule.LoadError: Plugin must export a default definition with an id and an effect or setup function` on OpenCode 2.x while remaining 100% backward-compatible with 1.x.
+  - Added dynamic `skillsDir` discovery checking candidate paths (`../../skills`, `../compound-engineering/skills`, `../skills`).
+  - Preserved workflow resume state injection (`spawnSync` + `getRepoState()`) across `session.created`, `session.idle`, `context`, and `compaction`.
+- **OpenCode Version-Aware Detection & Config Key Agnosticism (`src/opencode/plugins.rs`, `src/opencode/config.rs`)**:
+  - Eliminated false negative in `ce-ai doctor` by accepting both `"plugins"` (OpenCode V2) and `"plugin"` (OpenCode V1) keys in `opencode.json`.
+  - Added runtime version detection (`OpenCodeVersion`) via `opencode --version` with shape validation recognizing V1, V2, and dual-loader exports.
+  - Made `ensure_session_start_plugin` self-repairing on disk, automatically upgrading stale V1 loaders when OpenCode V2 is detected.
+  - Updated `merge_plugin` and `remove_session_start_plugin` to handle both `"plugins"` and `"plugin"` keys cleanly without clobbering user configurations.
+
+### Added
+- **Native OpenCode Command Materialization (`commands/`)**:
+  - Materialized user-invocable Compound Engineering skills as native command files under `<config_dir>/commands/<skill>.md` with frontmatter `description`, `$ARGUMENTS` interpolation, and `<!-- ce-ai:managed-command -->` guards.
+  - Ensured commands appear natively in OpenCode V2 command palette and CLI without runtime hook dependency or delay.
+  - Added safe cleanup of managed command files on `uninstall` while preserving custom user commands.
+  - Added autodiscovery plugin placement (`<config_dir>/plugins/compound-engineering.js`) when OpenCode V2 is active.
+
 ## [1.73.1] - 2026-09-29
 
 ### Performance

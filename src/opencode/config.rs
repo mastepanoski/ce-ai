@@ -21,24 +21,35 @@ pub struct ConfigMutation {
 /// `state::read_config` for opencode-specific callers.
 pub use crate::state::read_config;
 
-/// Appends `plugin_entry` to `plugin` unless already present (OI-2). Fails
-/// instead of clobbering when `plugin` exists but is not an array.
-fn merge_plugin(config: &mut serde_json::Value, plugin_entry: &str) -> Result<(), CeError> {
-    match config.get_mut("plugin") {
-        None => config["plugin"] = serde_json::json!([plugin_entry]),
+/// Appends `plugin_entry` to `plugins` or `plugin` unless already present (OI-2).
+/// Uses `plugins` if present or if OpenCode V2 is detected; otherwise uses `plugin`.
+/// Fails instead of clobbering when the key exists but is not an array.
+fn merge_plugin(config: &mut serde_json::Value, plugin_entry: &str) -> Result<String, CeError> {
+    let key = if config.get("plugins").is_some() {
+        "plugins"
+    } else if config.get("plugin").is_some()
+        || crate::opencode::plugins::detect_opencode_version()
+            == crate::opencode::plugins::OpenCodeVersion::V1
+    {
+        "plugin"
+    } else {
+        "plugins"
+    };
+
+    match config.get_mut(key) {
+        None => config[key] = serde_json::json!([plugin_entry]),
         Some(serde_json::Value::Array(arr)) => {
             if !arr.iter().any(|v| v.as_str() == Some(plugin_entry)) {
                 arr.push(serde_json::Value::String(plugin_entry.to_string()));
             }
         }
         Some(_) => {
-            return Err(CeError::Runtime(
-                "`plugin` in opencode.json must be an array; refusing to overwrite it. Fix the file manually, then re-run."
-                    .into(),
-            ))
+            return Err(CeError::Runtime(format!(
+                "`{key}` in opencode.json must be an array; refusing to overwrite it. Fix the file manually, then re-run."
+            )));
         }
     }
-    Ok(())
+    Ok(key.to_string())
 }
 
 /// Appends `skills_path` to `skills.paths` unless already present (OI-4). Fails
@@ -80,13 +91,13 @@ pub fn ensure_plugin_and_skills_with_store(
     skills_path: &str,
 ) -> Result<ConfigMutation, CeError> {
     let mut config = store.read_config(config_path)?;
-    merge_plugin(&mut config, plugin_entry)?;
+    let plugin_key = merge_plugin(&mut config, plugin_entry)?;
     merge_skills_path(&mut config, skills_path)?;
     store.write_config(config_path, &config)?;
     Ok(ConfigMutation {
         file: config_path.display().to_string(),
         backup: None,
-        keys: vec!["plugin".into(), "skills.paths".into()],
+        keys: vec![plugin_key, "skills.paths".into()],
     })
 }
 
