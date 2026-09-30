@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.73.1] - 2026-09-29
+
+### Performance
+- **Compact Build Profiles**: Configured `[profile.dev]` and `[profile.test]` with `debug = "line-tables-only"` and `incremental = false` to dramatically reduce build artifact bloat while retaining line and file traces for debug stacktraces.
+
+### Added
+- **Artifact Sweeping (`make sweep`)**: Added `sweep` recipe to `Makefile` leveraging `cargo-sweep --time 14` to prune inactive build artifacts older than 14 days without clobbering active build caches.
+
 ## [1.73.0] - 2026-09-29
 
 ### Added

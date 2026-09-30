@@ -1,4 +1,4 @@
-.PHONY: e2e test bench build clean hooks lint security
+.PHONY: e2e test bench build clean hooks lint security sweep
 
 test:
 	cargo test
@@ -29,3 +29,8 @@ hooks:
 
 clean:
 	cargo clean
+
+# Reclaim disk space by sweeping old compilation artifacts older than 14 days
+sweep:
+	@command -v cargo-sweep >/dev/null 2>&1 || { echo "installing cargo-sweep (one-time)..."; cargo install --locked cargo-sweep; }
+	cargo sweep --time 14
