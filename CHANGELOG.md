@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.74.2] - 2026-09-30
+
+### Added
+- **Deterministic Tasks Lifecycle Tail Validator (`scripts/validate-tasks-tail.py`)**:
+  - Added standalone, zero-dependency Python 3 script that inspects OpenSpec `tasks.md` checklists for mandatory post-implementation lifecycle units (`ce-simplify-code`, `ce-code-review` / `review-receipt`, and `ce-compound`).
+  - Implemented heuristic code detection (exempting documentation-only and configuration changes).
+  - Added idempotent `--fix` flag to automatically append standardized lifecycle tail units to incomplete task lists.
+  - Added companion unit test suite (`tests/test_validate_tasks_tail.py`).
+  - Added domain concept `Tasks Lifecycle Tail` in `CONCEPTS.md` and developer tooling solution document in `docs/solutions/developer-tooling/deterministic-tasks-lifecycle-validator.md`.
+
 ## [1.74.1] - 2026-09-30
 
 ### Documentation
