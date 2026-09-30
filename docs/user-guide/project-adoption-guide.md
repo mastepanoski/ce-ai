@@ -1,6 +1,6 @@
 # Project Adoption Engine Guide: Non-Destructive Multi-Harness Governance
 
-> **Intent**: How-to & Explanation — Learn why the Project Adoption Engine exists, how marker-delimited injection works under the hood, and how to safely adopt or de-adopt projects across real-world development scenarios.
+> **Intent**: How-to — Safely adopt or de-adopt projects across real-world development scenarios. For architectural details, see the [Architecture Guide](architectural-and-conceptual-guide.md).
 
 ---
 

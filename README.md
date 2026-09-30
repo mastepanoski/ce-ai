@@ -1,35 +1,6 @@
 # CE-AI — Compound Engineering Workflow Orchestration & Governance
 
-**Open-source workflow orchestration and governance for Compound Engineering across AI coding agents.** Turn ideas into verified work, preserve engineering context, and make each change improve the next. CE-AI is not a coding agent, a harness replacement, or an agent runtime: Claude Code, Codex, Cursor, and OpenCode execute the probabilistic work; `ce-ai` governs the engineering workflow, state transitions, drift auditing, and multi-harness asset synchronization.
-
-## Why CE-AI?
-
-A developer familiar with [Compound Engineering](https://github.com/EveryInc/compound-engineering-plugin) will ask: *why isn't the plugin itself enough?* The plugin provides the skills and workflow methodology (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`); `ce-ai` provides the operational and governance layer around them:
-
-- **Multi-harness workflow integration**: Installs, synchronizes, and drift-audits plugin assets across 10 native harnesses (Claude Code, OpenCode, Cursor, Codex, Copilot, AGY, Kimi, Grok, Pi, FX) with atomic writes and per-harness pre-mutation backups.
-- **Workflow FSM & stage tracking**: Records and validates legal transitions across 7 development stages; teams supply the test and knowledge-capture evidence required by their workflow.
-- **Checkpoints & drift recovery**: Snapshots progress before context compactions and synchronizes disk reality (`RepoState`) upon resumption.
-- **Project adoption**: Injects tamper-evident, SHA256-verified workflow contracts into project rule files (`ce-ai init-prj`).
-- **Skill registry & model profiles**: Discovers skills across hosts, manages workspace isolation, and handles role-scoped model assignments.
-
-> **Key principle**: Workflow bookkeeping and state transitions can be deterministic; agent execution remains probabilistic. `ce-ai` governs the state and contracts so probabilistic agent work stays verifiable.
-
-## How the pieces fit
-
-```text
-Compound Engineering (EveryInc)
-        │
-        │ skills + engineering workflow
-        ▼
-      ce-ai
- workflow orchestration + governance
-        │
-        ▼
- AI coding harnesses
- Claude Code / Codex / Cursor / OpenCode / Copilot / AGY / …
-```
-
-CE-AI complements the official [Compound Engineering plugin](https://github.com/EveryInc/compound-engineering-plugin); it does not replace it or compete with coding agents. See [CE-AI positioning](docs/user-guide/ce-ai-positioning.md) for the full architectural breakdown.
+**Open-source workflow orchestration and governance for Compound Engineering across AI coding agents.** Turn ideas into verified work, preserve engineering context, and make each change improve the next. `ce-ai` governs state transitions, drift auditing, and multi-harness asset synchronization without replacing coding agent reasoning.
 
 ## Try it in two minutes
 
@@ -57,14 +28,6 @@ ce-ai install --harness all && ce-ai init-prj && ce-ai doctor
 
 Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <outcome>`. For package manager alternatives and detailed steps, see [Getting Started](docs/user-guide/getting-started.md).
 
-## The 7-stage workflow & FSM
-
-```text
-Ideation → OpenSpec → Plan → Work/TDD → Verify → Compound → Ship
-```
-
-`ce-ai` governs progression through this flywheel by validating stage transitions and surfacing repository state. Teams attach empirical verification and capture decisions in `docs/solutions/`; for formal changes it coordinates [OpenSpec](openspec/specs/), while routine tactical tasks can use Organic Driven Development (ODD, by Alan Buscaglia / Gentle AI).
-
 ## Documentation map
 
 | Document | Audience | Intent |
@@ -79,10 +42,10 @@ Ideation → OpenSpec → Plan → Work/TDD → Verify → Compound → Ship
 | 🎓 [Determinism Explained](docs/user-guide/determinism-explained.md) | Beginner | Explanation — what CE-AI can and cannot guarantee |
 | 🎓 [Zero-Step Drift Recovery](docs/user-guide/zero-step-drift-recovery-explained.md) | Beginner | Explanation — recover current repository state at session start |
 | ⚡ [ODD Fast-Path Masterclass](docs/user-guide/odd-fast-path-and-graduation-masterclass.md) | Beginner / Senior | Explanation — the lightweight path and when to graduate to formal artifacts |
-| 🧠 [Decision Engine Guide](docs/user-guide/decision-engine-guide.md) | Both | How-to / Reference — routing, risk checks, and readiness |
+| 🧠 [Decision Engine Guide](docs/user-guide/decision-engine-guide.md) | Both | How-to — routing, risk checks, and readiness |
 | 🔧 [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) | Both | How-to — install without overwriting existing configurations |
 | 🔄 [Sync & Upgrade](docs/user-guide/sync-and-upgrade-mechanisms.md) | Both | How-to — reconcile drift, update, and roll back |
-| ⚡ [Skill Registry Guide](docs/user-guide/skill-registry-guide.md) | Both | How-to / Reference — find and resolve available skills |
+| ⚡ [Skill Registry Guide](docs/user-guide/skill-registry-guide.md) | Both | How-to — find and resolve available skills |
 | 💾 [Backup & Uninstall](docs/user-guide/backup-and-uninstall.md) | Both | How-to — restore configurations and remove CE-AI safely |
 | 🗂️ [Harness Matrix](docs/user-guide/harness-matrix.md) | Senior | Reference — supported hosts, configuration paths, and integration methods |
 | 🏛️ [Architecture Guide](docs/user-guide/architectural-and-conceptual-guide.md) | Senior | Explanation — deterministic state, adapters, and project artifacts |
