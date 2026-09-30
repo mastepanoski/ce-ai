@@ -160,3 +160,6 @@ A deterministic command provisioning mechanism in `ce-ai` that synthesizes decla
 
 ### OpenCode Config Key Agnosticism
 A resilient configuration parsing and serialization strategy in `src/opencode/config.rs` and `plugins.rs` that accepts either `"plugins"` (introduced in OpenCode 2.x) or `"plugin"` (used in OpenCode 1.x) array keys in `opencode.json`. When querying or mutating plugins, `ce-ai` inspects both keys transparently, preventing false-negative health check warnings and avoiding destructive clobbering of unmanaged user plugins.
+
+### Tasks Lifecycle Tail
+A standardized terminal work unit appended to OpenSpec checklist files (`openspec/changes/<feature>/tasks.md`) that explicitly enumerates mandatory post-implementation engineering phases: code simplification (`ce-simplify-code`), formal multi-agent review and receipt stamping (`ce-ai workflow review-receipt`), and knowledge compounding (`ce-compound` solution authoring and monotonic `CONCEPTS.md` accretion). By embedding the lifecycle tail directly into the task checklist, autonomous coding agents are prevented from prematurely concluding implementation upon merely satisfying technical tests. Verified mechanically via `scripts/validate-tasks-tail.py`.
