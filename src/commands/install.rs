@@ -399,6 +399,8 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             if !args.skip_companions {
                 crate::opencode::config::register_companions(&target_config)?;
             }
+            crate::opencode::plugins::ensure_session_start_plugin(&config_dir)?;
+            crate::opencode::plugins::ensure_managed_commands(&config_dir)?;
 
             InstallManifest {
                 version: version.to_string(),

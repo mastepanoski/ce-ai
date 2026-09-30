@@ -489,6 +489,8 @@ pub(crate) fn sync_with(
                     &crate::opencode::plugins::skills_path(&config_dir).to_string_lossy(),
                 )?;
                 crate::opencode::config::register_companions(&target_config)?;
+                crate::opencode::plugins::ensure_session_start_plugin(&config_dir)?;
+                crate::opencode::plugins::ensure_managed_commands(&config_dir)?;
             } else {
                 // Every supported kind has an explicit arm above; reaching
                 // this point means state.json references an unsupported

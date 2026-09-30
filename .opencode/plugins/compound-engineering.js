@@ -4,7 +4,12 @@ import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
 const pluginDir = path.dirname(fileURLToPath(import.meta.url));
-const skillsDir = path.resolve(pluginDir, "../../skills");
+const candidateDirs = [
+  path.resolve(pluginDir, "../../skills"),
+  path.resolve(pluginDir, "../compound-engineering/skills"),
+  path.resolve(pluginDir, "../skills"),
+];
+const skillsDir = candidateDirs.find((d) => fs.existsSync(d)) || candidateDirs[0];
 
 function unquote(value) {
   if (value.length < 2) return value;
@@ -95,13 +100,87 @@ function skillDefinition(skill) {
 }
 
 /**
- * OpenCode V2 plugin definition. V2 requires a default export carrying an
- * `id` and a `setup(ctx)` function; hooks, transforms, and subscriptions are
- * registered on the context instead of being returned from a plugin function
- * (see https://opencode.ai/v2/docs/build/plugins/migrate-v1).
+ * OpenCode V1 plugin implementation.
+ * V1 calls this function (either as named export or as default.server).
+ */
+export const CompoundEngineeringPlugin = async ({ project, client, $, directory, worktree }) => {
+  const cwd = directory || worktree || process.cwd();
+  const skills = loadSkills();
+  const skillCommands = {};
+  for (const skill of skills) {
+    if (!skill.userInvocable) continue;
+    skillCommands[skill.id] = {
+      template: `Load and execute the \`${skill.id}\` skill.\n\n$ARGUMENTS`,
+      ...(skill.description ? { description: skill.description } : {}),
+    };
+  }
+
+  return {
+    config: async (config) => {
+      config.skills = config.skills || {};
+      config.skills.paths = config.skills.paths || [];
+      if (!config.skills.paths.includes(skillsDir)) {
+        config.skills.paths.push(skillsDir);
+      }
+      config.command = config.command || {};
+      for (const [name, cmd] of Object.entries(skillCommands)) {
+        if (!(name in config.command)) {
+          config.command[name] = cmd;
+        }
+      }
+    },
+
+    event: async ({ event }) => {
+      if (event && event.type === "session.created") {
+        const sessionId =
+          event.properties?.info?.id ||
+          event.properties?.sessionID ||
+          event.sessionID;
+
+        const stateOutput = getRepoState(cwd);
+        if (sessionId && stateOutput && client && client.session && typeof client.session.prompt === "function") {
+          try {
+            await client.session.prompt({
+              path: { id: sessionId },
+              body: {
+                noReply: true,
+                parts: [{ type: "text", text: stateOutput }],
+              },
+            });
+          } catch {
+            // Non-blocking: continue normal session execution if prompt injection fails
+          }
+        }
+      } else if (event && event.type === "session.idle") {
+        // Turn-end auto-checkpoint: invoke ce-ai workflow resume to evaluate stage progression
+        getRepoState(cwd);
+      }
+    },
+
+    "experimental.session.compacting": async (input, output) => {
+      const stateOutput = getRepoState(cwd);
+      if (stateOutput && output && Array.isArray(output.context)) {
+        output.context.push(stateOutput);
+      }
+    },
+
+    "experimental.chat.system.transform": async (input, output) => {
+      const stateOutput = getRepoState(cwd);
+      if (stateOutput && output && Array.isArray(output.system)) {
+        output.system.push(stateOutput);
+      }
+    },
+  };
+};
+
+/**
+ * OpenCode V1/V2 Dual Plugin Definition.
+ * - OpenCode V1 invokes `server()` (and has named export `CompoundEngineeringPlugin`).
+ * - OpenCode V2 invokes `setup(ctx)` with `id: "compound-engineering"`.
  */
 export default {
   id: "compound-engineering",
+  server: CompoundEngineeringPlugin,
 
   async setup(ctx) {
     const cwd = (ctx.location && ctx.location.directory) || process.cwd();
