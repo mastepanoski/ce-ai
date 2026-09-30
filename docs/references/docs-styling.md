@@ -18,10 +18,10 @@ Every piece of documentation must have exactly one primary intent:
 
 | Quadrant | Reader's goal | Form | Examples in this repo |
 | --- | --- | --- | --- |
-| **Tutorial** | Learn by doing | Guided lesson, guaranteed to work | `docs/user-guide/quick-start-workflow-guide.md` |
-| **How-to** | Accomplish a task | Steps for a specific goal | `docs/user-guide/sync-and-upgrade-mechanisms.md` |
-| **Reference** | Look up a fact | Accurate, complete, dry | Harness Matrix, CLI flags, exit codes |
-| **Explanation** | Understand | Discussion of why and how | Architectural guide, FSM masterclass |
+| **Tutorial** | Learn by doing | Guided lesson, guaranteed to work | [`quick-start-workflow-guide.md`](../user-guide/quick-start-workflow-guide.md) |
+| **How-to** | Accomplish a task | Steps for a specific goal | [`sync-and-upgrade-mechanisms.md`](../user-guide/sync-and-upgrade-mechanisms.md) |
+| **Reference** | Look up a fact | Accurate, complete, dry | [`harness-matrix.md`](../user-guide/harness-matrix.md), [`cli-reference.md`](../user-guide/cli-reference.md) |
+| **Explanation** | Understand | Discussion of why and how | [`architectural-and-conceptual-guide.md`](../user-guide/architectural-and-conceptual-guide.md), [`fsm-and-checkpoints-explained.md`](../user-guide/fsm-and-checkpoints-explained.md) |
 
 Never blend quadrants inside one document section. A reference table does not belong mid-tutorial; an architecture discussion does not belong inside installation steps.
 

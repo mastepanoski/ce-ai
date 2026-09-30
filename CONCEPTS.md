@@ -151,3 +151,12 @@ An agentic engineering methodology employed by `ce-ai` that decouples durable sp
 
 ### Context Reset Resilience
 An architectural capability of `ce-ai` where operational workflow state (active feature, development stage, and task completion in `state.json` and `tasks.md`) and repository drift are decoupled from the transient conversational transcript and externalized into deterministic artifacts and persistent sidecar memory (such as Engram). While internal latent reasoning states cannot be fully reconstructed, the explicit operational workflow state can be discarded and restored at any point without loss of task orientation. Upon resumption, `ce-ai workflow resume --json` reconstructs a compact working context from durable artifacts, allowing agents to execute from an explicit baseline.
+
+### OpenCode Dual Plugin Loader
+A hybrid ECMAScript module export pattern in `.opencode/plugins/compound-engineering.js` that simultaneously satisfies the OpenCode 1.x `server()` hook contract and the OpenCode 2.x `default.setup(ctx)` plugin definition schema with `id: "compound-engineering"`. This dual architecture enables a single loader asset to register lifecycle events (`session.created`, `session.idle`, `compaction`, `context`) and trigger `ce-ai workflow resume` across both major OpenCode releases without configuration branching.
+
+### Native Command Materialization
+A deterministic command provisioning mechanism in `ce-ai` that synthesizes declarative Markdown command definitions (`commands/<command-name>.md`) under the harness configuration directory for CLI hosts (such as OpenCode 2.x) that do not support dynamic runtime command injection hooks. Each materialized command file includes YAML frontmatter with descriptions, prompt templates using `$ARGUMENTS`, and a tamper-evident comment guard (`<!-- ce-ai:managed-command -->`), preserving custom user commands during sync and ensuring clean removal during uninstallation.
+
+### OpenCode Config Key Agnosticism
+A resilient configuration parsing and serialization strategy in `src/opencode/config.rs` and `plugins.rs` that accepts either `"plugins"` (introduced in OpenCode 2.x) or `"plugin"` (used in OpenCode 1.x) array keys in `opencode.json`. When querying or mutating plugins, `ce-ai` inspects both keys transparently, preventing false-negative health check warnings and avoiding destructive clobbering of unmanaged user plugins.

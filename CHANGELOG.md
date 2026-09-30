@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.74.1] - 2026-09-30
+
+### Documentation
+- **Compound Solution Capture**: Added structured solution document `docs/solutions/bugfixes/opencode-v2-dual-loader.md` detailing OpenCode 2.x migration, config key agnosticism, dual ESM export contract, and native command materialization.
+- **Monotonic Concept Accretion**: Extended `CONCEPTS.md` with *OpenCode Dual Plugin Loader*, *Native Command Materialization*, and *OpenCode Config Key Agnosticism*.
+- **Documentation Style Compliance (`docs-styling.md`)**: Streamlined `README.md` to ≤ 100 lines (63 lines), leading immediately with Quick Path before Documentation Map. Normalized `docs/user-guide/project-adoption-guide.md` Diátaxis intent to singular `How-to` and added clickable markdown links in `docs/references/docs-styling.md`.
+
 ## [1.74.0] - 2026-09-30
 
 ### Fixed
