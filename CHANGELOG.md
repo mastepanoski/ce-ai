@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.75.2] - 2026-10-02
+
+### Added
+- **v2 Architectural Refinement: Semantic Authority Decoupling & Observable Capabilities Matrix**:
+  - **Foundational Boundary Rule**: Codified *"CE-AI must not require artifacts that Compound Engineering itself does not require"* across the v2 PRD and migration plan.
+  - **Inviolable Principle of No Semantic Authority**: Established that `ce-ai` must never invent mandatory workflow stages, gating rules, or required artifacts beyond upstream CE contracts.
+  - **Inviolable Principle of Repository Reality Over Mirrored State**: Established that repository artifacts (plans, git branch, commits, PR status, run receipts) are the sole authoritative workflow truth, eliminating mirrored stage cursors.
+  - **Core Domain vs. Optional Integrations Decoupling**: Decoupled OpenSpec from the core domain of `ce-ai`. Core `ce-ai` focuses on CE compatibility, host orchestration, and workflow observation; OpenSpec operates as an optional, opt-in integration (`ce-ai spec`) without blocking lightweight edits or bug fixes.
+  - **Observable Workflow Capabilities Matrix (`ObservableWorkflowState`)**: Replaced the rigid sequential 7-stage pipeline (`Stage 1 -> Stage 2 -> Stage 3`) with a non-linear capability matrix answering *"What do we objectively know about the current workflow state?"*.
+- **Domain Concepts Accretion (`CONCEPTS.md`)**:
+  - Monotonically accreted 4 new domain concepts: *No Semantic Authority*, *Repository Reality Over Mirrored State*, *Observable Workflow State*, and *Optional Integration Autonomy* (62 entries total, +4 added, 0 scrubbed).
+- **Compound Solution Capture**:
+  - Added solution document `docs/solutions/architecture/decoupling-semantic-authority-and-openspec.md`.
+
 ## [1.75.1] - 2026-10-02
 
 ### Fixed

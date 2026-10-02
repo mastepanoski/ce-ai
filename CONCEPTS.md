@@ -181,3 +181,15 @@ A dynamic path resolution capability in `ce-ai` v2 that respects the `docs_root`
 
 ### Pi Companion Namespacing
 A non-colliding lifecycle extension deployment architecture for Mario Zechner's Pi coding agent (`pi.dev`) in `ce-ai`. Rather than deploying companion hooks to `.pi/extensions/compound-engineering.ts` (which collides with upstream Compound Engineering's native Pi entrypoint), `ce-ai` installs its Turn-0 and session lifecycle extension to `.pi/extensions/ce-ai-companion.ts`. During project reconciliation and de-adoption, `ce-ai` safely migrates and cleans up legacy `compound-engineering.ts` files that contain managed `ce-ai` markers while preserving user-defined extensions.
+
+### No Semantic Authority
+An inviolable architectural principle of `ce-ai` v2 asserting that `ce-ai` must never introduce mandatory workflow stages, required artifacts, or gating transition rules beyond those defined by the Compound Engineering contracts it integrates with. Foundational rule: *CE-AI must not require artifacts that Compound Engineering itself does not require.* Optional integrations (such as OpenSpec) may introduce additional artifacts or constraints only when explicitly activated by the user or calling workflow; `ce-ai` may observe, coordinate, and validate these contracts, but must never redefine or impose workflow semantics.
+
+### Repository Reality Over Mirrored State
+An architectural principle and operational invariant in `ce-ai` v2 establishing that repository artifacts (plans, git branch names, commit history, pull request status, and run receipts) are the sole authoritative source of workflow truth. Storing an external or mirrored copy of workflow state (such as a global `current_stage` cursor in `state.json`) is an antipattern that guarantees drift, forces redundant reconciliation logic, and falsely imposes linear progression onto inherently non-linear engineering tasks (`ce-debug`, trivial edits, or direct execution).
+
+### Observable Workflow State
+An artifact-derived, capability-oriented workflow evaluation model in `ce-ai` v2 that replaces rigid scalar stage cursors (`Stage 1 -> Stage 2 -> Stage 3`). Rather than asking "What stage is the repository in?", `ce-ai` queries "What do we objectively know about the current workflow state?" across observable dimensions: active work branch, detected plan files, verification test evidence, handoff readiness, pull request status, knowledge capture eligibility, and optional specification activity (`ObservableWorkflowState`).
+
+### Optional Integration Autonomy
+A domain modularization pattern in `ce-ai` v2 that decouples secondary engineering frameworks and workflows (such as OpenSpec) from the core domain of `ce-ai`. Core `ce-ai` maintains strict focus on Compound Engineering compatibility, host adapters, repository observation, and fleet coordination. Auxiliary capabilities operate as decoupled, opt-in tools (`ce-ai spec`) that agents or developers may invoke for high-complexity, multi-agent, or heavily regulated tasks without imposing mandatory write gates or blocking barriers on standard or lightweight engineering workflows.

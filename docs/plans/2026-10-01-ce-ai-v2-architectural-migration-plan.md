@@ -23,11 +23,13 @@ Following official design critique and boundary review from the upstream maintai
    - Pi extension entrypoint collisions at `.pi/extensions/compound-engineering.ts`.
    - Fragile substring-based `ce-debug` gate exemptions.
 5. **Lack of a Delimited Compatibility Boundary:** Current implementation relies on fragile internals (skill prose, file layout, bundled references, file hashes) rather than stable integration points (skill names, mode tokens like `mode:return-to-caller`, versioned schemas, and native host installers).
+6. **Semantic Authority Overreach & False Linearity (OpenSpec Coupling):** Enforcing OpenSpec as an authoritative, mandatory "Stage 2" write gate directly clashed with CE's non-linear execution model (skipping planning for trivial tasks, specialized `ce-debug` loops, and contingent `ce-compound` capture). Forcing formal specs before any code write inflated documentation debt. CE-AI must enforce: *CE-AI must not require artifacts that Compound Engineering itself does not require.*
 
 This plan establishes the comprehensive **CE-AI v2 Architecture PRD and Migration Plan**, repositioning `ce-ai` from an authoritative workflow gatekeeper to a **Cross-Host Operational Companion for Compound Engineering**:
 - **CE owns engineering semantics and workflow artifacts.**
 - **Hosts own native execution and packaging.**
 - **CE-AI coordinates environment readiness, version governance, native installation orchestration, and advisory workflow observation.**
+- **OpenSpec is decoupled from core domain as an optional, opt-in integration for high-complexity tasks.**
 
 ## Requirements Traceability
 
@@ -36,6 +38,7 @@ This plan establishes the comprehensive **CE-AI v2 Architecture PRD and Migratio
 - **RF-3 (Documentation Debt & Integrated Hygiene):** Relax rigid write gates for lightweight/debug workflows; integrate with upstream `compound audit` and schema validators instead of duplicating checks.
 - **RF-4 (Coupling & Schema Corrections):** Resolve 7 concrete coupling bugs (frontmatter schema, component fields, `docs_root`, brainstorm directory migration, dead path file types, Pi extension paths, regex gate exemptions).
 - **RF-5 (Stable Integration Contracts):** Define Rust CE compatibility layer (`CeRelease`, `CeCapabilities`, `CeSkillContract`, `CeArtifactSchema`, `CeNativeInstaller`, `CeDocsRoot`) built exclusively on stable integration points.
+- **RF-6 (Decoupled Semantic Authority & Optional OpenSpec):** Eliminate OpenSpec from the core domain and mandatory invariants; replace linear stage cursors with an Observable Workflow Capabilities Matrix (`ObservableWorkflowState`).
 
 ## Implementation Units
 
@@ -92,6 +95,15 @@ This plan establishes the comprehensive **CE-AI v2 Architecture PRD and Migratio
 - **KTD 3: Explicit Compatibility Layer in Rust:**
   - *Decision:* Encapsulate all upstream CE knowledge within typed structs (`CeRelease`, `CeArtifactSchema`, `CeDocsRoot`) rather than scattering heuristics across commands.
   - *Rationale:* Insulates CE-AI from upstream internal changes; builds strictly on documented stable contracts.
+- **KTD 4: No Semantic Authority:**
+  - *Decision:* CE-AI MUST NOT introduce mandatory workflow stages, artifacts, or transition requirements beyond those defined by the Compound Engineering contracts it integrates with. Foundational rule: *CE-AI must not require artifacts that Compound Engineering itself does not require.*
+  - *Rationale:* Protects agents from artificial documentation debt and workflow friction; respects upstream CE's autonomous contract definitions.
+- **KTD 5: Decoupled Core Domain vs. Optional Integrations:**
+  - *Decision:* OpenSpec is removed from the core domain of CE-AI. CE-AI Core focuses on CE compatibility, host adapters, workflow observation, and fleet coordination. OpenSpec operates as an optional, opt-in integration (`ce-ai spec`) activated only when explicitly requested.
+  - *Rationale:* Preserves spec-driven engineering utility for high-complexity or regulated features without imposing mandatory barriers on small changes, documentation tweaks, or bug fixes.
+- **KTD 6: Observable Workflow Capabilities Matrix over Linear Stage Cursors:**
+  - *Decision:* CE-AI abandons scalar stage cursor tracking (`Stage 1 -> Stage 2 -> Stage 3`) in favor of an artifact-derived capabilities matrix (`ObservableWorkflowState`: active work, plan detected, verification evidence, handoff available, PR status, knowledge capture needed, optional spec active).
+  - *Rationale:* Accurately reflects non-linear real-world engineering (`ce-debug`, skipping planning for trivial edits) and aligns with how upstream CE tools (`ce-handoff`, `ce-work`) inspect repository state directly.
 
 ## Verification & Acceptance Scenarios
 
