@@ -41,7 +41,10 @@ fn pi_adapter_respects_pi_coding_agent_dir_env() {
 #[test]
 fn pi_session_start_hook_lifecycle() {
     let tmp = tempfile::TempDir::new().unwrap();
-    let ext_path = tmp.path().join(".pi/extensions/compound-engineering.ts");
+    let ext_path = tmp
+        .path()
+        .join(".pi/extensions")
+        .join(PI_EXTENSION_FILENAME);
 
     assert!(!has_session_start_hook(&ext_path));
 
@@ -76,6 +79,24 @@ fn pi_session_start_hook_lifecycle() {
 
     let removed_second = remove_session_start_hook(&ext_path).unwrap();
     assert!(!removed_second);
+}
+
+#[test]
+fn pi_removes_legacy_compound_engineering_ts_if_managed() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let ext_dir = tmp.path().join(".pi/extensions");
+    std::fs::create_dir_all(&ext_dir).unwrap();
+    let legacy_file = ext_dir.join(PI_LEGACY_EXTENSION_FILENAME);
+    std::fs::write(
+        &legacy_file,
+        "// ce-ai:hook v=2\nexecSync('ce-ai workflow resume')",
+    )
+    .unwrap();
+
+    let companion_file = ext_dir.join(PI_EXTENSION_FILENAME);
+    let removed = remove_session_start_hook(&companion_file).unwrap();
+    assert!(removed);
+    assert!(!legacy_file.exists());
 }
 
 #[test]

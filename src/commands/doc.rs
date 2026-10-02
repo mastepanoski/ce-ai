@@ -262,7 +262,14 @@ pub fn parse_solution_file(repo_root: &Path, file_path: &Path) -> Result<Solutio
                             ActiveList::Tags
                         }
                     }
-                    "components" => {
+                    "component" => {
+                        let clean = val.trim_matches('"').trim_matches('\'');
+                        if !clean.is_empty() {
+                            components.push(clean.to_string());
+                        }
+                        ActiveList::None
+                    }
+                    "components" | "related_components" => {
                         if val.starts_with('[') && val.ends_with(']') {
                             let inner = &val[1..val.len() - 1];
                             for item in inner.split(',') {
@@ -323,9 +330,10 @@ pub fn parse_solution_file(repo_root: &Path, file_path: &Path) -> Result<Solutio
     })
 }
 
-/// Recursively collects all solution documents under `docs/solutions/`.
+/// Recursively collects all solution documents under `<docs_root>/solutions/`.
 pub fn collect_solutions_inventory(repo_root: &Path) -> Vec<SolutionMetadata> {
-    let solutions_dir = repo_root.join("docs").join("solutions");
+    let docs_root = crate::commands::workflow::resolve_docs_root(repo_root);
+    let solutions_dir = repo_root.join(&docs_root).join("solutions");
     if !solutions_dir.is_dir() {
         return Vec::new();
     }

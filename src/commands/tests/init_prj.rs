@@ -94,11 +94,13 @@ fn test_reconcile_project_harness_hooks_upgrades_stale_hooks() {
         serde_json::from_str(&fs::read_to_string(&cursor_hooks).unwrap()).unwrap();
     assert!(cursor_val["hooks"]["stop"].is_array());
 
-    // Verify Pi was upgraded to v=2
-    let pi_content = fs::read_to_string(&pi_ext).unwrap();
+    // Verify Pi was upgraded to v=2 in ce-ai-companion.ts and legacy compound-engineering.ts was cleaned up
+    let companion_ext = pi_dir.join(crate::harness::pi::PI_EXTENSION_FILENAME);
+    let pi_content = fs::read_to_string(&companion_ext).unwrap();
     assert!(pi_content.contains("// ce-ai:hook v=2"));
     assert!(pi_content.contains("agent_end"));
     assert!(pi_content.contains("session_before_compact"));
+    assert!(!pi_ext.exists());
 }
 
 #[test]

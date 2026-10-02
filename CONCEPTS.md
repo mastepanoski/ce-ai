@@ -178,3 +178,6 @@ A strongly-typed domain module in `ce-ai` v2 (`src/compat/`) that encapsulates u
 
 ### Configurable Docs Root Resolution
 A dynamic path resolution capability in `ce-ai` v2 that respects the `docs_root` setting defined in `.compound-engineering/config.yaml`. Rather than hardcoding references to `docs/plans/` or `docs/solutions/`, `ce-ai` dynamically anchors all plan documents, solutions, and architectural records to the user-configured documentation directory (defaulting to `docs/`).
+
+### Pi Companion Namespacing
+A non-colliding lifecycle extension deployment architecture for Mario Zechner's Pi coding agent (`pi.dev`) in `ce-ai`. Rather than deploying companion hooks to `.pi/extensions/compound-engineering.ts` (which collides with upstream Compound Engineering's native Pi entrypoint), `ce-ai` installs its Turn-0 and session lifecycle extension to `.pi/extensions/ce-ai-companion.ts`. During project reconciliation and de-adoption, `ce-ai` safely migrates and cleans up legacy `compound-engineering.ts` files that contain managed `ce-ai` markers while preserving user-defined extensions.

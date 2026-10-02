@@ -266,6 +266,24 @@ fn test_evaluate_gate_policy_matrix_exemptions_and_enforcement() {
         assert!(reason.contains("ce-debug direct entry point permits bug fix writes"));
     }
 
+    // Substring occurrences of ce-debug must NOT trigger exemption
+    let (decision, _, missing, _) = evaluate_gate_policy(
+        Some(WorkflowStage::WorkTdd),
+        Some("feature-task"),
+        Some(FeatureResolution::Branch),
+        false,
+        false,
+        AdoptionTier::Full,
+        Some("refactor documentation regarding ce-debug usage"),
+        false,
+        false,
+        false,
+        GateMode::Enforce,
+        ExecutionMode::Compound,
+    );
+    assert_eq!(decision, GateDecision::Blocked);
+    assert!(!missing.is_empty());
+
     // 4. AdoptionTier::Minimal exempt from full OpenSpec requirement
     let (decision, edge, missing, reason) = evaluate_gate_policy(
         Some(WorkflowStage::WorkTdd),

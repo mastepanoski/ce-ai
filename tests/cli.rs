@@ -5725,7 +5725,7 @@ fn init_prj_pi_injects_and_deinits_session_start_hook() {
         .assert()
         .success();
 
-    let ext_file = pi_dir.join("extensions").join("compound-engineering.ts");
+    let ext_file = pi_dir.join("extensions").join("ce-ai-companion.ts");
     assert!(ext_file.exists());
     let content = fs::read_to_string(&ext_file).unwrap();
     assert!(content.contains("before_agent_start"));
@@ -6910,8 +6910,8 @@ fn init_prj_and_deinit_prj_roundtrip_all_harness_hooks() {
     assert!(agy_val["compound-engineering"]["PreInvocation"].is_array());
     assert!(agy_val["compound-engineering"]["Stop"].is_array());
 
-    // Pi: compound-engineering.ts with v=2
-    let pi_ext = pi_dir.join("extensions").join("compound-engineering.ts");
+    // Pi: ce-ai-companion.ts with v=2
+    let pi_ext = pi_dir.join("extensions").join("ce-ai-companion.ts");
     assert!(pi_ext.exists());
     let pi_text = fs::read_to_string(&pi_ext).unwrap();
     assert!(pi_text.contains("// ce-ai:hook v=2"));
