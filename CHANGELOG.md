@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.74.2] - 2026-09-30
+## [1.75.0] - 2026-10-01
+
+### Added
+- **CE-AI v2 Architectural Pivot & PRD (`docs/architecture/ce-ai-v2-architecture-prd.md`)**:
+  - Published comprehensive Product Requirements Document and technical architecture for CE-AI v2 in response to code-level review from the upstream Compound Engineering maintainer.
+  - Reframed `ce-ai`'s core mission from an authoritative workflow gatekeeper to a **Cross-Host Operational Companion for Compound Engineering**.
+  - Established the architectural blueprint to replace the global stage cursor in `state.json` with an advisory workflow observation model reading repository artifacts directly.
+  - Designed the Fleet Version Governance Subsystem to orchestrate native host package managers (`claude`, `opencode`, `codex`, `pi`) rather than scraping and duplicating release tarballs.
+  - Formulated the typed Rust CE Compatibility Layer (`src/compat/`) specification built strictly on stable upstream contracts (`docs_root`, `schema.yaml` with `schema_version`, documented mode tokens like `mode:return-to-caller`).
+  - Documented concrete remediation paths for 7 upstream coupling divergences.
+- **OpenSpec Change Package (`openspec/changes/ce-ai-v2-architecture-prd/`)**:
+  - Added full formal OpenSpec triad (`proposal.md`, `exploration.md`, `design.md`, `spec.md`, `tasks.md`).
+- **Domain Concepts Accretion (`CONCEPTS.md`)**:
+  - Monotonically accreted 5 new core concepts: *Cross-Host Operational Companion*, *Advisory Workflow Observation Engine*, *Native Harness Installer Orchestrator*, *Upstream Schema Compatibility Layer*, and *Configurable Docs Root Resolution*.
+- **Compound Solution Capture**:
+  - Added architecture learning document `docs/solutions/architecture/ce-ai-v2-architectural-pivot.md`.
 
 ### Added
 - **Deterministic Tasks Lifecycle Tail Validator (`scripts/validate-tasks-tail.py`)**:

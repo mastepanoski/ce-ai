@@ -163,3 +163,18 @@ A resilient configuration parsing and serialization strategy in `src/opencode/co
 
 ### Tasks Lifecycle Tail
 A standardized terminal work unit appended to OpenSpec checklist files (`openspec/changes/<feature>/tasks.md`) that explicitly enumerates mandatory post-implementation engineering phases: code simplification (`ce-simplify-code`), formal multi-agent review and receipt stamping (`ce-ai workflow review-receipt`), and knowledge compounding (`ce-compound` solution authoring and monotonic `CONCEPTS.md` accretion). By embedding the lifecycle tail directly into the task checklist, autonomous coding agents are prevented from prematurely concluding implementation upon merely satisfying technical tests. Verified mechanically via `scripts/validate-tasks-tail.py`.
+
+### Cross-Host Operational Companion
+The foundational architectural identity of `ce-ai` v2. Rather than attempting to serve as an authoritative workflow gatekeeper or file-level package manager, `ce-ai` acts as an operational companion: Compound Engineering owns workflow semantics and artifacts, AI hosts own native plugin execution, and `ce-ai` coordinates the environment around them (fleet version governance, environment readiness, multi-harness auditing, and advisory workflow observation).
+
+### Advisory Workflow Observation Engine
+A read-only workflow state inspection subsystem in `ce-ai` v2 that observes and summarizes feature development progress directly from repository artifacts (git branches, commit history, pull request status, plan files under `docs_root/plans/`, and skill run receipts) without storing or mutating an authoritative `current_stage` cursor in `state.json`. It provides non-blocking guidance, diagnostic warnings, and handoff summaries while honoring non-linear engineering pathways (such as `ce-debug` bug loops and direct execution).
+
+### Native Harness Installer Orchestrator
+A fleet management subsystem in `ce-ai` v2 that drives host-native plugin managers (such as Claude Code plugins, OpenCode extensions, and Pi packages) to install, update, and pin specific Compound Engineering release versions. By delegating file-level unpacking and transforms to each host's native mechanism, it eliminates `external-duplicate` conflicts and prevents file-level state drift without scraping raw release tarballs.
+
+### Upstream Schema Compatibility Layer
+A strongly-typed domain module in `ce-ai` v2 (`src/compat/`) that encapsulates upstream Compound Engineering contracts and metadata schemas (`schema.yaml` with `schema_version`, documented skill mode tokens like `mode:return-to-caller`, and released version capabilities). It insulates `ce-ai` from upstream internal refactorings by building strictly against documented, stable integration points.
+
+### Configurable Docs Root Resolution
+A dynamic path resolution capability in `ce-ai` v2 that respects the `docs_root` setting defined in `.compound-engineering/config.yaml`. Rather than hardcoding references to `docs/plans/` or `docs/solutions/`, `ce-ai` dynamically anchors all plan documents, solutions, and architectural records to the user-configured documentation directory (defaulting to `docs/`).
