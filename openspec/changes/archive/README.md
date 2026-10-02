@@ -77,3 +77,4 @@ Historical notes:
 - deterministic-tasks-tail-validator: archived (6/6 tasks) under criterion (1) on 2026-09-30.
 - ce-ai-v2-architecture-prd: archived (7/7 tasks) under criterion (1) on 2026-10-02.
 - upstream-coupling-remediation: archived (7/7 tasks) under criterion (1) on 2026-10-02.
+- v2-architecture-refinement: archived (7/7 tasks) under criterion (1) on 2026-10-02.
