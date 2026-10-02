@@ -1783,7 +1783,10 @@ fn test_probe_solution_drift_clean() {
     let clean_md = r#"---
 title: "Clean Architecture Pattern"
 category: "architecture"
+date: "2026-10-02"
 problem_type: "design"
+component: "core"
+severity: "medium"
 tags:
   - workflow
   - state
@@ -1815,7 +1818,10 @@ fn test_probe_solution_drift_dead_paths() {
     let broken_paths_md = r#"---
 title: "Legacy Bug Fix"
 category: "bugfixes"
+date: "2026-10-02"
 problem_type: "bug"
+component: "core"
+severity: "medium"
 tags:
   - fix
 applies_when: "When fixing a broken path"
@@ -1927,10 +1933,8 @@ applies_when: "When using module key"
         assert_eq!(
             finding.missing_frontmatter_fields,
             vec![
-                "title".to_string(),
                 "category".to_string(),
                 "problem_type".to_string(),
-                "tags".to_string(),
                 "applies_when".to_string(),
             ]
         );

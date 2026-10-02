@@ -375,11 +375,14 @@ pub fn evaluate_gate_policy(
     // 5. Direct Entry Point: ce-debug exemption (for bugfixes)
     if let Some(entry) = entry_point {
         let clean = entry.trim().to_lowercase();
-        if clean.starts_with("ce-debug")
-            || clean.contains("ce-debug")
-            || clean.starts_with("debug")
-            || clean.contains("debug:")
-        {
+        let is_ce_debug = clean == "ce-debug"
+            || clean.starts_with("ce-debug:")
+            || clean.starts_with("ce-debug ")
+            || clean.starts_with("ce-debug/")
+            || clean == "debug"
+            || clean.starts_with("debug:")
+            || clean.starts_with("debug ");
+        if is_ce_debug {
             return (
                 GateDecision::Pass,
                 None,

@@ -30,7 +30,8 @@ impl HarnessAdapter for PiAdapter {
 use crate::error::CeError;
 use crate::state::write_atomic;
 
-pub const PI_EXTENSION_FILENAME: &str = "compound-engineering.ts";
+pub const PI_EXTENSION_FILENAME: &str = "ce-ai-companion.ts";
+pub const PI_LEGACY_EXTENSION_FILENAME: &str = "compound-engineering.ts";
 pub const PI_HOOK_VERSION_MARKER: &str = "// ce-ai:hook v=2";
 
 pub const PI_EXTENSION_CONTENT: &str = r#"// ce-ai:hook v=2
@@ -100,9 +101,20 @@ pub fn has_session_start_hook(extension_path: &Path) -> bool {
     content.contains("ce-ai workflow resume") && content.contains(PI_HOOK_VERSION_MARKER)
 }
 
-/// Ensures `.pi/extensions/compound-engineering.ts` exists with the canonical extension content.
+/// Ensures `.pi/extensions/ce-ai-companion.ts` exists with the canonical extension content.
 /// Idempotent; returns Ok(true) if written/updated, Ok(false) if already present and identical.
 pub fn ensure_session_start_hook(extension_path: &Path) -> Result<bool, CeError> {
+    if let Some(parent) = extension_path.parent() {
+        let legacy_file = parent.join(PI_LEGACY_EXTENSION_FILENAME);
+        if legacy_file.exists() && legacy_file != extension_path {
+            if let Ok(content) = std::fs::read_to_string(&legacy_file) {
+                if content.contains("ce-ai workflow resume") || content.contains("// ce-ai:hook") {
+                    let _ = std::fs::remove_file(&legacy_file);
+                }
+            }
+        }
+    }
+
     if has_session_start_hook(extension_path) {
         return Ok(false);
     }
@@ -115,31 +127,38 @@ pub fn ensure_session_start_hook(extension_path: &Path) -> Result<bool, CeError>
     Ok(true)
 }
 
-/// Surgically removes `.pi/extensions/compound-engineering.ts` if it is managed by ce-ai.
+/// Surgically removes `.pi/extensions/ce-ai-companion.ts` (and legacy `compound-engineering.ts`) if managed by ce-ai.
 /// Prunes `.pi/extensions` and `.pi` if left empty.
 pub fn remove_session_start_hook(extension_path: &Path) -> Result<bool, CeError> {
-    if !extension_path.exists() {
-        return Ok(false);
+    let mut removed = false;
+
+    if extension_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(extension_path) {
+            if content.contains("ce-ai workflow resume") {
+                let _ = std::fs::remove_file(extension_path);
+                removed = true;
+            }
+        }
     }
-
-    let Ok(content) = std::fs::read_to_string(extension_path) else {
-        return Ok(false);
-    };
-
-    if !content.contains("ce-ai workflow resume") {
-        return Ok(false);
-    }
-
-    let _ = std::fs::remove_file(extension_path);
 
     if let Some(ext_dir) = extension_path.parent() {
+        let legacy_file = ext_dir.join(PI_LEGACY_EXTENSION_FILENAME);
+        if legacy_file.exists() {
+            if let Ok(content) = std::fs::read_to_string(&legacy_file) {
+                if content.contains("ce-ai workflow resume") {
+                    let _ = std::fs::remove_file(&legacy_file);
+                    removed = true;
+                }
+            }
+        }
+
         let _ = std::fs::remove_dir(ext_dir);
         if let Some(pi_dir) = ext_dir.parent() {
             let _ = std::fs::remove_dir(pi_dir);
         }
     }
 
-    Ok(true)
+    Ok(removed)
 }
 
 #[cfg(test)]

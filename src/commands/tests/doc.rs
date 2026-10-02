@@ -262,3 +262,120 @@ date: "2026-09-0{i}"
     assert!(warnings[0].contains("1 dense topic cluster(s) detected"));
     assert!(warnings[0].contains("ce-ai doc cluster"));
 }
+
+#[test]
+fn test_parse_solution_file_component_and_related_components() {
+    let dir = tempdir().unwrap();
+    let sol_file = dir.path().join("upstream-solution.md");
+    let content = r#"---
+module: workflow::resume
+date: 2026-10-02
+problem_type: bugfix
+component: "workflow"
+related_components: ["resume", "state"]
+severity: major
+---
+
+# Upstream Solution
+"#;
+    fs::write(&sol_file, content).unwrap();
+
+    let meta = parse_solution_file(dir.path(), &sol_file).unwrap();
+    assert_eq!(meta.category, "workflow::resume");
+    assert_eq!(meta.problem_type, "bugfix");
+    assert_eq!(meta.date, "2026-10-02");
+    assert!(meta.components.contains(&"workflow".to_string()));
+    assert!(meta.components.contains(&"resume".to_string()));
+    assert!(meta.components.contains(&"state".to_string()));
+}
+
+#[test]
+fn test_resolve_docs_root_custom_and_fallback() {
+    let dir = tempdir().unwrap();
+    // Default fallback
+    assert_eq!(
+        crate::commands::workflow::resolve_docs_root(dir.path()),
+        PathBuf::from("docs")
+    );
+
+    // Custom docs_root in .compound-engineering/config.yaml
+    let ce_dir = dir.path().join(".compound-engineering");
+    fs::create_dir_all(&ce_dir).unwrap();
+    fs::write(
+        ce_dir.join("config.yaml"),
+        "# CE config\ndocs_root: documentation\n",
+    )
+    .unwrap();
+
+    assert_eq!(
+        crate::commands::workflow::resolve_docs_root(dir.path()),
+        PathBuf::from("documentation")
+    );
+}
+
+#[test]
+fn test_check_solution_frontmatter_upstream_conformance() {
+    // 1. Valid upstream bugfix frontmatter without applies_when or tags
+    let bugfix_content = r#"---
+module: harness::pi
+date: 2026-10-02
+problem_type: bugfix
+component: pi
+severity: standard
+---
+"#;
+    let missing = crate::commands::workflow::check_solution_frontmatter(bugfix_content);
+    assert!(
+        missing.is_empty(),
+        "Expected clean frontmatter, got: {:?}",
+        missing
+    );
+
+    // 2. Knowledge-track doc (architecture) requires applies_when
+    let arch_without_applies = r#"---
+module: harness::pi
+date: 2026-10-02
+problem_type: architecture
+component: pi
+severity: standard
+---
+"#;
+    let missing_arch = crate::commands::workflow::check_solution_frontmatter(arch_without_applies);
+    assert_eq!(missing_arch, vec!["applies_when"]);
+
+    // 3. Incomplete frontmatter missing category and problem_type
+    let incomplete = r#"---
+title: Incomplete Doc
+tags:
+  - test
+---
+"#;
+    let missing_inc = crate::commands::workflow::check_solution_frontmatter(incomplete);
+    assert!(missing_inc.contains(&"category".to_string()));
+    assert!(missing_inc.contains(&"problem_type".to_string()));
+}
+
+#[test]
+fn test_clean_code_path_multi_language() {
+    assert_eq!(
+        crate::commands::workflow::clean_code_path("src/lib.rs"),
+        Some("src/lib.rs")
+    );
+    assert_eq!(
+        crate::commands::workflow::clean_code_path("src/components/App.tsx:42"),
+        Some("src/components/App.tsx")
+    );
+    assert_eq!(
+        crate::commands::workflow::clean_code_path("tests/integration/test_api.py#L10-L20"),
+        Some("tests/integration/test_api.py")
+    );
+    assert_eq!(
+        crate::commands::workflow::clean_code_path("src/server/handler.go"),
+        Some("src/server/handler.go")
+    );
+    // Non-code or outside src/tests should be None
+    assert_eq!(
+        crate::commands::workflow::clean_code_path("docs/architecture.md"),
+        None
+    );
+}

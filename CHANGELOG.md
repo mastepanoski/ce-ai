@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.75.1] - 2026-10-02
+
+### Fixed
+- **Upstream Coupling Divergence Remediation**:
+  - **Dynamic `docs_root` Discovery**: Implemented `resolve_docs_root` in `src/commands/workflow.rs`, inspecting `.compound-engineering/config.yaml` and `.compound-engineering/config.local.yaml` for relocated documentation roots (defaulting to `docs/`). Wired across solution probing, modern brainstorm discovery, and solution cataloging.
+  - **Upstream Schema Conformance**: Aligned `check_solution_frontmatter` with upstream CE `schema.yaml`, making `tags` and `title` optional, and exempting bug-track documents (`problem_type: bugfix | bug`) from mandatory `applies_when`.
+  - **Unified Component Metadata**: Updated `parse_solution_file` in `src/commands/doc.rs` to parse singular `component: <name>`, `related_components: [...]`, and plural `components: [...]` for semantic clustering.
+  - **Multi-Language Dead Path Validation**: Expanded `clean_code_path` to recognize code paths across `.rs`, `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.go`, `.rb`, `.c`, `.cpp`, `.cc`, `.h`, `.hpp`, `.java`, `.kt`, `.swift`, `.sh`, `.bash`, `.zsh`, `.yaml`, `.yml`, `.json`, and `.toml`.
+  - **Modern Requirements Plan Discovery**: Updated Stage 1 ideation detection in `infer_stage_from_repo` to recognize `*-requirements.md` and `*-requirements.html` files located under `<docs_root>/plans/` alongside legacy brainstorm folders.
+  - **Pi Extension Collision Prevention**: Renamed Pi companion extension to `ce-ai-companion.ts` (`PI_EXTENSION_FILENAME`) to eliminate entrypoint collisions with upstream Compound Engineering, with automatic cleanup of legacy managed `compound-engineering.ts` files.
+  - **Strict `ce-debug` Gate Prefix Matching**: Hardened task string matching in `src/commands/gate.rs` to require exact string or structured prefixes (`ce-debug:`, `ce-debug `, `ce-debug/`), eliminating false-positive gate exemptions on arbitrary task substrings.
+- **Domain Concepts Accretion (`CONCEPTS.md`)**:
+  - Accreted concept *Pi Companion Namespacing* (58 entries total, +1 added, 0 scrubbed).
+- **Compound Solution Capture**:
+  - Added solution document `docs/solutions/bugfixes/upstream-coupling-remediation.md`.
+
 ## [1.75.0] - 2026-10-01
 
 ### Added

@@ -2197,6 +2197,38 @@ pub fn probe_stale_pending_openspecs(
 }
 
 /// Probe 5: Scans `docs/solutions/` for dead code references and missing YAML frontmatter fields.
+/// Resolves the documentation root directory, respecting `.compound-engineering/config.yaml`.
+/// Defaults to `PathBuf::from("docs")` if not explicitly relocated.
+pub fn resolve_docs_root(repo_root: &Path) -> PathBuf {
+    let candidates = [
+        repo_root.join(".compound-engineering").join("config.yaml"),
+        repo_root
+            .join(".compound-engineering")
+            .join("config.local.yaml"),
+    ];
+
+    for config_path in candidates {
+        if let Ok(content) = std::fs::read_to_string(&config_path) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with('#') {
+                    continue;
+                }
+                if let Some((k, v)) = trimmed.split_once(':') {
+                    if k.trim() == "docs_root" {
+                        let clean = v.trim().trim_matches('"').trim_matches('\'');
+                        if !clean.is_empty() {
+                            return PathBuf::from(clean);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    PathBuf::from("docs")
+}
+
 pub fn probe_solution_drift(
     repo_root: &Path,
     config: &DocHygieneConfig,
@@ -2205,7 +2237,8 @@ pub fn probe_solution_drift(
         return ProbeStatus::Clean;
     }
 
-    let solutions_dir = repo_root.join("docs").join("solutions");
+    let docs_root = resolve_docs_root(repo_root);
+    let solutions_dir = repo_root.join(&docs_root).join("solutions");
     if !solutions_dir.is_dir() {
         return ProbeStatus::Clean;
     }
@@ -2287,25 +2320,21 @@ fn extract_yaml_frontmatter(content: &str) -> Option<Vec<&str>> {
     None
 }
 
-fn check_solution_frontmatter(content: &str) -> Vec<String> {
+pub fn check_solution_frontmatter(content: &str) -> Vec<String> {
     let mut missing = Vec::new();
     let header_lines = match extract_yaml_frontmatter(content) {
         Some(lines) => lines,
         None => {
             return vec![
-                "title".into(),
                 "category".into(),
                 "problem_type".into(),
-                "tags".into(),
                 "applies_when".into(),
             ];
         }
     };
 
-    let mut has_title = false;
     let mut has_category_or_module = false;
-    let mut has_problem_type = false;
-    let mut has_tags = false;
+    let mut problem_type_val: Option<String> = None;
     let mut has_applies_when = false;
 
     for line in header_lines {
@@ -2314,13 +2343,12 @@ fn check_solution_frontmatter(content: &str) -> Vec<String> {
             continue;
         }
         if !line.starts_with(' ') && !line.starts_with('\t') {
-            if let Some((k, _)) = trimmed.split_once(':') {
+            if let Some((k, v)) = trimmed.split_once(':') {
                 let key = k.trim().to_lowercase();
+                let val = v.trim().trim_matches('"').trim_matches('\'').to_string();
                 match key.as_str() {
-                    "title" => has_title = true,
                     "category" | "module" => has_category_or_module = true,
-                    "problem_type" => has_problem_type = true,
-                    "tags" => has_tags = true,
+                    "problem_type" => problem_type_val = Some(val),
                     "applies_when" => has_applies_when = true,
                     _ => {}
                 }
@@ -2328,26 +2356,28 @@ fn check_solution_frontmatter(content: &str) -> Vec<String> {
         }
     }
 
-    if !has_title {
-        missing.push("title".into());
-    }
     if !has_category_or_module {
         missing.push("category".into());
     }
-    if !has_problem_type {
+    let is_bugfix = match &problem_type_val {
+        Some(pt) => {
+            let clean = pt.to_lowercase();
+            clean == "bugfix" || clean == "bug"
+        }
+        None => false,
+    };
+    if problem_type_val.is_none() {
         missing.push("problem_type".into());
     }
-    if !has_tags {
-        missing.push("tags".into());
-    }
-    if !has_applies_when {
+    // Upstream schema rule: applies_when is required only for knowledge-track docs (not bugfixes)
+    if !is_bugfix && !has_applies_when {
         missing.push("applies_when".into());
     }
 
     missing
 }
 
-fn clean_code_path(token: &str) -> Option<&str> {
+pub fn clean_code_path(token: &str) -> Option<&str> {
     let trimmed = token.trim();
     if trimmed.contains('*') || trimmed.contains('<') || trimmed.contains('>') {
         return None;
@@ -2368,7 +2398,13 @@ fn clean_code_path(token: &str) -> Option<&str> {
         _ => path_no_anchor,
     };
 
-    if candidate.ends_with(".rs") {
+    const CODE_EXTENSIONS: &[&str] = &[
+        ".rs", ".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rb", ".c", ".cpp", ".cc", ".h",
+        ".hpp", ".java", ".kt", ".swift", ".sh", ".bash", ".zsh", ".yaml", ".yml", ".json",
+        ".toml",
+    ];
+
+    if CODE_EXTENSIONS.iter().any(|ext| candidate.ends_with(ext)) {
         Some(candidate)
     } else {
         None
@@ -3627,9 +3663,23 @@ pub fn infer_stage_from_repo(
     }
 
     // 3. Ideation (Stage 1):
-    // docs/ideation/ or docs/brainstorms/*.md exists and no openspec change dir
-    let ideation_dir = repo_root.join("docs").join("ideation");
-    let brainstorms_dir = repo_root.join("docs").join("brainstorms");
+    // docs/ideation/, docs/brainstorms/*.md, or modern <docs_root>/plans/*-requirements.md exists and no openspec change dir
+    let docs_root = resolve_docs_root(repo_root);
+    let ideation_dir = repo_root.join(&docs_root).join("ideation");
+    let brainstorms_dir = repo_root.join(&docs_root).join("brainstorms");
+    let plans_dir = repo_root.join(&docs_root).join("plans");
+
+    let has_modern_brainstorms = plans_dir.is_dir()
+        && std::fs::read_dir(&plans_dir)
+            .ok()
+            .map(|r| {
+                r.flatten().any(|entry| {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    name.ends_with("-requirements.md") || name.ends_with("-requirements.html")
+                })
+            })
+            .unwrap_or(false);
+
     let has_brainstorms = brainstorms_dir.is_dir()
         && std::fs::read_dir(&brainstorms_dir)
             .ok()
@@ -3639,7 +3689,7 @@ pub fn infer_stage_from_repo(
             })
             .unwrap_or(false);
 
-    if ideation_dir.is_dir() || has_brainstorms {
+    if ideation_dir.is_dir() || has_brainstorms || has_modern_brainstorms {
         return Some((
             WorkflowStage::Ideation,
             "Ideation & brainstorming in progress".to_string(),
