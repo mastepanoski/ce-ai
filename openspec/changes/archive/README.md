@@ -75,3 +75,4 @@ Historical notes:
 - opencode-v2-dual-loader: archived (4/4 tasks) under criterion (1) on 2026-09-30.
 - compound-opencode-v2-and-align-docs: archived (5/5 tasks) under criterion (1) on 2026-09-30.
 - deterministic-tasks-tail-validator: archived (6/6 tasks) under criterion (1) on 2026-09-30.
+- ce-ai-v2-architecture-prd: archived (7/7 tasks) under criterion (1) on 2026-10-02.
