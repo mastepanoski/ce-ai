@@ -9,9 +9,9 @@ use std::path::PathBuf;
 use clap::Subcommand;
 
 use crate::commands::{
-    audit, backups, decisions, deinit_prj, doc, doctor, gate, guard, init_prj, install, models,
-    report_bug, self_update, skills, status, sync, tools, uninstall, upgrade, usage, workflow,
-    Context,
+    audit, backups, decisions, deinit_prj, doc, doctor, fleet, gate, guard, init_prj, install,
+    models, report_bug, self_update, skills, status, sync, tools, uninstall, upgrade, usage,
+    workflow, Context,
 };
 use crate::error::CeError;
 
@@ -93,12 +93,15 @@ pub enum Commands {
     /// Intelligent upstream bug detection, deduplication, and reporting with user consent.
     #[command(name = "report-bug")]
     ReportBug(report_bug::Args),
+    /// Fleet version governance and synchronization across native AI coding agent harnesses.
+    Fleet(fleet::Args),
 }
 
 impl CeCommand for Commands {
     fn run(&self, ctx: &Context) -> Result<(), CeError> {
         match self {
             Commands::Decisions(args) => decisions::run(ctx, args),
+            Commands::Fleet(args) => fleet::run(ctx, args.clone()),
             Commands::Install(args) => install::run(ctx, args),
             Commands::Sync(args) => sync::run(ctx, args),
             Commands::Upgrade(args) => upgrade::run(ctx, args),

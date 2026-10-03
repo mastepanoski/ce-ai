@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.76.0] - 2026-10-03
+
+### Added
+- **Centralized Upstream CE Compatibility Layer (`src/compat/`)**:
+  - `CeDocsConfig` (`src/compat/docs.rs`): Centralized discovery of dynamic `docs_root` from `.compound-engineering/config.local.yaml` or `.compound-engineering/config.yaml` with helpers for `plans_dir` and `solutions_dir`.
+  - `CeSolutionFrontmatter` (`src/compat/schema.rs`): Strongly-typed frontmatter parser validating upstream `schema.yaml` conformance (`module`, `date`, `problem_type`, `component`, `severity`), correctly treating `applies_when` as knowledge-track only and exempting `bugfix` and `bug` problem tracks.
+  - `CeSkillContract` (`src/compat/contracts.rs`): Formal contracts for documented skills, exposing `mode:return-to-caller` support (for `ce-work` and `ce-resolve-pr-feedback`).
+  - `CeRelease` (`src/compat/release.rs`): Semantic release tag parsing, normalization, and version comparisons.
+  - Refactored `src/commands/workflow.rs` and `src/commands/doc.rs` to delegate docs root discovery and frontmatter validation entirely to `src/compat/`.
+- **Fleet Version Governance Subsystem (`src/fleet/`)**:
+  - `FleetState` in `src/state/state.rs`: Added `pinned_version` and `last_sync` timestamp to `state.json` with atomic persistence.
+  - `FleetHarnessDriver` Trait (`src/fleet/driver.rs`): Polymorphic driver interface defining readiness probing (`is_installed`), version detection (`detect_version`), and sync action planning (`plan_sync`).
+  - Native Host Harness Drivers (`src/fleet/drivers.rs`): Out-of-the-box drivers for `OpenCodeDriver`, `ClaudeDriver`, `PiDriver`, `CodexDriver`, and `CursorDriver` driving native package managers or configuration rather than raw tarball scraping.
+  - Declarative Action Planning: `FleetAction` enum representing `UpToDate`, `RunCommand`, and `UpdateConfig` with atomic execution and dry-run previewing.
+  - Auditing & Alignment (`src/fleet/status.rs`): Generates `FleetStatusReport` mapping installed host versions to `Aligned`, `Divergent`, `Missing`, or `Unmanaged`.
+- **New CLI Subcommand: `ce-ai fleet` (`src/commands/fleet.rs`)**:
+  - `ce-ai fleet status [--json]`: Audits and reports installed harness versions, alignment status, and overall fleet readiness.
+  - `ce-ai fleet pin <version>`: Atomically records the target semantic version tag in `state.json`.
+  - `ce-ai fleet sync [--dry-run]`: Evaluates planned actions across all detected hosts, allowing safe previewing (`--dry-run`) before executing native package managers or config updates.
+- **Domain Concepts Accretion (`CONCEPTS.md`)**:
+  - Monotonically accreted 3 new domain concepts: *Fleet Version Governance Engine*, *Native Harness Driver Pattern*, and *Centralized Upstream Compatibility Boundary* (65 entries total, +3 added, 0 scrubbed).
+- **Compound Solution Capture**:
+  - Added solution document `docs/solutions/architecture/ce-compatibility-layer-and-fleet-governance.md`.
+
 ## [1.75.2] - 2026-10-02
 
 ### Added
