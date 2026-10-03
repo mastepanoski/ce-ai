@@ -10700,3 +10700,83 @@ fn test_cli_usage_sync_idempotent_multi_harness() {
     let stdout2 = String::from_utf8_lossy(&out2.stdout);
     assert!(stdout2.contains("usage: no new records"));
 }
+
+#[test]
+fn test_cli_fleet_pin_status_sync_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let opencode_dir = home.join(".config/opencode");
+    fs::create_dir_all(&opencode_dir).unwrap();
+
+    // 1. Initial status with no pinned version
+    let out = ceai(&config_dir, &home)
+        .args(["fleet", "status"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("Pinned Version: (none"));
+
+    // JSON status check
+    let out_json = ceai(&config_dir, &home)
+        .args(["fleet", "status", "--json"])
+        .output()
+        .unwrap();
+    assert!(out_json.status.success());
+    let json_val: serde_json::Value = serde_json::from_slice(&out_json.stdout).unwrap();
+    assert_eq!(json_val["is_aligned"], false);
+
+    // 2. Sync without pinning fails with exit 2
+    let out_sync_fail = ceai(&config_dir, &home)
+        .args(["fleet", "sync"])
+        .output()
+        .unwrap();
+    assert_eq!(out_sync_fail.status.code(), Some(2));
+    let err_str = String::from_utf8_lossy(&out_sync_fail.stderr);
+    assert!(err_str.contains("no fleet version is pinned"));
+
+    // 3. Pin invalid version fails with exit 2
+    let out_pin_fail = ceai(&config_dir, &home)
+        .args(["fleet", "pin", "invalid version with spaces"])
+        .output()
+        .unwrap();
+    assert_eq!(out_pin_fail.status.code(), Some(2));
+
+    // 4. Pin valid version
+    let out_pin = ceai(&config_dir, &home)
+        .args(["fleet", "pin", "1.76.0"])
+        .output()
+        .unwrap();
+    assert!(out_pin.status.success());
+    let pin_stdout = String::from_utf8_lossy(&out_pin.stdout);
+    assert!(pin_stdout.contains("Pinned fleet Compound Engineering version to v1.76.0"));
+
+    // Verify pinned version in state.json
+    let state_raw = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    let state_val: serde_json::Value = serde_json::from_str(&state_raw).unwrap();
+    assert_eq!(state_val["fleet"]["pinned_version"], "v1.76.0");
+
+    // 5. Dry-run sync
+    let out_sync_dry = ceai(&config_dir, &home)
+        .args(["fleet", "sync", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(out_sync_dry.status.success());
+    let dry_stdout = String::from_utf8_lossy(&out_sync_dry.stdout);
+    assert!(dry_stdout.contains("[dry-run]"));
+
+    // 6. Real sync
+    let out_sync = ceai(&config_dir, &home)
+        .args(["fleet", "sync"])
+        .output()
+        .unwrap();
+    assert!(out_sync.status.success());
+    let sync_stdout = String::from_utf8_lossy(&out_sync.stdout);
+    assert!(sync_stdout.contains("Fleet synchronization complete"));
+
+    // 7. Verify opencode.json updated with pinned version
+    let opencode_json_path = opencode_dir.join("opencode.json");
+    assert!(opencode_json_path.exists());
+    let opencode_raw = fs::read_to_string(opencode_json_path).unwrap();
+    assert!(opencode_raw.contains("@everyinc/compound-engineering@v1.76.0"));
+}

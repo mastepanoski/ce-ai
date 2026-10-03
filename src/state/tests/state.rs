@@ -35,6 +35,7 @@ fn state_with(slot: &str) -> State {
         doc_hygiene: None,
         decisions: None,
         update_notifier: None,
+        fleet: None,
     }
 }
 
@@ -45,6 +46,28 @@ fn round_trips_through_state_json() {
     let state = state_with("ce-brainstorm");
     state.save(&path).unwrap();
     assert_eq!(State::load(&path).unwrap(), state);
+}
+
+#[test]
+fn test_fleet_state_roundtrip() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("state.json");
+    let mut state = State::new();
+    state.fleet = Some(crate::state::state::FleetState {
+        pinned_version: Some("v1.76.0".to_string()),
+        last_sync: Some("2026-10-03T12:00:00Z".to_string()),
+    });
+    state.save(&path).unwrap();
+    let loaded = State::load(&path).unwrap();
+    assert_eq!(
+        loaded.fleet.as_ref().unwrap().pinned_version.as_deref(),
+        Some("v1.76.0")
+    );
+    assert_eq!(
+        loaded.fleet.as_ref().unwrap().last_sync.as_deref(),
+        Some("2026-10-03T12:00:00Z")
+    );
+    assert_eq!(loaded.fleet().pinned_version.as_deref(), Some("v1.76.0"));
 }
 
 #[test]

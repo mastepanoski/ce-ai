@@ -2200,33 +2200,7 @@ pub fn probe_stale_pending_openspecs(
 /// Resolves the documentation root directory, respecting `.compound-engineering/config.yaml`.
 /// Defaults to `PathBuf::from("docs")` if not explicitly relocated.
 pub fn resolve_docs_root(repo_root: &Path) -> PathBuf {
-    let candidates = [
-        repo_root.join(".compound-engineering").join("config.yaml"),
-        repo_root
-            .join(".compound-engineering")
-            .join("config.local.yaml"),
-    ];
-
-    for config_path in candidates {
-        if let Ok(content) = std::fs::read_to_string(&config_path) {
-            for line in content.lines() {
-                let trimmed = line.trim();
-                if trimmed.starts_with('#') {
-                    continue;
-                }
-                if let Some((k, v)) = trimmed.split_once(':') {
-                    if k.trim() == "docs_root" {
-                        let clean = v.trim().trim_matches('"').trim_matches('\'');
-                        if !clean.is_empty() {
-                            return PathBuf::from(clean);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    PathBuf::from("docs")
+    crate::compat::CeDocsConfig::discover(repo_root).docs_root
 }
 
 pub fn probe_solution_drift(
@@ -2304,77 +2278,8 @@ fn collect_solution_files(dir: &Path, files: &mut Vec<PathBuf>) {
     }
 }
 
-fn extract_yaml_frontmatter(content: &str) -> Option<Vec<&str>> {
-    let mut lines = content.trim_start().lines();
-    let first = lines.next()?.trim();
-    if first != "---" {
-        return None;
-    }
-    let mut header = Vec::new();
-    for line in lines {
-        if line.trim() == "---" {
-            return Some(header);
-        }
-        header.push(line);
-    }
-    None
-}
-
 pub fn check_solution_frontmatter(content: &str) -> Vec<String> {
-    let mut missing = Vec::new();
-    let header_lines = match extract_yaml_frontmatter(content) {
-        Some(lines) => lines,
-        None => {
-            return vec![
-                "category".into(),
-                "problem_type".into(),
-                "applies_when".into(),
-            ];
-        }
-    };
-
-    let mut has_category_or_module = false;
-    let mut problem_type_val: Option<String> = None;
-    let mut has_applies_when = false;
-
-    for line in header_lines {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-        if !line.starts_with(' ') && !line.starts_with('\t') {
-            if let Some((k, v)) = trimmed.split_once(':') {
-                let key = k.trim().to_lowercase();
-                let val = v.trim().trim_matches('"').trim_matches('\'').to_string();
-                match key.as_str() {
-                    "category" | "module" => has_category_or_module = true,
-                    "problem_type" => problem_type_val = Some(val),
-                    "applies_when" => has_applies_when = true,
-                    _ => {}
-                }
-            }
-        }
-    }
-
-    if !has_category_or_module {
-        missing.push("category".into());
-    }
-    let is_bugfix = match &problem_type_val {
-        Some(pt) => {
-            let clean = pt.to_lowercase();
-            clean == "bugfix" || clean == "bug"
-        }
-        None => false,
-    };
-    if problem_type_val.is_none() {
-        missing.push("problem_type".into());
-    }
-    // Upstream schema rule: applies_when is required only for knowledge-track docs (not bugfixes)
-    if !is_bugfix && !has_applies_when {
-        missing.push("applies_when".into());
-    }
-
-    missing
+    crate::compat::check_solution_frontmatter(content)
 }
 
 pub fn clean_code_path(token: &str) -> Option<&str> {

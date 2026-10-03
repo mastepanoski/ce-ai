@@ -332,8 +332,7 @@ pub fn parse_solution_file(repo_root: &Path, file_path: &Path) -> Result<Solutio
 
 /// Recursively collects all solution documents under `<docs_root>/solutions/`.
 pub fn collect_solutions_inventory(repo_root: &Path) -> Vec<SolutionMetadata> {
-    let docs_root = crate::commands::workflow::resolve_docs_root(repo_root);
-    let solutions_dir = repo_root.join(&docs_root).join("solutions");
+    let solutions_dir = crate::compat::CeDocsConfig::discover(repo_root).solutions_dir(repo_root);
     if !solutions_dir.is_dir() {
         return Vec::new();
     }

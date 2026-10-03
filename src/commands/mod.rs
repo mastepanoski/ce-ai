@@ -8,6 +8,7 @@ pub mod decisions;
 pub mod deinit_prj;
 pub mod doc;
 pub mod doctor;
+pub mod fleet;
 pub mod gate;
 pub mod guard;
 pub mod init_prj;
@@ -102,6 +103,19 @@ impl Context {
     /// Returns the canonical path to `state.json`.
     pub fn state_path(&self) -> PathBuf {
         self.config_dir.join("state.json")
+    }
+
+    /// Resolves the host user's home directory.
+    pub fn home_dir(&self) -> PathBuf {
+        if let Some(parent) = self.config_dir.parent() {
+            if parent != std::path::Path::new("") {
+                return parent.to_path_buf();
+            }
+        }
+        let home = std::env::var("HOME")
+            .or_else(|_| std::env::var("USERPROFILE"))
+            .unwrap_or_default();
+        PathBuf::from(home)
     }
 
     /// Resolves the effective OpenCode configuration directory.

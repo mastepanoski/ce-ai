@@ -259,6 +259,15 @@ impl std::fmt::Display for GuardLevel {
     }
 }
 
+/// Fleet version governance state in `state.json`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct FleetState {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pinned_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_sync: Option<String>,
+}
+
 /// Pedagogical guardrail configuration in `state.json`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GuardrailState {
@@ -480,6 +489,8 @@ pub struct State {
     pub decisions: Option<DecisionsConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub update_notifier: Option<UpdateNotifierConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fleet: Option<FleetState>,
 }
 
 /// Configuration for the automated background update notifier (Issue #425).
@@ -912,6 +923,9 @@ impl State {
         if local_state.update_notifier.is_some() {
             self.update_notifier = local_state.update_notifier;
         }
+        if local_state.fleet.is_some() {
+            self.fleet = local_state.fleet;
+        }
     }
 
     /// Returns the effective documentation hygiene configuration, falling back to defaults if not set.
@@ -922,6 +936,11 @@ impl State {
     /// Returns the effective update notifier configuration, falling back to defaults if not set.
     pub fn update_notifier(&self) -> UpdateNotifierConfig {
         self.update_notifier.clone().unwrap_or_default()
+    }
+
+    /// Returns the effective fleet governance configuration, falling back to defaults if not set.
+    pub fn fleet(&self) -> FleetState {
+        self.fleet.clone().unwrap_or_default()
     }
 
     /// Loads global state and applies local `.ce-ai.json` overrides if present.
