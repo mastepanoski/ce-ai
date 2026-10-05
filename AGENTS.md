@@ -12,7 +12,7 @@ All AI agents MUST enforce these hard invariants deterministically at every sess
 3. **Atomic File Writes**: Mutations to `state.json` or `opencode.json` MUST use `crate::state::write_atomic`.
 4. **Preserve User Configs**: NEVER overwrite unmanaged custom plugins or custom skills in `opencode.json`.
 5. **No Dummy Fallbacks**: NEVER comment out failing assertions, mask errors with empty catches, or ignore CLI errors.
-6. **OpenSpec Required**: NO code changes without formal spec in `openspec/changes/<feature_name>/`.
+6. **No Semantic Authority & Optional OpenSpec**: CE-AI MUST NOT introduce mandatory workflow stages, artifacts, or blocking write gates beyond those defined by Compound Engineering contracts. OpenSpec is decoupled from the core domain as an optional, opt-in integration for high-complexity architectural changes, rather than an authoritarian write blocker.
 7. **Strict Exit Codes**: Map all errors to `CeError` enum exit codes (`0` Success, `1` Runtime, `2` Usage, `3` State, `4` IO, `5` Network, `6` Verification).
 8. **Preserve Active Worktrees**: NEVER run `git worktree remove` or delete sibling worktrees in `<repo>-worktrees/` without explicit USER permission or verifying creation within the current turn.
 9. **Mandatory Versioning & CHANGELOG**: Every merged feature/fix MUST bump SemVer in `Cargo.toml`, update `CHANGELOG.md`, tag release (`vX.Y.Z`), and create a GitHub Release. Homebrew distribution is owned exclusively by the `mastepanoski/homebrew-ce-ai` tap (self-updating); no formula is maintained in this repository.
@@ -92,8 +92,8 @@ src/
      make e2e
      ```
 
-5. **Mandatory OpenSpec Before Code Changes**:
-   - NO code changes or feature implementations shall be made without creating or updating a formal spec under `openspec/changes/<feature_name>/` containing `proposal.md`, `exploration.md`, `design.md`, `spec.md`, and `tasks.md`.
+5. **No Semantic Authority & Optional OpenSpec Integration**:
+   - CE-AI must not require artifacts that Compound Engineering itself does not require. OpenSpec change packages (`proposal.md`, `exploration.md`, `design.md`, `spec.md`, `tasks.md`) are optional tools for complex architectural work or formal compliance, not mandatory blockers for bug fixes, docs, or routine tasks.
 
 6. **Standardized Exit Code Compliance**:
    - Errors MUST map to standard `CeError` exit codes: `0` (Success), `1` (Runtime), `2` (Usage), `3` (State), `4` (IO), `5` (Network), `6` (Verification).
@@ -127,18 +127,18 @@ src/
 
 ---
 
-## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement
+## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Integration
 
 Regardless of whether Compound Engineering, Spec-Driven Development, or pair programming workflows are used, all AI agents MUST strictly follow the 7-stage development cycle:
 
 ```
-[Stage 1: Ideation (ce-brainstorm)] ➔ [Stage 2: OpenSpec Definition (MANDATORY)] ➔ [Stage 3: Execution Plan (ce-plan)]
+[Stage 1: Ideation (ce-brainstorm)] ➔ [Stage 2: OpenSpec Definition (OPTIONAL)] ➔ [Stage 3: Execution Plan (ce-plan)]
    ➔ [Stage 4: TDD & Implementation (ce-work)] ➔ [Stage 5: Verification (project quality gates)]
    ➔ [Stage 6: Knowledge Capture (ce-compound)] ➔ [Stage 7: Git Shipping (ce-commit-push-pr)]
 ```
 
-### Stage 2 OpenSpec Enforcement Requirements
-OpenSpec is authored **progressively**: Stage 2 writes `proposal.md`, `exploration.md`, `design.md`, and `spec.md`; Stage 3 (`/ce-plan`) then generates the executable checklist `tasks.md` from the frozen contract. Before creating any PR or writing feature code, agents MUST verify that `openspec/changes/<feature_name>/` contains all five files:
+### Stage 2 OpenSpec Integration (Optional)
+When formal specifications are activated for complex or regulated features, OpenSpec is authored **progressively**: Stage 2 writes `proposal.md`, `exploration.md`, `design.md`, and `spec.md`; Stage 3 (`/ce-plan`) then generates the executable checklist `tasks.md` from the frozen contract. When OpenSpec is used, agents verify that `openspec/changes/<feature_name>/` contains:
 - `proposal.md`: Problem statement, in-scope/out-of-scope boundaries, risk evaluation, and success criteria.
 - `exploration.md`: Technical investigation, evaluated options, and architectural tradeoffs.
 - `design.md`: Technical design, system architecture, structs, data schemas, and API/CLI contracts.

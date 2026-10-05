@@ -322,8 +322,8 @@ impl GateDecision {
 #[serde(rename_all = "snake_case")]
 pub enum GateMode {
     #[default]
-    Enforce,
     Observe,
+    Enforce,
 }
 
 impl GateMode {

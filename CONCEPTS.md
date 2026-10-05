@@ -202,3 +202,12 @@ A polymorphic architectural abstraction in `ce-ai` v2 (`FleetHarnessDriver` in `
 
 ### Centralized Upstream Compatibility Boundary
 A strongly-typed domain isolation layer in `ce-ai` v2 (`src/compat/`) that centralizes all assumptions, schemas, and contracts originating from upstream Compound Engineering. It models upstream frontmatter specifications (`CeSolutionFrontmatter` validating `module`, `date`, `problem_type`, `component`, `severity`, and bug-track exemption rules), dynamically resolves configurable documentation roots (`CeDocsConfig` reading `.compound-engineering/config.yaml`), standardizes mode tokens (`MODE_RETURN_TO_CALLER`), and compares semantic release tags (`CeRelease`), preventing fragmented or out-of-sync contract logic across CLI commands.
+
+### Observable Workflow Capabilities Matrix
+A real-time diagnostic table and data structure (`ObservableWorkflowState`) in `ce-ai` v2 that inspects physical repository artifacts—such as active git branches, uncommitted working tree diffs, markdown plan checkboxes (`- [x]` vs `- [ ]`), verification receipts, handoff notes, and solution documentation—to provide an objective status report of developer and agent capabilities. Unlike legacy stage cursors, the matrix is non-mutating and purely advisory.
+
+### Decoupled OpenSpec Integration
+An optional, opt-in integration architecture in `ce-ai` v2 that separates formal specification packages (`proposal.md`, `exploration.md`, `design.md`, `spec.md`, `tasks.md`) from the core workflow engine. While formal OpenSpec remains available and recommended for high-complexity architectural initiatives, its presence is never required as a prerequisite write gate for standard code edits, bug fixes, or documentation tasks.
+
+### Advisory Write Telemetry
+A non-blocking audit logging mechanism in `ce-ai` v2 (`src/commands/gate.rs`) that tracks AI agent file write operations (`Write`, `Edit`) to `gate-events.jsonl` without interrupting tool execution or returning blocking error codes. By defaulting to `GateMode::Observe`, `ce-ai` provides governance, telemetry, and edge-case detection while strictly preserving the autonomous, fluid execution of the agent.

@@ -1875,6 +1875,44 @@ fn workflow_status_checkpoint_and_resume_subcommands() {
 }
 
 #[test]
+fn test_workflow_status_advisory_matrix_and_json() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let workspace = tmp.path().join("workspace");
+    fs::create_dir_all(&workspace).unwrap();
+
+    // 1. Text output includes Advisory Capabilities Matrix
+    ceai(&config_dir, &home)
+        .current_dir(&workspace)
+        .args(["workflow", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Advisory Workflow Capabilities Matrix",
+        ))
+        .stdout(predicate::str::contains("Active Branch"))
+        .stdout(predicate::str::contains("Plan Observation"))
+        .stdout(predicate::str::contains("Verification"))
+        .stdout(predicate::str::contains("Knowledge Capture"))
+        .stdout(predicate::str::contains("OpenSpec Integration"));
+
+    // 2. JSON output includes structured observable_state
+    let output = ceai(&config_dir, &home)
+        .current_dir(&workspace)
+        .args(["workflow", "status", "--json"])
+        .output()
+        .expect("run status --json");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json_val: serde_json::Value = serde_json::from_str(&stdout).expect("valid json");
+    assert!(json_val.get("observable_state").is_some());
+    let obs = json_val.get("observable_state").unwrap();
+    assert!(obs.get("verification").is_some());
+    assert!(obs.get("knowledge_capture").is_some());
+}
+
+#[test]
 fn workflow_resume_surfaces_live_repo_state_and_detects_drift() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
@@ -8248,10 +8286,19 @@ fn test_gate_check_spike_observe_only_lifecycle() {
             .success();
     }
 
-    // Default enforce mode: Stage 4 write without OpenSpec contract is actively blocked (exit code 2)
+    // Explicit enforce mode: Stage 4 write without OpenSpec contract is actively blocked (exit code 2)
     ceai(&config_dir, &home)
         .current_dir(&proj)
-        .args(["gate", "check", "--tool", "Write", "--path", "src/lib.rs"])
+        .args([
+            "gate",
+            "check",
+            "--tool",
+            "Write",
+            "--path",
+            "src/lib.rs",
+            "--mode",
+            "enforce",
+        ])
         .assert()
         .code(2)
         .stderr(predicate::str::contains("Write blocked on 'src/lib.rs'"));
@@ -8277,19 +8324,10 @@ fn test_gate_check_spike_observe_only_lifecycle() {
             "doctor-warn: gate-check: write blocked on 'src/lib.rs' for feature 'gate-test'",
         ));
 
-    // Explicit observe mode: Stage 4 write without OpenSpec logs would_block and exits 0
+    // Default observe mode: Stage 4 write without OpenSpec logs would_block and exits 0 (non-blocking)
     ceai(&config_dir, &home)
         .current_dir(&proj)
-        .args([
-            "gate",
-            "check",
-            "--tool",
-            "Write",
-            "--path",
-            "src/lib.rs",
-            "--mode",
-            "observe",
-        ])
+        .args(["gate", "check", "--tool", "Write", "--path", "src/lib.rs"])
         .assert()
         .success();
 
