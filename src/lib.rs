@@ -8,6 +8,7 @@ pub mod decisions;
 pub mod error;
 pub mod fleet;
 pub mod harness;
+pub mod observation;
 pub mod opencode;
 pub mod source;
 pub mod state;

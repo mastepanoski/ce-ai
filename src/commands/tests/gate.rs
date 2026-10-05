@@ -1078,3 +1078,104 @@ fn test_run_gate_check_organic_mode_permits_write_and_advisory_on_diff_limit() {
         .reason
         .contains("organic execution mode permits writes"));
 }
+
+#[test]
+fn test_resolve_gate_mode_default_is_observe() {
+    use crate::commands::gate::resolve_gate_mode;
+    use crate::state::state::GateMode;
+
+    let _lock = ENV_MUTEX.lock().unwrap();
+    std::env::remove_var("CE_AI_GATE_MODE");
+
+    // When no flags, env, or state mode are set, default is Observe
+    assert_eq!(resolve_gate_mode(None, None), GateMode::Observe);
+
+    // State mode is honored if set
+    assert_eq!(
+        resolve_gate_mode(None, Some(GateMode::Enforce)),
+        GateMode::Enforce
+    );
+    assert_eq!(
+        resolve_gate_mode(None, Some(GateMode::Observe)),
+        GateMode::Observe
+    );
+
+    // Flag overrides state
+    assert_eq!(
+        resolve_gate_mode(Some("enforce"), Some(GateMode::Observe)),
+        GateMode::Enforce
+    );
+    assert_eq!(
+        resolve_gate_mode(Some("observe"), Some(GateMode::Enforce)),
+        GateMode::Observe
+    );
+}
+
+#[test]
+fn test_run_gate_check_default_mode_does_not_block() {
+    use crate::commands::gate::{run_gate_check, GateCheckArgs, GateDecision};
+    use crate::commands::Context;
+    use crate::state::state::{State, WorkflowSource, WorkflowStage, WorkflowState};
+    use tempfile::tempdir;
+
+    let temp_root = tempdir().unwrap();
+    let repo_root = temp_root.path().join("repo");
+    let config_dir = temp_root.path().join("config");
+    std::fs::create_dir_all(&repo_root).unwrap();
+    std::fs::create_dir_all(&config_dir).unwrap();
+
+    let ctx = Context {
+        config_dir: config_dir.clone(),
+        opencode_config_dir: config_dir.join("opencode"),
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let mut state = State::default();
+    let state_path = config_dir.join("state.json");
+
+    let wf = WorkflowState {
+        stage: WorkflowStage::WorkTdd,
+        task: "Implementing core logic without specs in default mode".to_string(),
+        feature_name: Some("missing-spec-default-mode".to_string()),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        source: WorkflowSource::Manual,
+        resolution: None,
+        new_cycle: false,
+        execution_mode: None,
+    };
+    let key = State::workspace_branch_key(&repo_root, None);
+    state.workflows.insert(key, wf.clone());
+    state.workflow = Some(wf);
+    state.save(&state_path).unwrap();
+
+    // In default mode (mode: None), gate check must succeed (Ok(())) and not block
+    let args = GateCheckArgs {
+        tool: Some("Write".to_string()),
+        path: Some("src/my_code.rs".to_string()),
+        mode: None,
+        entry_point: None,
+        execution_mode: None,
+        disabled: false,
+    };
+
+    let res = run_gate_check(&ctx, &args);
+    assert!(
+        res.is_ok(),
+        "gate check must not block in default observe mode"
+    );
+
+    let stats = crate::commands::gate::load_gate_stats(&config_dir).unwrap();
+    assert_eq!(stats.total_observed, 1);
+    assert_eq!(stats.blocked, 0);
+    assert_eq!(stats.would_block, 1);
+
+    let state_reloaded = State::load(&state_path).unwrap();
+    let receipt = state_reloaded
+        .gate_receipts
+        .get("missing-spec-default-mode")
+        .expect("receipt must exist");
+    assert_eq!(receipt.decision, GateDecision::WouldBlock);
+}

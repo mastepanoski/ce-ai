@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.77.0] - 2026-10-05
+
+### Added
+- **Advisory Workflow Observation Subsystem (`src/observation/`)**:
+  - `ObservableWorkflowState`: Artifact-derived, capability-oriented workflow evaluation model that queries repository reality directly from disk instead of tracking an authoritative stage cursor in `state.json`.
+  - `PlanObservation`: Inspects `CeDocsConfig::plans_dir`, counts checked items (`- [x]`) and incomplete items (`- [ ]`), and identifies requirements-only framing plans.
+  - `VerificationObservation`: Inspects review receipt stamps (`state.review_receipts` and `.review-receipt.json`), test coverage markers, and uncommitted changes count.
+  - `HandoffObservation`: Locates handoff artifacts in well-known paths (`.compound-engineering/handoff.md`, `docs/plans/handoff.md`, `.handoff.json`).
+  - `KnowledgeObservation`: Evaluates core code modifications (`src/**`) and searches for recently modified solution documents in `CeDocsConfig::solutions_dir`.
+  - `OpenSpecObservation`: Detects active `openspec/changes/<feature>` packages as an optional integration, evaluating whether `tasks.md` is sealed.
+- **Advisory Capabilities Matrix in `ce-ai workflow status`**:
+  - Formatted stdout rendering of `== [Advisory Workflow Capabilities Matrix] ==` displaying Active Branch, Plan Observation, Verification, Knowledge Capture, and OpenSpec Integration.
+  - Full structured embedding in `ce-ai workflow status --json` via `"observable_state"` payload with 100% backward compatibility for existing consumers.
+- **Decoupled OpenSpec & Non-Blocking Gate Check (`src/commands/gate.rs`)**:
+  - Changed default gate mode from `Enforce` to `Observe` (`GateMode::Observe`), ensuring agent tool writes are never blocked by default.
+  - Missing OpenSpec contracts in default observe mode emit advisory telemetry to `gate-events.jsonl` without failing execution (exit code 0).
+  - Explicit enforcement remains available via `--mode enforce` or `CE_AI_GATE_MODE=enforce`.
+- **Operating Directive & Invariant Formalization (`AGENTS.md`)**:
+  - Formally updated Invariant 6 and Mandatory Constraint 5 to codify the "No Semantic Authority & Optional OpenSpec" rule.
+  - Stage 2 marked as optional rather than a mandatory write gate.
+- **Domain Concepts Accretion (`CONCEPTS.md`)**:
+  - Monotonically accreted 3 new architectural concepts: *Observable Workflow Capabilities Matrix*, *Decoupled OpenSpec Integration*, and *Advisory Write Telemetry* (68 entries total, +3 added, 0 scrubbed).
+- **Compound Solution Capture**:
+  - Added solution document `docs/solutions/architecture/advisory-workflow-fsm-and-openspec-decoupling.md`.
+
 ## [1.76.0] - 2026-10-03
 
 ### Added

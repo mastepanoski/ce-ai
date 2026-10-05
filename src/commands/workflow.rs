@@ -137,7 +137,25 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             if *json {
                 let state = State::load(&state_path)?;
                 let wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
-                println!("{}", serde_json::to_string_pretty(&wf)?);
+                let obs = crate::observation::ObservableWorkflowState::observe(
+                    &repo_root,
+                    &ctx.config_dir,
+                )
+                .ok();
+                let mut val = serde_json::to_value(&wf)?;
+                if let Some(obs_val) = obs {
+                    if let serde_json::Value::Object(ref mut map) = val {
+                        map.insert(
+                            "observable_state".to_string(),
+                            serde_json::to_value(obs_val)?,
+                        );
+                    } else if val.is_null() {
+                        val = json!({
+                            "observable_state": obs_val,
+                        });
+                    }
+                }
+                println!("{}", serde_json::to_string_pretty(&val)?);
             } else {
                 for line in status_lines_with_mode(ctx, cli_mode)? {
                     println!("{line}");
@@ -320,6 +338,82 @@ pub fn status_lines_with_mode(
             "  • [7: Ship]       ➔ ce-commit-push-pr / ce-commit / ce-resolve-pr-feedback"
                 .to_string(),
         );
+        lines.push(String::new());
+    }
+
+    if let Ok(obs) =
+        crate::observation::ObservableWorkflowState::observe(&repo_root, &ctx.config_dir)
+    {
+        lines.push("== [Advisory Workflow Capabilities Matrix] ==".to_string());
+        let branch_display = match &obs.active_branch {
+            Some(b) => {
+                if obs.active_work {
+                    format!("{b} (work in progress)")
+                } else {
+                    format!("{b} (clean)")
+                }
+            }
+            None => "Detached / non-git workspace".to_string(),
+        };
+        lines.push(format!("  • Active Branch        ➔ {branch_display}"));
+
+        let plan_display = match &obs.plan {
+            Some(p) => {
+                let title = p.title.as_deref().unwrap_or("Plan");
+                if p.is_requirements_only {
+                    format!("{title} (requirements-only)")
+                } else {
+                    format!(
+                        "{title} ({}/{} items completed)",
+                        p.completed_items, p.total_items
+                    )
+                }
+            }
+            None => "No active plan detected in plans directory".to_string(),
+        };
+        lines.push(format!("  • Plan Observation     ➔ {plan_display}"));
+
+        let verify_display = if obs.verification.review_receipt_stamped {
+            "Review receipt stamped (HEAD verified)".to_string()
+        } else if obs.verification.uncommitted_changes > 0 {
+            format!(
+                "{} uncommitted changes in progress",
+                obs.verification.uncommitted_changes
+            )
+        } else {
+            "Working tree clean".to_string()
+        };
+        lines.push(format!("  • Verification         ➔ {verify_display}"));
+
+        let knowledge_display = if obs.knowledge_capture.doc_detected {
+            if let Some(ref dp) = obs.knowledge_capture.doc_path {
+                let fname = dp
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("solution.md");
+                format!("Solution doc detected ({fname})")
+            } else {
+                "Solution doc detected".to_string()
+            }
+        } else if obs.knowledge_capture.required {
+            "Core changes detected; doc capture recommended upon completion".to_string()
+        } else {
+            "Not required yet".to_string()
+        };
+        lines.push(format!("  • Knowledge Capture    ➔ {knowledge_display}"));
+
+        let openspec_display = match &obs.openspec {
+            Some(spec) => {
+                let status = if spec.is_sealed {
+                    "sealed"
+                } else {
+                    "in progress"
+                };
+                format!("Active for '{}' ({status})", spec.feature)
+            }
+            None => "Inactive (Optional)".to_string(),
+        };
+        lines.push(format!("  • OpenSpec Integration ➔ {openspec_display}"));
         lines.push(String::new());
     }
 

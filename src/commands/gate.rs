@@ -92,7 +92,7 @@ pub struct GateCheckArgs {
     #[arg(long)]
     pub path: Option<String>,
 
-    /// Gate mode: enforce (default, blocking) or observe (advisory)
+    /// Gate mode: enforce or observe (default: observe, advisory)
     #[arg(long)]
     pub mode: Option<String>,
 
@@ -121,7 +121,7 @@ pub fn resolve_gate_mode(flag_mode: Option<&str>, state_mode: Option<GateMode>) 
             return m;
         }
     }
-    state_mode.unwrap_or(GateMode::Enforce)
+    state_mode.unwrap_or(GateMode::Observe)
 }
 
 /// Evaluates whether the gate check kill-switch is active via flag or environment variables.
