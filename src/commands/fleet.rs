@@ -96,7 +96,7 @@ fn print_harness_status(h: &FleetHarnessStatus) {
     }
 }
 
-fn handle_pin(ctx: &Context, raw_version: &str) -> Result<(), CeError> {
+pub fn handle_pin(ctx: &Context, raw_version: &str) -> Result<(), CeError> {
     let clean = raw_version.trim();
     if clean.is_empty() {
         return Err(CeError::Usage("version tag cannot be empty".to_string()));
@@ -105,7 +105,9 @@ fn handle_pin(ctx: &Context, raw_version: &str) -> Result<(), CeError> {
         return Err(CeError::Usage(format!("invalid version tag '{clean}'")));
     }
 
-    let normalized = if clean.starts_with('v') || clean.starts_with('V') {
+    let normalized = if let Some(rel) = crate::compat::release::CeRelease::parse_tag(clean) {
+        format!("v{}", rel.version)
+    } else if clean.starts_with('v') || clean.starts_with('V') {
         format!("v{}", &clean[1..])
     } else {
         format!("v{clean}")
@@ -130,7 +132,7 @@ fn handle_pin(ctx: &Context, raw_version: &str) -> Result<(), CeError> {
     Ok(())
 }
 
-fn handle_sync(ctx: &Context, dry_run: bool) -> Result<(), CeError> {
+pub fn handle_sync(ctx: &Context, dry_run: bool) -> Result<(), CeError> {
     let effective_dry_run = dry_run || ctx.dry_run;
     let state_file = ctx.state_path();
     let mut state = if state_file.exists() {

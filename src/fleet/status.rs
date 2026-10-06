@@ -3,7 +3,7 @@
 use crate::commands::Context;
 use crate::error::CeError;
 use crate::fleet::driver::{FleetHarnessStatus, FleetStatusReport, HarnessAlignment};
-use crate::fleet::drivers::all_drivers;
+use crate::fleet::drivers::{all_drivers, is_version_match};
 
 /// Computes the fleet status report comparing installed harness versions against the pinned version.
 pub fn generate_fleet_status_report(ctx: &Context) -> Result<FleetStatusReport, CeError> {
@@ -26,7 +26,7 @@ pub fn generate_fleet_status_report(ctx: &Context) -> Result<FleetStatusReport, 
             any_installed = true;
             let alignment = match (&pinned_version, &installed_ver) {
                 (Some(pinned), Some(inst)) => {
-                    if inst == pinned {
+                    if is_version_match(inst, pinned) {
                         HarnessAlignment::Aligned
                     } else {
                         all_aligned = false;
