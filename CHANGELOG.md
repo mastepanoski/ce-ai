@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-06
+
+### Changed
+- **Architectural Identity Pivot (Cross-Host Operational Companion)**:
+  - Formally repositioned `ce-ai` from an authoritative workflow gatekeeper and file scraper to a Cross-Host Operational Companion for Compound Engineering.
+  - Compound Engineering owns engineering semantics and workflow artifacts, AI hosts own native execution and packaging, and `ce-ai` coordinates the environment around them.
+- **Decommissioned File Scraping & Watch Loop**:
+  - Deprecated raw tarball extraction (`extract_to_source` in `src/source/archive.rs`) of plugin trees into harness directories in favor of native host package managers orchestrated by `src/fleet/`.
+  - Deprecated continuous file-restoration loop (`ce-ai sync --watch`), eliminating competing sources of truth with native installations.
+  - Added user-facing deprecation notices on `ce-ai install`, `ce-ai upgrade`, and `ce-ai sync`, directing developers and agents to `ce-ai init-prj` (project adoption) and `ce-ai fleet pin / sync` (native harness governance).
+- **Documentation & Packaging Overhaul**:
+  - Rewrote `README.md` (retaining strict ≤ 100 line limit) to reflect the new operational companion role and updated Quick Start workflow.
+  - Updated `Cargo.toml` description and CLI `--help` strings across all commands.
+
+### Added
+- **v2 GA Domain Concepts (`CONCEPTS.md`)**:
+  - Monotonically accreted 3 new concepts: *Cross-Host Operational Companion (v2 GA)*, *Decommissioned File Scraping*, and *Native Host Packaging Sovereignty* (71 entries total, +3 added, 0 scrubbed).
+- **v2 GA Architecture Solution Document**:
+  - Authored `docs/solutions/architecture/ce-ai-v2-ga-operational-companion-pivot.md`.
+
 ## [1.77.0] - 2026-10-05
 
 ### Added

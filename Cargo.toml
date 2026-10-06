@@ -1,8 +1,8 @@
 [package]
 name = "ce-ai"
-version = "1.77.0"
+version = "2.0.0"
 edition = "2021"
-description = "Workflow orchestration and governance for Compound Engineering across AI coding agents"
+description = "Cross-host operational companion for Compound Engineering across AI coding agents"
 license = "MIT"
 
 [dependencies]

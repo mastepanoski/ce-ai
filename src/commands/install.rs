@@ -59,6 +59,11 @@ pub struct Args {
 use crate::harness::HarnessKind;
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
+    eprintln!(
+        "[DEPRECATION] 'ce-ai install' file copying is deprecated in CE-AI v2.0.\n\
+         In v2, hosts own native execution and packaging.\n\
+         Use 'ce-ai init-prj' to adopt the project repository and 'ce-ai fleet pin <version>' / 'ce-ai fleet sync' to govern native harness plugins."
+    );
     let harness_arg = args.harness.to_lowercase();
     let scope_arg = args.scope.to_lowercase();
 

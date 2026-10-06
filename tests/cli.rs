@@ -10818,3 +10818,46 @@ fn test_cli_fleet_pin_status_sync_lifecycle() {
     let opencode_raw = fs::read_to_string(opencode_json_path).unwrap();
     assert!(opencode_raw.contains("@everyinc/compound-engineering@v1.76.0"));
 }
+
+#[test]
+fn test_cli_v2_deprecation_notices_emitted_on_legacy_surfaces() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source_top_level_skills(tmp.path());
+
+    // 1. ce-ai install emits deprecation notice on stderr
+    let out_install = ceai(&config_dir, &home)
+        .args(["install", "--harness", "opencode", "--source"])
+        .arg(&source)
+        .output()
+        .unwrap();
+    assert!(out_install.status.success());
+    let install_stderr = String::from_utf8_lossy(&out_install.stderr);
+    assert!(install_stderr
+        .contains("[DEPRECATION] 'ce-ai install' file copying is deprecated in CE-AI v2.0."));
+    assert!(install_stderr.contains("ce-ai init-prj"));
+    assert!(install_stderr.contains("ce-ai fleet pin"));
+
+    // 2. ce-ai sync emits deprecation notice on stderr
+    let out_sync = ceai(&config_dir, &home)
+        .args(["sync", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(out_sync.status.success());
+    let sync_stderr = String::from_utf8_lossy(&out_sync.stderr);
+    assert!(sync_stderr.contains(
+        "[DEPRECATION] 'ce-ai sync' file-level reconciliation is deprecated in CE-AI v2.0."
+    ));
+    assert!(sync_stderr.contains("ce-ai fleet sync"));
+
+    // 3. ce-ai upgrade emits deprecation notice on stderr
+    let out_upgrade = ceai(&config_dir, &home)
+        .args(["upgrade", "--source"])
+        .arg(&source)
+        .output()
+        .unwrap();
+    assert!(out_upgrade.status.success());
+    let upgrade_stderr = String::from_utf8_lossy(&out_upgrade.stderr);
+    assert!(upgrade_stderr.contains("[DEPRECATION] 'ce-ai upgrade' is deprecated in CE-AI v2.0."));
+    assert!(upgrade_stderr.contains("ce-ai fleet pin"));
+}
