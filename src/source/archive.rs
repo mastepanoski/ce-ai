@@ -98,6 +98,8 @@ pub fn extract_safe(archive: &Path, dest: &Path) -> Result<(), CeError> {
     Ok(())
 }
 
+/// Decommissioned in CE-AI v2.0: Raw tarball extraction of plugin trees is retired
+/// in favor of native host fleet management (`ce-ai fleet pin / sync`).
 /// Real runs persist the extracted tree under `<config-dir>/cache/trees/<tag>`
 /// so later `sync` runs resolve it from the manifest; dry-runs extract to a
 /// system temp dir that is removed afterwards.
@@ -123,6 +125,8 @@ pub fn extract_to_source(
     Ok((root, tmp))
 }
 
+/// Decommissioned in CE-AI v2.0: Direct source root discovery inside downloaded tarballs
+/// is retired in favor of native host package managers.
 /// GitHub tarballs nest the tree under a `<repo>-<ref>/` top dir; the source
 /// root is the extracted dir itself when it holds `.opencode`, else its single
 /// subdirectory.

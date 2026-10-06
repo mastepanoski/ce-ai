@@ -1,6 +1,6 @@
-# CE-AI — Compound Engineering Workflow Orchestration & Governance
+# CE-AI — Cross-Host Operational Companion for Compound Engineering
 
-**Open-source workflow orchestration and governance for Compound Engineering across AI coding agents.** Turn ideas into verified work, preserve engineering context, and make each change improve the next. `ce-ai` governs state transitions, drift auditing, and multi-harness asset synchronization without replacing coding agent reasoning.
+**Cross-host operational companion for Compound Engineering across AI coding agents.** Compound Engineering owns engineering semantics and workflow artifacts, hosts own native execution and packaging, and `ce-ai` coordinates the environment around them: fleet version governance, native installation orchestration, project adoption, and advisory workflow observation without replacing coding agent reasoning.
 
 ## Try it in two minutes
 
@@ -21,9 +21,9 @@ go install github.com/Gentleman-Programming/engram/cmd/engram@latest; cargo inst
 brew install mastepanoski/ce-ai/ce-ai gentleman-programming/tap/engram rtk
 curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
 
-# In your project: initialize graph, install plugin & companions, adopt, and verify
+# In your project: initialize graph, adopt project, govern fleet, and verify
 cd your-project && codegraph init
-ce-ai install --harness all && ce-ai init-prj && ce-ai doctor
+ce-ai init-prj && ce-ai fleet pin latest && ce-ai fleet sync && ce-ai doctor
 ```
 
 Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <outcome>`. For package manager alternatives and detailed steps, see [Getting Started](docs/user-guide/getting-started.md).

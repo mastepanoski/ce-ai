@@ -31,6 +31,11 @@ pub struct Args {
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
+    eprintln!(
+        "[DEPRECATION] 'ce-ai upgrade' is deprecated in CE-AI v2.0.\n\
+         In v2, harnesses are updated through native plugin managers.\n\
+         Use 'ce-ai fleet pin <version>' followed by 'ce-ai fleet sync' to govern version upgrades across harnesses."
+    );
     if args.bin {
         crate::commands::self_update::run(
             ctx,

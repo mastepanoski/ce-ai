@@ -1,4 +1,4 @@
-//! ce-ai: Workflow orchestration and governance for Compound Engineering across AI coding agents.
+//! ce-ai: Cross-host operational companion for Compound Engineering across AI coding agents.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used))]
@@ -13,7 +13,7 @@ use ce_ai::error::result_exit_code;
 #[derive(Parser)]
 #[command(
     name = "ce-ai",
-    about = "Workflow orchestration and governance for Compound Engineering across AI coding agents",
+    about = "Cross-host operational companion for Compound Engineering across AI coding agents",
     version
 )]
 struct Cli {

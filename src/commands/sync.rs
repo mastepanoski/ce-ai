@@ -35,6 +35,11 @@ pub struct Args {
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
+    eprintln!(
+        "[DEPRECATION] 'ce-ai sync' file-level reconciliation is deprecated in CE-AI v2.0.\n\
+         In v2, hosts own native execution and packaging.\n\
+         Use 'ce-ai fleet sync' to achieve version parity across harnesses."
+    );
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
         .unwrap_or_default();
@@ -45,6 +50,11 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         resolve_sync_source_and_version(ctx, &state, &home_dir, &opencode_dir)?;
 
     if args.watch {
+        eprintln!(
+            "[DEPRECATION] 'ce-ai sync --watch' continuous file restoration is deprecated in CE-AI v2.0.\n\
+             Continuous file restoration causes dual sources of truth with native installations.\n\
+             Use 'ce-ai fleet sync' for native harness lifecycle management."
+        );
         let opencode_manifest = InstallManifest::load(&opencode_dir).ok();
         return run_watch(
             ctx,

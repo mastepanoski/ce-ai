@@ -211,3 +211,12 @@ An optional, opt-in integration architecture in `ce-ai` v2 that separates formal
 
 ### Advisory Write Telemetry
 A non-blocking audit logging mechanism in `ce-ai` v2 (`src/commands/gate.rs`) that tracks AI agent file write operations (`Write`, `Edit`) to `gate-events.jsonl` without interrupting tool execution or returning blocking error codes. By defaulting to `GateMode::Observe`, `ce-ai` provides governance, telemetry, and edge-case detection while strictly preserving the autonomous, fluid execution of the agent.
+
+### Cross-Host Operational Companion (v2 GA)
+An architectural identity and product definition established in `ce-ai` v2.0. Rather than acting as an authoritative workflow gatekeeper or raw asset duplicator, `ce-ai` functions as a cross-host operational companion for Compound Engineering. Compound Engineering owns engineering semantics and workflow artifacts, AI hosts (Claude Code, OpenCode, Codex, Pi, Cursor) own native execution and packaging, and `ce-ai` coordinates the operational environment around them: fleet version governance, native installation orchestration, project adoption, and advisory workflow observation.
+
+### Decommissioned File Scraping
+An intentional deprecation and architectural retirement in `ce-ai` v2.0 of raw GitHub release tarball extraction and filesystem diff-restoring loops (`sync --watch`). Scraping release tarballs directly into harness directories bypassed host-native packaging transformations and created dual sources of truth (`external-duplicate`). In v2.0, file scraping is replaced entirely by native host installer drivers and fleet version governance (`src/fleet/`).
+
+### Native Host Packaging Sovereignty
+An architectural design invariant in `ce-ai` v2.0 affirming that each AI coding host's native plugin manager, marketplace, or configuration system possesses exclusive sovereignty over plugin asset distribution, compilation, and file layout. `ce-ai` never directly overwrites or injects raw skill assets into host directories; it orchestrates and audits native installations through dedicated `FleetHarnessDriver` implementations.
