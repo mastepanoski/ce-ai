@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-10-06
+
+### Fixed
+- **Fleet Claude Code Driver Marketplace Syntax & Version Resolution (`src/fleet/drivers.rs`)**:
+  - Fixed Claude Code plugin CLI invocation to use native marketplace target syntax (`claude plugin update/install compound-engineering@compound-engineering-plugin -y`) rather than invalid `@version` arguments.
+  - Added native detection of installed Claude Code plugin versions directly from `~/.claude/plugins/installed_plugins.json`, matching exact `compound-engineering` plugin entries across user scopes.
+  - Added `-y` non-interactive flag to prevent blocking on interactive TTY confirmation prompts in non-interactive/scripted runs.
+- **Fleet SemVer Normalization Across Harnesses (`src/fleet/status.rs`, `src/fleet/drivers.rs`)**:
+  - Implemented `is_version_match` using `CeRelease::parse_tag`, normalizing `compound-engineering-v3.30.4`, `v3.30.4`, and `3.30.4` so all harnesses evaluate as `Aligned` rather than falsely `Divergent`.
+  - Updated `OpenCodeDriver`, `PiDriver`, `CodexDriver`, and `CursorDriver` to use semantic version matching.
+- **`ce-ai upgrade` Fleet Governance Delegation (`src/commands/upgrade.rs`)**:
+  - Updated bare `ce-ai upgrade` to resolve the latest GitHub release, pin it via `ce-ai fleet pin`, and synchronize harnesses via `ce-ai fleet sync`, deprecating legacy tarball downloads and multi-file restores.
+
 ## [2.0.0] - 2026-10-06
 
 ### Changed

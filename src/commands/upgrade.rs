@@ -9,12 +9,9 @@ use std::path::{Path, PathBuf};
 use crate::commands::{sync, Context};
 use crate::error::CeError;
 use crate::source::archive::extract_to_source;
-use crate::source::cache::{record_tarball_provenance, Cache};
-use crate::source::release::{
-    pinned_version_and_url, resolve_github_token, resolve_latest_release,
-};
+use crate::source::release::{resolve_github_token, resolve_latest_release};
 use crate::state::diff::sha256_hex;
-use crate::state::state::{ReleaseProvenance, State};
+use crate::state::state::State;
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -49,15 +46,20 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 
     let state_path = ctx.config_dir.join("state.json");
-    let state = State::load(&state_path)?;
-
-    // MH-2: Upgrade converts local source installations to latest GitHub release.
-    let is_local_installed = state.installed_harnesses.iter().any(|h| {
-        h.get("source")
-            .and_then(|s| s.get("kind"))
-            .and_then(|k| k.as_str())
-            == Some("local")
-    });
+    let is_local_installed = if state_path.exists() {
+        State::load(&state_path)
+            .map(|state| {
+                state.installed_harnesses.iter().any(|h| {
+                    h.get("source")
+                        .and_then(|s| s.get("kind"))
+                        .and_then(|k| k.as_str())
+                        == Some("local")
+                })
+            })
+            .unwrap_or(false)
+    } else {
+        false
+    };
     if is_local_installed && args.source.is_none() && args.to.is_none() {
         println!("notice: upgrading harnesses with local source to latest GitHub release.");
     }
@@ -69,49 +71,20 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
     if let Some(tag) = &args.to {
         let tarball = cached_tarball_for(ctx, tag)?;
-        return sync_from_extracted(ctx, &tarball, tag, tag, None);
+        return sync_from_extracted(ctx, &tarball, tag, tag);
     }
-    // Default: fetch the latest release from GitHub, cache it with full
-    // provenance, then sync (SU-5). No implicit fallback: every failure is an
-    // explicit error and the resolved tag is immutable.
+
+    // In v2, bare upgrade pins the latest release for the fleet and syncs native harnesses.
     let client = reqwest::blocking::Client::new();
     let token = resolve_github_token();
-    let tag = resolve_latest_release(&client, token.as_deref())?;
-    let (version, url) = pinned_version_and_url(tag)?;
-    let bytes = client
-        .get(&url)
-        .header(reqwest::header::USER_AGENT, "ce-ai/0.1.0")
-        .send()
-        .map_err(|err| CeError::Network(format!("release download failed: {err}")))?
-        .bytes()
-        .map_err(|err| CeError::Runtime(err.to_string()))?;
-    let (tarball, hex, _dry_run_tmp) = if ctx.dry_run {
-        let tmp = tempfile::TempDir::new()?;
-        let tarball_path = tmp.path().join("dry_run.tar.gz");
-        std::fs::write(&tarball_path, &bytes)?;
-        use sha2::Digest;
-        let hex = format!("{:x}", sha2::Sha256::digest(&bytes));
-        (tarball_path, hex, Some(tmp))
-    } else {
-        let (tarball, hex) = Cache::new(ctx.config_dir.join("cache")).cache_tarball(&bytes)?;
-        (tarball, hex, None)
-    };
-    sync_from_extracted(
-        ctx,
-        &tarball,
-        &version,
-        &version,
-        if ctx.dry_run {
-            None
-        } else {
-            Some(FetchMeta { url, sha256: hex })
-        },
-    )
-}
-/// Download metadata needed to record release provenance after extraction.
-struct FetchMeta {
-    url: String,
-    sha256: String,
+    let tag = resolve_latest_release(&client, token.as_deref())?.ok_or_else(|| {
+        CeError::Usage(
+            "no 'compound-engineering-v*' release found on GitHub — pin a specific version with 'ce-ai fleet pin <version>'".to_string(),
+        )
+    })?;
+    crate::commands::fleet::handle_pin(ctx, &tag)?;
+    crate::commands::fleet::handle_sync(ctx, ctx.dry_run)?;
+    Ok(())
 }
 
 /// Resolves `--to <tag>` strictly against the recorded release provenance
@@ -160,28 +133,15 @@ fn cached_tarball_for(ctx: &Context, requested_tag: &str) -> Result<PathBuf, CeE
     Ok(tarball)
 }
 
-/// Extracts a tarball, records fresh provenance when this run fetched a new
-/// archive, locates the source root, runs sync, and cleans up the dry-run
+/// Extracts a tarball, locates the source root, runs sync, and cleans up the dry-run
 /// temp tree so the dry-run writes nothing on the managed surface.
 fn sync_from_extracted(
     ctx: &Context,
     tarball: &Path,
     tag: &str,
     version: &str,
-    fetch: Option<FetchMeta>,
 ) -> Result<(), CeError> {
     let (root, tmp) = extract_to_source(&ctx.config_dir, ctx.dry_run, tarball, tag)?;
-    if let (Some(meta), false) = (fetch, ctx.dry_run) {
-        record_tarball_provenance(
-            &ctx.config_dir.join("state.json"),
-            ReleaseProvenance {
-                tag: version.to_string(),
-                url: meta.url,
-                archive_sha256: meta.sha256,
-                extraction_path: root.clone(),
-            },
-        )?;
-    }
     let source_json = serde_json::json!({ "kind": "github-release", "tag": version, "tree": root });
     let result = sync::sync_with(ctx, &root, version, source_json);
     if let Some(tmp) = tmp {

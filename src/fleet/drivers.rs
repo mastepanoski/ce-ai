@@ -1,10 +1,62 @@
 //! Concrete harness driver implementations for OpenCode, Claude Code, Pi, Codex, and Cursor.
 
 use crate::commands::Context;
+use crate::compat::release::CeRelease;
 use crate::error::CeError;
 use crate::fleet::driver::{FleetAction, FleetHarnessDriver};
 use crate::harness::HarnessKind;
 use std::fs;
+
+/// Compares two version strings for semantic equality, normalizing tag formats
+/// (e.g. "v3.30.4", "3.30.4", and "compound-engineering-v3.30.4" all match).
+pub fn is_version_match(v1: &str, v2: &str) -> bool {
+    if v1 == v2 {
+        return true;
+    }
+    let norm1 = CeRelease::parse_tag(v1)
+        .map(|r| r.version)
+        .unwrap_or_else(|| v1.trim_start_matches('v').to_string());
+    let norm2 = CeRelease::parse_tag(v2)
+        .map(|r| r.version)
+        .unwrap_or_else(|| v2.trim_start_matches('v').to_string());
+    norm1 == norm2
+}
+
+fn detect_claude_installed_plugin(ctx: &Context) -> Option<(String, String)> {
+    let installed_plugins_path = ctx
+        .home_dir()
+        .join(".claude")
+        .join("plugins")
+        .join("installed_plugins.json");
+    if installed_plugins_path.exists() {
+        if let Ok(content) = fs::read_to_string(&installed_plugins_path) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(plugins) = val.get("plugins").and_then(|p| p.as_object()) {
+                    for (key, installations) in plugins {
+                        let plugin_name = key.split('@').next().unwrap_or(key);
+                        if plugin_name == "compound-engineering" {
+                            if let Some(arr) = installations.as_array() {
+                                let ver = arr
+                                    .iter()
+                                    .find(|inst| {
+                                        inst.get("scope").and_then(|s| s.as_str()) == Some("user")
+                                    })
+                                    .or_else(|| arr.first())
+                                    .and_then(|inst| inst.get("version"))
+                                    .and_then(|v| v.as_str());
+
+                                if let Some(v) = ver {
+                                    return Some((key.clone(), v.to_string()));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
 
 fn detect_version_from_state(ctx: &Context, harness_name: &str) -> Option<String> {
     let state_file = ctx.state_path();
@@ -73,7 +125,7 @@ impl FleetHarnessDriver for OpenCodeDriver {
 
     fn plan_sync(&self, ctx: &Context, target_version: &str) -> Result<FleetAction, CeError> {
         if let Some(installed) = self.detect_version(ctx)? {
-            if installed == target_version {
+            if is_version_match(&installed, target_version) {
                 return Ok(FleetAction::UpToDate);
             }
         }
@@ -106,6 +158,10 @@ impl FleetHarnessDriver for ClaudeDriver {
     }
 
     fn detect_version(&self, ctx: &Context) -> Result<Option<String>, CeError> {
+        if let Some((_, v)) = detect_claude_installed_plugin(ctx) {
+            return Ok(Some(v));
+        }
+
         if let Some(v) = detect_version_from_state(ctx, "claude") {
             return Ok(Some(v));
         }
@@ -119,21 +175,41 @@ impl FleetHarnessDriver for ClaudeDriver {
     }
 
     fn plan_sync(&self, ctx: &Context, target_version: &str) -> Result<FleetAction, CeError> {
-        if let Some(installed) = self.detect_version(ctx)? {
-            if installed == target_version {
+        let plugin_info = detect_claude_installed_plugin(ctx);
+        if let Some((_, ref installed_ver)) = plugin_info {
+            if is_version_match(installed_ver, target_version) {
+                return Ok(FleetAction::UpToDate);
+            }
+        } else if let Some(installed) = self.detect_version(ctx)? {
+            if is_version_match(&installed, target_version) {
                 return Ok(FleetAction::UpToDate);
             }
         }
+
+        let (subcmd, target) = match plugin_info {
+            Some((key, _)) => ("update".to_string(), key),
+            None => (
+                "install".to_string(),
+                "compound-engineering@compound-engineering-plugin".to_string(),
+            ),
+        };
 
         Ok(FleetAction::RunCommand {
             program: "claude".to_string(),
             args: vec![
                 "plugin".to_string(),
-                "update".to_string(),
-                format!("compound-engineering@{}", target_version),
+                subcmd.clone(),
+                target.clone(),
+                "-y".to_string(),
             ],
             description: format!(
-                "Update Claude Code plugin compound-engineering to {}",
+                "{} Claude Code plugin {} to {}",
+                if subcmd == "update" {
+                    "Update"
+                } else {
+                    "Install"
+                },
+                target,
                 target_version
             ),
         })
@@ -167,7 +243,7 @@ impl FleetHarnessDriver for PiDriver {
 
     fn plan_sync(&self, ctx: &Context, target_version: &str) -> Result<FleetAction, CeError> {
         if let Some(installed) = self.detect_version(ctx)? {
-            if installed == target_version {
+            if is_version_match(&installed, target_version) {
                 return Ok(FleetAction::UpToDate);
             }
         }
@@ -213,7 +289,7 @@ impl FleetHarnessDriver for CodexDriver {
 
     fn plan_sync(&self, ctx: &Context, target_version: &str) -> Result<FleetAction, CeError> {
         if let Some(installed) = self.detect_version(ctx)? {
-            if installed == target_version {
+            if is_version_match(&installed, target_version) {
                 return Ok(FleetAction::UpToDate);
             }
         }
@@ -257,7 +333,7 @@ impl FleetHarnessDriver for CursorDriver {
 
     fn plan_sync(&self, ctx: &Context, target_version: &str) -> Result<FleetAction, CeError> {
         if let Some(installed) = self.detect_version(ctx)? {
-            if installed == target_version {
+            if is_version_match(&installed, target_version) {
                 return Ok(FleetAction::UpToDate);
             }
         }
@@ -357,12 +433,74 @@ mod tests {
                     args,
                     vec![
                         "plugin".to_string(),
-                        "update".to_string(),
-                        "compound-engineering@v2.0.0".to_string()
+                        "install".to_string(),
+                        "compound-engineering@compound-engineering-plugin".to_string(),
+                        "-y".to_string(),
                     ]
                 );
             }
             _ => panic!("Expected RunCommand action"),
         }
+    }
+
+    #[test]
+    fn test_claude_driver_plan_sync_when_installed() {
+        let temp = tempdir().unwrap();
+        let plugins_dir = temp.path().join(".claude").join("plugins");
+        fs::create_dir_all(&plugins_dir).unwrap();
+        fs::write(
+            plugins_dir.join("installed_plugins.json"),
+            serde_json::json!({
+                "plugins": {
+                    "compound-engineering@compound-engineering-plugin": [
+                        { "scope": "user", "version": "3.30.4" }
+                    ]
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let ctx = Context {
+            config_dir: temp.path().join(".ce-ai"),
+            opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        let driver = ClaudeDriver;
+        // When target matches normalized version
+        let plan = driver.plan_sync(&ctx, "v3.30.4").unwrap();
+        assert_eq!(plan, FleetAction::UpToDate);
+
+        // When target differs
+        let plan_upgrade = driver.plan_sync(&ctx, "v3.31.0").unwrap();
+        match plan_upgrade {
+            FleetAction::RunCommand { program, args, .. } => {
+                assert_eq!(program, "claude");
+                assert_eq!(
+                    args,
+                    vec![
+                        "plugin".to_string(),
+                        "update".to_string(),
+                        "compound-engineering@compound-engineering-plugin".to_string(),
+                        "-y".to_string(),
+                    ]
+                );
+            }
+            _ => panic!("Expected RunCommand action"),
+        }
+    }
+
+    #[test]
+    fn test_is_version_match() {
+        assert!(is_version_match("v3.30.4", "3.30.4"));
+        assert!(is_version_match("compound-engineering-v3.30.4", "v3.30.4"));
+        assert!(is_version_match("compound-engineering-v3.30.4", "3.30.4"));
+        assert!(is_version_match("3.30.4", "3.30.4"));
+        assert!(!is_version_match("v3.30.4", "v3.30.5"));
+        assert!(!is_version_match("host-detected", "v3.30.4"));
     }
 }

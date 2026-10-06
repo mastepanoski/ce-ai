@@ -5,6 +5,7 @@ use tempfile::tempdir;
 use super::*;
 use crate::commands::Context;
 use crate::source::cache::{record_tarball_provenance, Cache};
+use crate::state::state::ReleaseProvenance;
 
 fn ctx_in(dir: &Path) -> Context {
     Context {
