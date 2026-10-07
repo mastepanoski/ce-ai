@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-06
+
+### Added
+- **`ce-ai fleet pin latest` Automatic Upstream Release Resolution (`src/commands/fleet.rs`)**:
+  - Added support for `latest` (case-insensitive) keyword in `ce-ai fleet pin latest`.
+  - Automatically queries upstream GitHub releases via `resolve_latest_release()`, extracts the newest SemVer tag (e.g. `v3.30.4`), prints the resolved version, and pins it in `state.json`.
+
 ## [2.0.1] - 2026-10-06
 
 ### Fixed

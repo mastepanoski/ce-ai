@@ -24,7 +24,7 @@ pub enum FleetActionCommand {
     },
     /// Pin target Compound Engineering version for the fleet.
     Pin {
-        /// Semantic version tag to pin (e.g. v1.76.0 or 1.76.0).
+        /// Semantic version tag to pin (e.g. v1.76.0 or 1.76.0), or 'latest' to resolve the newest release.
         version: String,
     },
     /// Synchronize all detected/installed harnesses with the pinned fleet version.
@@ -105,7 +105,21 @@ pub fn handle_pin(ctx: &Context, raw_version: &str) -> Result<(), CeError> {
         return Err(CeError::Usage(format!("invalid version tag '{clean}'")));
     }
 
-    let normalized = if let Some(rel) = crate::compat::release::CeRelease::parse_tag(clean) {
+    let normalized = if clean.eq_ignore_ascii_case("latest") {
+        let client = reqwest::blocking::Client::new();
+        let token = crate::source::release::resolve_github_token();
+        let tag = crate::source::release::resolve_latest_release(&client, token.as_deref())?
+            .ok_or_else(|| {
+                CeError::Usage(
+                    "no 'compound-engineering-v*' release found on GitHub — specify an explicit version tag (e.g. 'v3.30.4')".to_string(),
+                )
+            })?;
+        let ver = crate::compat::release::CeRelease::parse_tag(&tag)
+            .map(|rel| format!("v{}", rel.version))
+            .unwrap_or_else(|| tag.clone());
+        println!("Resolved latest Compound Engineering release: {ver}");
+        ver
+    } else if let Some(rel) = crate::compat::release::CeRelease::parse_tag(clean) {
         format!("v{}", rel.version)
     } else if clean.starts_with('v') || clean.starts_with('V') {
         format!("v{}", &clean[1..])
@@ -230,4 +244,78 @@ pub fn handle_sync(ctx: &Context, dry_run: bool) -> Result<(), CeError> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_handle_pin_explicit_version() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().join(".ce-ai"),
+            opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        handle_pin(&ctx, "3.30.4").unwrap();
+
+        let state = State::load(&ctx.state_path()).unwrap();
+        assert_eq!(
+            state.fleet.unwrap().pinned_version,
+            Some("v3.30.4".to_string())
+        );
+
+        handle_pin(&ctx, "compound-engineering-v3.31.0").unwrap();
+        let state2 = State::load(&ctx.state_path()).unwrap();
+        assert_eq!(
+            state2.fleet.unwrap().pinned_version,
+            Some("v3.31.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_handle_pin_empty_or_invalid() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().join(".ce-ai"),
+            opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        let err1 = handle_pin(&ctx, "  ").unwrap_err();
+        assert_eq!(err1.exit_code(), 2);
+
+        let err2 = handle_pin(&ctx, "invalid version with spaces").unwrap_err();
+        assert_eq!(err2.exit_code(), 2);
+    }
+
+    #[test]
+    fn test_handle_pin_latest_when_online() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().join(".ce-ai"),
+            opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        // When network is reachable, "latest" resolves a valid SemVer tag
+        if let Ok(()) = handle_pin(&ctx, "latest") {
+            let state = State::load(&ctx.state_path()).unwrap();
+            let pinned = state.fleet.unwrap().pinned_version.unwrap();
+            assert!(pinned.starts_with('v'));
+            assert!(pinned.len() > 2);
+        }
+    }
 }
