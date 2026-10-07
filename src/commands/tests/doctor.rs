@@ -183,7 +183,10 @@ fn test_doctor_detects_missing_rtk_hook_in_strict_mode() {
     state.save(&ctx.config_dir.join("state.json")).unwrap();
 
     // In strict mode, if RTK hook is missing for claude, doctor flags it
-    let args = Args { strict: true };
+    let args = Args {
+        strict: true,
+        ..Default::default()
+    };
     let res = run(&ctx, &args);
     // Since claude hook or manifest is missing, strict doctor returns finding
     assert!(res.is_err());
@@ -241,7 +244,10 @@ fn test_doctor_rtk_probe_resolves_home_from_ctx() {
     )
     .unwrap();
 
-    let args = Args { strict: true };
+    let args = Args {
+        strict: true,
+        ..Default::default()
+    };
     let res = run(&ctx, &args);
     // In strict mode, doctor fails on missing optional companion tools, but it must NOT
     // report rtk-hook-missing because the hook was properly detected in home_dir_from_ctx.
@@ -1128,4 +1134,83 @@ fn test_doctor_reports_update_notifier_status() {
     });
     state.save(&ctx.config_dir.join("state.json")).unwrap();
     assert!(run(&ctx, &args).is_ok());
+}
+
+#[test]
+fn test_doctor_scopes_project_adoption_to_active_project() {
+    let tmp = TempDir::new().unwrap();
+    let prj_a = tmp.path().join("prj-a");
+    let prj_b = tmp.path().join("prj-b");
+    std::fs::create_dir_all(&prj_a).unwrap();
+    std::fs::create_dir_all(&prj_b).unwrap();
+
+    let ctx = Context {
+        config_dir: tmp.path().join("config"),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: Some(prj_a.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+    std::fs::create_dir_all(&ctx.config_dir).unwrap();
+    std::fs::create_dir_all(&ctx.opencode_config_dir).unwrap();
+
+    std::fs::write(
+        ctx.config_dir.join("skills-registry.json"),
+        r#"{"version":"1.6.3","updated_at":"2026-08-22T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    // Project A is adopted and healthy (v=7 block)
+    let block_a =
+        crate::commands::init_prj::render_block_content(crate::state::state::AdoptionTier::Full);
+    let block_a_str = format!(
+        "<!-- ce-ai:block begin v=7 tier=full sha256={} -->\n{}\n<!-- ce-ai:block end -->\n",
+        crate::commands::init_prj::compute_sha256(block_a),
+        block_a
+    );
+    std::fs::write(prj_a.join("AGENTS.md"), block_a_str).unwrap();
+
+    // Project B is adopted but has a stale v=6 block
+    std::fs::write(
+        prj_b.join("AGENTS.md"),
+        "<!-- ce-ai:block begin v=6 tier=full sha256=stale -->\nstale\n<!-- ce-ai:block end -->\n",
+    )
+    .unwrap();
+
+    let mut state = State::new();
+    state.projects.push(ProjectAdoptionEntry {
+        path: prj_a.clone(),
+        file: "AGENTS.md".into(),
+        tier: crate::state::state::AdoptionTier::Full,
+        block_version: 7,
+        block_sha256: crate::commands::init_prj::compute_sha256(block_a),
+        created_file: false,
+        adopted_at: "2026-10-07T00:00:00Z".into(),
+    });
+    state.projects.push(ProjectAdoptionEntry {
+        path: prj_b.clone(),
+        file: "AGENTS.md".into(),
+        tier: crate::state::state::AdoptionTier::Full,
+        block_version: 6,
+        block_sha256: "stale".into(),
+        created_file: false,
+        adopted_at: "2026-10-07T00:00:00Z".into(),
+    });
+    state.save(&ctx.config_dir.join("state.json")).unwrap();
+
+    // When running inside prj_a, stale prj_b does NOT cause a fatal finding
+    let args = Args::default();
+    assert!(run(&ctx, &args).is_ok());
+
+    // When --all-projects is set, stale prj_b IS reported as a fatal finding
+    let args_all = Args {
+        all_projects: true,
+        ..Default::default()
+    };
+    let res = run(&ctx, &args_all);
+    assert!(res.is_err());
+    if let Err(CeError::Runtime(err)) = res {
+        assert!(err.contains("doctor found"));
+    }
 }
