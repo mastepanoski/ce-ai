@@ -252,6 +252,33 @@ pub fn install_loader(source_root: &Path, config_dir: &Path) -> Result<ManifestF
 /// Returns true if the OpenCode plugin loader exists, contains the
 /// `session.created` hook and valid shape, and is registered in `opencode.json`.
 pub fn has_session_start_plugin(config_dir: &Path) -> bool {
+    let config_file = config_dir.join("opencode.json");
+    if config_file.exists() {
+        if let Ok(config_str) = std::fs::read_to_string(&config_file) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&config_str) {
+                let has_native = |key: &str| -> bool {
+                    val.get(key)
+                        .and_then(|p| p.as_array())
+                        .map(|arr| {
+                            arr.iter().any(|v| {
+                                v.as_str()
+                                    .map(|s| {
+                                        (s.starts_with("@everyinc/compound-engineering")
+                                            || s.starts_with("compound-engineering"))
+                                            && !s.ends_with(".js")
+                                    })
+                                    .unwrap_or(false)
+                            })
+                        })
+                        .unwrap_or(false)
+                };
+                if has_native("plugins") || has_native("plugin") {
+                    return true;
+                }
+            }
+        }
+    }
+
     let loader_path = plugin_entry(config_dir);
     let auto_loader_path = autodiscovered_plugin_entry(config_dir);
 

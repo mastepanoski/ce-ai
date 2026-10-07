@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-10-07
+
+### Fixed
+- **OpenCode Native Plugin Recognition in Doctor (`src/opencode/plugins.rs`)**:
+  - Updated `has_session_start_plugin` to recognize native npm-distributed Compound Engineering plugins (`@everyinc/compound-engineering` or `compound-engineering` in `opencode.json` `plugins`/`plugin` arrays) without falsely requiring legacy disk loader files.
+- **Active Workspace Scoping for Project Adoption Health Checks (`src/commands/doctor.rs`)**:
+  - Scoped project adoption diagnostics to the active workspace/repository root. When running `ce-ai doctor` within an adopted project, staleness or drift in external registered projects is reported as informational notices (`doctor-info:`) rather than fatal exit-code-1 findings.
+  - Added `--all-projects` flag to `ce-ai doctor` to allow explicitly evaluating all registered projects across the host filesystem as hard findings.
+- **Project File Name Resolution in `deinit-prj` (`src/commands/deinit_prj.rs`)**:
+  - Dynamically resolved the adopted instruction file name from `state.projects` (`p.file`) rather than hardcoding `AGENTS.md`, and normalized target paths to prevent matching misses.
+
 ## [2.1.0] - 2026-10-06
 
 ### Added

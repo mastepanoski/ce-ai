@@ -319,6 +319,26 @@ fn has_session_start_plugin_recognizes_plugin_key_v1() {
 }
 
 #[test]
+fn has_session_start_plugin_recognizes_native_npm_plugin() {
+    let dir = tempdir().unwrap();
+    let config_dir = dir.path().join("opencode-config");
+    std::fs::create_dir_all(&config_dir).unwrap();
+    std::fs::write(
+        config_dir.join("opencode.json"),
+        serde_json::json!({
+            "plugins": ["@everyinc/compound-engineering@v3.30.4"]
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    assert!(
+        has_session_start_plugin(&config_dir),
+        "Native @everyinc/compound-engineering plugin package must be recognized"
+    );
+}
+
+#[test]
 fn ensure_managed_commands_generates_files_and_is_idempotent() {
     let dir = tempdir().unwrap();
     let config_dir = dir.path().join("opencode-config");

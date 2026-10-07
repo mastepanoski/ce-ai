@@ -21,11 +21,18 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
         Err(_) => raw_target,
     };
 
-    let agents_file = target_dir.join("AGENTS.md");
     let global_state_path = ctx.config_dir.join("state.json");
     let mut state = State::load(&global_state_path)?;
 
-    let registry_pos = state.projects.iter().position(|p| p.path == target_dir);
+    let registry_pos = state.projects.iter().position(|p| {
+        p.path == target_dir
+            || State::normalize_workspace_key(&p.path)
+                == State::normalize_workspace_key(&target_dir)
+    });
+    let file_name = registry_pos
+        .map(|idx| state.projects[idx].file.clone())
+        .unwrap_or_else(|| "AGENTS.md".to_string());
+    let agents_file = target_dir.join(&file_name);
     let created_file = registry_pos
         .map(|idx| state.projects[idx].created_file)
         .unwrap_or(false);
@@ -39,7 +46,7 @@ pub fn run(ctx: &Context, target_path_opt: Option<PathBuf>) -> Result<(), CeErro
         }
         if !ctx.quiet {
             println!(
-                "No 'AGENTS.md' found at '{}'. Project registry entry cleaned up.",
+                "No '{file_name}' found at '{}'. Project registry entry cleaned up.",
                 target_dir.display()
             );
         }
