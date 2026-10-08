@@ -331,6 +331,22 @@ severity: standard
         missing
     );
 
+    // 1b. Canonical Compound Engineering bug types (logic_error, integration_issue) require no applies_when
+    let logic_error_content = r#"---
+category: logic-errors
+module: users device-session
+problem_type: logic_error
+component: service_object
+severity: high
+---
+"#;
+    let missing_logic = crate::commands::workflow::check_solution_frontmatter(logic_error_content);
+    assert!(
+        missing_logic.is_empty(),
+        "Expected clean frontmatter for logic_error, got: {:?}",
+        missing_logic
+    );
+
     // 2. Knowledge-track doc (architecture) requires applies_when
     let arch_without_applies = r#"---
 module: harness::pi
@@ -378,4 +394,68 @@ fn test_clean_code_path_multi_language() {
         crate::commands::workflow::clean_code_path("docs/architecture.md"),
         None
     );
+}
+
+#[test]
+fn test_repair_solution_frontmatter_injects_missing_fields() {
+    let dir = tempfile::tempdir().unwrap();
+    let sol_dir = dir.path().join("docs").join("solutions").join("patterns");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+    let sol_file = sol_dir.join("caching.md");
+
+    // File missing category/module, problem_type, applies_when
+    let raw = r#"---
+title: "Redis Response Caching"
+date: "2026-10-07"
+component: "redis"
+severity: "medium"
+---
+
+# Redis Response Caching
+
+We use Redis for response caching.
+"#;
+    std::fs::write(&sol_file, raw).unwrap();
+
+    let repaired = crate::commands::doc::repair_solution_frontmatter(
+        dir.path(),
+        "docs/solutions/patterns/caching.md",
+    )
+    .unwrap();
+    assert!(repaired, "Expected repair to succeed and modify file");
+
+    let updated = std::fs::read_to_string(&sol_file).unwrap();
+    let missing_after = crate::commands::workflow::check_solution_frontmatter(&updated);
+    assert!(
+        missing_after.is_empty(),
+        "Expected all missing fields resolved, got: {:?}",
+        missing_after
+    );
+    assert!(updated.contains("category: patterns"));
+    assert!(updated.contains("problem_type: best_practice"));
+    assert!(updated.contains("applies_when:"));
+}
+
+#[test]
+fn test_repair_solution_frontmatter_creates_frontmatter_if_missing() {
+    let dir = tempfile::tempdir().unwrap();
+    let sol_dir = dir.path().join("docs").join("solutions").join("guides");
+    std::fs::create_dir_all(&sol_dir).unwrap();
+    let sol_file = sol_dir.join("setup.md");
+
+    let raw = "# Project Setup\n\nHow to set up the project.";
+    std::fs::write(&sol_file, raw).unwrap();
+
+    let repaired = crate::commands::doc::repair_solution_frontmatter(
+        dir.path(),
+        "docs/solutions/guides/setup.md",
+    )
+    .unwrap();
+    assert!(repaired);
+
+    let updated = std::fs::read_to_string(&sol_file).unwrap();
+    assert!(updated.starts_with("---\n"));
+    assert!(updated.contains("category: guides"));
+    assert!(updated.contains("problem_type: best_practice"));
+    assert!(updated.contains("applies_when:"));
 }

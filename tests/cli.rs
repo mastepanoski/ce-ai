@@ -9199,6 +9199,21 @@ date: "2026-09-10"
         .code(6)
         .stderr(predicates::str::contains("missing required field(s)"));
 
+    // 2b. ce-ai doc lint --fix (repairs invalid.md)
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "lint", "--fix"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("repaired frontmatter in"));
+
+    // 2c. ce-ai doc lint --strict now succeeds cleanly
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doc", "lint", "--strict"])
+        .assert()
+        .success();
+
     // 3. ce-ai doc refresh --dry-run
     ceai(&config_dir, &home)
         .current_dir(&proj)
@@ -10860,4 +10875,181 @@ fn test_cli_v2_deprecation_notices_emitted_on_legacy_surfaces() {
     let upgrade_stderr = String::from_utf8_lossy(&out_upgrade.stderr);
     assert!(upgrade_stderr.contains("[DEPRECATION] 'ce-ai upgrade' is deprecated in CE-AI v2.0."));
     assert!(upgrade_stderr.contains("ce-ai fleet pin"));
+}
+
+#[test]
+fn test_cli_archive_stale_batch_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let proj = tmp.path().join("proj");
+    fs::create_dir_all(&proj).unwrap();
+
+    // 1. Initialize git repo
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.email", "test@example.com"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    let stale_dir = proj.join("openspec").join("changes").join("stale-change");
+    fs::create_dir_all(&stale_dir).unwrap();
+    fs::write(stale_dir.join("tasks.md"), "- [ ] 1. Incomplete task\n").unwrap();
+
+    std::process::Command::new("git")
+        .args(["add", "."])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args([
+            "commit",
+            "-m",
+            "initial stale change",
+            "--date",
+            "2026-08-01T12:00:00Z",
+        ])
+        .env("GIT_COMMITTER_DATE", "2026-08-01T12:00:00Z")
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    // 2. Batch archive stale changes
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["archive", "--stale", "--status", "superseded"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "archived (Criterion 2 STATUS-attested: 'superseded'): 'stale-change'",
+        ));
+
+    assert!(proj
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join("stale-change")
+        .is_dir());
+    assert!(!stale_dir.exists());
+}
+
+#[test]
+fn test_cli_doctor_fix_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let proj = tmp.path().join("proj");
+    fs::create_dir_all(&proj).unwrap();
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::write(
+        config_dir.join("skills-registry.json"),
+        r#"{"version":"2.1.1","updated_at":"2026-10-07T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    // 1. Initialize git repo
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.email", "test@example.com"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    // 2. Create a completed change
+    let completed_dir = proj.join("openspec").join("changes").join("feat-completed");
+    fs::create_dir_all(&completed_dir).unwrap();
+    fs::write(completed_dir.join("tasks.md"), "- [x] 1. Completed task\n").unwrap();
+
+    // 3. Create a solution missing applies_when
+    let sol_dir = proj.join("docs").join("solutions").join("guides");
+    fs::create_dir_all(&sol_dir).unwrap();
+    let sol_file = sol_dir.join("workflow-guide.md");
+    fs::write(
+        &sol_file,
+        r#"---
+title: "Workflow Guide"
+date: "2026-10-07"
+category: "guides"
+problem_type: "best_practice"
+component: "workflow"
+severity: "low"
+---
+
+# Workflow Guide
+"#,
+    )
+    .unwrap();
+
+    std::process::Command::new("git")
+        .args(["add", "."])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["commit", "-m", "setup project"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    // 4. Verify doctor reports warnings
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doctor"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "openspec/specs/ directory does not exist",
+        ))
+        .stdout(predicates::str::contains(
+            "openspec change 'feat-completed' is complete",
+        ))
+        .stdout(predicates::str::contains(
+            "solution 'guides/workflow-guide.md' missing required YAML frontmatter: applies_when",
+        ));
+
+    // 5. Run doctor --fix
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doctor", "--fix"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "doctor-fix: created directory 'openspec/specs/'",
+        ))
+        .stdout(predicates::str::contains(
+            "doctor-fix: archived completed change 'feat-completed'",
+        ))
+        .stdout(predicates::str::contains(
+            "doctor-fix: repaired frontmatter in 'guides/workflow-guide.md'",
+        ));
+
+    // Verify disk state
+    assert!(proj.join("openspec").join("specs").is_dir());
+    assert!(proj
+        .join("openspec")
+        .join("changes")
+        .join("archive")
+        .join("feat-completed")
+        .is_dir());
+    assert!(!completed_dir.exists());
+
+    let repaired_sol = fs::read_to_string(&sol_file).unwrap();
+    assert!(repaired_sol.contains("applies_when:"));
 }

@@ -55,6 +55,9 @@ pub enum DocCommand {
         /// Output report as JSON.
         #[arg(long)]
         json: bool,
+        /// Automatically repair repairable frontmatter issues (inject missing applies_when/category).
+        #[arg(long)]
+        fix: bool,
     },
     /// Display inventory statistics for the solution library.
     Stats {
@@ -125,7 +128,7 @@ pub fn run_doc(ctx: &Context, args: &DocArgs) -> Result<(), CeError> {
         DocCommand::Refresh { scope, dry_run } => {
             run_doc_refresh(&repo_root, scope.as_deref(), *dry_run)
         }
-        DocCommand::Lint { strict, json } => run_doc_lint(&repo_root, *strict, *json),
+        DocCommand::Lint { strict, json, fix } => run_doc_lint(&repo_root, *strict, *json, *fix),
         DocCommand::Stats { json } => run_doc_stats(&repo_root, *json),
     }
 }
@@ -647,12 +650,164 @@ fn run_doc_refresh(repo_root: &Path, scope: Option<&str>, dry_run: bool) -> Resu
     Ok(())
 }
 
-fn run_doc_lint(repo_root: &Path, strict: bool, json: bool) -> Result<(), CeError> {
+/// Repairs repairable missing frontmatter fields (`applies_when`, `category`, `problem_type`)
+/// in a solution markdown file, performing an atomic write.
+pub fn repair_solution_frontmatter(repo_root: &Path, rel_path: &str) -> Result<bool, CeError> {
+    let target_file = if repo_root.join(rel_path).is_file() {
+        repo_root.join(rel_path)
+    } else {
+        let docs_root = crate::compat::CeDocsConfig::discover(repo_root).docs_root;
+        let candidate = repo_root.join(&docs_root).join("solutions").join(rel_path);
+        if candidate.is_file() {
+            candidate
+        } else {
+            return Err(CeError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("solution file not found: {}", rel_path),
+            )));
+        }
+    };
+
+    let content = std::fs::read_to_string(&target_file)?;
+    let missing = crate::compat::check_solution_frontmatter(&content);
+    if missing.is_empty() {
+        return Ok(false);
+    }
+
+    // Determine category from path hierarchy if possible
+    let norm_path = target_file
+        .strip_prefix(repo_root)
+        .unwrap_or(&target_file)
+        .to_string_lossy()
+        .replace('\\', "/");
+    let inferred_category = if let Some(sub) = norm_path.strip_prefix("docs/solutions/") {
+        sub.split('/').next().unwrap_or("general").to_string()
+    } else {
+        target_file
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .unwrap_or("general")
+            .to_string()
+    };
+
+    // Determine title from frontmatter or heading or filename
+    let extract_title = || -> String {
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("title:") {
+                let t = trimmed.strip_prefix("title:").unwrap_or("").trim();
+                let clean = t.trim_matches('"').trim_matches('\'').trim();
+                if !clean.is_empty() {
+                    return clean.to_string();
+                }
+            }
+        }
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("# ") {
+                let t = trimmed.strip_prefix("# ").unwrap_or("").trim();
+                if !t.is_empty() {
+                    return t.to_string();
+                }
+            }
+        }
+        target_file
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(|s| s.replace(['-', '_'], " "))
+            .unwrap_or_else(|| "general guidance".to_string())
+    };
+
+    let new_content = if content.trim_start().starts_with("---") {
+        let lines: Vec<&str> = content.lines().collect();
+        let mut closing_idx = None;
+        let mut open_found = false;
+        for (i, line) in lines.iter().enumerate() {
+            if line.trim() == "---" {
+                if !open_found {
+                    open_found = true;
+                } else {
+                    closing_idx = Some(i);
+                    break;
+                }
+            }
+        }
+
+        if let Some(c_idx) = closing_idx {
+            let mut fm_additions = Vec::new();
+            if missing.contains(&"category".to_string()) {
+                fm_additions.push(format!("category: {inferred_category}"));
+            }
+            if missing.contains(&"problem_type".to_string()) {
+                fm_additions.push("problem_type: best_practice".to_string());
+            }
+            if missing.contains(&"applies_when".to_string()) {
+                let title = extract_title();
+                let condition = if title.to_ascii_lowercase().starts_with("when ") {
+                    title
+                } else {
+                    format!("When encountering or implementing {title}")
+                };
+                fm_additions.push(format!("applies_when: \"{condition}\""));
+            }
+
+            let mut new_lines = Vec::new();
+            for (i, line) in lines.iter().enumerate() {
+                if i == c_idx {
+                    for add in &fm_additions {
+                        new_lines.push(add.clone());
+                    }
+                }
+                new_lines.push(line.to_string());
+            }
+            new_lines.join("\n") + "\n"
+        } else {
+            let title = extract_title();
+            let condition = format!("When encountering or implementing {title}");
+            let header = format!(
+                "---\ntitle: \"{title}\"\ncategory: {inferred_category}\nproblem_type: best_practice\napplies_when: \"{condition}\"\n---\n\n"
+            );
+            header + &content
+        }
+    } else {
+        let title = extract_title();
+        let condition = format!("When encountering or implementing {title}");
+        let header = format!(
+            "---\ntitle: \"{title}\"\ncategory: {inferred_category}\nproblem_type: best_practice\napplies_when: \"{condition}\"\n---\n\n"
+        );
+        header + &content
+    };
+
+    crate::state::write_atomic(&target_file, new_content.as_bytes())?;
+    Ok(true)
+}
+
+fn run_doc_lint(repo_root: &Path, strict: bool, json: bool, fix: bool) -> Result<(), CeError> {
     let config = crate::state::state::DocHygieneConfig {
         check_solution_paths: true,
         require_solution_frontmatter: true,
         ..Default::default()
     };
+
+    if fix {
+        let initial_status = crate::commands::workflow::probe_solution_drift(repo_root, &config);
+        if let crate::commands::workflow::ProbeStatus::Debt(findings) = initial_status {
+            for f in &findings {
+                if !f.missing_frontmatter_fields.is_empty() {
+                    match repair_solution_frontmatter(repo_root, &f.solution_path) {
+                        Ok(true) => {
+                            println!("doc lint: repaired frontmatter in '{}'", f.solution_path);
+                        }
+                        Ok(false) => {}
+                        Err(err) => {
+                            eprintln!("warning: failed to repair '{}': {err}", f.solution_path);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     let status = crate::commands::workflow::probe_solution_drift(repo_root, &config);
     let git_available = repo_root.join(".git").exists()
