@@ -26,6 +26,18 @@ pub struct Args {
     /// Check all registered projects in state.json as findings, even when running inside a specific adopted project.
     #[arg(long)]
     pub all_projects: bool,
+
+    /// Automatically repair fixable health findings (solutions frontmatter, missing spec directories, completed changes).
+    #[arg(long)]
+    pub fix: bool,
+
+    /// When --fix is set, also batch-archive stale pending changes with the given status (or 'superseded').
+    #[arg(long)]
+    pub archive_stale: bool,
+
+    /// Status to assign when archiving stale changes (e.g. 'superseded').
+    #[arg(long)]
+    pub status: Option<String>,
 }
 
 /// Extracts the `OWNER/REPO` slug from a GitHub `origin` remote URL
@@ -563,10 +575,29 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     // Detects fully-completed OpenSpec changes lingering outside openspec/changes/archive/.
     let unarchived = crate::commands::workflow::probe_unarchived_completed_changes(&repo_root);
     for item in &unarchived {
-        println!(
-            "doctor-warn: openspec change '{}' is complete ({}/{} tasks) but not archived — run 'ce-ai archive {}'",
-            item.feature, item.completed_tasks, item.total_tasks, item.feature
-        );
+        if args.fix {
+            match crate::commands::workflow::validate_and_archive_feature(
+                &repo_root,
+                &item.feature,
+                None,
+                false,
+            ) {
+                Ok(_) => {
+                    println!(
+                        "doctor-fix: archived completed change '{}' ({}/{} tasks)",
+                        item.feature, item.completed_tasks, item.total_tasks
+                    );
+                }
+                Err(e) => {
+                    eprintln!("warning: failed to auto-archive '{}': {e}", item.feature);
+                }
+            }
+        } else {
+            println!(
+                "doctor-warn: openspec change '{}' is complete ({}/{} tasks) but not archived — run 'ce-ai archive {}'",
+                item.feature, item.completed_tasks, item.total_tasks, item.feature
+            );
+        }
     }
 
     // Documentation Technical Debt Diagnostic Engine & Probes (doc-debt-engine-and-probes)
@@ -597,14 +628,38 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     if let crate::commands::workflow::ProbeStatus::Debt(stale_findings) = &doc_debt.stale_pending {
         for f in stale_findings {
-            let git_msg = match f.source {
-                crate::commands::workflow::InactivitySource::GitCommitDate => "with no git commits",
-                crate::commands::workflow::InactivitySource::FilesystemMtime => "with no activity",
-            };
-            println!(
-                "doctor-warn: openspec change '{}' has been pending for {} days {} (progress: {}/{}) — resume, shelve, or archive with '--status \"superseded\"'",
-                f.feature, f.days_inactive, git_msg, f.completed_tasks, f.total_tasks
-            );
+            if args.fix && args.archive_stale {
+                let status_val = args.status.as_deref().unwrap_or("superseded");
+                match crate::commands::workflow::validate_and_archive_feature(
+                    &repo_root,
+                    &f.feature,
+                    Some(status_val),
+                    false,
+                ) {
+                    Ok(_) => {
+                        println!(
+                            "doctor-fix: archived stale change '{}' (status: '{}')",
+                            f.feature, status_val
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("warning: failed to archive stale '{}': {e}", f.feature);
+                    }
+                }
+            } else {
+                let git_msg = match f.source {
+                    crate::commands::workflow::InactivitySource::GitCommitDate => {
+                        "with no git commits"
+                    }
+                    crate::commands::workflow::InactivitySource::FilesystemMtime => {
+                        "with no activity"
+                    }
+                };
+                println!(
+                    "doctor-warn: openspec change '{}' has been pending for {} days {} (progress: {}/{}) — resume, shelve, or archive with '--status \"superseded\"'",
+                    f.feature, f.days_inactive, git_msg, f.completed_tasks, f.total_tasks
+                );
+            }
         }
     }
 
@@ -620,11 +675,31 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                     display_path, dead_path
                 );
             }
-            for field in &f.missing_frontmatter_fields {
-                println!(
-                    "doctor-warn: solution '{}' missing required YAML frontmatter: {}",
-                    display_path, field
-                );
+            if !f.missing_frontmatter_fields.is_empty() {
+                if args.fix {
+                    match crate::commands::doc::repair_solution_frontmatter(
+                        &repo_root,
+                        &f.solution_path,
+                    ) {
+                        Ok(true) => {
+                            println!("doctor-fix: repaired frontmatter in '{}'", display_path);
+                        }
+                        Ok(false) => {}
+                        Err(e) => {
+                            eprintln!(
+                                "warning: failed to repair frontmatter in '{}': {e}",
+                                display_path
+                            );
+                        }
+                    }
+                } else {
+                    for field in &f.missing_frontmatter_fields {
+                        println!(
+                            "doctor-warn: solution '{}' missing required YAML frontmatter: {}",
+                            display_path, field
+                        );
+                    }
+                }
             }
         }
     }
@@ -648,6 +723,14 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     }
 
     // Living System Specifications Health Probe (living-system-specs-promotion)
+    let specs_dir = repo_root.join("openspec").join("specs");
+    if !specs_dir.is_dir() && args.fix {
+        if let Err(e) = std::fs::create_dir_all(&specs_dir) {
+            eprintln!("warning: failed to create openspec/specs/: {e}");
+        } else {
+            println!("doctor-fix: created directory 'openspec/specs/'");
+        }
+    }
     let spec_warnings = crate::commands::spec::probe_specs_health(&repo_root);
     for warn in &spec_warnings {
         println!("doctor-warn: {warn}");

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-08
+
+### Added
+- **`ce-ai doctor --fix` Automated Health Repair (`src/commands/doctor.rs`)**:
+  - Automatically creates missing `openspec/specs/` directory when detected by domain spec probes.
+  - Automatically repairs solution frontmatter issues (missing `category`, `problem_type`, or `applies_when`) in `docs/solutions/` using atomic writes (`crate::state::write_atomic`).
+  - Automatically archives 100% completed OpenSpec changes lingering outside `openspec/changes/archive/`.
+  - Added `--archive-stale` flag (with optional `--status <STATUS>`) to batch-archive stale pending changes (>30 days inactive) with attested status (defaults to `superseded`).
+- **`ce-ai archive --stale` Batch Inactive Changes Archival (`src/commands/workflow.rs`)**:
+  - Added `--stale` flag to `ce-ai archive` allowing one-command batch archival of all stale pending changes (>30 days inactive) without manual per-change invocations.
+- **`ce-ai doc lint --fix` Frontmatter Auto-Repair (`src/commands/doc.rs`)**:
+  - Added `--fix` flag to `ce-ai doc lint` to repair missing YAML frontmatter keys, inferring `category` from directory paths and synthesizing `applies_when` from title/headings.
+
+### Fixed
+- **Canonical Compound Engineering Bug Track Schema Alignment (`src/compat/schema.rs`)**:
+  - Expanded `is_bug_problem_type` and `is_bug_track` to recognize all canonical defect problem types from upstream `skills/ce-compound/references/schema.yaml`: `build_error`, `test_failure`, `runtime_error`, `performance_issue`, `database_issue`, `security_issue`, `ui_bug`, `integration_issue`, `logic_error`, `bug`, and `bugfix`.
+  - Normalized case, hyphens, and underscores so types like `logic-error` or `integration_issue` are accurately recognized as bug tracks.
+  - Eliminated false-positive warnings demanding `applies_when` on bug-track solutions whose retrieval is governed by `symptoms`.
+
 ## [2.1.1] - 2026-10-07
 
 ### Fixed

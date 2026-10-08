@@ -21,11 +21,35 @@ pub struct CeSolutionFrontmatter {
     pub title: Option<String>,
 }
 
+/// Returns true if the problem type matches any canonical Compound Engineering bug track types
+/// defined in `skills/ce-compound/references/schema.yaml`:
+/// `build_error`, `test_failure`, `runtime_error`, `performance_issue`, `database_issue`,
+/// `security_issue`, `ui_bug`, `integration_issue`, `logic_error`, plus legacy `bug`, `bugfix`.
+pub fn is_bug_problem_type(problem_type: &str) -> bool {
+    let normalized = problem_type
+        .trim()
+        .to_ascii_lowercase()
+        .replace(['-', ' '], "_");
+    matches!(
+        normalized.as_str(),
+        "bug"
+            | "bugfix"
+            | "build_error"
+            | "test_failure"
+            | "runtime_error"
+            | "performance_issue"
+            | "database_issue"
+            | "security_issue"
+            | "ui_bug"
+            | "integration_issue"
+            | "logic_error"
+    )
+}
+
 impl CeSolutionFrontmatter {
     /// Returns true if the problem type represents a bugfix or bug diagnosis track.
     pub fn is_bug_track(&self) -> bool {
-        self.problem_type.eq_ignore_ascii_case("bugfix")
-            || self.problem_type.eq_ignore_ascii_case("bug")
+        is_bug_problem_type(&self.problem_type)
     }
 
     /// Validates compliance with upstream Compound Engineering schema rules:
@@ -107,10 +131,7 @@ pub fn check_solution_frontmatter(content: &str) -> Vec<String> {
         missing.push("category".into());
     }
     let is_bugfix = match &problem_type_val {
-        Some(pt) => {
-            let clean = pt.to_lowercase();
-            clean == "bugfix" || clean == "bug"
-        }
+        Some(pt) => is_bug_problem_type(pt),
         None => false,
     };
     if problem_type_val.is_none() {
@@ -183,5 +204,62 @@ mod tests {
 
         frontmatter.applies_when = Some("When planning v2".to_string());
         assert!(frontmatter.validate_upstream_compliance().is_ok());
+    }
+
+    #[test]
+    fn test_canonical_bug_types_recognized() {
+        let bug_types = [
+            "logic_error",
+            "logic-error",
+            "integration_issue",
+            "integration-issue",
+            "test_failure",
+            "test-failure",
+            "runtime_error",
+            "build_error",
+            "database_issue",
+            "security_issue",
+            "ui_bug",
+            "performance_issue",
+            "bug",
+            "bugfix",
+        ];
+
+        for pt in bug_types {
+            assert!(
+                is_bug_problem_type(pt),
+                "Expected '{}' to be recognized as bug problem type",
+                pt
+            );
+
+            let frontmatter = CeSolutionFrontmatter {
+                schema_version: Some("1.0".to_string()),
+                module: "wallet::device".to_string(),
+                date: "2026-06-25".to_string(),
+                problem_type: pt.to_string(),
+                component: "service_object".to_string(),
+                related_components: vec![],
+                severity: "high".to_string(),
+                tags: vec![],
+                applies_when: None,
+                title: Some("Sample Bug".to_string()),
+            };
+
+            assert!(
+                frontmatter.is_bug_track(),
+                "Expected '{}' to be bug track",
+                pt
+            );
+            assert!(
+                frontmatter.validate_upstream_compliance().is_ok(),
+                "Expected '{}' to pass compliance without applies_when",
+                pt
+            );
+        }
+
+        let non_bugs = ["best_practice", "architecture_pattern", "convention"];
+        for nb in non_bugs {
+            assert!(!is_bug_problem_type(nb));
+        }
     }
 }

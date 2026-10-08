@@ -108,6 +108,10 @@ pub struct ArchiveArgs {
     #[arg(long, default_value_t = false)]
     pub all: bool,
 
+    /// Batch archive all stale/inactive pending changes detected in openspec/changes/.
+    #[arg(long, default_value_t = false)]
+    pub stale: bool,
+
     /// Preview intended moves and ledger updates without modifying disk or git.
     #[arg(long, default_value_t = false)]
     pub dry_run: bool,
@@ -2832,7 +2836,42 @@ pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
 
     let mut outcomes = Vec::new();
 
-    if args.all {
+    if args.stale {
+        let git_available = repo_root.join(".git").exists()
+            || git_probe(&repo_root, &["rev-parse", "--git-dir"])
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+        let stale_status = probe_stale_pending_openspecs(&repo_root, 30, git_available);
+        let stale_findings = match stale_status {
+            ProbeStatus::Debt(findings) => findings,
+            _ => Vec::new(),
+        };
+        if stale_findings.is_empty() {
+            println!("archive: no stale pending OpenSpec changes (>30 days inactive)");
+            return Ok(());
+        }
+        let status_attestation = args.status.as_deref().unwrap_or("superseded");
+        for item in &stale_findings {
+            match validate_and_archive_feature(
+                &repo_root,
+                &item.feature,
+                Some(status_attestation),
+                args.dry_run,
+            ) {
+                Ok(outcome) => {
+                    outcomes.push(outcome);
+                }
+                Err(err) => {
+                    eprintln!("warning: skipping stale '{}': {err}", item.feature);
+                }
+            }
+        }
+        if outcomes.is_empty() {
+            return Err(CeError::Verification(
+                "no stale features could be archived successfully".to_string(),
+            ));
+        }
+    } else if args.all {
         let unarchived = probe_unarchived_completed_changes(&repo_root);
         if unarchived.is_empty() {
             println!("archive: no completed OpenSpec changes pending archival");
