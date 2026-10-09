@@ -56,39 +56,6 @@ pub fn supports_agent_definitions(harness: &HarnessKind) -> bool {
     matches!(harness, HarnessKind::Opencode)
 }
 
-/// Applies a user-driven model assignment to `agent.<slot>.model` in any
-/// agent-capable harness config, preserving every other key on the slot and
-/// every other agent entry. Never writes `variant` (#111). Hard-fails on a
-/// malformed `agent` map instead of clobbering it (D4).
-pub fn apply_agent_model(config_path: &Path, slot: &str, model_value: &str) -> Result<(), CeError> {
-    let mut config = crate::state::read_config(config_path)?;
-    let agents = match config.get_mut("agent") {
-        Some(serde_json::Value::Object(map)) => map,
-        Some(_) => {
-            return Err(CeError::Runtime(
-                "`agent` in harness config must be an object; refusing to overwrite it. Fix the file manually, then re-run."
-                    .into(),
-            ))
-        }
-        None => {
-            config["agent"] = serde_json::json!({});
-            config["agent"].as_object_mut().ok_or_else(|| {
-                CeError::Runtime("failed to initialize agent object in harness config".into())
-            })?
-        }
-    };
-    let entry = agents
-        .entry(slot.to_string())
-        .or_insert_with(|| serde_json::json!({}));
-    if !entry.is_object() {
-        return Err(CeError::Runtime(format!(
-            "`agent.{slot}` in harness config must be an object; refusing to overwrite it. Fix the file manually, then re-run."
-        )));
-    }
-    entry["model"] = serde_json::Value::String(model_value.to_string());
-    write_atomic(config_path, &serde_json::to_vec_pretty(&config)?)
-}
-
 /// Ensures the structural `ce-ai` orchestrator agent exists in the target
 /// harness config. Idempotent: an existing `agent.ce-ai` entry is preserved
 /// verbatim (including any user-assigned model). Never writes `model` or

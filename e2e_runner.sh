@@ -45,16 +45,17 @@ echo "$SYNC_OUT" | grep -q -E "(plan: no changes|up-to-date)" || {
   exit 1
 }
 
-echo "== [E2E 4] Running ce-ai models set =="
-ce-ai models set ce-brainstorm opencode-go/kimi-k2.6
-
-echo "== [E2E 5] Asserting model assignment =="
-grep -q "ce-brainstorm" "$HOME/.config/opencode/opencode.json" || {
-  echo "FAIL: ce-brainstorm not found in opencode.json"
+echo "== [E2E 4] Running ce-ai decisions route =="
+ROUTE_OUT=$(ce-ai decisions route "Refactor authentication flow")
+echo "$ROUTE_OUT" | grep -q "Recommended Class" || {
+  echo "FAIL: decisions route did not report recommended class: $ROUTE_OUT"
   exit 1
 }
-grep -q "opencode-go/kimi-k2.6" "$HOME/.config/opencode/opencode.json" || {
-  echo "FAIL: model opencode-go/kimi-k2.6 not found in opencode.json"
+
+echo "== [E2E 5] Asserting decommissioned models subcommand =="
+MODELS_ERR=$(ce-ai models 2>&1 || true)
+echo "$MODELS_ERR" | grep -q "unrecognized subcommand 'models'" || {
+  echo "FAIL: ce-ai models did not fail with unrecognized subcommand: $MODELS_ERR"
   exit 1
 }
 
@@ -78,8 +79,6 @@ echo "== [E2E 8] Running TUI headless checks (zen-free, no TTY) =="
 ce-ai skills list > /tmp/skills.txt 2>&1; grep -q "ce-brainstorm" /tmp/skills.txt || echo "WARN: skills list missing ce-brainstorm (soft)"
 ce-ai skills resolve --harness opencode --query "test" > /tmp/resolve.txt 2>&1; grep -q "ce-" /tmp/resolve.txt || echo "WARN: skills resolve headless (soft)"
 ce-ai tools status > /tmp/tools.txt 2>&1; grep -q "codegraph" /tmp/tools.txt || echo "WARN: tools status (soft)"
-# Zen free model path (mock if no API key): assignment must succeed without network
-ce-ai models set ce-brainstorm opencode/zen-free > /tmp/models.txt 2>&1; grep -q "opencode/zen-free" /tmp/models.txt || echo "WARN: zen-free assignment (soft)"
 # Headless TUI rendering via cargo test (TestBackend) inside container if source present
 if [ -f "/app/Cargo.toml" ]; then
   echo "== [E2E 8b] cargo test tui headless snapshots =="

@@ -10,8 +10,8 @@ use clap::Subcommand;
 
 use crate::commands::{
     audit, backups, decisions, deinit_prj, doc, doctor, fleet, gate, guard, init_prj, install,
-    models, report_bug, self_update, skills, status, sync, tools, uninstall, upgrade, usage,
-    workflow, Context,
+    report_bug, self_update, skills, status, sync, tools, uninstall, upgrade, usage, workflow,
+    Context,
 };
 use crate::error::CeError;
 
@@ -31,8 +31,6 @@ pub enum Commands {
     /// Update the ce-ai CLI binary itself to the latest release (or specified tag).
     #[command(name = "self-update")]
     SelfUpdate(self_update::Args),
-    /// Manage model assignments and named profiles.
-    Models(models::Args),
     /// Multi-harness skill registry discovery, prompt resolution, and health diagnostics.
     Skills(skills::Args),
     /// Show installed harnesses, versions, and drift.
@@ -106,7 +104,6 @@ impl CeCommand for Commands {
             Commands::Sync(args) => sync::run(ctx, args),
             Commands::Upgrade(args) => upgrade::run(ctx, args),
             Commands::SelfUpdate(args) => self_update::run(ctx, args),
-            Commands::Models(args) => models::run(ctx, args),
             Commands::Skills(args) => skills::run(ctx, args),
             Commands::Status => status::run(ctx),
             Commands::Uninstall(args) => uninstall::run(ctx, args),

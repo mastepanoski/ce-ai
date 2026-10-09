@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-09
+
+### Removed
+- **Decommissioned `ce-ai models` CLI Subcommand (`src/commands/registry.rs`)**:
+  - Completely removed the `ce-ai models` subcommand (`set`, `list`, `profile`). In modern multi-harness workflows, models are configured natively per harness (Claude Code flags, Cursor settings, OpenCode interactive commands).
+  - Deleted legacy profile persistence (`src/state/profiles.rs`) and model assignment synchronization in `ce-ai sync`.
+  - Removed OpenCode-specific model drift and mid-tier diagnostic warnings from `ce-ai doctor`.
+
+### Changed
+- **First-Class Task Routing in `ce-ai decisions route` (`src/commands/decisions.rs`)**:
+  - Promoted model routing directly into the Pluggable Decision Engine under `ce-ai decisions route <task>`.
+  - All automated model class recommendations (fast, standard, reasoning) and complexity evaluations remain fully available and first-class without legacy OpenCode slot dependencies.
+
 ## [2.2.0] - 2026-10-08
 
 ### Added
