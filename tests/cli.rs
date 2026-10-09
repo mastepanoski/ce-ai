@@ -802,220 +802,20 @@ fn sync_dry_run_lists_changes_without_writing() {
     );
 }
 
-// ---- models (MM-1..MM-4) ----
+// ---- models decommissioned ----
 
 #[test]
-fn models_set_reflects_in_state_and_opencode_config() {
+fn test_cli_models_subcommand_decommissioned() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
-    let source = ce_source(tmp.path());
-    let user = r#"{"plugin":["user-plugin"],"agent":{"ce-brainstorm":{"model":"user-model","temperature":0.7}}}"#;
-    user_config(&home, user);
-    install(&config_dir, &home, &source);
 
+    // In v3.0, 'models' is completely decommissioned.
+    // Clap returns error code 2 with unrecognized subcommand.
     ceai(&config_dir, &home)
-        .args(["models", "set", "ce-brainstorm", "opencode-go/kimi-k2.6"])
+        .arg("models")
         .assert()
-        .success();
-
-    // MM-1: persisted in state.json.
-    let state = read_json(&config_dir.join("state.json"));
-    assert_eq!(
-        state["model_assignments"]["ce-brainstorm"]["provider_id"],
-        "opencode-go"
-    );
-    assert_eq!(
-        state["model_assignments"]["ce-brainstorm"]["model_id"],
-        "kimi-k2.6"
-    );
-    // MM-2: applied to opencode.json agent.<slot>.model without clobbering user keys.
-    let config = read_json(&home.join(".config/opencode/opencode.json"));
-    assert_eq!(
-        config["agent"]["ce-brainstorm"]["model"],
-        "opencode-go/kimi-k2.6"
-    );
-    assert!(
-        config["agent"]["ce-brainstorm"].get("variant").is_none(),
-        "ce-ai never writes variant; that is user customization"
-    );
-    assert_eq!(
-        config["agent"]["ce-brainstorm"]["temperature"], 0.7,
-        "user agent keys preserved"
-    );
-    assert_eq!(
-        config["plugin"].as_array().unwrap().len(),
-        2,
-        "plugin merge intact"
-    );
-}
-
-#[test]
-fn models_set_unknown_slot_persists_with_warning() {
-    let tmp = TempDir::new().unwrap();
-    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
-    let source = ce_source(tmp.path());
-    install(&config_dir, &home, &source);
-
-    ceai(&config_dir, &home)
-        .args([
-            "models",
-            "set",
-            "definitely-unknown",
-            "opencode-go/kimi-k2.6",
-        ])
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("warning"));
-
-    let state = read_json(&config_dir.join("state.json"));
-    assert_eq!(
-        state["model_assignments"]["definitely-unknown"]["model_id"], "kimi-k2.6",
-        "assignment persisted"
-    );
-    let config = read_json(&home.join(".config/opencode/opencode.json"));
-    assert_eq!(
-        config["agent"]["definitely-unknown"]["model"],
-        "opencode-go/kimi-k2.6"
-    );
-}
-
-#[test]
-fn models_mid_tier_slot_set_list_and_doctor_diagnostic() {
-    let tmp = TempDir::new().unwrap();
-    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
-    let source = ce_source(tmp.path());
-    install(&config_dir, &home, &source);
-
-    // 1. Assign ce-code-review
-    ceai(&config_dir, &home)
-        .args([
-            "models",
-            "set",
-            "ce-code-review",
-            "anthropic/claude-sonnet-4-5",
-        ])
-        .assert()
-        .success();
-
-    // Doctor reports diagnostic note for unconfigured mid-tier slot (Exit 0)
-    ceai(&config_dir, &home)
-        .arg("doctor")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "doctor-info: ce-code-review has a model assigned but 'ce-code-review-mid-tier' is not configured",
-        ));
-
-    // Models list shows ce-code-review without mid-tier
-    ceai(&config_dir, &home)
-        .args(["models", "list"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "ce-code-review: anthropic/claude-sonnet-4-5",
-        ));
-
-    // 2. Assign mid-tier slot
-    ceai(&config_dir, &home)
-        .args([
-            "models",
-            "set",
-            "--harness",
-            "opencode",
-            "ce-code-review-mid-tier",
-            "anthropic/claude-haiku-3-5",
-        ])
-        .assert()
-        .success();
-
-    // Models list shows hierarchical mid-tier sub-slot
-    ceai(&config_dir, &home)
-        .args(["models", "list"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "  └─ mid-tier (ce-code-review-mid-tier): anthropic/claude-haiku-3-5",
-        ));
-
-    // Doctor diagnostic note is now absent
-    ceai(&config_dir, &home)
-        .arg("doctor")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "doctor-info: ce-code-review has a model assigned but 'ce-code-review-mid-tier' is not configured",
-        ).not());
-}
-
-#[test]
-fn models_profile_save_load_round_trip_restores_snapshot() {
-    let tmp = TempDir::new().unwrap();
-    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
-    let source = ce_source(tmp.path());
-    install(&config_dir, &home, &source);
-
-    ceai(&config_dir, &home)
-        .args(["models", "set", "ce-brainstorm", "opencode-go/kimi-k2.6"])
-        .assert()
-        .success();
-    ceai(&config_dir, &home)
-        .args(["models", "set", "ce-plan", "opencode-go/claude-sonnet-4"])
-        .assert()
-        .success();
-
-    // MM-3/MM-4: named profile + append-only snapshot.
-    ceai(&config_dir, &home)
-        .args(["models", "profile", "save", "fast"])
-        .assert()
-        .success();
-    assert!(
-        config_dir.join("profiles/fast.json").exists(),
-        "profile file written"
-    );
-    let versions = fs::read_dir(config_dir.join("profiles/versions")).unwrap();
-    assert!(
-        versions.into_iter().any(|e| e
-            .unwrap()
-            .file_name()
-            .to_string_lossy()
-            .starts_with("fast-")),
-        "snapshot written"
-    );
-
-    // Change the assignment, then load the profile back.
-    ceai(&config_dir, &home)
-        .args(["models", "set", "ce-brainstorm", "opencode-go/gemini-3-pro"])
-        .assert()
-        .success();
-    let opencode_json = home.join(".config/opencode/opencode.json");
-    assert_eq!(
-        read_json(&opencode_json)["agent"]["ce-brainstorm"]["model"],
-        "opencode-go/gemini-3-pro"
-    );
-
-    ceai(&config_dir, &home)
-        .args(["models", "profile", "load", "fast"])
-        .assert()
-        .success();
-
-    let config = read_json(&opencode_json);
-    assert_eq!(
-        config["agent"]["ce-brainstorm"]["model"], "opencode-go/kimi-k2.6",
-        "opencode.json matches snapshot"
-    );
-    assert_eq!(
-        config["agent"]["ce-plan"]["model"],
-        "opencode-go/claude-sonnet-4"
-    );
-    let state = read_json(&config_dir.join("state.json"));
-    assert_eq!(
-        state["model_assignments"]["ce-brainstorm"]["provider_id"],
-        "opencode-go"
-    );
-    assert_eq!(
-        state["model_assignments"]["ce-plan"]["model_id"],
-        "claude-sonnet-4"
-    );
+        .code(2)
+        .stderr(predicate::str::contains("unrecognized subcommand 'models'"));
 }
 
 // ---- upgrade (SU-5) ----
@@ -3019,46 +2819,6 @@ fn doctor_reports_generic_drift_for_tampered_current_body() {
         .assert()
         .stdout(predicate::str::contains("block SHA drift detected"))
         .stdout(predicate::str::contains("stale block version").not());
-}
-
-#[test]
-fn doctor_reports_model_assignment_drift_and_sync_reconciles() {
-    let tmp = TempDir::new().unwrap();
-    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
-    let source = ce_source(tmp.path());
-    install(&config_dir, &home, &source);
-
-    // Manually inject an unrecorded model assignment into opencode.json
-    let opencode_json = home.join(".config/opencode/opencode.json");
-    let content = fs::read_to_string(&opencode_json).unwrap();
-    let mut val: serde_json::Value = serde_json::from_str(&content).unwrap();
-    val["agent"]["ce-brainstorm"] = serde_json::json!({
-        "model": "anthropic/claude-3-5-sonnet",
-        "variant": ""
-    });
-    fs::write(&opencode_json, serde_json::to_string_pretty(&val).unwrap()).unwrap();
-
-    // 1. Doctor should report model assignment drift
-    ceai(&config_dir, &home)
-        .current_dir(tmp.path())
-        .arg("doctor")
-        .assert()
-        .failure()
-        .stdout(predicate::str::contains("model-assignment-drift"));
-
-    // 2. Sync should reconcile model assignments bidirectionally
-    ceai(&config_dir, &home)
-        .current_dir(tmp.path())
-        .arg("sync")
-        .assert()
-        .success();
-
-    // 3. Doctor should now pass cleanly
-    ceai(&config_dir, &home)
-        .current_dir(tmp.path())
-        .arg("doctor")
-        .assert()
-        .success();
 }
 
 // ---- skills (R1..R6) ----
@@ -9728,16 +9488,16 @@ fn test_cli_doctor_probe_decisions() {
 }
 
 #[test]
-fn test_cli_models_route_and_doctor_routing() {
+fn test_cli_decisions_route_and_doctor_routing() {
     let tmp = TempDir::new().unwrap();
     let config_dir = tmp.path().join(".ce-ai");
     let home = tmp.path().join("home");
     std::fs::create_dir_all(&config_dir).unwrap();
     std::fs::create_dir_all(&home).unwrap();
 
-    // 1. When decisions are not configured, models route returns fallback model gracefully (exit 0)
+    // 1. When decisions are not configured, decisions route returns fallback model gracefully (exit 0)
     let out = ceai(&config_dir, &home)
-        .args(["models", "route", "Fix spelling error in comments"])
+        .args(["decisions", "route", "Fix spelling error in comments"])
         .output()
         .unwrap();
     assert!(out.status.success());
@@ -9748,7 +9508,7 @@ fn test_cli_models_route_and_doctor_routing() {
     // 2. Output as JSON
     let out = ceai(&config_dir, &home)
         .args([
-            "models",
+            "decisions",
             "route",
             "Fix spelling error in comments",
             "--json",
@@ -9764,7 +9524,7 @@ fn test_cli_models_route_and_doctor_routing() {
     // 3. Explicit model override takes precedence
     let out = ceai(&config_dir, &home)
         .args([
-            "models",
+            "decisions",
             "route",
             "Fix spelling error",
             "--model",
@@ -10391,7 +10151,7 @@ fn test_cli_decisions_stats_and_compare() {
     // A. Model routing evaluation
     let out = ceai(&config_dir, &home)
         .current_dir(&repo_root)
-        .args(["models", "route", "write a quick python function"])
+        .args(["decisions", "route", "write a quick python function"])
         .output()
         .unwrap();
     assert!(out.status.success());
@@ -10507,7 +10267,7 @@ fn test_cli_decisions_stats_and_compare() {
 
     let out = ceai(&config_dir, &home)
         .current_dir(&repo_root)
-        .args(["models", "route", "complex architecture refactor"])
+        .args(["decisions", "route", "complex architecture refactor"])
         .output()
         .unwrap();
     assert!(out.status.success());

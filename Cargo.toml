@@ -1,6 +1,6 @@
 [package]
 name = "ce-ai"
-version = "2.2.0"
+version = "3.0.0"
 edition = "2021"
 description = "Cross-host operational companion for Compound Engineering across AI coding agents"
 license = "MIT"

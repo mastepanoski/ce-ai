@@ -158,18 +158,6 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
         ));
     }
 
-    // Model assignment drift between state.json and opencode.json (#111).
-    if let Ok(config) = read_config(&opencode_json) {
-        findings.extend(crate::commands::models::model_drift_findings(
-            &state, &config,
-        ));
-        if let Some(note) =
-            crate::commands::models::check_code_review_mid_tier_note(&state, &config)
-        {
-            println!("doctor-info: {note}");
-        }
-    }
-
     // Skill Registry Integrity Health Probe
     if let Ok(skill_findings) = crate::source::registry::check_skill_registry_health(ctx) {
         findings.extend(skill_findings);

@@ -536,28 +536,6 @@ pub(crate) fn sync_with(
         }
         state.installed_harnesses.push(entry);
     }
-    // Repair model-assignment desync: import effective opencode.json
-    // assignments into state.json (config→state; #111). Config is the live
-    // truth — state is never pushed back over user-edited config here.
-    if opencode_active {
-        let opencode_json = opencode_dir.join("opencode.json");
-        if opencode_json.exists() {
-            let config = crate::opencode::config::read_config(&opencode_json)?;
-            for (slot, model) in
-                crate::commands::models::import_config_assignments(&mut state, &config)
-            {
-                if !ctx.quiet {
-                    println!("sync: imported model {slot} = {model}");
-                }
-            }
-            for slot in crate::commands::models::purge_stale_assignments(&mut state, &config) {
-                if !ctx.quiet {
-                    println!("sync: purged stale assignment {slot}");
-                }
-            }
-        }
-    }
-
     // Adopted surfaces: rewrite drift back to canonical (U4/R16) and flag
     // vanished roots as orphaned (R19). Runs before the state save so the
     // ledger status changes persist.

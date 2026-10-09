@@ -100,7 +100,7 @@ pub enum Action {
         verbose: bool,
     },
     /// Evaluate model routing recommendation for a given task description.
-    Route(crate::commands::models::RouteArgs),
+    Route(RouteArgs),
     /// Display aggregated decision telemetry statistics and performance metrics.
     Stats {
         /// Optional workflow or feature ID to filter by.
@@ -122,6 +122,27 @@ pub enum Action {
         #[arg(long)]
         json: bool,
     },
+}
+
+#[derive(clap::Args, Debug, Clone)]
+pub struct RouteArgs {
+    /// Natural language task description or prompt to evaluate.
+    pub task: String,
+    /// Output in JSON format.
+    #[arg(long)]
+    pub json: bool,
+    /// Verbose output with full decision answers and confidence metrics.
+    #[arg(short, long)]
+    pub verbose: bool,
+    /// Check against existing static assignment for a specific slot.
+    #[arg(long)]
+    pub slot: Option<String>,
+    /// Test an explicit model override.
+    #[arg(long)]
+    pub model: Option<String>,
+    /// Default fallback model if unconfigured or unrouted.
+    #[arg(long, default_value = "anthropic/claude-3-5-sonnet")]
+    pub default_model: String,
 }
 
 pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
@@ -158,7 +179,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             *json,
             *verbose,
         ),
-        Action::Route(route_args) => crate::commands::models::route(ctx, route_args),
+        Action::Route(route_args) => handle_route(ctx, route_args),
         Action::Stats {
             workflow,
             decision_type,
@@ -1177,6 +1198,67 @@ fn handle_compare(ctx: &Context, workflow: Option<&str>, json: bool) -> Result<(
     Ok(())
 }
 
+pub fn handle_route(ctx: &Context, args: &RouteArgs) -> Result<(), CeError> {
+    let state_path = ctx.config_dir.join("state.json");
+    let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
+        .unwrap_or_default();
+    let decisions_config = state.decisions.clone().unwrap_or_default();
+    let routing_config = &decisions_config.routing;
+
+    let slot_assignment = args.slot.as_deref().and_then(|slot| {
+        state
+            .model_assignments
+            .get(slot)
+            .map(|a| format!("{}/{}", a.provider_id, a.model_id))
+    });
+
+    let root = ctx.repo_root();
+    let branch = crate::commands::workflow::probe_git_branch(&root);
+    let current_wf = state.current_workflow_for_branch(&root, branch.as_deref());
+    let workflow_id = current_wf.as_ref().and_then(|w| w.feature_name.clone());
+    let stage = current_wf.as_ref().map(|w| w.stage.as_str().to_string());
+
+    let engine = crate::decisions::DecisionEngine::from_config(&decisions_config);
+    let router = crate::decisions::routing::ModelRouter::new(routing_config, Some(&engine))
+        .with_config_dir(&ctx.config_dir)
+        .with_workflow(workflow_id)
+        .with_stage(stage);
+    let res = router.route(
+        &args.task,
+        &args.default_model,
+        args.model.as_deref(),
+        slot_assignment.as_deref(),
+    );
+
+    if args.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&res).map_err(|e| CeError::State(e.to_string()))?
+        );
+    } else {
+        println!("Task: {}", res.task);
+        println!("Recommended Class: {}", res.recommended_class);
+        println!("Resolved Model: {}", res.resolved_model);
+        if res.fallback_applied {
+            println!("Fallback Applied: yes ({})", res.rationale);
+        } else {
+            println!("Rationale: {}", res.rationale);
+        }
+        if args.verbose {
+            println!("Dimensions:");
+            println!("  Complexity: {}", res.complexity);
+            println!("  Needs Reasoning: {}", res.needs_reasoning);
+            println!("  Needs Large Context: {}", res.needs_large_context);
+            println!("  Risk: {}", res.risk);
+            if res.latency_ms > 0 {
+                println!("Latency: {}ms", res.latency_ms);
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1546,5 +1628,29 @@ mod tests {
             }
             _ => panic!("expected Action::Compare"),
         }
+    }
+
+    #[test]
+    fn test_handle_route_execution() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().to_path_buf(),
+            opencode_config_dir: temp.path().join("opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: true,
+            quiet: false,
+        };
+
+        let args = RouteArgs {
+            task: "write unit test".into(),
+            json: true,
+            verbose: false,
+            slot: None,
+            model: None,
+            default_model: "anthropic/claude-3-5-sonnet".into(),
+        };
+
+        assert!(handle_route(&ctx, &args).is_ok());
     }
 }
