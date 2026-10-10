@@ -27,7 +27,7 @@ pub struct Args {
     #[arg(long)]
     pub all_projects: bool,
 
-    /// Automatically repair fixable health findings (solutions frontmatter, missing spec directories, completed changes).
+    /// Automatically repair fixable health findings (solutions frontmatter, missing spec directories, completed changes, stale project adoptions).
     #[arg(long)]
     pub fix: bool,
 
@@ -356,7 +356,7 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
             .unwrap_or(false);
 
         let treat_as_finding = args.all_projects || current_adopted_project.is_none() || is_current;
-        check_project_adoption_health(p, treat_as_finding, &mut findings);
+        check_project_adoption_health(ctx, p, treat_as_finding, args.fix, &mut findings);
     }
 
     // Git Hooks & Worktree Health Probes
@@ -809,8 +809,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 }
 
 pub(crate) fn check_project_adoption_health(
+    ctx: &Context,
     p: &ProjectAdoptionEntry,
     treat_as_finding: bool,
+    fix: bool,
     findings: &mut Vec<String>,
 ) {
     let mut report = |msg: String| {
@@ -823,40 +825,108 @@ pub(crate) fn check_project_adoption_health(
         }
     };
 
+    if !p.path.exists() || !p.path.is_dir() {
+        report(format!(
+            "project-adoption: registered project directory missing at '{}'",
+            p.path.display()
+        ));
+        return;
+    }
+
     let agents_file = p.path.join(&p.file);
-    match crate::commands::init_prj::check_adoption_block_status(&agents_file, p.tier) {
+    let status = crate::commands::init_prj::check_adoption_block_status(&agents_file, p.tier);
+    let mut block_repaired = false;
+    match status {
         crate::commands::init_prj::AdoptionBlockStatus::Ok => {}
         crate::commands::init_prj::AdoptionBlockStatus::FileMissing => {
-            report(format!(
-                "project-adoption: missing instruction file '{}' at '{}'",
-                p.file,
-                p.path.display()
-            ));
+            if fix && treat_as_finding {
+                match crate::commands::init_prj::adopt_project(ctx, &p.path, p.tier, false, false, false) {
+                    Ok(_) => {
+                        println!(
+                            "doctor-fix: restored missing instruction file '{}' at '{}'",
+                            p.file,
+                            p.path.display()
+                        );
+                        block_repaired = true;
+                    }
+                    Err(e) => report(format!(
+                        "project-adoption: missing instruction file '{}' at '{}' (auto-repair failed: {e})",
+                        p.file,
+                        p.path.display()
+                    )),
+                }
+            } else {
+                report(format!(
+                    "project-adoption: missing instruction file '{}' at '{}'",
+                    p.file,
+                    p.path.display()
+                ));
+            }
         }
         crate::commands::init_prj::AdoptionBlockStatus::StaleVersion { version } => {
-            report(format!(
-                "project-adoption: stale block version v={} at '{}' — re-run ce-ai init-prj --tier {} to upgrade",
-                version,
-                p.path.display(),
-                p.tier.as_str()
-            ));
+            if fix && treat_as_finding {
+                match crate::commands::init_prj::adopt_project(ctx, &p.path, p.tier, false, false, false) {
+                    Ok(_) => {
+                        println!(
+                            "doctor-fix: upgraded project adoption block from v={version} to v={} at '{}'",
+                            crate::commands::init_prj::BLOCK_VERSION,
+                            p.path.display()
+                        );
+                        block_repaired = true;
+                    }
+                    Err(e) => report(format!(
+                        "project-adoption: stale block version v={version} at '{}' — re-run ce-ai init-prj --tier {} to upgrade (auto-repair failed: {e})",
+                        p.path.display(),
+                        p.tier.as_str()
+                    )),
+                }
+            } else {
+                report(format!(
+                    "project-adoption: stale block version v={} at '{}' — re-run ce-ai init-prj --tier {} to upgrade",
+                    version,
+                    p.path.display(),
+                    p.tier.as_str()
+                ));
+            }
         }
         crate::commands::init_prj::AdoptionBlockStatus::DriftDetected
         | crate::commands::init_prj::AdoptionBlockStatus::MalformedBlock
         | crate::commands::init_prj::AdoptionBlockStatus::BlockMissing
         | crate::commands::init_prj::AdoptionBlockStatus::ReadError => {
-            report(format!(
-                "project-adoption: block SHA drift detected at '{}'",
-                p.path.display()
-            ));
+            if fix && treat_as_finding {
+                match crate::commands::init_prj::adopt_project(ctx, &p.path, p.tier, true, false, false) {
+                    Ok(_) => {
+                        println!(
+                            "doctor-fix: repaired project adoption block at '{}'",
+                            p.path.display()
+                        );
+                        block_repaired = true;
+                    }
+                    Err(e) => report(format!(
+                        "project-adoption: block SHA drift detected at '{}' (auto-repair failed: {e})",
+                        p.path.display()
+                    )),
+                }
+            } else {
+                report(format!(
+                    "project-adoption: block SHA drift detected at '{}'",
+                    p.path.display()
+                ));
+            }
         }
     }
+
+    if block_repaired {
+        return;
+    }
+
+    let mut missing_hooks = Vec::new();
 
     let claude_dir = p.path.join(".claude");
     if claude_dir.exists() {
         let settings = claude_dir.join("settings.json");
         if !crate::harness::claude::has_session_start_hook(&settings) {
-            report(format!(
+            missing_hooks.push(format!(
                 "project-adoption: Claude Code SessionStart hook missing at '{}' — re-run ce-ai init-prj --tier {} to configure",
                 settings.display(),
                 p.tier.as_str()
@@ -868,7 +938,7 @@ pub(crate) fn check_project_adoption_health(
     if github_dir.exists() {
         let hooks_file = github_dir.join("hooks").join("hooks.json");
         if !crate::harness::copilot::has_session_start_hook(&hooks_file) {
-            report(format!(
+            missing_hooks.push(format!(
                 "project-adoption: Copilot CLI sessionStart hook missing at '{}' — re-run ce-ai init-prj --tier {} to configure",
                 hooks_file.display(),
                 p.tier.as_str()
@@ -880,7 +950,7 @@ pub(crate) fn check_project_adoption_health(
     if codex_dir.exists() {
         let config_file = codex_dir.join("config.toml");
         if !crate::harness::codex::has_session_start_hook(&config_file) {
-            report(format!(
+            missing_hooks.push(format!(
                 "project-adoption: Codex CLI SessionStart hook missing at '{}' — re-run ce-ai init-prj --tier {} to configure",
                 config_file.display(),
                 p.tier.as_str()
@@ -894,7 +964,7 @@ pub(crate) fn check_project_adoption_health(
             .join("extensions")
             .join(crate::harness::pi::PI_EXTENSION_FILENAME);
         if !crate::harness::pi::has_session_start_hook(&extension_file) {
-            report(format!(
+            missing_hooks.push(format!(
                 "project-adoption: Pi before_agent_start extension missing at '{}' — re-run ce-ai init-prj --tier {} to configure",
                 extension_file.display(),
                 p.tier.as_str()
@@ -906,7 +976,7 @@ pub(crate) fn check_project_adoption_health(
     if cursor_dir.exists() {
         let hooks_file = cursor_dir.join("hooks.json");
         if !crate::harness::cursor::has_session_start_hook(&hooks_file) {
-            report(format!(
+            missing_hooks.push(format!(
                 "project-adoption: Cursor sessionStart hook missing at '{}' — re-run ce-ai init-prj --tier {} to configure",
                 hooks_file.display(),
                 p.tier.as_str()
@@ -918,11 +988,35 @@ pub(crate) fn check_project_adoption_health(
     if agents_dir.exists() {
         let hooks_file = agents_dir.join("hooks.json");
         if !crate::harness::agy::has_pre_invocation_hook(&hooks_file) {
-            report(format!(
+            missing_hooks.push(format!(
                 "project-adoption: Antigravity PreInvocation hook missing at '{}' — re-run ce-ai init-prj --tier {} to configure",
                 hooks_file.display(),
                 p.tier.as_str()
             ));
+        }
+    }
+
+    if !missing_hooks.is_empty() {
+        if fix && treat_as_finding {
+            match crate::commands::init_prj::adopt_project(
+                ctx, &p.path, p.tier, false, false, false,
+            ) {
+                Ok(_) => {
+                    println!(
+                        "doctor-fix: configured missing harness hooks at '{}'",
+                        p.path.display()
+                    );
+                }
+                Err(e) => {
+                    for hook_msg in missing_hooks {
+                        report(format!("{hook_msg} (auto-repair failed: {e})"));
+                    }
+                }
+            }
+        } else {
+            for hook_msg in missing_hooks {
+                report(hook_msg);
+            }
         }
     }
 }

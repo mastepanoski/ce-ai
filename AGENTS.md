@@ -216,7 +216,7 @@ Before declaring any task or issue completed, an AI agent MUST satisfy all crite
 - [ ] All GitHub Actions CI jobs pass green across Linux, macOS, and Windows.
 - [ ] Definition of Done (DoD) criteria fully satisfied.
 
-<!-- ce-ai:block begin v=6 tier=minimal sha256=0b96d6153224fe2d8db634928e94010079841528114282b9273966896e9041f2 -->
+<!-- ce-ai:block begin v=7 tier=minimal sha256=0b96d6153224fe2d8db634928e94010079841528114282b9273966896e9041f2 -->
 ## 🔄 Compound Engineering Workflow Guidelines
 
 AI agents operating on this codebase should follow structured planning and verification:

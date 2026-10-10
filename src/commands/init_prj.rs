@@ -137,43 +137,21 @@ pub fn compute_sha256(content: &str) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-/// Executes `ce-ai init-prj`.
-pub fn run(
+/// Adopts or upgrades a single project directory.
+pub fn adopt_project(
     ctx: &Context,
-    target_path_opt: Option<PathBuf>,
-    tier_str: &str,
+    target_dir: &Path,
+    tier: AdoptionTier,
     force: bool,
     skip_rtk: bool,
     skip_companions: bool,
 ) -> Result<(), CeError> {
-    let raw_target = match target_path_opt {
-        Some(p) => p,
-        None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
-    };
-
-    let target_dir = match raw_target.canonicalize() {
-        Ok(canonical) => canonical,
-        Err(_) => raw_target,
-    };
-
     if !target_dir.exists() || !target_dir.is_dir() {
         return Err(CeError::Usage(format!(
             "target project path '{}' does not exist or is not a directory",
             target_dir.display()
         )));
     }
-
-    let tier = match tier_str.to_lowercase().as_str() {
-        "full" => AdoptionTier::Full,
-        "minimal" => AdoptionTier::Minimal,
-        "orchestrator" => AdoptionTier::Orchestrator,
-        unknown => {
-            return Err(CeError::Usage(format!(
-                "unknown adoption tier '{}'. Supported tiers: full, minimal, orchestrator",
-                unknown
-            )))
-        }
-    };
 
     let agents_file = target_dir.join("AGENTS.md");
     let file_existed = agents_file.exists();
@@ -194,7 +172,7 @@ pub fn run(
     let block_header = format!(
         "<!-- ce-ai:block begin v={} tier={} sha256={} -->",
         BLOCK_VERSION,
-        tier_str.to_lowercase(),
+        tier.as_str(),
         body_sha256
     );
     let full_block = format!(
@@ -252,7 +230,7 @@ pub fn run(
         let mut state = State::load(&global_state_path)?;
         let now = chrono::Utc::now().to_rfc3339();
         let mut entry = ProjectAdoptionEntry {
-            path: target_dir.clone(),
+            path: target_dir.to_path_buf(),
             file: "AGENTS.md".into(),
             tier,
             block_version: BLOCK_VERSION,
@@ -274,10 +252,10 @@ pub fn run(
             }
         }
         // Inject sentinel-bounded .gitignore block (DEC-06)
-        ensure_gitignore_block(&target_dir)?;
+        ensure_gitignore_block(target_dir)?;
 
         // Reconcile harness project rules and hooks across all supported harnesses
-        reconcile_project_harness_hooks(&target_dir, inner_body)?;
+        reconcile_project_harness_hooks(target_dir, inner_body)?;
 
         if let Err(e) = crate::source::registry::SkillRegistry::sync_registry(ctx) {
             if !ctx.quiet {
@@ -285,11 +263,11 @@ pub fn run(
             }
         }
 
-        init_codegraph_if_available(&target_dir, ctx.quiet);
+        init_codegraph_if_available(target_dir, ctx.quiet);
 
         // Auto-configure RTK hook injection for detected supported harnesses unless opted out
         if !crate::harness::rtk::is_rtk_opted_out(skip_rtk, skip_companions) {
-            reconcile_rtk_hooks_if_supported(&target_dir, &state, ctx, false)?;
+            reconcile_rtk_hooks_if_supported(target_dir, &state, ctx, false)?;
         } else if !ctx.quiet {
             println!("rtk: hook injection skipped (opted out)");
         }
@@ -309,7 +287,7 @@ pub fn run(
                 State::default()
             }
         };
-        reconcile_rtk_hooks_if_supported(&target_dir, &state, ctx, true)?;
+        reconcile_rtk_hooks_if_supported(target_dir, &state, ctx, true)?;
     } else if !ctx.quiet {
         println!("rtk: hook injection skipped (opted out)");
     }
@@ -330,7 +308,7 @@ pub fn run(
             println!(
                 "dry-run: would adopt project at '{}' (tier: {}, block SHA: {})",
                 target_dir.display(),
-                tier_str.to_lowercase(),
+                tier.as_str(),
                 &body_sha256[..8]
             );
         }
@@ -341,12 +319,86 @@ pub fn run(
         println!(
             "✓ Adopted project at '{}' (tier: {}, block SHA: {})",
             target_dir.display(),
-            tier_str.to_lowercase(),
+            tier.as_str(),
             &body_sha256[..8]
         );
     }
 
     Ok(())
+}
+
+/// Executes `ce-ai init-prj`.
+pub fn run(
+    ctx: &Context,
+    target_path_opt: Option<PathBuf>,
+    tier_opt: Option<&str>,
+    all: bool,
+    force: bool,
+    skip_rtk: bool,
+    skip_companions: bool,
+) -> Result<(), CeError> {
+    if all {
+        let global_state_path = ctx.config_dir.join("state.json");
+        let state = State::load(&global_state_path)?;
+        if state.projects.is_empty() {
+            if !ctx.quiet {
+                println!("no registered projects found in state.json");
+            }
+            return Ok(());
+        }
+        let parsed_tier = match tier_opt {
+            Some(t) => Some(match t.to_lowercase().as_str() {
+                "full" => AdoptionTier::Full,
+                "minimal" => AdoptionTier::Minimal,
+                "orchestrator" => AdoptionTier::Orchestrator,
+                unknown => {
+                    return Err(CeError::Usage(format!(
+                        "unknown adoption tier '{}'. Supported tiers: full, minimal, orchestrator",
+                        unknown
+                    )))
+                }
+            }),
+            None => None,
+        };
+
+        let mut count = 0;
+        for p in &state.projects {
+            let tier = parsed_tier.unwrap_or(p.tier);
+            adopt_project(ctx, &p.path, tier, force, skip_rtk, skip_companions)?;
+            count += 1;
+        }
+        if !ctx.quiet {
+            println!(
+                "successfully updated {count} registered project(s) to block v={BLOCK_VERSION}"
+            );
+        }
+        return Ok(());
+    }
+
+    let raw_target = match target_path_opt {
+        Some(p) => p,
+        None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+    };
+
+    let target_dir = match raw_target.canonicalize() {
+        Ok(canonical) => canonical,
+        Err(_) => raw_target,
+    };
+
+    let tier_str = tier_opt.unwrap_or("full");
+    let tier = match tier_str.to_lowercase().as_str() {
+        "full" => AdoptionTier::Full,
+        "minimal" => AdoptionTier::Minimal,
+        "orchestrator" => AdoptionTier::Orchestrator,
+        unknown => {
+            return Err(CeError::Usage(format!(
+                "unknown adoption tier '{}'. Supported tiers: full, minimal, orchestrator",
+                unknown
+            )))
+        }
+    };
+
+    adopt_project(ctx, &target_dir, tier, force, skip_rtk, skip_companions)
 }
 
 /// Ensures the sentinel-bounded .gitignore block exists and contains both

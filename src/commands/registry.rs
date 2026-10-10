@@ -55,8 +55,11 @@ pub enum Commands {
         /// Target project directory path (default: current working directory)
         path: Option<PathBuf>,
         /// Adoption tier: full, minimal, orchestrator
-        #[arg(long, default_value = "full")]
-        tier: String,
+        #[arg(long)]
+        tier: Option<String>,
+        /// Upgrade or re-adopt all registered projects in state.json
+        #[arg(long, default_value_t = false)]
+        all: bool,
         /// Force overwrite of modified managed blocks
         #[arg(long)]
         force: bool,
@@ -118,10 +121,19 @@ impl CeCommand for Commands {
             Commands::InitPrj {
                 path,
                 tier,
+                all,
                 force,
                 skip_rtk,
                 skip_companions,
-            } => init_prj::run(ctx, path.clone(), tier, *force, *skip_rtk, *skip_companions),
+            } => init_prj::run(
+                ctx,
+                path.clone(),
+                tier.as_deref(),
+                *all,
+                *force,
+                *skip_rtk,
+                *skip_companions,
+            ),
             Commands::DeinitPrj { path } => deinit_prj::run(ctx, path.clone()),
             Commands::Guard(args) => guard::run(ctx, args),
             Commands::Gate(cmd) => match cmd {

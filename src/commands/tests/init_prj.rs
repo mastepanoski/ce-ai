@@ -269,3 +269,73 @@ fn test_render_block_content_turn_0_and_progressive_openspec() {
         .unwrap();
     assert!(!stage2_section.contains("- `tasks.md`:"));
 }
+
+#[test]
+fn test_init_prj_all_updates_registered_projects() {
+    let tmp = TempDir::new().unwrap();
+    let prj_a = tmp.path().join("prj_a");
+    let prj_b = tmp.path().join("prj_b");
+    let config_dir = tmp.path().join("config");
+    fs::create_dir_all(&prj_a).unwrap();
+    fs::create_dir_all(&prj_b).unwrap();
+    fs::create_dir_all(&config_dir).unwrap();
+
+    fs::write(
+        prj_a.join("AGENTS.md"),
+        "<!-- ce-ai:block begin v=6 tier=full sha256=stale -->\nstale\n<!-- ce-ai:block end -->\n",
+    )
+    .unwrap();
+    fs::write(
+        prj_b.join("AGENTS.md"),
+        "<!-- ce-ai:block begin v=4 tier=minimal sha256=stale -->\nstale\n<!-- ce-ai:block end -->\n",
+    )
+    .unwrap();
+
+    let mut state = State::new();
+    state.projects.push(ProjectAdoptionEntry {
+        path: prj_a.clone(),
+        file: "AGENTS.md".into(),
+        tier: AdoptionTier::Full,
+        block_version: 6,
+        block_sha256: "stale".into(),
+        created_file: false,
+        adopted_at: "2026-09-01T00:00:00Z".into(),
+    });
+    state.projects.push(ProjectAdoptionEntry {
+        path: prj_b.clone(),
+        file: "AGENTS.md".into(),
+        tier: AdoptionTier::Minimal,
+        block_version: 4,
+        block_sha256: "stale".into(),
+        created_file: false,
+        adopted_at: "2026-09-01T00:00:00Z".into(),
+    });
+    state.save(&config_dir.join("state.json")).unwrap();
+
+    let ctx = Context {
+        config_dir: config_dir.clone(),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        quiet: true,
+        dry_run: false,
+        verbose: false,
+    };
+
+    let res = run(&ctx, None, None, true, true, false, false);
+    assert!(res.is_ok());
+
+    let content_a = fs::read_to_string(prj_a.join("AGENTS.md")).unwrap();
+    assert!(content_a.contains(&format!("v={BLOCK_VERSION}")));
+    assert!(content_a.contains("tier=full"));
+
+    let content_b = fs::read_to_string(prj_b.join("AGENTS.md")).unwrap();
+    assert!(content_b.contains(&format!("v={BLOCK_VERSION}")));
+    assert!(content_b.contains("tier=minimal"));
+
+    let updated_state = State::load(&config_dir.join("state.json")).unwrap();
+    assert_eq!(updated_state.projects.len(), 2);
+    assert_eq!(updated_state.projects[0].block_version, BLOCK_VERSION);
+    assert_eq!(updated_state.projects[0].tier, AdoptionTier::Full);
+    assert_eq!(updated_state.projects[1].block_version, BLOCK_VERSION);
+    assert_eq!(updated_state.projects[1].tier, AdoptionTier::Minimal);
+}

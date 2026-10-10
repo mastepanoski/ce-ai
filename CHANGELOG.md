@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-10-10
+
+### Added
+- **Automated Fleet Adoption Repair in `ce-ai doctor --fix` (`src/commands/doctor.rs`)**:
+  - `ce-ai doctor --fix` now automatically repairs registered project adoption health issues.
+  - When evaluated (including with `--all-projects`), it upgrades stale managed blocks (`StaleVersion`) to `BLOCK_VERSION` (v=7), repairs block drift (`DriftDetected`), restores missing instruction files, and configures missing harness hooks across Claude, Cursor, Codex, Pi, Copilot, and Antigravity.
+- **Batch Project Adoption Upgrade in `ce-ai init-prj --all` (`src/commands/init_prj.rs`)**:
+  - Added `--all` flag to `ce-ai init-prj` to re-adopt and upgrade the entire registered project fleet in `state.json` in a single command.
+  - Preserves each registered project's configured tier (`full`, `minimal`, `orchestrator`) by default, while supporting `--tier <tier>` overrides and `--force` flags.
+
 ## [3.0.0] - 2026-10-09
 
 ### Removed

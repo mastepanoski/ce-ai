@@ -10813,3 +10813,94 @@ severity: "low"
     let repaired_sol = fs::read_to_string(&sol_file).unwrap();
     assert!(repaired_sol.contains("applies_when:"));
 }
+
+#[test]
+fn test_cli_doctor_fix_repairs_stale_project_adoption_and_init_prj_all() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let proj = tmp.path().join("proj");
+    fs::create_dir_all(&proj).unwrap();
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::write(
+        config_dir.join("skills-registry.json"),
+        r#"{"version":"2.1.1","updated_at":"2026-10-07T00:00:00Z","skills":[]}"#,
+    )
+    .unwrap();
+
+    // 1. Setup repo
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+
+    // 2. Setup AGENTS.md with stale block v=5
+    fs::write(
+        proj.join("AGENTS.md"),
+        "<!-- ce-ai:block begin v=5 tier=full sha256=stale -->\nstale content\n<!-- ce-ai:block end -->\n",
+    )
+    .unwrap();
+
+    // 3. Register project in state.json
+    let state_json = serde_json::json!({
+        "installed_at": "2026-10-07T00:00:00Z",
+        "projects": [
+            {
+                "path": proj.to_str().unwrap(),
+                "file": "AGENTS.md",
+                "tier": "full",
+                "block_version": 5,
+                "block_sha256": "stale",
+                "created_file": false,
+                "adopted_at": "2026-10-07T00:00:00Z"
+            }
+        ]
+    });
+    fs::write(
+        config_dir.join("state.json"),
+        serde_json::to_string(&state_json).unwrap(),
+    )
+    .unwrap();
+
+    // 4. Run doctor --all-projects without fix (should fail finding stale block)
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doctor", "--all-projects"])
+        .assert()
+        .failure()
+        .stdout(predicates::str::contains(
+            "project-adoption: stale block version v=5",
+        ));
+
+    // 5. Run doctor --fix --all-projects (should repair and succeed)
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["doctor", "--fix", "--all-projects"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "doctor-fix: upgraded project adoption block from v=5 to v=7",
+        ));
+
+    let updated_content = fs::read_to_string(proj.join("AGENTS.md")).unwrap();
+    assert!(updated_content.contains("v=7"));
+
+    // 6. Set back to stale v=6 and test init-prj --all
+    fs::write(
+        proj.join("AGENTS.md"),
+        "<!-- ce-ai:block begin v=6 tier=full sha256=stale -->\nstale content\n<!-- ce-ai:block end -->\n",
+    )
+    .unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&proj)
+        .args(["init-prj", "--all", "--force"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(
+            "successfully updated 1 registered project(s) to block v=7",
+        ));
+
+    let init_all_content = fs::read_to_string(proj.join("AGENTS.md")).unwrap();
+    assert!(init_all_content.contains("v=7"));
+}

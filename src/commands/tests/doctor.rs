@@ -1134,4 +1134,16 @@ fn test_doctor_scopes_project_adoption_to_active_project() {
     if let Err(CeError::Runtime(err)) = res {
         assert!(err.contains("doctor found"));
     }
+
+    // When --fix and --all-projects are set, stale prj_b is automatically upgraded
+    let args_fix_all = Args {
+        all_projects: true,
+        fix: true,
+        ..Default::default()
+    };
+    let res_fix = run(&ctx, &args_fix_all);
+    assert!(res_fix.is_ok());
+
+    let content_b = std::fs::read_to_string(prj_b.join("AGENTS.md")).unwrap();
+    assert!(content_b.contains(&format!("v={}", crate::commands::init_prj::BLOCK_VERSION)));
 }
