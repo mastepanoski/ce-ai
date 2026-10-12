@@ -229,6 +229,22 @@ impl FleetHarnessDriver for PiDriver {
     }
 
     fn detect_version(&self, ctx: &Context) -> Result<Option<String>, CeError> {
+        let config_path = HarnessKind::Pi
+            .harness_dir(&ctx.home_dir())
+            .join("settings.json");
+        if config_path.exists() {
+            if let Ok(content) = fs::read_to_string(&config_path) {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(v) = val
+                        .get("compound_engineering_version")
+                        .and_then(|v| v.as_str())
+                    {
+                        return Ok(Some(v.to_string()));
+                    }
+                }
+            }
+        }
+
         if let Some(v) = detect_version_from_state(ctx, "pi") {
             return Ok(Some(v));
         }
@@ -248,16 +264,14 @@ impl FleetHarnessDriver for PiDriver {
             }
         }
 
-        Ok(FleetAction::RunCommand {
-            program: "npm".to_string(),
-            args: vec![
-                "install".to_string(),
-                format!("@everyinc/compound-engineering@{}", target_version),
-            ],
-            description: format!(
-                "Install/update Pi extension @everyinc/compound-engineering@{}",
-                target_version
-            ),
+        let config_path = HarnessKind::Pi
+            .harness_dir(&ctx.home_dir())
+            .join("settings.json");
+        Ok(FleetAction::UpdateConfig {
+            file_path: config_path,
+            key: "compound_engineering_version".to_string(),
+            value: serde_json::json!(target_version),
+            description: format!("Pin Pi compound-engineering version to {}", target_version),
         })
     }
 }
@@ -275,6 +289,20 @@ impl FleetHarnessDriver for CodexDriver {
     }
 
     fn detect_version(&self, ctx: &Context) -> Result<Option<String>, CeError> {
+        let config_path = ctx.home_dir().join(".codex").join("config.json");
+        if config_path.exists() {
+            if let Ok(content) = fs::read_to_string(&config_path) {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(v) = val
+                        .get("compound_engineering_version")
+                        .and_then(|v| v.as_str())
+                    {
+                        return Ok(Some(v.to_string()));
+                    }
+                }
+            }
+        }
+
         if let Some(v) = detect_version_from_state(ctx, "codex") {
             return Ok(Some(v));
         }
@@ -319,6 +347,20 @@ impl FleetHarnessDriver for CursorDriver {
     }
 
     fn detect_version(&self, ctx: &Context) -> Result<Option<String>, CeError> {
+        let config_path = ctx.home_dir().join(".cursor").join("settings.json");
+        if config_path.exists() {
+            if let Ok(content) = fs::read_to_string(&config_path) {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(v) = val
+                        .get("compound_engineering_version")
+                        .and_then(|v| v.as_str())
+                    {
+                        return Ok(Some(v.to_string()));
+                    }
+                }
+            }
+        }
+
         if let Some(v) = detect_version_from_state(ctx, "cursor") {
             return Ok(Some(v));
         }
@@ -502,5 +544,160 @@ mod tests {
         assert!(is_version_match("3.30.4", "3.30.4"));
         assert!(!is_version_match("v3.30.4", "v3.30.5"));
         assert!(!is_version_match("host-detected", "v3.30.4"));
+    }
+
+    #[test]
+    fn test_pi_driver_plan_sync_and_detect() {
+        let temp = tempdir().unwrap();
+        let config_dir = temp.path().join(".ce-ai");
+        let pi_dir = temp.path().join(".pi").join("agent");
+        fs::create_dir_all(&config_dir).unwrap();
+        fs::create_dir_all(&pi_dir).unwrap();
+
+        let ctx = Context {
+            config_dir,
+            opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        let driver = PiDriver;
+        assert!(driver.is_installed(&ctx));
+
+        // When not yet pinned, plans UpdateConfig
+        let plan = driver.plan_sync(&ctx, "v3.30.5").unwrap();
+        match plan {
+            FleetAction::UpdateConfig {
+                file_path,
+                key,
+                value,
+                ..
+            } => {
+                assert_eq!(file_path, pi_dir.join("settings.json"));
+                assert_eq!(key, "compound_engineering_version");
+                assert_eq!(value, serde_json::json!("v3.30.5"));
+            }
+            _ => panic!("Expected UpdateConfig action, got {:?}", plan),
+        }
+
+        // Simulate config updated
+        fs::write(
+            pi_dir.join("settings.json"),
+            serde_json::json!({
+                "compound_engineering_version": "v3.30.5"
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let ver = driver.detect_version(&ctx).unwrap();
+        assert_eq!(ver, Some("v3.30.5".to_string()));
+
+        let plan_synced = driver.plan_sync(&ctx, "v3.30.5").unwrap();
+        assert_eq!(plan_synced, FleetAction::UpToDate);
+    }
+
+    #[test]
+    fn test_codex_driver_plan_sync_and_detect() {
+        let temp = tempdir().unwrap();
+        let config_dir = temp.path().join(".ce-ai");
+        let codex_dir = temp.path().join(".codex");
+        fs::create_dir_all(&config_dir).unwrap();
+        fs::create_dir_all(&codex_dir).unwrap();
+
+        let ctx = Context {
+            config_dir,
+            opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        let driver = CodexDriver;
+        assert!(driver.is_installed(&ctx));
+
+        let plan = driver.plan_sync(&ctx, "v3.30.5").unwrap();
+        match plan {
+            FleetAction::UpdateConfig {
+                file_path,
+                key,
+                value,
+                ..
+            } => {
+                assert_eq!(file_path, codex_dir.join("config.json"));
+                assert_eq!(key, "compound_engineering_version");
+                assert_eq!(value, serde_json::json!("v3.30.5"));
+            }
+            _ => panic!("Expected UpdateConfig action, got {:?}", plan),
+        }
+
+        fs::write(
+            codex_dir.join("config.json"),
+            serde_json::json!({
+                "compound_engineering_version": "v3.30.5"
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let ver = driver.detect_version(&ctx).unwrap();
+        assert_eq!(ver, Some("v3.30.5".to_string()));
+
+        let plan_synced = driver.plan_sync(&ctx, "v3.30.5").unwrap();
+        assert_eq!(plan_synced, FleetAction::UpToDate);
+    }
+
+    #[test]
+    fn test_cursor_driver_plan_sync_and_detect() {
+        let temp = tempdir().unwrap();
+        let config_dir = temp.path().join(".ce-ai");
+        let cursor_dir = temp.path().join(".cursor");
+        fs::create_dir_all(&config_dir).unwrap();
+        fs::create_dir_all(&cursor_dir).unwrap();
+
+        let ctx = Context {
+            config_dir,
+            opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        let driver = CursorDriver;
+        assert!(driver.is_installed(&ctx));
+
+        let plan = driver.plan_sync(&ctx, "v3.30.5").unwrap();
+        match plan {
+            FleetAction::UpdateConfig {
+                file_path,
+                key,
+                value,
+                ..
+            } => {
+                assert_eq!(file_path, cursor_dir.join("settings.json"));
+                assert_eq!(key, "compound_engineering_version");
+                assert_eq!(value, serde_json::json!("v3.30.5"));
+            }
+            _ => panic!("Expected UpdateConfig action, got {:?}", plan),
+        }
+
+        fs::write(
+            cursor_dir.join("settings.json"),
+            serde_json::json!({
+                "compound_engineering_version": "v3.30.5"
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let ver = driver.detect_version(&ctx).unwrap();
+        assert_eq!(ver, Some("v3.30.5".to_string()));
+
+        let plan_synced = driver.plan_sync(&ctx, "v3.30.5").unwrap();
+        assert_eq!(plan_synced, FleetAction::UpToDate);
     }
 }

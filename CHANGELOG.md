@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-10-12
+
+### Fixed
+- **Fleet Sync Native Configuration for Pi Driver (`src/fleet/drivers.rs`)**:
+  - Replaced faulty `npm install @everyinc/compound-engineering@<version>` command with native `settings.json` configuration update (`~/.pi/agent/settings.json`), pinning `compound_engineering_version`.
+  - Fixed `detect_version` in `PiDriver`, `CodexDriver`, and `CursorDriver` to check their on-disk configuration files (`settings.json` and `config.json`) for `compound_engineering_version` before falling back to state/host detection.
+  - Updated `handle_sync` in `src/commands/fleet.rs` to synchronize matching entries in `state.installed_harnesses` to `pinned_version` and update `last_synced_at`, keeping `state.json` and `ce-ai status` aligned.
+  - Added unit test coverage for `PiDriver`, `CodexDriver`, `CursorDriver`, and `handle_sync` state updates.
+
 ## [3.1.0] - 2026-10-10
 
 ### Added
