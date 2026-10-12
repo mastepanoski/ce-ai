@@ -235,6 +235,18 @@ pub fn handle_sync(ctx: &Context, dry_run: bool) -> Result<(), CeError> {
         fleet.last_sync = Some(chrono::Utc::now().to_rfc3339());
         state.fleet = Some(fleet);
 
+        let now = chrono::Utc::now().to_rfc3339();
+        for h in &mut state.installed_harnesses {
+            if let Some(name) = h.get("name").and_then(|n| n.as_str()) {
+                if drivers.iter().any(|d| d.harness_kind().as_str() == name) {
+                    if let Some(obj) = h.as_object_mut() {
+                        obj.insert("version".to_string(), serde_json::json!(pinned_version));
+                        obj.insert("last_synced_at".to_string(), serde_json::json!(now));
+                    }
+                }
+            }
+        }
+
         let pretty = serde_json::to_string_pretty(&state)
             .map_err(|e| CeError::State(format!("failed to serialize state.json: {e}")))?;
         crate::state::write_atomic(&state_file, pretty.as_bytes())?;
@@ -317,5 +329,55 @@ mod tests {
             assert!(pinned.starts_with('v'));
             assert!(pinned.len() > 2);
         }
+    }
+
+    #[test]
+    fn test_handle_sync_updates_installed_harnesses_and_pi_config() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().join(".ce-ai"),
+            opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        std::fs::create_dir_all(&ctx.config_dir).unwrap();
+        let pi_dir = ctx.home_dir().join(".pi").join("agent");
+        std::fs::create_dir_all(&pi_dir).unwrap();
+
+        let mut state = State::new();
+        state.fleet = Some(crate::state::state::FleetState {
+            pinned_version: Some("v3.30.5".to_string()),
+            last_sync: None,
+        });
+        state.installed_harnesses.push(serde_json::json!({
+            "name": "pi",
+            "scope": "global",
+            "version": "compound-engineering-v3.30.4",
+            "installed_at": "2026-09-08T00:50:40+00:00"
+        }));
+        state.save(&ctx.state_path()).unwrap();
+
+        handle_sync(&ctx, false).unwrap();
+
+        // Verify state.json was updated
+        let reloaded = State::load(&ctx.state_path()).unwrap();
+        assert_eq!(
+            reloaded.installed_harnesses[0]["version"],
+            serde_json::json!("v3.30.5")
+        );
+        assert!(reloaded.installed_harnesses[0]["last_synced_at"].is_string());
+
+        // Verify pi settings.json was written
+        let settings_path = pi_dir.join("settings.json");
+        assert!(settings_path.exists());
+        let settings_val: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&settings_path).unwrap()).unwrap();
+        assert_eq!(
+            settings_val["compound_engineering_version"],
+            serde_json::json!("v3.30.5")
+        );
     }
 }
