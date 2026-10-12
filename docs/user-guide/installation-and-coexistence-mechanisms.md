@@ -27,48 +27,65 @@ Before `ce-ai` makes any changes to your AI tools' configuration files (like `.c
 
 ---
 
-## 1. Step-by-Step Installation Pipeline (`ce-ai install`)
+## 1. Modern Installation & Coexistence Architecture
 
-When executing `ce-ai install --harness claude` (or `ce-ai install --harness all`), `ce-ai` executes a six-step pipeline with a pre-mutation configuration snapshot.
+Rather than extracting raw tarballs into host directories (the legacy `ce-ai install` approach), `ce-ai` operates as a **cross-host operational companion** organized into three distinct tiers:
 
 ```mermaid
 flowchart TD
-    A[Start: ce-ai install] --> B[Step 1: Resolve Source Tree]
-    B --> C[Step 2: Automatic Pre-Mutation Backup in ~/.ce-ai/backups/]
-    C --> D[Step 3: Atomic Disk Asset Copy]
-    D --> E[Step 4: Non-Destructive Harness Config Merger]
-    E --> F[Step 5: Record Install Manifest install-manifest.json]
-    F --> G[Step 6: Update Global State state.json]
+    subgraph TIER1["Tier 1: Global Toolchain & Companions"]
+        CE["ce-ai CLI Binary"]
+        CG["CodeGraph (AST Symbol Indexer)"]
+        EG["Engram (Persistent Memory Server)"]
+        RTK["RTK (Terminal Token Reducer)"]
+    end
+
+    subgraph TIER2["Tier 2: Fleet Version Governance (ce-ai fleet)"]
+        PIN["ce-ai fleet pin latest"] --> SYNC["ce-ai fleet sync"]
+        SYNC --> H1["OpenCode (opencode.json plugin array)"]
+        SYNC --> H2["Claude Code (claude plugin update)"]
+        SYNC --> H3["Pi (~/.pi/agent/settings.json)"]
+        SYNC --> H4["Codex (.codex/config.json)"]
+        SYNC --> H5["Cursor (.cursor/settings.json)"]
+    end
+
+    subgraph TIER3["Tier 3: Repository Adoption (ce-ai init-prj)"]
+        ADOPT["ce-ai init-prj"] --> AGENTS["AGENTS.md / CLAUDE.md Rules"]
+        ADOPT --> HOOKS["Session-Start Auto-Resume Hooks"]
+        ADOPT --> RTKHOOK["RTK Output Compression Hooks"]
+    end
+
+    TIER1 --> TIER2
+    TIER2 --> TIER3
 ```
 
-### 📋 Detailed Step Breakdown
+### 📋 Detailed Tier Breakdown
 
-#### Step 1: Resolve Source Tree
-- `ce-ai` determines the plugin source:
-  - **Default**: Resolves and caches the latest official release tarball from GitHub (`everyinc/compound-engineering-plugin`).
-  - **With `--source <path>`**: Uses a local development directory.
-- Extracts and validates the source layout, verifying the presence of the loader (`plugins/compound-engineering.js`) and skills (`skills/`).
+#### Tier 1: Global Toolchain & Companions
+- **`ce-ai`**: Cross-host operational CLI that governs fleet version parity, project adoption, decision routing, and workflow observation.
+- **`codegraph`**: Codebase AST symbol, call-graph, and blast-radius indexer. Generates the local `.codegraph/` index (`codegraph init`) and exposes `codegraph_explore` via MCP so agents query symbols without blind filesystem greps.
+- **`engram`**: SQLite + FTS5 persistent memory server. Maintains architectural decisions, bug fixes, and user constraints across agent sessions and context compactions via `mem_save` and `mem_context`.
+- **`rtk`**: Smart terminal output compressor. Intercepts verbose stdio streams (`cargo test`, `git status`, `docker`) to reduce token usage by 60%–90%.
 
-#### Step 2: Automatic Pre-Mutation Backup (`~/.ce-ai/backups/`)
-- Before writing any files or modifying configuration on disk, `ce-ai` checks if pre-existing harness configuration files (e.g., `.claude.json` or `opencode.json`) exist.
-- If present, it creates an immutable, timestamped backup copy inside `~/.ce-ai/backups/<timestamp>/`.
-- This lets `ce-ai uninstall` restore the exact pre-installation configuration snapshot for the harness.
+Verify companion health at any time with `ce-ai tools status`.
 
-#### Step 3: Atomic Disk Asset Copy
-- Copies skills (`skills/`) and loader scripts into the user's managed directory (`~/.config/opencode/compound-engineering/` or harness-specific directories).
-- Writes files using atomic file writers (`write_atomic`) to prevent partial or corrupted file writes on process crash.
+#### Tier 2: Multi-Harness Fleet Governance (`ce-ai fleet`)
+- Users pin the target Compound Engineering version declaratively: `ce-ai fleet pin latest` (or explicit tag `v3.30.5`).
+- `ce-ai fleet sync` inspects detected coding agents and drives each host's **native package manager or configuration system** rather than scraping files:
+  - **OpenCode**: updates plugin version array in `opencode.json`.
+  - **Claude Code**: runs native `claude plugin update compound-engineering@compound-engineering-plugin -y`.
+  - **Pi**: updates `compound_engineering_version` in `~/.pi/agent/settings.json`.
+  - **Codex**: updates `compound_engineering_version` in `.codex/config.json`.
+  - **Cursor**: updates `compound_engineering_version` in `.cursor/settings.json`.
+- Auditing: `ce-ai fleet status` reports version parity across all hosts.
 
-#### Step 4: Non-Destructive Config Merger
-- Updates target harness configuration files using non-destructive config merger strategies tailored per harness type (see Section 2).
+#### Tier 3: Repository Project Adoption (`ce-ai init-prj`)
+- Writes non-destructive governance blocks into the repository (`AGENTS.md`, `CLAUDE.md`, `.cursor/rules/`).
+- Wires session-start hooks so agents automatically recover git status and active tasks upon session launch.
+- Automatically injects RTK token-reduction wrappers for supported CLI commands.
+- Registers the repository in `~/.ce-ai/state.json` under `projects` so batch maintenance (`ce-ai init-prj --all` and `ce-ai doctor --fix --all-projects`) can keep entire fleets updated.
 
-#### Step 5: Record Install Manifest (`install-manifest.json`)
-- Writes `install-manifest.json` in the managed directory recording:
-  - Installed plugin version and source.
-  - Per-file SHA256 hashes.
-  - Audit trail linking to the exact pre-install backup path created in Step 2.
-
-#### Step 6: Update Global State (`state.json`)
-- Registers the installed harness in `~/.ce-ai/state.json` under `installed_harnesses` with installation and sync timestamps.
+> ⚠️ **Legacy `ce-ai install` notice**: Direct tarball extraction via `ce-ai install` is deprecated in favor of `ce-ai init-prj` + `ce-ai fleet pin / sync`. If invoked, `ce-ai install` emits a deprecation advisory directing users to the modern fleet and adoption commands.
 
 ---
 

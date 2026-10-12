@@ -23,12 +23,12 @@ Before touching a terminal, get this distinction straight — it is the #1 sourc
 ## 2. Prerequisites & Companion Tools
 
 Before adopting the workflow, make sure you have:
-1. **One supported AI harness** installed (e.g. Claude Code, Cursor, OpenCode, GitHub Copilot CLI). See the [Harness Matrix](harness-matrix.md).
+1. **One supported AI harness** installed (e.g. Claude Code, Cursor, OpenCode, Codex, Pi, GitHub Copilot CLI). See the [Harness Matrix](harness-matrix.md).
 2. **Git** and a project repository.
-3. **Companion Developer Tools (Recommended for memory & codebase graph)**:
-   - **Engram**: SQLite + FTS5 persistent memory server. Keeps architecture decisions, bug fixes, and preferences across sessions (`mem_save`, `mem_context`).
-   - **CodeGraph**: AST symbol, call-graph, and blast-radius indexer (`codegraph_explore`). Gives agents accurate structural codebase knowledge instead of guessing.
-   - **RTK (Rust Token Killer)**: Terminal output compressor. Intercepts verbose outputs (`cargo test`, `git status`, `docker`) to cut token usage by 60–90%.
+3. **Companion Developer Tools (Memory, Structural Graph & Token Compressor)**:
+   - **CodeGraph**: AST symbol, call-graph, and blast-radius indexer (`codegraph_explore`). Gives coding agents structural repository maps, symbol hierarchies, callers, and callees in a single query rather than guessing with blind `grep`/`find`. Initialized per project via `codegraph init`.
+   - **Engram**: SQLite + FTS5 persistent memory server (`mem_save`, `mem_context`, `mem_search`). Persists architecture decisions, bug fixes, patterns, and user preferences across agent sessions and context window compactions so the agent never starts blind.
+   - **RTK (Rust Token Killer)**: Smart terminal pre-processor and token reducer. Intercepts verbose CLI outputs (`cargo test`, `git status`, `docker ps`, linter errors) and shrinks stdio token volume by 60%–90% before sending text to the LLM. Automatically configured via session hooks during project adoption (`ce-ai init-prj`).
 
 ---
 
@@ -132,34 +132,38 @@ curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install
 
 ---
 
-## 4. Go to your project, index the codebase, and install skills
+## 4. Go to your project, index the codebase, and adopt the repository
 
 ```bash
 cd my-project   # an existing repo, or: mkdir my-project && cd my-project && git init
 
-# 1. Initialize CodeGraph index for structural navigation
+# 1. Initialize CodeGraph index for structural codebase navigation
 codegraph init
 
-# 2. Install CE skills and auto-register companion MCP servers in your harnesses
-ce-ai install --harness all
-```
-
-This step:
-- Builds the local `.codegraph/` index so agents can query callers, callees, and symbol references.
-- Copies the Compound Engineering skill files (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`, …) into every detected harness.
-- Automatically registers `engram` and `codegraph` MCP sidecars in each supported harness configuration.
-
-Only want one harness? Use its name instead of `all` (e.g. `--harness claude`) — see the [Harness Matrix](harness-matrix.md).
-
----
-
-## 5. Adopt this specific project
-
-```bash
+# 2. Adopt this repository: configure rules, session hooks, and RTK token compression
 ce-ai init-prj
 ```
 
-This is a **separate, complementary step** from `install`: it writes a governance block into this project's `AGENTS.md` (the rules your AI agent follows — the 7-stage cycle, TDD, OpenSpec) and, on harnesses that support it, a startup hook so the agent automatically re-syncs with reality (current branch, uncommitted files, in-progress task) every time a session starts. Nothing here is destructive — see the [Project Adoption Guide](project-adoption-guide.md) if you're curious how.
+This step:
+- **Builds the `.codegraph/` index**: enables coding agents to query symbols, callers, and callees via the `codegraph_explore` MCP tool instead of broad filesystem searches.
+- **Adopts the project (`ce-ai init-prj`)**: writes non-destructive Compound Engineering rules into `AGENTS.md` (and `CLAUDE.md`), configures session-start hooks so agents automatically recover git status and active tasks, and wires RTK terminal output compression. Nothing here clobbers user settings — see the [Project Adoption Guide](project-adoption-guide.md).
+
+---
+
+## 5. Govern and align your AI agent fleet
+
+```bash
+# Pin to the latest upstream Compound Engineering release (or an explicit tag like v3.30.5)
+ce-ai fleet pin latest
+
+# Synchronize all installed harnesses to the pinned version
+ce-ai fleet sync
+```
+
+Instead of extracting raw tarballs or scraping files, **`ce-ai fleet` acts as a cross-host version governance engine**:
+- It inspects each installed coding agent harness on your machine (`OpenCode`, `Claude Code`, `Pi`, `Codex`, `Cursor`).
+- It drives each harness's **native package manager or configuration system** (`opencode.json` plugin arrays, Claude Code plugin updater, `~/.pi/agent/settings.json`, `.codex/config.json`, `.cursor/settings.json`).
+- You can check multi-harness parity at any time with `ce-ai fleet status`.
 
 ---
 
@@ -168,9 +172,10 @@ This is a **separate, complementary step** from `install`: it writes a governanc
 ```bash
 ce-ai doctor
 ce-ai tools status
+ce-ai fleet status
 ```
 
-A healthy first run confirms your harnesses, project adoption, and companion tools:
+A healthy first run confirms your harnesses, project adoption, companion tools, and fleet version parity:
 
 ```text
 == [Companion Tools, Memory Sidecars & Token Reducers Status] ==
@@ -180,17 +185,23 @@ A healthy first run confirms your harnesses, project adoption, and companion too
 
 == [Harness Health] ==
   claude: installed, skills registered, session-start hook: ok
+  opencode: installed, plugins registered: ok
+
+== [Fleet Version Governance] ==
+  Pinned Version: v3.30.5
+  Fleet Aligned:  yes
+
 == [Project Adoption] ==
   AGENTS.md: adopted (tier: full, SHA256 verified)
 ```
 
-If a tool or harness needs attention, `ce-ai tools status` and `ce-ai doctor` provide copy-paste remediation commands. See [Installation & Coexistence](installation-and-coexistence-mechanisms.md).
+If a tool, harness, or adoption needs attention, `ce-ai doctor` and `ce-ai tools status` provide exact copy-paste remediation commands, or you can run `ce-ai doctor --fix` for automated repair. See [Installation & Coexistence](installation-and-coexistence-mechanisms.md).
 
 ---
 
 ## 7. Run your first Compound Engineering skill
 
-This is the step that happens **inside your AI harness's chat, not the terminal**. Open Claude Code / Cursor / whichever harness you installed into, **in this same project folder**, and type:
+This is the step that happens **inside your AI harness's chat, not the terminal**. Open Claude Code / Cursor / OpenCode / whichever harness you installed into, **in this same project folder**, and type:
 
 ```
 /ce-brainstorm add a /health endpoint that returns {"status": "ok"}
@@ -203,10 +214,11 @@ The agent will ask a couple of clarifying questions and then write a requirement
 ## 8. What just happened — the mental model
 
 ```
-ce-ai install   → puts the skills where your AI harness can find them
-ce-ai init-prj  → tells your AI agent the rules to follow in THIS project
-ce-ai doctor    → confirms both are wired up correctly
-/ce-brainstorm  → the first thing YOU type, inside the chat, to start real work
+codegraph init        → builds structural AST index for callers, callees, and symbol refs
+ce-ai init-prj       → adopts the repo: injects AGENTS.md rules, session hooks, and RTK
+ce-ai fleet pin/sync → aligns Compound Engineering version across all your AI harnesses
+ce-ai doctor         → confirms project adoption, fleet alignment, and companion readiness
+/ce-brainstorm       → typed inside your AI tool's chat to begin real engineering work
 ```
 
 Everything after this point — turning that brainstorm into a spec, a plan, working code, a reviewed PR, and reusable learning — is the full 7-stage cycle. For the agent/plugin/harness distinction, see [CE-AI positioning](ce-ai-positioning.md). Continue with the [Quick Start Workflow Guide](quick-start-workflow-guide.md), which picks up exactly here.
@@ -217,7 +229,8 @@ Everything after this point — turning that brainstorm into a spec, a plan, wor
 
 | Symptom | Likely cause | Fix |
 | :--- | :--- | :--- |
-| `/ce-brainstorm` doesn't autocomplete or errors in chat | Skills weren't installed for *this* harness, or the harness needs a restart to pick up new skill files | Re-run `ce-ai install --harness <yours>`, then restart/reload your AI harness |
+| `/ce-brainstorm` doesn't autocomplete or errors in chat | Plugin/skills were not synchronized for *this* harness, or the harness needs a restart | Run `ce-ai fleet sync`, then restart/reload your AI harness |
+| `ce-ai fleet status` shows a harness as divergent | An individual harness is lagging behind the pinned version | Run `ce-ai fleet sync` (use `--dry-run` to preview actions) |
 | `ce-ai doctor` shows a harness as missing | `ce-ai` couldn't find that harness's config on disk | Confirm the harness is actually installed and has been run at least once; see `ce-ai status` |
 | `install`/`upgrade` fails with `403 Forbidden` | Unauthenticated GitHub API rate limit | Set `CE_AI_GITHUB_TOKEN` / `GITHUB_TOKEN`, or run `gh auth login` — see the [README](../../README.md) |
 | You typed a `/ce-...` command into the terminal by mistake | See Section 1 above | Open your AI harness's chat window instead |

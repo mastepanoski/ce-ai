@@ -220,3 +220,15 @@ An intentional deprecation and architectural retirement in `ce-ai` v2.0 of raw G
 
 ### Native Host Packaging Sovereignty
 An architectural design invariant in `ce-ai` v2.0 affirming that each AI coding host's native plugin manager, marketplace, or configuration system possesses exclusive sovereignty over plugin asset distribution, compilation, and file layout. `ce-ai` never directly overwrites or injects raw skill assets into host directories; it orchestrates and audits native installations through dedicated `FleetHarnessDriver` implementations.
+
+### Companion Developer Tools Ecosystem
+A coordinated trio of external intelligence and optimization tools (`codegraph`, `engram`, `rtk`) that operate alongside `ce-ai` to augment AI coding agents. While `ce-ai` governs workflow rules, project adoption, and multi-harness fleet version parity, companion tools provide structural AST codebase indexing, persistent cross-session memory, and stdio terminal output compression without coupling directly to any single coding agent host.
+
+### CodeGraph Structural Indexer
+A codebase AST symbol, call-graph, and blast-radius indexer (`codegraph`) that provides agents with deterministic structural architecture navigation. Initialized per workspace via `codegraph init` into a local `.codegraph/` index and exposed via the `codegraph_explore` MCP tool, CodeGraph enables agents to query callers, callees, symbol references, and blast radius in a single tool call, eliminating expensive and speculative broad filesystem searches (`grep`, `find`).
+
+### Engram Persistent Memory Engine
+A persistent SQLite + FTS5 cross-session memory server (`engram`) designed to bridge context loss between agent sessions and compaction boundaries. Exposing native MCP tools (`mem_save`, `mem_context`, `mem_search`), Engram captures completed bug fixes, architectural decisions, and user preferences into project-scoped topic keys, ensuring that newly spawned subagents or resumed sessions never begin blind.
+
+### RTK (Rust Token Killer) Compression
+A high-throughput terminal pre-processor and stdio output compressor (`rtk`) that intercepts verbose CLI outputs (such as `cargo test`, `git status`, `docker ps`, and test runners) before sending text to the LLM context window. Configured transparently via session and shell hooks during project adoption (`ce-ai init-prj`), RTK compresses noise and boilerplate by 60% to 90%, preventing context exhaustion while preserving critical error stacks and test results.

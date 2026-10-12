@@ -9,13 +9,25 @@
 3. **Native Skill Directory Adapter** (`pi`): copies skills natively into `~/.pi/agent/skills/`.
 4. **Markdown & MDC Rules Ingestion** (`cursor`, `copilot`, project rules): injects non-destructive marker-delimited blocks into project rule files.
 
+## Fleet Governance Matrix (`ce-ai fleet`)
+
+`ce-ai fleet sync` drives native packaging and configuration systems across supported hosts without file scraping:
+
+| Harness | Configuration / Driver Target | Sync Action Type | Mechanism |
+| :--- | :--- | :--- | :--- |
+| `opencode` | `~/.config/opencode/opencode.json` | `UpdateConfig` | Pins `@everyinc/compound-engineering@<version>` in plugin array |
+| `claude` | Claude Code CLI & plugin marketplace | `RunCommand` | Runs `claude plugin update compound-engineering@compound-engineering-plugin -y` |
+| `pi` | `~/.pi/agent/settings.json` | `UpdateConfig` | Updates `compound_engineering_version` key atomically |
+| `codex` | `.codex/config.json` | `UpdateConfig` | Updates `compound_engineering_version` key atomically |
+| `cursor` | `.cursor/settings.json` | `UpdateConfig` | Updates `compound_engineering_version` key atomically |
+
 ## Supported Harness Matrix
 
 | Harness Identifier | Config File / Location | Strategy |
 | :--- | :--- | :--- |
 | `opencode` | `~/.config/opencode/opencode.json` | Native JSON Merger (`plugin` & `skills.paths`) |
 | `claude` | `~/.claude.json` / `~/.claude/settings.json` | Native JSON `mcpServers` Merger |
-| `pi` | `~/.pi/agent/skills/` | Native Skill Directory Manager |
+| `pi` | `~/.pi/agent/settings.json` / `~/.pi/agent/skills/` | Native JSON Settings & Skills Directory Manager |
 | `cursor` | `~/.cursor/mcp.json` / `.cursor/rules/` | Native JSON `mcpServers` Merger & MDC Rules |
 | `copilot` | `~/.config/github-copilot/mcp.json` | Native JSON `mcpServers` Merger & Markdown Rules |
 | `codex` | `~/.codex/config.toml` | Native TOML `[mcp_servers]` Merger |
