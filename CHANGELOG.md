@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Accreted durable concepts to `CONCEPTS.md` for `Companion Developer Tools Ecosystem`, `CodeGraph Structural Indexer`, `Engram Persistent Memory Engine`, and `RTK (Rust Token Killer) Compression` (74 total entries, verified via `ce-ai doc lint --strict`).
 - **Operational Companion Identity & Philosophy**:
   - Refined `docs/user-guide/ce-ai-positioning.md` and `README.md` to clarify domain separation between Compound Engineering (skills/semantics), AI Hosts (native execution/packaging), Companions (memory/graph/compression), and CE-AI (operational environment coordinator).
+- **Clean De-Adoption & Multi-Layer Uninstallation**:
+  - Rewrote `docs/user-guide/backup-and-uninstall.md` covering repository de-adoption (`ce-ai deinit-prj`), bulk harness uninstallation (`ce-ai uninstall --harness all --yes`), companion tool removal (`codegraph`, `engram`, `rtk`), and cross-platform CLI binary removal (Homebrew, standalone curl, Windows PowerShell). Removed decommissioned `models` references.
 
 ## [3.1.1] - 2026-10-12
 

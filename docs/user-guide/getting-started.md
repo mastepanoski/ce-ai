@@ -225,6 +225,15 @@ Everything after this point — turning that brainstorm into a spec, a plan, wor
 
 ---
 
+## 9. How to de-adopt or uninstall cleanly
+
+If you ever need to roll back or remove the setup:
+- **De-adopt this project**: run `ce-ai deinit-prj` in your project folder. This surgically removes the managed `AGENTS.md` block and session hooks without touching your code.
+- **Uninstall from all coding agent harnesses**: run `ce-ai uninstall --harness all --yes` to restore pre-mutation configuration backups.
+- For complete binary and companion tool removal, see the [Backup & Uninstall Guide](backup-and-uninstall.md).
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
