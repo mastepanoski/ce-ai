@@ -59,7 +59,8 @@ src/
     ├── deinit_prj.rs  # ce-ai deinit-prj project de-adoption implementation
     ├── sync.rs        # ce-ai sync implementation
     ├── upgrade.rs     # ce-ai upgrade implementation
-    ├── models.rs      # ce-ai models set/list/profile implementation
+    ├── fleet.rs       # ce-ai fleet pin/status/sync implementation
+    ├── decisions.rs   # ce-ai decisions route model advisor
     ├── status.rs      # ce-ai status implementation
     ├── uninstall.rs    # ce-ai uninstall implementation
     └── doctor.rs      # ce-ai doctor health check implementation

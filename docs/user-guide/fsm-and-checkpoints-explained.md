@@ -335,7 +335,7 @@ flowchart TD
         V3["3. Idea Discovery Sub-Loop"] -->|"Stage 1 ce-ideate"| IDEATE["Ranked Idea Dossier in docs/ideation/"]
         V4["4. Cross-Session Resumption"] -->|"ce-ai workflow resume"| RESUME["Context Re-hydration"]
         V5["5. Multi-Harness Handoff"] -->|"Harness Agnostic Disk State"| HANDOFF["Claude ➔ Cursor ➔ Antigravity"]
-        V6["6. Worktree Isolation"] -->|"--scope workspace"| WORKTREE["Parallel Git Worktrees"]
+        V6["6. Worktree Isolation"] -->|"ce-ai init-prj & codegraph"| WORKTREE["Parallel Git Worktrees"]
         V7["7. Targeted Fast-Track"] -->|"Stage 6 ce-compound"| DOCS["Docs / Research Only"]
         V8["8. Project-Grounded Verdict"] -->|"Any Stage ce-pov"| POV["Adopt/Switch/Revisit Decision"]
     end
@@ -350,7 +350,7 @@ flowchart TD
 | **Approach Uncertain** | Stage 0/1 (`ce-ideate`) | Idea Discovery Sub-Loop ➔ Stage 1 (`ce-brainstorm`) ➔ Stage 2 | Ranked dossier in `docs/ideation/`; chosen idea + rejected alternatives distill into `exploration.md` |
 | **Session Interruption & Resume** | Any Stage | Re-probes the local checkpoint and repository context | Atomic disk writes (`state.json`) + local repository/OpenSpec probes |
 | **Multi-Harness Handoff** | Any Stage | Harness-Agnostic State Traversal | Shared disk state allows Claude Code to ideate, Cursor to edit, and AGY to ship |
-| **Git Worktree Isolation** | Worktree Root | Workspace-Scoped Traversal | `install --scope workspace` isolates state and CodeGraph per worktree |
+| **Git Worktree Isolation** | Worktree Root | Workspace-Scoped Traversal | `ce-ai init-prj` isolates state, workflow hooks, and CodeGraph per worktree |
 | **Docs / Research Fast-Track** | Stage 1 or Stage 6 | Targeted Pass | Bypasses code implementation; mutates `docs/solutions/` or research summary directly |
 | **Project-Grounded Verdict** | Any Stage (`ce-pov`) | Targeted Pass | Decisive adopt/switch/revisit judgment against the current codebase; no disk mutation of its own — a positive verdict feeds into `ce-brainstorm`/`exploration.md` like any other idea |
 

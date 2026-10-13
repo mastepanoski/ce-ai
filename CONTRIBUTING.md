@@ -46,7 +46,7 @@ Before submitting a pull request, you MUST verify that the containerized end-to-
 ```bash
 make e2e
 ```
-This builds an isolated Linux container (`Dockerfile.e2e`) and validates `ce-ai install`, `sync`, `models`, `status`, and `uninstall` flows against OpenCode.
+This builds an isolated Linux container (`Dockerfile.e2e`) and validates `ce-ai install`, `sync`, `decisions route`, `status`, and `uninstall` flows against OpenCode.
 
 ---
 
