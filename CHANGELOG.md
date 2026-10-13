@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.2] - 2026-10-12
+
+### Documentation
+- **Fleet Version Governance & Modern 3-Tier Installation**:
+  - Updated `docs/user-guide/getting-started.md` to lead with modern workflow (`codegraph init` → `ce-ai init-prj` → `ce-ai fleet pin latest && ce-ai fleet sync` → `ce-ai doctor`), deprecating legacy `ce-ai install` file-scraping.
+  - Updated `docs/user-guide/installation-and-coexistence-mechanisms.md` and `sync-and-upgrade-mechanisms.md` with detailed 3-tier installation architecture, polymorphic driver execution, and batch project maintenance (`init-prj --all`, `doctor --fix --all-projects`).
+  - Added dedicated Fleet Version Governance commands and updated decommissioned commands in `docs/user-guide/cli-reference.md`.
+  - Added Fleet Governance Driver Matrix in `docs/user-guide/harness-matrix.md` covering OpenCode, Claude Code, Pi, Codex, and Cursor.
+- **Companion Developer Tools Ecosystem (`codegraph`, `engram`, `rtk`)**:
+  - Documented role, setup, MCP integration, and token compression mechanics for CodeGraph (structural AST symbol navigation), Engram (persistent cross-session memory), and RTK (stdio output token reduction).
+  - Accreted durable concepts to `CONCEPTS.md` for `Companion Developer Tools Ecosystem`, `CodeGraph Structural Indexer`, `Engram Persistent Memory Engine`, and `RTK (Rust Token Killer) Compression` (74 total entries, verified via `ce-ai doc lint --strict`).
+- **Operational Companion Identity & Philosophy**:
+  - Refined `docs/user-guide/ce-ai-positioning.md` and `README.md` to clarify domain separation between Compound Engineering (skills/semantics), AI Hosts (native execution/packaging), Companions (memory/graph/compression), and CE-AI (operational environment coordinator).
+- **Clean De-Adoption & Multi-Layer Uninstallation**:
+  - Rewrote `docs/user-guide/backup-and-uninstall.md` covering repository de-adoption (`ce-ai deinit-prj`), bulk harness uninstallation (`ce-ai uninstall --harness all --yes`), companion tool removal (`codegraph`, `engram`, `rtk`), and cross-platform CLI binary removal (Homebrew, standalone curl, Windows PowerShell). Removed decommissioned `models` references.
+
 ## [3.1.1] - 2026-10-12
 
 ### Fixed

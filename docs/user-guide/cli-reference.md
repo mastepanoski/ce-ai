@@ -5,33 +5,43 @@ This is the current command surface for `ce-ai`. Run `ce-ai <command> --help`
 for complete arguments. Commands that mutate configuration support global
 `--dry-run`; it previews their own writes, not external tool installation.
 
-## Installation and recovery
+## Fleet Version Governance
 
 | Command | Boundary |
 | --- | --- |
-| `install --harness <name>` | Installs managed CE assets into one harness; use `--harness all` for every detected harness. |
-| `sync`, `upgrade`, `self-update` | Reconcile managed assets, update plugin source, or update the CLI binary. |
-| `status`, `doctor`, `backups`, `uninstall` | Inspect state, diagnose health, browse/restore snapshots, or remove managed assets. |
-| `init-prj`, `deinit-prj` | Add or remove the managed project workflow block. |
+| `fleet pin <version\|latest>` | Atomically records the target Compound Engineering semantic version in `state.json` (or dynamically resolves `latest` upstream release). |
+| `fleet status [--json]` | Audits and reports installed coding agent harnesses, version parity, and fleet alignment status (`aligned`, `divergent`, `missing`). |
+| `fleet sync [--dry-run]` | Drives native host package managers and configuration files across all detected harnesses (`opencode`, `claude`, `pi`, `codex`, `cursor`) to align with the pinned version. |
 
-## Workflow and specifications
+## Project Adoption and Environment Health
 
 | Command | Boundary |
 | --- | --- |
-| `workflow`, `archive`, `graduate` | Persist/recover workflow state and manage ODD/OpenSpec change packages. |
+| `init-prj [--tier <tier>] [--all]` | Injects non-destructive `AGENTS.md` rules, session-start hooks, and RTK token compression into the current repository. Use `--all` to batch-upgrade all registered projects across your local fleet. |
+| `deinit-prj` | Safely removes managed blocks and session hooks from the current repository without touching user code or custom rules. |
+| `doctor [--fix] [--all-projects]` | Diagnoses environment readiness, harness health, companion tools, and project adoptions. Use `--fix` for automated repair of drifted blocks, missing hooks, and stale adoptions. |
+| `status`, `backups`, `uninstall` | Inspect state, browse/restore pre-mutation configuration snapshots, or remove managed assets. |
+| `install`, `sync`, `upgrade` | *Legacy surfaces*: Emit deprecation notices guiding users to `init-prj` and `fleet pin / sync`. |
+
+## Workflow and Specifications
+
+| Command | Boundary |
+| --- | --- |
+| `workflow`, `archive`, `graduate` | Persist/recover workflow state and manage ODD / OpenSpec change packages. |
 | `gate check` | Enforces a complete Stage 4 OpenSpec contract by default; `--mode observe` records the decision without blocking. The Organic LOC notice is advisory. |
 | `guard` | Persists and reports a pedagogical guardrail configuration marker. It does not independently enforce agent behavior. |
-| `spec`, `doc` | Inspect/promote living specifications and inspect solution-library hygiene. |
+| `spec`, `doc` | Inspect/promote living specifications and run documentation hygiene/linting (`doc lint`, `doc refresh`, `doc stats`). |
 
-## Harness configuration and analysis
+## Decisions, Companions and Telemetry
 
 | Command | Boundary |
 | --- | --- |
-| `models`, `skills`, `decisions` | Manage model settings, skill discovery, and decision-engine configuration/evaluation. |
-| `tools status` | Reports companion readiness. |
-| `tools install <tool>` | Registers an MCP definition; it does **not** download or install the third-party binary. |
-| `tools init codegraph` | Initializes an already-installed CodeGraph CLI for a workspace. |
-| `audit` | Reports local configuration-hygiene heuristics; it is not a token-usage measurement system. |
-| `usage sync` | Captures local **Claude Code** transcript usage into the ledger. Other harness adapters are not implemented. |
-| `usage report` | Renders ledger rows; `--from` and `--to` require inclusive RFC 3339 timestamps. `--by record` is the only supported grouping. |
-| `report-bug` | Produces a sanitized internal ce-ai diagnostic report and asks for explicit submission consent. |
+| `decisions route <role>` | Evaluates role-based model and prompt routing (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`). Replaces the decommissioned `models` command. |
+| `decisions check`, `stats` | Checks task risk and complexity thresholds, and analyzes routing decision metrics. |
+| `skills list`, `skills resolve` | Inspects and resolves available Compound Engineering skills across installed harnesses. |
+| `tools status` | Reports companion readiness and health: **CodeGraph** (AST indexer), **Engram** (persistent memory), and **RTK** (token reducer). |
+| `tools init codegraph` | Initializes the `.codegraph/` index in the current workspace. |
+| `tools install <tool>` | Registers an MCP definition; does **not** download or install third-party binaries. |
+| `usage sync [--harness <name>]` | Captures local transcript usage into the ledger from supported harnesses (`claude`, `opencode`, `codex`, `pi`). |
+| `usage report` | Renders usage ledger rows; `--from` and `--to` require inclusive RFC 3339 timestamps. |
+| `report-bug` | Produces a sanitized internal `ce-ai` diagnostic report for CLI errors and crashes, requiring explicit user consent. |

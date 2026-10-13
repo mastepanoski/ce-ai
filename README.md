@@ -44,7 +44,7 @@ Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <
 | ⚡ [ODD Fast-Path Masterclass](docs/user-guide/odd-fast-path-and-graduation-masterclass.md) | Beginner / Senior | Explanation — the lightweight path and when to graduate to formal artifacts |
 | 🧠 [Decision Engine Guide](docs/user-guide/decision-engine-guide.md) | Both | How-to — routing, risk checks, and readiness |
 | 🔧 [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) | Both | How-to — install without overwriting existing configurations |
-| 🔄 [Sync & Upgrade](docs/user-guide/sync-and-upgrade-mechanisms.md) | Both | How-to — reconcile drift, update, and roll back |
+| 🔄 [Fleet, Sync & Upgrade](docs/user-guide/sync-and-upgrade-mechanisms.md) | Both | How-to — multi-harness fleet governance, reconcile drift, and batch maintenance |
 | ⚡ [Skill Registry Guide](docs/user-guide/skill-registry-guide.md) | Both | How-to — find and resolve available skills |
 | 💾 [Backup & Uninstall](docs/user-guide/backup-and-uninstall.md) | Both | How-to — restore configurations and remove CE-AI safely |
 | 🗂️ [Harness Matrix](docs/user-guide/harness-matrix.md) | Senior | Reference — supported hosts, configuration paths, and integration methods |
