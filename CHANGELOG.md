@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.3] - 2026-10-12
+
+### Documentation
+- **Comprehensive Documentation Audit & Legacy Reference Cleanup**:
+  - **Quick Start Workflow Guide (`docs/user-guide/quick-start-workflow-guide.md`)**:
+    - Replaced remaining legacy `ce-ai install --harness all --scope workspace` commands with modern companion initialization and project adoption (`codegraph init` + `ce-ai init-prj` + `ce-ai fleet sync`).
+    - Updated Greenfield setup flow and diagram to reflect modern fleet-based workflow (`codegraph init` → `ce-ai init-prj` → `ce-ai fleet pin latest && ce-ai fleet sync` → `ce-ai doctor`).
+    - Aligned OpenSpec scenario block snippets and SDD migration steps with `ce-ai init-prj` and `ce-ai fleet sync`.
+  - **Project Adoption Guide (`docs/user-guide/project-adoption-guide.md`)**:
+    - Expanded CLI options and flag reference table (`--tier`, `--all`, `--dry-run`, `--force`, `--skip-rtk`, `--skip-companions`).
+    - Documented companion tool integration (`CodeGraph`, `Engram`, `RTK`), automatic hook injection, and workspace `.gitignore` sentinel isolation.
+    - Added batch maintenance documentation (`ce-ai init-prj --all` and `ce-ai doctor --fix --all-projects`).
+    - Documented clean reversible de-adoption with `--dry-run` and state unregistration.
+  - **Architecture & Conceptual Guide (`docs/user-guide/architectural-and-conceptual-guide.md`)**:
+    - Updated Git worktree isolation solution to specify `codegraph init` and `ce-ai init-prj` per sibling worktree.
+  - **FSM & Checkpoints Guide (`docs/user-guide/fsm-and-checkpoints-explained.md`)**:
+    - Updated Variant 6 (Worktree Isolation) in the FSM flowchart and variant matrix to reflect `ce-ai init-prj` and `codegraph`.
+  - **Zero-Step Drift Recovery Guide (`docs/user-guide/zero-step-drift-recovery-explained.md`)**:
+    - Updated OpenCode plugin loader lifecycle trigger to reference `ce-ai fleet sync` and `ce-ai sync`.
+  - **Sync & Upgrade Guide (`docs/user-guide/sync-and-upgrade-mechanisms.md`)**:
+    - Updated reconciliation matrix notes and harness management instructions to feature `ce-ai fleet sync` as primary driver.
+  - **Contributing & Agent Operating Directives (`CONTRIBUTING.md`, `AGENTS.md`, `AI_POLICY.md`)**:
+    - Replaced decommissioned `models` references with `decisions route` and `fleet.rs`.
+
 ## [3.1.2] - 2026-10-12
 
 ### Documentation

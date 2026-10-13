@@ -84,9 +84,27 @@ ce-ai init-prj
 # Adopt a specific project path with Minimal tier
 ce-ai init-prj /path/to/my-project --tier minimal
 
+# Preview changes without modifying disk
+ce-ai init-prj --dry-run
+
 # Re-apply or upgrade block on an already adopted project
 ce-ai init-prj --force
+
+# Upgrade or re-adopt all registered projects across your machine
+ce-ai init-prj --all
 ```
+
+#### CLI Options & Flags
+
+| Flag | Description |
+| :--- | :--- |
+| `[PATH]` | Target project directory path (default: current working directory). |
+| `--tier <tier>` | Adoption tier: `full` (default), `minimal`, or `orchestrator`. |
+| `--all` | Batch upgrade or re-adopt all registered projects in `state.json`. |
+| `--dry-run` | Preview planned file modifications without writing to disk. |
+| `--force` | Force overwrite of modified managed blocks when drift is detected. |
+| `--skip-rtk` | Skip auto-configuring RTK (Run-Time Kit) hook injection. |
+| `--skip-companions` | Skip configuring all companion tools (both MCP servers and hooks). |
 
 #### Available Adoption Tiers
 
@@ -96,16 +114,36 @@ ce-ai init-prj --force
 | `minimal` | Core DoD guidelines, atomic write rules, and basic testing verification. | Small libraries, scripts, internal tools. |
 | `orchestrator` | Multi-repo orchestration directives and delegation protocols, plus a directive to distill ideation outputs into specs rather than maintaining them in parallel — and retain them as raw history instead of deleting them. | Monorepos, parent workspace folders. |
 
-#### Upgrading Adopted Projects (v2 ➔ v3)
+#### Companion Tool Integration (CodeGraph, Engram, RTK)
+
+During `ce-ai init-prj`, `ce-ai` automatically configures and integrates the 3 foundational companion tools:
+
+1. **CodeGraph (Deterministic Code Intelligence & Call Graphs)**:
+   - When the `codegraph` CLI is installed on your workstation, `ce-ai init-prj` automatically initializes the local `.codegraph/` repository index (`init_codegraph_if_available`).
+   - Sibling Git worktrees (`<repo>-worktrees/<name>`) each receive their own independent index.
+   - Sentinel lines are added to `.gitignore` so `.codegraph/` is never accidentally tracked in Git.
+2. **Engram (Cross-Session Persistent Memory)**:
+   - Registered as an MCP server across active host harnesses (`~/.claude.json`, `opencode.json`, `~/.cursor/mcp.json`).
+   - Observations, architectural decisions, and bug fixes are tagged with the active project path so memory remains partitioned cleanly between workspaces.
+3. **RTK (Run-Time Kit Token Optimization & Output Redirection)**:
+   - Unless `--skip-rtk` or `--skip-companions` is specified, `ce-ai init-prj` reconciles RTK command hooks in supported harnesses (`reconcile_rtk_hooks_if_supported`).
+   - Filters verbose build, test, and package manager outputs to preserve agent context windows.
+
+#### Upgrading Adopted Projects (v2 ➔ v3) & Batch Maintenance
 
 Blocks injected by older binaries (`v=2`) remain valid but predate the
-retention clarification of the Single Source of Truth rule. To upgrade an
-adopted project, re-run the command after upgrading your `ce-ai` binary — the
-managed block is replaced in place between markers and all user content around
-it is preserved:
+retention clarification of the Single Source of Truth rule. You can upgrade
+individual projects or batch-upgrade all registered projects:
 
 ```bash
+# Upgrade single project in place
 ce-ai init-prj /path/to/my-project --tier full
+
+# Batch upgrade all registered projects on your machine
+ce-ai init-prj --all
+
+# Batch reconcile drift and repair issues across all registered projects
+ce-ai doctor --fix --all-projects
 ```
 
 > ℹ️ **Expected after upgrading**: `ce-ai doctor` and `ce-ai status` compare
@@ -122,9 +160,12 @@ ce-ai init-prj /path/to/my-project --tier full
 
 ### De-adopting a Project (`ce-ai deinit-prj`)
 
-To remove Compound Engineering governance and restore original file state:
+To remove Compound Engineering governance and restore original file state cleanly:
 
 ```bash
+# Preview what de-adoption would remove without touching disk
+ce-ai deinit-prj --dry-run
+
 # De-adopt current directory
 ce-ai deinit-prj
 
@@ -132,8 +173,9 @@ ce-ai deinit-prj
 ce-ai deinit-prj /path/to/my-project
 ```
 
-- **If `AGENTS.md` pre-existed**: The managed block is removed, leaving your custom pre-existing content intact.
+- **If `AGENTS.md` pre-existed**: The managed block between `<!-- ce-ai:block begin -->` and `<!-- ce-ai:block end -->` is surgically removed, preserving all pre-existing developer content byte-for-byte (including CRLF/LF line endings).
 - **If `AGENTS.md` was created by `ce-ai`**: The file and derived `CLAUDE.md` stub are completely deleted.
+- **Project unregistration**: The project path is removed from `state.json` atomically.
 
 ---
 

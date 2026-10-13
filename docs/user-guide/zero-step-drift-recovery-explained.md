@@ -104,7 +104,7 @@ How does `ce-ai workflow resume` actually reach the agent at session start witho
    Claude Code automatically executes this hook at session startup and streams its output directly into the agent's context window.
 
 2. **Native Plugin Lifecycle Event & Compaction Hook (Automated — OpenCode):**
-   When `ce-ai install --harness opencode` or `ce-ai sync` runs, it installs the canonical V2 plugin loader at `~/.config/opencode/compound-engineering/plugins/compound-engineering.js` and registers it in `opencode.json`. The plugin is an OpenCode V2 definition (`{ id, setup(ctx) }`) that subscribes to the server's public event stream and registers session hooks:
+   When `ce-ai fleet sync` (or `ce-ai sync` / legacy `ce-ai install --harness opencode`) runs, it installs the canonical V2 plugin loader at `~/.config/opencode/compound-engineering/plugins/compound-engineering.js` and registers it in `opencode.json`. The plugin is an OpenCode V2 definition (`{ id, setup(ctx) }`) that subscribes to the server's public event stream and registers session hooks:
    - **`session.created`**: Upon initialization of every session, runs `ce-ai workflow resume` in the project directory and silently injects live `RepoState` into the session via `ctx.session.synthetic` (the V2-native context-only message; replaces the retired V1 `noReply` prompt).
    - **`session.idle`**: Runs `ce-ai workflow resume` to evaluate 7-stage FSM checkpoint progression at every turn end.
    - **`context` / `compaction` session hooks**: Inject live `RepoState` into the assembled system context of every agent-loop and checkpoint-summary model request, ensuring canonical drift status survives context compaction.

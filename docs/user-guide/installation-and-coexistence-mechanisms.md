@@ -129,11 +129,11 @@ Verify companion health at any time with `ce-ai tools status`.
 - **Coexistence Behavior**:
   - Preserves existing key-value structures in each harness's respective native configuration files (`~/.pi/agent/skills/`, `~/.gemini/config/mcp_config.json`, `~/.kimi-code/mcp.json`, `~/.codex/config.toml`, `~/.grok/config.toml`, `~/.fx/mcp.json`).
 
-### 📁 6. Workspace Scoping & Gitignore Isolation (`--scope workspace`)
+### 📁 6. Workspace Scoping & Gitignore Isolation (`init-prj` & `--scope workspace`)
 - **Strategy**: Sentinel-Bounded `.gitignore` Protection.
 - **Artifact Boundary**:
   - `compound-engineering/`: Contains machine-local installation files and manifests (`install-manifest.json`) recording absolute local paths. `ce-ai` automatically ensures this directory is ignored inside the sentinel block in `.gitignore`.
-  - `.ce-ai/skills-registry.json`: Machine-local skills cache, automatically ignored.
+  - `.ce-ai/skills-registry.json` & `.codegraph/`: Machine-local companion caches and indices, automatically ignored.
   - `AGENTS.md` / `CLAUDE.md` / `.cursor/rules/`: Shared team governance and directives; these **should be committed** to Git.
   - `opencode.json` / `.claude.json`: Native harness configs; can optionally be committed if sharing team-wide settings and MCP servers.
 

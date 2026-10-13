@@ -148,9 +148,9 @@ flowchart TD
   note: 'registered' = ce-ai wrote harness config only; it manages no files on that
         surface, so there is nothing to hash-verify. CE installed via other channels
         (plugin marketplaces, manual copies) is outside ce-ai's verification scope.
-        To put a harness under ce-ai management: ce-ai install --harness <name>
-        (or --harness all). Skill files are managed per harness only when the
-        installed source ships a managed skills tree.
+        To synchronize fleet harnesses with pinned version: ce-ai fleet sync
+        (or legacy: ce-ai install --harness <name> / --harness all). Skill files
+        are managed per harness only when the installed source ships a managed skills tree.
   ```
   *(Note: when OpenCode is not installed, only the active installed harnesses—such as `claude`, `cursor`, or `custom`—appear in the matrix without an OpenCode entry).*
 
@@ -176,10 +176,10 @@ and works, but it is outside ce-ai's verification scope.
 | `cursor` | MCP registration in config only (it consumes no skills tree) | None — config registration only |
 | `custom` | Files copied to your `--plugins-dir` / `--skills-dir` + manifest snapshot | All copied files |
 
-To put a harness under ce-ai management (or re-apply it): `ce-ai install
---harness <name>`, or `ce-ai install --harness all` for every detected
-harness. After installing, `ce-ai sync` verifies whatever ce-ai manages on
-that surface.
+To put a harness under ce-ai management (or re-apply it): run `ce-ai fleet sync`
+(for native fleet-managed harnesses), or `ce-ai install --harness <name>`
+(`--harness all` for every detected harness). After syncing, `ce-ai sync`
+verifies whatever ce-ai manages on that surface.
 
 ### Canonical skills adoption (`ce-ai skills adopt`)
 
