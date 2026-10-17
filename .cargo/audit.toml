@@ -1,0 +1,10 @@
+# Supply Chain Security Audit (ISO 27001 / ISO 27002)
+# Configures cargo-audit behavior for automated CI compliance checks.
+
+[advisories]
+ignore = [
+    # RUSTSEC-2026-0370: zvariant is unmaintained (standalone crate deprecated in favor of zbus >=6.0.0; transitively pulled via keyring -> secret-service)
+    "RUSTSEC-2026-0370",
+    # RUSTSEC-2026-0372: zvariant_derive is unmaintained (standalone crate deprecated in favor of zbus >=6.0.0; transitively pulled via keyring -> secret-service)
+    "RUSTSEC-2026-0372",
+]

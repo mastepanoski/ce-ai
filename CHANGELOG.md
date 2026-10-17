@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Preserved unmanaged custom user plugins in `opencode.json` during version synchronization.
   - Updated `OpenCodeDriver::detect_version` to check `compound_engineering_version` and on-disk `compound-engineering/install-manifest.json` before falling back to state/host detection.
   - Enhanced `has_session_start_plugin` in `src/opencode/plugins.rs` to recognize native `compound_engineering_version` configuration and OpenCode v2 autodiscovered plugin loader.
+- **Supply Chain Security Audit Configuration (`.cargo/audit.toml`, `Cargo.lock`)**:
+  - Configured `.cargo/audit.toml` to ignore unmaintained warnings for deprecated standalone `zvariant` and `zvariant_derive` crates (`RUSTSEC-2026-0370`, `RUSTSEC-2026-0372`), which were merged into `zbus >=6.0.0` and are transitively pulled by `keyring` via `secret-service`.
+  - Bumped `zvariant` and `zvariant_derive` to `5.15.1`.
 
 ## [3.1.3] - 2026-10-12
 
