@@ -93,6 +93,12 @@ impl FleetHarnessDriver for OpenCodeDriver {
         if config_path.exists() {
             if let Ok(content) = fs::read_to_string(&config_path) {
                 if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(v) = val
+                        .get("compound_engineering_version")
+                        .and_then(|v| v.as_str())
+                    {
+                        return Ok(Some(v.to_string()));
+                    }
                     if let Some(plugins) = val.get("plugins").and_then(|p| p.as_array()) {
                         for p in plugins {
                             if let Some(s) = p.as_str() {
@@ -111,6 +117,20 @@ impl FleetHarnessDriver for OpenCodeDriver {
             }
         }
 
+        let manifest_path = ctx
+            .opencode_config_dir
+            .join("compound-engineering")
+            .join("install-manifest.json");
+        if manifest_path.exists() {
+            if let Ok(content) = fs::read_to_string(&manifest_path) {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(v) = val.get("version").and_then(|v| v.as_str()) {
+                        return Ok(Some(v.to_string()));
+                    }
+                }
+            }
+        }
+
         if let Some(v) = detect_version_from_state(ctx, "opencode") {
             return Ok(Some(v));
         }
@@ -124,21 +144,50 @@ impl FleetHarnessDriver for OpenCodeDriver {
     }
 
     fn plan_sync(&self, ctx: &Context, target_version: &str) -> Result<FleetAction, CeError> {
+        let has_bogus_plugin = if ctx.opencode_config_path().exists() {
+            fs::read_to_string(ctx.opencode_config_path())
+                .ok()
+                .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
+                .map(|val| {
+                    let in_plugins =
+                        val.get("plugins")
+                            .and_then(|p| p.as_array())
+                            .is_some_and(|arr| {
+                                arr.iter().any(|v| {
+                                    v.as_str().is_some_and(|s| {
+                                        s.starts_with("@everyinc/compound-engineering")
+                                    })
+                                })
+                            });
+                    let in_plugin =
+                        val.get("plugin")
+                            .and_then(|p| p.as_array())
+                            .is_some_and(|arr| {
+                                arr.iter().any(|v| {
+                                    v.as_str().is_some_and(|s| {
+                                        s.starts_with("@everyinc/compound-engineering")
+                                    })
+                                })
+                            });
+                    in_plugins || in_plugin
+                })
+                .unwrap_or(false)
+        } else {
+            false
+        };
+
         if let Some(installed) = self.detect_version(ctx)? {
-            if is_version_match(&installed, target_version) {
+            if is_version_match(&installed, target_version) && !has_bogus_plugin {
                 return Ok(FleetAction::UpToDate);
             }
         }
 
         Ok(FleetAction::UpdateConfig {
             file_path: ctx.opencode_config_path(),
-            key: "plugins".to_string(),
-            value: serde_json::json!([format!(
-                "@everyinc/compound-engineering@{}",
-                target_version
-            )]),
+            key: "compound_engineering_version".to_string(),
+            value: serde_json::json!(target_version),
             description: format!(
-                "Update opencode.json plugins to pin @everyinc/compound-engineering@{}",
+                "Pin OpenCode compound-engineering version to {}",
                 target_version
             ),
         })
@@ -428,10 +477,10 @@ mod tests {
         let driver = OpenCodeDriver;
         assert!(driver.is_installed(&ctx));
 
-        // When opencode.json has pinned version
+        // When opencode.json has compound_engineering_version pinned
         fs::write(
             ctx.opencode_config_path(),
-            r#"{"plugins": ["@everyinc/compound-engineering@v1.2.3"]}"#,
+            r#"{"compound_engineering_version": "v1.2.3"}"#,
         )
         .unwrap();
 
@@ -444,14 +493,41 @@ mod tests {
         let plan_upgrade = driver.plan_sync(&ctx, "v1.3.0").unwrap();
         match plan_upgrade {
             FleetAction::UpdateConfig { key, value, .. } => {
-                assert_eq!(key, "plugins");
-                assert_eq!(
-                    value,
-                    serde_json::json!(["@everyinc/compound-engineering@v1.3.0"])
-                );
+                assert_eq!(key, "compound_engineering_version");
+                assert_eq!(value, serde_json::json!("v1.3.0"));
             }
             _ => panic!("Expected UpdateConfig action"),
         }
+
+        // When opencode.json contains a legacy bogus @everyinc npm plugin entry
+        fs::write(
+            ctx.opencode_config_path(),
+            r#"{"plugins": ["@everyinc/compound-engineering@v1.2.3", "my-custom-plugin"], "compound_engineering_version": "v1.2.3"}"#,
+        )
+        .unwrap();
+
+        // Even though version matches, plan_sync schedules an update to sanitize the bogus plugin
+        let plan_sanitize = driver.plan_sync(&ctx, "v1.2.3").unwrap();
+        match &plan_sanitize {
+            FleetAction::UpdateConfig { key, value, .. } => {
+                assert_eq!(key, "compound_engineering_version");
+                assert_eq!(value, &serde_json::json!("v1.2.3"));
+            }
+            _ => panic!("Expected UpdateConfig action to purge bogus plugin"),
+        }
+
+        // Execute action and verify plugins array was sanitized while preserving custom plugins
+        plan_sanitize.execute(false).unwrap();
+        let sanitized_content: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(ctx.opencode_config_path()).unwrap()).unwrap();
+        assert_eq!(
+            sanitized_content["compound_engineering_version"],
+            serde_json::json!("v1.2.3")
+        );
+        assert_eq!(
+            sanitized_content["plugins"],
+            serde_json::json!(["my-custom-plugin"])
+        );
     }
 
     #[test]

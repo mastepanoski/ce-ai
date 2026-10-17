@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.4] - 2026-10-17
+
+### Fixed
+- **OpenCode Fleet Sync Native Version Governance (`src/fleet/drivers.rs`, `src/fleet/driver.rs`)**:
+  - Replaced faulty `@everyinc/compound-engineering@<version>` npm plugin array injection in `OpenCodeDriver::plan_sync` with native `compound_engineering_version` configuration pinning in `opencode.json`.
+  - Added automatic purging of bogus `@everyinc/compound-engineering` npm package entries from `plugins`/`plugin` arrays during config updates, preventing OpenCode from querying `registry.npmjs.org` and failing with 404 on startup.
+  - Preserved unmanaged custom user plugins in `opencode.json` during version synchronization.
+  - Updated `OpenCodeDriver::detect_version` to check `compound_engineering_version` and on-disk `compound-engineering/install-manifest.json` before falling back to state/host detection.
+  - Enhanced `has_session_start_plugin` in `src/opencode/plugins.rs` to recognize native `compound_engineering_version` configuration and OpenCode v2 autodiscovered plugin loader.
+
 ## [3.1.3] - 2026-10-12
 
 ### Documentation
