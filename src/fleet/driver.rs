@@ -67,6 +67,21 @@ impl FleetAction {
                 };
                 if let Some(obj) = root.as_object_mut() {
                     obj.insert(key.clone(), value.clone());
+
+                    // If updating OpenCode configuration, purge bogus @everyinc/compound-engineering npm
+                    // package references from plugins arrays while preserving custom user plugins.
+                    if file_path.file_name().and_then(|n| n.to_str()) == Some("opencode.json") {
+                        for list_key in ["plugins", "plugin"] {
+                            if let Some(arr) = obj.get_mut(list_key).and_then(|v| v.as_array_mut())
+                            {
+                                arr.retain(|item| {
+                                    !item.as_str().is_some_and(|s| {
+                                        s.starts_with("@everyinc/compound-engineering")
+                                    })
+                                });
+                            }
+                        }
+                    }
                 }
                 let pretty = serde_json::to_string_pretty(&root)
                     .map_err(|e| CeError::State(format!("failed to serialize json: {e}")))?;

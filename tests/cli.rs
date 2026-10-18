@@ -10591,7 +10591,8 @@ fn test_cli_fleet_pin_status_sync_lifecycle() {
     let opencode_json_path = opencode_dir.join("opencode.json");
     assert!(opencode_json_path.exists());
     let opencode_raw = fs::read_to_string(opencode_json_path).unwrap();
-    assert!(opencode_raw.contains("@everyinc/compound-engineering@v1.76.0"));
+    assert!(opencode_raw.contains("\"compound_engineering_version\": \"v1.76.0\""));
+    assert!(!opencode_raw.contains("@everyinc/compound-engineering"));
 }
 
 #[test]

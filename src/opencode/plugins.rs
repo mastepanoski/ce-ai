@@ -256,6 +256,9 @@ pub fn has_session_start_plugin(config_dir: &Path) -> bool {
     if config_file.exists() {
         if let Ok(config_str) = std::fs::read_to_string(&config_file) {
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&config_str) {
+                if val.get("compound_engineering_version").is_some() {
+                    return true;
+                }
                 let has_native = |key: &str| -> bool {
                     val.get(key)
                         .and_then(|p| p.as_array())

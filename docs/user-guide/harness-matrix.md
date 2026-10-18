@@ -15,7 +15,7 @@
 
 | Harness | Configuration / Driver Target | Sync Action Type | Mechanism |
 | :--- | :--- | :--- | :--- |
-| `opencode` | `~/.config/opencode/opencode.json` | `UpdateConfig` | Pins `@everyinc/compound-engineering@<version>` in plugin array |
+| `opencode` | `~/.config/opencode/opencode.json` | `UpdateConfig` | Updates `compound_engineering_version` key atomically |
 | `claude` | Claude Code CLI & plugin marketplace | `RunCommand` | Runs `claude plugin update compound-engineering@compound-engineering-plugin -y` |
 | `pi` | `~/.pi/agent/settings.json` | `UpdateConfig` | Updates `compound_engineering_version` key atomically |
 | `codex` | `.codex/config.json` | `UpdateConfig` | Updates `compound_engineering_version` key atomically |
