@@ -5,6 +5,15 @@
 ignore = [
     # RUSTSEC-2026-0370: zvariant is unmaintained (standalone crate deprecated in favor of zbus >=6.0.0; transitively pulled via keyring -> secret-service)
     "RUSTSEC-2026-0370",
+    # RUSTSEC-2026-0371: zbus_names is unmaintained (standalone crate deprecated in favor of zbus >=6.0.0; transitively pulled via keyring -> secret-service)
+    "RUSTSEC-2026-0371",
     # RUSTSEC-2026-0372: zvariant_derive is unmaintained (standalone crate deprecated in favor of zbus >=6.0.0; transitively pulled via keyring -> secret-service)
     "RUSTSEC-2026-0372",
+    # RUSTSEC-2026-0367: zip `ZipArchive::extract` SUID/SGID preservation (ce-ai does not call extract(); reads binary entries directly in-memory)
+    "RUSTSEC-2026-0367",
+    # RUSTSEC-2026-0368: zip `ZipArchive::extract` symlink traversal (ce-ai does not call extract(); reads binary entries directly in-memory)
+    "RUSTSEC-2026-0368",
+    # RUSTSEC-2026-0369: zip `ZipStreamReader::extract()` and `ZipArchive::extract()` symlink permissions (ce-ai does not call extract())
+    "RUSTSEC-2026-0369",
 ]
+
