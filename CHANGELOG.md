@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-10-17
+
+### Changed
+- **Streamlined CLI Surface & Cognitive Load Optimization (`src/commands/registry.rs`)**:
+  - Cleaned up root `ce-ai --help` output by hiding 10 legacy, deprecated, and alias commands using Clap's `#[command(hide = true)]`:
+    - Deprecated file-copying/sync commands: `install`, `sync`, `upgrade` (superseded by `init-prj` and `fleet pin` / `fleet sync`).
+    - Obsolete / redundant tools: `gate` (superseded by non-authoritarian workflow FSM), `guard` (superseded by `decisions`), `audit` (subsumed by `doctor`).
+    - Top-level aliases: `archive` (canonical: `ce-ai workflow archive`), `graduate` (canonical: `ce-ai workflow graduate`).
+    - Single-harness / rollback relics: `usage` (Claude Code specific), `backups` (v1 destructive rollback artifact).
+  - Maintained 100% backward compatibility: all hidden subcommands remain fully executable when invoked directly.
+  - Promoted the 13 essential Core commands across Fleet Governance, Project Adoption, Workflow, and Companion Intelligence.
+  - Added regression test `test_cli_help_hides_legacy_commands_while_preserving_invocation` in `tests/cli.rs`.
+
 ## [3.1.4] - 2026-10-17
 
 ### Fixed

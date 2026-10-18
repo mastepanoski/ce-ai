@@ -10905,3 +10905,72 @@ fn test_cli_doctor_fix_repairs_stale_project_adoption_and_init_prj_all() {
     let init_all_content = fs::read_to_string(proj.join("AGENTS.md")).unwrap();
     assert!(init_all_content.contains("v=7"));
 }
+
+#[test]
+fn test_cli_help_hides_legacy_commands_while_preserving_invocation() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    // 1. ce-ai --help should show only the modern core commands
+    let out = ceai(&config_dir, &home).arg("--help").output().unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    // Visible Core commands
+    let visible_core = [
+        "self-update",
+        "skills",
+        "status",
+        "uninstall",
+        "doctor",
+        "tools",
+        "workflow",
+        "init-prj",
+        "deinit-prj",
+        "spec",
+        "doc",
+        "decisions",
+        "report-bug",
+        "fleet",
+    ];
+    for cmd in visible_core {
+        assert!(
+            stdout.contains(cmd),
+            "expected core command '{cmd}' to be visible in --help"
+        );
+    }
+
+    // Hidden legacy / redundant commands
+    let hidden_commands = [
+        "  install ",
+        "  sync ",
+        "  upgrade ",
+        "  backups ",
+        "  usage ",
+        "  audit ",
+        "  guard ",
+        "  gate ",
+        "  archive ",
+        "  graduate ",
+    ];
+    for cmd in hidden_commands {
+        assert!(
+            !stdout.contains(cmd),
+            "expected legacy/alias command '{cmd}' to be hidden from --help"
+        );
+    }
+
+    // 2. Invoking hidden commands directly still functions cleanly
+    for cmd in [
+        "archive", "gate", "audit", "guard", "graduate", "backups", "usage",
+    ] {
+        let hidden_out = ceai(&config_dir, &home)
+            .args([cmd, "--help"])
+            .output()
+            .unwrap();
+        assert!(
+            hidden_out.status.success(),
+            "expected hidden command '{cmd} --help' to succeed"
+        );
+    }
+}

@@ -23,10 +23,13 @@ pub trait CeCommand {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Install the CE plugin into a harness.
+    #[command(hide = true)]
     Install(install::Args),
     /// Reconcile the installed plugin against the current source tree.
+    #[command(hide = true)]
     Sync(sync::Args),
     /// Fetch a newer CE source and sync the installed plugin.
+    #[command(hide = true)]
     Upgrade(upgrade::Args),
     /// Update the ce-ai CLI binary itself to the latest release (or specified tag).
     #[command(name = "self-update")]
@@ -40,14 +43,17 @@ pub enum Commands {
     /// Report config validity, drift, and state consistency.
     Doctor(doctor::Args),
     /// Backup listing and point-in-time config recovery.
+    #[command(hide = true)]
     Backups(backups::BackupsArgs),
     /// Companion MCP registration and readiness checks (does not install third-party binaries).
     Tools(tools::Args),
     /// Claude Code usage capture and ledger reporting.
+    #[command(hide = true)]
     Usage(usage::Args),
     /// Workflow FSM & progress recovery system across 7 development stages.
     Workflow(workflow::Args),
     /// Configuration-hygiene audit using local repository and harness heuristics.
+    #[command(hide = true)]
     Audit(audit::Args),
     /// Adopt a project repository by injecting managed Compound Engineering workflow blocks into AGENTS.md.
     #[command(name = "init-prj")]
@@ -77,13 +83,16 @@ pub enum Commands {
         path: Option<PathBuf>,
     },
     /// Persist and inspect pedagogical guardrail configuration (Issue #114).
+    #[command(hide = true)]
     Guard(guard::Args),
     /// OpenSpec contract gate for agent code writes; enforcement is the default.
-    #[command(subcommand)]
+    #[command(subcommand, hide = true)]
     Gate(gate::GateCommands),
     /// Archive completed OpenSpec change packages to openspec/changes/archive/ (alias for workflow archive).
+    #[command(hide = true)]
     Archive(crate::commands::workflow::ArchiveArgs),
     /// Graduate an ODD task brief to formal OpenSpec change package (alias for workflow graduate).
+    #[command(hide = true)]
     Graduate(crate::commands::workflow::GraduateArgs),
     /// Manage living system specifications in openspec/specs/.
     Spec(crate::commands::spec::SpecArgs),
