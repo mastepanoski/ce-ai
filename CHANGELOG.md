@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-10-18
+
+### Added
+- **Workflow Guide Subcommand & Proactive OpenSpec Onboarding Guidance (`src/commands/workflow.rs`, `AGENTS.md`)**:
+  - Added new `ce-ai workflow guide` subcommand providing educational guidance on Organic Driven Development (ODD Fast-Path), the 7-stage Compound Engineering cycle, and the OpenSpec Rule of Thumb (when to use vs when to skip).
+  - Enhanced `ce-ai workflow status` and `ce-ai workflow resume` outputs with proactive OpenSpec integration hints when inactive (`scope > 200 LOC or API contracts; run 'ce-ai workflow guide'`).
+  - Added contextual OpenSpec guidance tips during Stage 1 (Ideation) and Stage 2 in Compound mode.
+  - Added Proactive OpenSpec Triage & Guidance directive in `AGENTS.md` instructing AI agents to evaluate scope during Stage 1 and proactively guide developers on whether to formalize in OpenSpec or proceed with direct agile plans.
+  - Added regression test `test_cli_workflow_guide_and_openspec_onboarding_guidance` in `tests/cli.rs`.
+
 ## [3.2.0] - 2026-10-17
 
 ### Changed
