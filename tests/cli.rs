@@ -10974,3 +10974,38 @@ fn test_cli_help_hides_legacy_commands_while_preserving_invocation() {
         );
     }
 }
+
+#[test]
+fn test_cli_workflow_guide_and_openspec_onboarding_guidance() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let workspace = tmp.path().join("workspace");
+    fs::create_dir_all(&workspace).unwrap();
+
+    // 1. ce-ai workflow guide outputs full onboarding guide
+    let out_guide = ceai(&config_dir, &home)
+        .current_dir(&workspace)
+        .args(["workflow", "guide"])
+        .output()
+        .unwrap();
+    assert!(out_guide.status.success());
+    let guide_stdout = String::from_utf8_lossy(&out_guide.stdout);
+    assert!(guide_stdout.contains("Compound Engineering Workflow & OpenSpec Onboarding Guide"));
+    assert!(guide_stdout.contains("Organic Driven Development (ODD Fast-Path)"));
+    assert!(guide_stdout.contains("The OpenSpec Rule of Thumb"));
+    assert!(guide_stdout.contains("Skip OpenSpec when"));
+    assert!(guide_stdout.contains("Use OpenSpec when"));
+
+    // 2. ce-ai workflow status outputs guidance tip when OpenSpec is inactive
+    let out_status = ceai(&config_dir, &home)
+        .current_dir(&workspace)
+        .args(["workflow", "status"])
+        .output()
+        .unwrap();
+    assert!(out_status.status.success());
+    let status_stdout = String::from_utf8_lossy(&out_status.stdout);
+    assert!(status_stdout.contains(
+        "OpenSpec Integration ➔ Inactive (Optional — tip: recommended for scope > 200 LOC"
+    ));
+    assert!(status_stdout.contains("💡 OpenSpec Guidance:"));
+}
