@@ -81,3 +81,4 @@ Historical notes:
 - v2-phase2-compat-and-fleet: archived (8/8 tasks) under criterion (1) on 2026-10-03.
 - v2-phase3-advisory-fsm-and-openspec-decouple: archived (39/39 tasks) under criterion (1) on 2026-10-05.
 - v2-phase4-decommission-file-scraping-and-v2-ga: archived (28/28 tasks) under criterion (1) on 2026-10-06.
+- agent-guardrails-pivot: archived (26/26 tasks) under criterion (1) on 2026-10-19.
