@@ -21,7 +21,7 @@ methodology and reusable skills (/ce-...)
               coordinates the operational environment around them
               ├── Fleet Version Governance: declarative multi-harness parity (ce-ai fleet)
               ├── Project Adoption & Health: non-destructive AGENTS.md rules & hooks (init-prj)
-              ├── Decision Engine: role-based model & prompt routing (decisions route)
+              ├── Agent Guardrails & Risk Engine: pre-execution command policy & safety (ce-ai guard)
               └── Advisory Workflow: 7-stage observation & ODD fast-path (workflow)
 ```
 
@@ -32,7 +32,7 @@ The layers have distinct jobs:
 | **Coding agent / host** | Reasons about a task, edits code, and operates native toolchains. | Claude Code, Codex, OpenCode, Cursor, Pi |
 | **Compound Engineering** | Supplies a methodology and multi-host skill set for compounding engineering work. | `ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound` |
 | **Companion Tools** | Structural codebase index (CodeGraph), persistent memory (Engram), and token compression (RTK). | `codegraph init`, `mem_save`, `rtk` hooks |
-| **CE-AI** | Coordinates the operational environment: fleet version governance, project adoption, companion verification, and advisory workflow observation. | `ce-ai fleet sync`, `init-prj`, `doctor`, `decisions route` |
+| **CE-AI** | Coordinates the operational environment: fleet version governance, project adoption, companion verification, and agent guardrails. | `ce-ai fleet sync`, `init-prj`, `doctor`, `ce-ai guard` |
 
 This is why CE-AI is not an alternative to Claude Code, Codex, OpenCode, or the official Compound Engineering plugin. It is the operational companion that helps those tools participate in a coherent, recoverable, and fleet-aligned engineering process.
 

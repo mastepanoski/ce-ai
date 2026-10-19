@@ -1,6 +1,6 @@
-# Decision Engine Guide & Reference
+# Agent Guardrails & Decision Engine Guide
 
-The `ce-ai decisions` subsystem governs the **Pluggable Decision Engine** — a fast, structured, probabilistic **System 1** micro-decision layer that sits between deterministic core rules and heavy LLM reasoning.
+The `ce-ai guard` subsystem (formerly `ce-ai decisions`) governs the **Agent Guardrails & Risk Execution Engine** — a fast, structured micro-decision layer providing deterministic safety precedence (<1 ms) and semantic risk scoring for autonomous agent tool invocations, alongside readiness checking and pluggable evaluation providers.
 
 ---
 
@@ -21,7 +21,8 @@ A common point of confusion is the distinction between **Presets** (`--preset`) 
 ```
 +-------------------------------------------------------------------------+
 | CLI Setup Preset (Template):                                            |
-|   ce-ai decisions setup --preset <recommended|shadow|kev|laya|local|off>|
+|   ce-ai guard setup --preset <recommended|shadow|kev|laya|local|off>    |
+|   (or alias: ce-ai decisions setup --preset <...>)                      |
 +-------------------------------------------------------------------------+
                               │
                               ▼ writes to state.json
@@ -51,39 +52,41 @@ A common point of confusion is the distinction between **Presets** (`--preset`) 
 
 ### Step 1: Apply a Configuration Preset
 
-To provision recommended defaults (Jev provider, $5 monthly cap):
+To provision recommended local-first defaults (Laya MLX on Apple Silicon, local deterministic rules on universal platforms):
 
 ```bash
+ce-ai guard setup --preset recommended
+# or via legacy alias:
 ce-ai decisions setup --preset recommended
 ```
 
 For local, zero-cost System 1 evaluation with Kev (universal):
 
 ```bash
-ce-ai decisions setup --preset kev
+ce-ai guard setup --preset kev
 ```
 
 For ultra-low latency Apple Silicon evaluation with Laya-MLX:
 
 ```bash
-ce-ai decisions setup --preset laya
+ce-ai guard setup --preset laya
 ```
 
 For offline or hermetic local testing with canned/mock responses:
 
 ```bash
-ce-ai decisions setup --preset local
+ce-ai guard setup --preset local
 ```
 
 To turn off evaluations entirely:
 
 ```bash
-ce-ai decisions setup --preset off
+ce-ai guard setup --preset off
 ```
 
 ### Step 2: Configure Credentials (Remote) or Start Daemon (Local)
 
-#### For Cloud Jev (`recommended` / `shadow`)
+#### For Cloud Jev (Optional / `shadow`)
 `ce-ai` never stores API keys in git-tracked files (`state.json`, `ce-ai.toml`). Keys are resolved in order:
 1. Environment variable: `TYPESAFE_API_KEY` (or fallback `JEV_API_KEY`)
 2. Local secured file: `~/.config/ce-ai/credentials.toml` (Unix permissions `0600`)
@@ -160,7 +163,7 @@ You can inspect or switch the operational mode at any time without resetting you
 
 ```bash
 ce-ai decisions mode
-# Output: Decision Engine mode: active (provider: jev)
+# Output: Decision Engine mode: active (provider: laya / local)
 ```
 
 ### Toggle Operational Mode
