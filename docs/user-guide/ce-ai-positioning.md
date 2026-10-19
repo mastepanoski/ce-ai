@@ -53,7 +53,8 @@ This is not a claim that one project has more features than another. The project
 | Multi-harness fleet version governance | CE-AI (`ce-ai fleet`) | CE-AI declaratively pins and synchronizes Compound Engineering versions across all developer hosts. |
 | Project adoption, deterministic rules, and session hooks | CE-AI (`ce-ai init-prj`) | CE-AI injects non-destructive `AGENTS.md` rules and session-start recovery hooks into repositories. |
 | Companion developer tools (memory, AST graph, token reduction) | Engram, CodeGraph, RTK | CE-AI configures hooks, MCP sidecars, and audits companion readiness via `doctor` and `tools status`. |
-| Lightweight everyday routing | [Gentle AI’s ODD](https://github.com/Gentleman-Programming/gentle-ai/blob/main/docs/intended-usage.md) | CE-AI adapts the approach as an optional fast path and credits its origin. |
+| Lightweight tactical execution | Compound Agile Fast-Path | CE-AI observes direct work and lightweight plans (`docs/plans/`), keeping small changes light without formal specs. |
+```
 
 As checked on 2026-09-24, the official plugin describes 36 skills across 14 hosts, including newer capabilities such as `ce-explain`, `ce-pov`, Compound Packs, and evolved multi-host support. CE-AI complements those capabilities by orchestrating the project-level workflow rather than duplicating upstream skills.
 
@@ -70,10 +71,13 @@ The sequence is a mental model, not a demand for ceremony on every edit:
 - **Implement and Validate** turn the plan into code and evidence.
 - **Learn and Compound** preserve reusable conclusions so future work does not rediscover the same facts.
 
-For substantial work, CE-AI can coordinate formal OpenSpec artifacts. For routine, understood work, it can use ODD instead.
+For substantial architectural work (> 200 LOC or cross-cutting contracts), CE-AI can coordinate optional OpenSpec change packages. For routine, tactical work, developers use the agile fast-path (`docs/plans/` or direct execution via `/ce-work` / `/ce-debug`).
 
-## ODD: the adaptive path
+## Agile Fast-Path: Bounded Tactical Execution
 
-**Organic Driven Development (ODD)** was created by [Alan Buscaglia](https://github.com/Alan-TheGentleman) through [Gentle AI](https://github.com/Gentleman-Programming/gentle-ai). Gentle AI documents it as the everyday path: keep small, understood changes lightweight; retain one recoverable task record when work is substantial; select formal Spec-Driven Development only when it is wanted.
+Originally adapted from [Alan Buscaglia's](https://github.com/Alan-TheGentleman) Organic Driven Development (ODD) in [Gentle AI](https://github.com/Gentleman-Programming/gentle-ai), CE-AI embraces the principle that everyday bugfixes, minor chores, and localized edits must never be burdened by mandatory specification ceremony.
 
-CE-AI does not claim ODD as its own. It adapts ODD as an optional fast path for bounded, tactical work. Its adaptive mode router can keep a small fix light, while its graduation bridge moves work into formal OpenSpec artifacts when the task becomes broader or more consequential. See the [ODD Fast-Path Masterclass](odd-fast-path-and-graduation-masterclass.md) for CE-AI’s implementation details.
+In CE-AI, this fast-path is aligned natively with Compound Engineering:
+- Tactical bugfixes run directly via `/ce-debug` or `/ce-work`.
+- Lightly planned tasks maintain a single plan in `docs/plans/`.
+- The artificial `odd/tasks/` directory and `workflow graduate` commands are deprecated in favor of native planning and direct OpenSpec adoption only when architectural complexity warrants it. See the [Agile Fast-Path Masterclass](odd-fast-path-and-graduation-masterclass.md) for details.

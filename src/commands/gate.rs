@@ -653,7 +653,7 @@ pub fn run_gate_check(ctx: &Context, args: &GateCheckArgs) -> Result<(), CeError
         let diff_loc = crate::commands::workflow::probe_git_diff_loc(&repo_root);
         if diff_loc > 200 && !ctx.quiet {
             eprintln!(
-                "Notice: Organic task diff (+{diff_loc} LOC) exceeds 200 LOC ceiling. Consider running 'ce-ai workflow graduate' to formalize in OpenSpec."
+                "Notice: Agile fast-path task diff (+{diff_loc} LOC) exceeds 200 LOC ceiling. Consider formalizing an OpenSpec change package in openspec/changes/ or planning in docs/plans/."
             );
         }
     }

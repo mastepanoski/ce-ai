@@ -311,20 +311,23 @@ pub fn status_lines_with_mode(
 
     let mut lines = Vec::new();
     if mode == ExecutionMode::Organic {
-        lines.push("== [Workflow Mode: Organic Driven Development (ODD Fast-Path)] ==".to_string());
-        lines.push("Tactical Execution Triad (odd/tasks/<feature>.md):".to_string());
         lines.push(
-            "  • Problem Statement     ➔ Describe observed symptom, error, or tactical friction"
+            "== [Workflow Mode: Compound Agile Fast-Path (Direct / docs/plans/)] ==".to_string(),
+        );
+        lines.push("Agile Tactical Execution:".to_string());
+        lines.push(
+            "  • Problem & Fix         ➔ Direct implementation via /ce-debug or /ce-work"
                 .to_string(),
         );
         lines.push(
-            "  • Guardrails & Limits   ➔ Inviolable safety, compatibility, and performance bounds"
+            "  • Light Planning        ➔ Optional single-file plans in docs/plans/ via /ce-plan"
                 .to_string(),
         );
         lines.push(
-            "  • Definition of Done    ➔ Concrete, testable checkboxes (- [ ] / - [x])".to_string(),
+            "  • Quality & Testing     ➔ Verify tests, clippy, and formatting before commit"
+                .to_string(),
         );
-        lines.push("  * Graduation Notice     ➔ For scope > 200 LOC, run 'ce-ai workflow graduate <feature>' to formalize in OpenSpec.".to_string());
+        lines.push("  * Scope Boundary        ➔ For architecture or scope > 200 LOC, formalize in openspec/changes/.".to_string());
         lines.push(String::new());
     } else {
         lines.push("== [Workflow FSM & Progress Recovery Status] ==".to_string());
@@ -1611,6 +1614,10 @@ pub fn run_graduate(ctx: &Context, args: &GraduateArgs) -> Result<(), CeError> {
         return Err(CeError::Usage("feature name cannot be empty".to_string()));
     }
 
+    eprintln!(
+        "warning: 'ce-ai workflow graduate' and the 'odd/tasks/' directory structure are deprecated. Use 'docs/plans/' for lightweight agile tasks, or initialize 'openspec/changes/{feature_name}/' directly for architectural scope (> 200 LOC)."
+    );
+
     let source_file = repo_root
         .join("odd")
         .join("tasks")
@@ -1709,10 +1716,10 @@ pub fn guide_lines() -> Vec<String> {
         "== [Compound Engineering Workflow & OpenSpec Onboarding Guide] ==".to_string(),
         String::new(),
         "Two Complementary Development Paths:".to_string(),
-        "  1. Organic Driven Development (ODD Fast-Path):".to_string(),
+        "  1. Compound Agile Fast-Path (Tactical & Bug Fixes):".to_string(),
         "     • Best for: Bug fixes, minor tweaks, docs, tests, and tactical work (< 200 LOC).".to_string(),
-        "     • Workflow: Problem Statement ➔ Guardrails & Limits ➔ Definition of Done.".to_string(),
-        "     • Fast execution: proceed directly with /ce-plan or /ce-work without formal specs.".to_string(),
+        "     • Workflow: Direct execution via /ce-debug or /ce-work, or lightweight planning in docs/plans/.".to_string(),
+        "     • Fast execution: proceed directly without formal OpenSpec change packages.".to_string(),
         String::new(),
         "  2. 7-Stage Compound Engineering Cycle:".to_string(),
         "     • [1: Ideation]   ➔ ce-brainstorm / ce-ideate / ce-strategy".to_string(),
@@ -1734,7 +1741,6 @@ pub fn guide_lines() -> Vec<String> {
         String::new(),
         "Core Workflow Commands:".to_string(),
         "  • ce-ai workflow status          ➔ Inspect active phase, uncommitted drift, and capabilities.".to_string(),
-        "  • ce-ai workflow graduate <feat> ➔ Graduate an ODD task brief to an OpenSpec change package.".to_string(),
         "  • ce-ai spec list                ➔ View living system specifications in openspec/specs/.".to_string(),
         "  • ce-ai workflow archive <feat>  ➔ Archive completed change package post-merge to maintain clean state.".to_string(),
     ]
