@@ -60,7 +60,8 @@ src/
     ├── sync.rs        # ce-ai sync implementation
     ├── upgrade.rs     # ce-ai upgrade implementation
     ├── fleet.rs       # ce-ai fleet pin/status/sync implementation
-    ├── decisions.rs   # ce-ai decisions route model advisor
+    ├── guard.rs       # ce-ai guard agent guardrails & risk policy engine
+    ├── decisions.rs   # ce-ai decisions (legacy aliases & deprecated routing)
     ├── status.rs      # ce-ai status implementation
     ├── uninstall.rs    # ce-ai uninstall implementation
     └── doctor.rs      # ce-ai doctor health check implementation

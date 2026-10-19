@@ -29,7 +29,7 @@ This policy establishes our AI Governance System, adhering strictly to:
 
 | Risk Vector | Description | Severity | Mitigation Strategy |
 | ----------- | ----------- | -------- | ------------------- |
-| **Model Drift** | Agent slot executing under unvetted model parameters | Medium | Native harness configuration & `ce-ai decisions route` advisory tracking |
+| **Execution Risk & Drift** | Agent slot executing unsafe commands or drifted models | Medium | Deterministic safety precedence & `ce-ai guard check` policy evaluation |
 | **Skill Tampering** | Unauthorized prompt injection or skill file corruption | High | SHA256 cryptographic manifest verification (`ce-ai sync`) |
 | **Config Overwrite** | Destruction of developer harness settings during install | High | Pre-install timestamped backups & atomic restoration |
 
@@ -49,7 +49,7 @@ This policy establishes our AI Governance System, adhering strictly to:
 ### 4.1 Safety & Fallback Controls
 - **Dry-Run Mode (`--dry-run`)**: Enables engineers to preview all filesystem mutations, file copies, and JSON changes before writing to disk.
 - **Deterministic Uninstallation**: Instant, 1-command rollback (`ce-ai uninstall`) restores pre-installation harness states cleanly.
-- **Model Routing Transparency**: `ce-ai decisions route` provides empirical guidance for task-to-model capability and routing confidence.
+- **Agent Guardrails & Risk Controls**: `ce-ai guard check` evaluates command execution risk with deterministic safety precedence (<1 ms) for catastrophic operations and semantic scoring.
 
 ---
 

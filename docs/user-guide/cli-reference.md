@@ -29,14 +29,21 @@ for complete arguments. Commands that mutate configuration support global
 | --- | --- |
 | `workflow`, `archive`, `graduate` | Persist/recover workflow state and manage ODD / OpenSpec change packages. |
 | `gate check` | Enforces a complete Stage 4 OpenSpec contract by default; `--mode observe` records the decision without blocking. The Organic LOC notice is advisory. |
-| `guard` | Persists and reports a pedagogical guardrail configuration marker. It does not independently enforce agent behavior. |
 | `spec`, `doc` | Inspect/promote living specifications and run documentation hygiene/linting (`doc lint`, `doc refresh`, `doc stats`). |
+
+## Agent Guardrails & Risk Execution
+
+| Command | Boundary |
+| --- | --- |
+| `guard check <tool> <cmd>` | Evaluates execution risk and safety policy for commands or tool invocations using deterministic precedence (<1 ms) and local semantic risk scoring. |
+| `guard status`, `setup`, `test` | Inspects operational guardrails, applies local-first presets, and executes self-test verification probes. |
+| `guard enable`, `disable` | Toggles pedagogical guardrail mode and level (`junior`, `strict`) across developer harnesses. |
 
 ## Decisions, Companions and Telemetry
 
 | Command | Boundary |
-| `guard check <tool> <cmd>` | Evaluates execution risk and safety policy for commands or tool invocations using deterministic precedence (<1 ms) and local semantic risk scoring. |
-| `guard status`, `setup`, `test` | Inspects operational guardrails and pedagogical level, applies local-first presets, and executes self-test verification probes. |
+| --- | --- |
+| `decisions check-risk` | Backward-compatible alias forwarding directly to `ce-ai guard check`. |
 | `decisions route` (deprecated) | Deprecated advisory command; modern AI coding harnesses manage model selection natively via CLI flags or configuration files. |
 | `skills list`, `skills resolve` | Inspects and resolves available Compound Engineering skills across installed harnesses. |
 | `tools status` | Reports companion readiness and health: **CodeGraph** (AST indexer), **Engram** (persistent memory), and **RTK** (token reducer). |
