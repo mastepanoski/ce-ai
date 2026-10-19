@@ -232,3 +232,10 @@ A persistent SQLite + FTS5 cross-session memory server (`engram`) designed to br
 
 ### RTK (Rust Token Killer) Compression
 A high-throughput terminal pre-processor and stdio output compressor (`rtk`) that intercepts verbose CLI outputs (such as `cargo test`, `git status`, `docker ps`, and test runners) before sending text to the LLM context window. Configured transparently via session and shell hooks during project adoption (`ce-ai init-prj`), RTK compresses noise and boilerplate by 60% to 90%, preventing context exhaustion while preserving critical error stacks and test results.
+
+### Agent Guardrails & Risk Engine
+A dedicated operational security and tool execution policy subsystem in `ce-ai` (`src/commands/guard.rs` and `src/decisions/risk.rs`, invoked via `ce-ai guard check`) designed for autonomous agent loops and CI pipelines. Pivoted from the legacy multi-purpose decision engine, the Guardrails Engine evaluates tool invocations across deterministic safety violations (<1 ms) and six probabilistic risk dimensions (`destructive`, `credential_sensitive`, `external_side_effect`, `privilege_escalation`, `irreversible`, `scope_exceeds_task`). It supports local-first inference via Apple Silicon MLX (`LayaMlxProvider`, <20 ms) or universal local servers (`KevProvider`), enforcing strict `Allow`, `RequireConfirmation`, or `Deny` policies without requiring external cloud API keys or leaking code.
+
+### Deterministic Safety Precedence
+A fundamental security design invariant in `ce-ai`'s Guardrails Engine guaranteeing that deterministic rule checks always execute prior to and take precedence over any probabilistic model evaluation. Critical security violations—such as destructive filesystem deletions (`sudo rm -rf /`), force-pushes to protected branches (`git push --force origin main`), or credential exfiltration (`~/.ssh/id_*`, `.env`)—are blocked immediately (`Policy::Deny`) with zero network latency (<1 ms). Probabilistic models can elevate risk or prompt for confirmation, but can never override or lower a deterministic denial.
+

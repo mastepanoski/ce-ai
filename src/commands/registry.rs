@@ -82,8 +82,7 @@ pub enum Commands {
         /// Target project directory path (default: current working directory)
         path: Option<PathBuf>,
     },
-    /// Persist and inspect pedagogical guardrail configuration (Issue #114).
-    #[command(hide = true)]
+    /// Operational guardrails and tool execution risk evaluation for AI agents.
     Guard(guard::Args),
     /// OpenSpec contract gate for agent code writes; enforcement is the default.
     #[command(subcommand, hide = true)]

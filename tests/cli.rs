@@ -10930,6 +10930,7 @@ fn test_cli_help_hides_legacy_commands_while_preserving_invocation() {
         "spec",
         "doc",
         "decisions",
+        "guard",
         "report-bug",
         "fleet",
     ];
@@ -10948,7 +10949,6 @@ fn test_cli_help_hides_legacy_commands_while_preserving_invocation() {
         "  backups ",
         "  usage ",
         "  audit ",
-        "  guard ",
         "  gate ",
         "  archive ",
         "  graduate ",
@@ -10961,9 +10961,7 @@ fn test_cli_help_hides_legacy_commands_while_preserving_invocation() {
     }
 
     // 2. Invoking hidden commands directly still functions cleanly
-    for cmd in [
-        "archive", "gate", "audit", "guard", "graduate", "backups", "usage",
-    ] {
+    for cmd in ["archive", "gate", "audit", "graduate", "backups", "usage"] {
         let hidden_out = ceai(&config_dir, &home)
             .args([cmd, "--help"])
             .output()

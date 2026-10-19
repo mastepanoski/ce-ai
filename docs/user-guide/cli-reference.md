@@ -35,9 +35,9 @@ for complete arguments. Commands that mutate configuration support global
 ## Decisions, Companions and Telemetry
 
 | Command | Boundary |
-| --- | --- |
-| `decisions route <role>` | Evaluates role-based model and prompt routing (`ce-brainstorm`, `ce-plan`, `ce-work`, `ce-compound`). Replaces the decommissioned `models` command. |
-| `decisions check`, `stats` | Checks task risk and complexity thresholds, and analyzes routing decision metrics. |
+| `guard check <tool> <cmd>` | Evaluates execution risk and safety policy for commands or tool invocations using deterministic precedence (<1 ms) and local semantic risk scoring. |
+| `guard status`, `setup`, `test` | Inspects operational guardrails and pedagogical level, applies local-first presets, and executes self-test verification probes. |
+| `decisions route` (deprecated) | Deprecated advisory command; modern AI coding harnesses manage model selection natively via CLI flags or configuration files. |
 | `skills list`, `skills resolve` | Inspects and resolves available Compound Engineering skills across installed harnesses. |
 | `tools status` | Reports companion readiness and health: **CodeGraph** (AST indexer), **Engram** (persistent memory), and **RTK** (token reducer). |
 | `tools init codegraph` | Initializes the `.codegraph/` index in the current workspace. |

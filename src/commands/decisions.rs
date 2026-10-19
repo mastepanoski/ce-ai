@@ -824,77 +824,7 @@ fn handle_check_risk(
     as_json: bool,
     verbose: bool,
 ) -> Result<(), CeError> {
-    let state_path = ctx.config_dir.join("state.json");
-    let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
-        .unwrap_or_default();
-    let config = state.decisions.clone().unwrap_or_default();
-
-    let provider_box: Option<Box<dyn DecisionProvider>> = if !config.enabled {
-        None
-    } else if config.provider == "mock" {
-        Some(Box::new(MockDecisionProvider::new()))
-    } else {
-        Some(Box::new(JevProvider::new(config.jev.clone(), None)))
-    };
-
-    let root = ctx.repo_root();
-    let branch = crate::commands::workflow::probe_git_branch(&root);
-    let current_wf = state.current_workflow_for_branch(&root, branch.as_deref());
-    let workflow_id = current_wf.as_ref().and_then(|w| w.feature_name.clone());
-
-    let engine = DecisionEngine::new(provider_box, config.mode);
-    let evaluator = crate::decisions::RiskEvaluator::new(&config.risk, Some(&engine))
-        .with_config_dir(&ctx.config_dir)
-        .with_workflow(workflow_id);
-    let result = evaluator.evaluate(tool, command, task);
-
-    // Persist to risk audit log
-    let _ = crate::decisions::log_risk_event(&ctx.config_dir, &result);
-
-    if as_json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&result)
-                .map_err(|e| CeError::Runtime(format!("failed to serialize risk result: {e}")))?
-        );
-        return Ok(());
-    }
-
-    let policy_label = match result.policy {
-        crate::decisions::ExecutionPolicy::Allow => "ALLOW (Safe to execute)",
-        crate::decisions::ExecutionPolicy::RequireConfirmation => {
-            "REQUIRE_CONFIRMATION (User approval needed)"
-        }
-        crate::decisions::ExecutionPolicy::Deny => "DENY (Categorically blocked)",
-    };
-
-    println!("Risk Evaluation Policy: {policy_label}");
-    println!("  Tool:       {}", result.tool);
-    println!("  Command:    {}", result.command);
-    if let Some(t) = &result.task {
-        println!("  Task:       {t}");
-    }
-    println!("  Score:      {:.1}%", result.composite_risk_score * 100.0);
-    println!("  Reason:     {}", result.reason);
-    if result.fallback_applied {
-        println!("  Fallback:   Active (provider unconfigured or unreachable)");
-    }
-    println!("  Latency:    {}ms", result.latency_ms);
-
-    if verbose && !result.dimensions.is_empty() {
-        println!();
-        println!("Risk Dimensions Breakdown:");
-        for dim in &result.dimensions {
-            let status = if dim.elevated { "ELEVATED" } else { "safe" };
-            println!(
-                "  - {:<22} {:>5.1}% [{status}]",
-                dim.dimension,
-                dim.confidence * 100.0
-            );
-        }
-    }
-
-    Ok(())
+    crate::commands::guard::run_guard_check(ctx, tool, command, task, as_json, verbose)
 }
 
 fn handle_check_readiness(
@@ -1126,6 +1056,9 @@ fn handle_stats(
 }
 
 fn handle_compare(ctx: &Context, workflow: Option<&str>, json: bool) -> Result<(), CeError> {
+    eprintln!(
+        "⚠️ Notice: 'ce-ai decisions compare' is deprecated. Model routing is superseded by native harness orchestration."
+    );
     let events = read_decision_events(&ctx.config_dir)?;
     let analytics = DecisionAnalytics::new(events);
     let routing_events = analytics.filter(workflow, Some(DecisionType::ModelRouting));
@@ -1199,6 +1132,9 @@ fn handle_compare(ctx: &Context, workflow: Option<&str>, json: bool) -> Result<(
 }
 
 pub fn handle_route(ctx: &Context, args: &RouteArgs) -> Result<(), CeError> {
+    eprintln!(
+        "⚠️ Notice: 'ce-ai decisions route' is deprecated. Modern AI harnesses manage model assignments natively via CLI flags or configuration files."
+    );
     let state_path = ctx.config_dir.join("state.json");
     let state = State::load_with_workspace_overrides(&state_path, ctx.workspace_root.as_deref())
         .unwrap_or_default();

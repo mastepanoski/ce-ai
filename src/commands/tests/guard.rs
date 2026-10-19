@@ -59,3 +59,45 @@ fn guard_dry_run_writes_nothing() {
 
     assert!(!ctx.state_path().exists());
 }
+
+#[test]
+fn guard_check_catastrophic_command_denied_deterministically() {
+    let (_tmp, ctx) = test_ctx();
+    // Test check on rm -rf /
+    let res = run_guard_check(&ctx, "run_command", "rm -rf /", None, true, false);
+    assert!(res.is_ok());
+
+    let log_file = crate::decisions::risk_events_log_path(&ctx.config_dir);
+    assert!(log_file.exists());
+    let log_content = std::fs::read_to_string(&log_file).unwrap();
+    assert!(log_content.contains("\"policy\":\"deny\""));
+}
+
+#[test]
+fn guard_check_safe_command_allowed() {
+    let (_tmp, ctx) = test_ctx();
+    let res = run_guard_check(&ctx, "run_command", "cargo test", None, false, false);
+    assert!(res.is_ok());
+}
+
+#[test]
+fn guard_setup_and_status() {
+    let (_tmp, ctx) = test_ctx();
+    run_guard_setup(&ctx, "recommended", None, None).unwrap();
+
+    let state = State::load(&ctx.state_path()).unwrap();
+    let dec = state.decisions.expect("decisions should exist");
+    assert!(dec.enabled);
+    assert!(dec.risk.enabled);
+
+    // Status json check
+    let res = run_guard_status(&ctx, true);
+    assert!(res.is_ok());
+}
+
+#[test]
+fn guard_test_runs_successfully() {
+    let (_tmp, ctx) = test_ctx();
+    let res = run_guard_test(&ctx);
+    assert!(res.is_ok());
+}
