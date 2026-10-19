@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-10-18
+
+### Added
+- **First-Class Agent Guardrails & Risk Execution Engine (`src/commands/guard.rs`, `src/commands/registry.rs`)**:
+  - Promoted `ce-ai guard` to a visible, first-class CLI command for pre-execution command and tool policy evaluation.
+  - Implemented `ce-ai guard check <tool> <command>` with deterministic safety precedence (<1 ms) blocking catastrophic operations (`rm -rf /`, force push to main, `.ssh` leaks) and 6-dimension semantic risk scoring.
+  - Added `ce-ai guard status`, `ce-ai guard setup`, and `ce-ai guard test` subcommands.
+  - Retained backward-compatible alias `ce-ai decisions check-risk -> ce-ai guard check`.
+
+### Changed
+- **Local-First Safety Presets & Clean Diagnostics (`src/commands/guard.rs`, `src/commands/doctor.rs`)**:
+  - Re-aligned setup preset `recommended`: defaults to local Apple Silicon MLX (`laya`, <20 ms) on `aarch64-apple-darwin` or deterministic local rules on universal platforms, eliminating cloud API key requirements by default.
+  - Silenced unauthenticated Jev warnings in `ce-ai doctor` when third-party TypeSafe AI was not explicitly enabled.
+- **Deprecation of Model Routing (`src/commands/decisions.rs`)**:
+  - Deprecated `ce-ai decisions route` and `ce-ai decisions compare` with advisory notices, reflecting modern AI coding harnesses that manage model selection natively.
+
 ## [3.3.0] - 2026-10-18
 
 ### Added

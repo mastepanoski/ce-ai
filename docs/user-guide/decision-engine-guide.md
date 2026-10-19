@@ -35,10 +35,10 @@ A common point of confusion is the distinction between **Presets** (`--preset`) 
 
 | Concept | Option | Provider | Mode | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| **Setup Preset** | `recommended` | `jev` | `active` | Active Jev (TypeSafe AI) evaluations with $5/month ceiling, 100 req/session, 1000ms timeout, and all sub-engines enabled. |
-| | `shadow` | `jev` | `shadow` | Evaluates Jev in background to monitor latency and telemetry without altering deterministic policies. |
-| | `kev` | `kev` | `active` | Local System 1 inference via Kev server (`127.0.0.1:8009`). Zero cost, unmetered, universal platform support. |
+| **Setup Preset** | `recommended` | `laya` / `local` | `active` | Local-first evaluation: uses ultra-low latency (<20ms) Laya MLX on Apple Silicon; uses deterministic local rules on universal platforms (zero cloud spend or keys required). |
+| | `shadow` | `jev` | `shadow` | Evaluates in background to monitor latency and telemetry without altering deterministic policies. |
 | | `laya` / `mlx` | `laya-mlx` | `active` | Ultra-low latency (<20ms) local Apple Silicon MLX inference daemon (`127.0.0.1:8008`). |
+| | `kev` | `kev` | `active` | Local System 1 inference via Kev server (`127.0.0.1:8009`). Zero cost, unmetered, universal platform support. |
 | | `local` | `mock` | `active` | 100% offline Mock provider for hermetic testing or environments without API keys. |
 | | `off` / `disabled` | *none* | `off` | Completely disables the Decision Engine; zero network calls and zero evaluations. |
 | **Runtime Mode** | `active` | *configured* | `active` | Evaluations actively enforce policies (e.g., risk confirmation, model routing). |
@@ -180,20 +180,24 @@ ce-ai decisions mode off
 
 ## 5. Operational Workflows
 
-### 1. Risk-Aware Tool Execution (`check-risk`)
+### 1. Risk-Aware Tool Execution (`ce-ai guard check`)
 
-Before running potentially dangerous shell commands or tool invocations, evaluate execution risk across 6 semantic dimensions (`destructive`, `credential_sensitive`, `external_side_effect`, `privilege_escalation`, `irreversible`, `scope_exceeds_task`):
+Before running potentially dangerous shell commands or tool invocations in autonomous loops, evaluate execution risk across deterministic safety rules (<1 ms) and 6 semantic dimensions (`destructive`, `credential_sensitive`, `external_side_effect`, `privilege_escalation`, `irreversible`, `scope_exceeds_task`):
 
 ```bash
-ce-ai decisions check-risk "run_command" "git push --force origin main" --task "Deploy release"
+ce-ai guard check "run_command" "git push --force origin main" --task "Deploy release"
+# Backward-compatible alias:
+ce-ai decisions check-risk "run_command" "git push --force origin main"
 ```
 
 Output:
 ```text
-Tool:     run_command
-Command:  git push --force origin main
-Policy:   RequireConfirmation (composite score: 72%)
-Reason:   Probabilistic risk threshold reached: destructive (85%), irreversible (80%)
+Agent Guardrail Policy: DENY (Categorically blocked)
+  Tool:       run_command
+  Command:    git push --force origin main
+  Score:      100.0%
+  Reason:     Deterministic denial: Force push to protected branch detected
+  Latency:    0ms
 ```
 
 Policies returned:
@@ -201,7 +205,7 @@ Policies returned:
 - `RequireConfirmation`: Risk score between 60% and 89%. Prompts operator for approval.
 - `Deny`: Risk score ≥ 90% or matches deterministic safety violations. Blocked immediately.
 
-Add `--verbose` to inspect individual dimension scores or `--json` for programmatic consumption.
+Add `--verbose` to inspect individual dimension scores or `--json` for programmatic consumption by pre-tool hooks.
 
 ### 2. Work Readiness Advisory (`check-readiness`)
 
@@ -217,21 +221,10 @@ Readiness Advisory: ✓ Ready (88%)
 Summary: DoD verification criteria met across code, unit tests, and security boundaries.
 ```
 
-### 3. Model & Skill Routing (`route`)
+### 3. Model Routing (`route` — Deprecated)
 
-Obtain optimal model class recommendations (Lightweight, Balanced, High-Reasoning, Large-Context) based on semantic complexity:
-
-```bash
-ce-ai decisions route "Refactor multi-threaded state synchronizer to eliminate lock contention"
-```
-
-Output:
-```text
-Task:              Refactor multi-threaded state synchronizer...
-Recommended Class: Reasoning
-Resolved Model:    anthropic/claude-3-7-sonnet
-Rationale:         Concurrency refactoring requires deep reasoning and invariant proofs.
-```
+> [!NOTE]
+> `ce-ai decisions route` is deprecated in favor of native coding-agent harness configuration. Modern harnesses (Antigravity, Claude Code, Cursor, OpenCode) configure model selection natively through CLI flags or configuration files.
 
 ---
 
@@ -239,14 +232,18 @@ Rationale:         Concurrency refactoring requires deep reasoning and invariant
 
 | Command | Purpose | Key Flags |
 | :--- | :--- | :--- |
+| `ce-ai guard check` | Evaluate tool execution risk & safety policy | `<tool>`, `<command>`, `--task`, `--verbose`, `--json` |
+| `ce-ai guard status` | Inspect guardrail operational status | `--json` |
+| `ce-ai guard setup` | Configure guardrails preset | `--preset <recommended\|laya\|kev\|local\|off>` |
+| `ce-ai guard test` | Run self-test evaluation probe | *none* |
 | `ce-ai decisions setup` | Provision preset configurations | `--preset <recommended\|shadow\|local\|off>` |
 | `ce-ai decisions mode [mode]` | Query or switch execution mode | `active`, `shadow`, `off` |
 | `ce-ai decisions auth` | Manage and verify credentials | `--key`, `--stdin`, `--check` |
 | `ce-ai decisions status` | Inspect provider health & budget | `--json` |
 | `ce-ai decisions test` | Run hermetic evaluation probe | `--provider <jev\|mock>` |
-| `ce-ai decisions check-risk` | Evaluate tool execution policy | `--task`, `--verbose`, `--json` |
+| `ce-ai decisions check-risk` | Alias for `ce-ai guard check` | `--task`, `--verbose`, `--json` |
 | `ce-ai decisions check-readiness` | Assess stage or task DoD readiness | `--stage`, `--task`, `--verbose`, `--json` |
-| `ce-ai decisions route <task>` | Compute model recommendation | positional `<task>`, `--verbose`, `--json` |
+| `ce-ai decisions route <task>` | *(Deprecated)* Model recommendation | positional `<task>`, `--verbose`, `--json` |
 
 ---
 

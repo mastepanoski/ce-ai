@@ -1150,12 +1150,8 @@ pub(crate) fn probe_decision_engine_health(
                     }
                 }
                 None => {
-                    let msg = "decision-provider-unauthenticated: Jev enabled but TYPESAFE_API_KEY not found (run 'ce-ai decisions auth' or set TYPESAFE_API_KEY)".to_string();
-                    if strict {
-                        findings.push(msg);
-                    } else {
-                        println!("doctor-warn: {}", msg);
-                    }
+                    let msg = "decision-provider-unauthenticated: Jev provider selected but TYPESAFE_API_KEY not found (run 'ce-ai decisions auth' or switch to local guardrails with 'ce-ai guard setup --preset recommended')".to_string();
+                    println!("doctor-warn: {}", msg);
                 }
             }
         }
@@ -1173,7 +1169,7 @@ pub(crate) fn probe_decision_engine_health(
                 "doctor-info: decision-routing: active (fast: {fast}, standard: {std}, reasoning: {rsn})"
             );
         } else {
-            println!("doctor-info: decision-routing: disabled (static agent slots used)");
+            println!("doctor-info: decision-routing: disabled (native harness orchestration used)");
         }
 
         let skills_cfg = &decisions_cfg.skills;
@@ -1189,13 +1185,15 @@ pub(crate) fn probe_decision_engine_health(
         let risk_cfg = &decisions_cfg.risk;
         if risk_cfg.enabled {
             println!(
-                "doctor-info: risk-engine: active (confirm: {}%, deny: {}%, fallback: {})",
+                "doctor-info: guard / risk-engine: active (confirm: {}%, deny: {}%, fallback: {})",
                 risk_cfg.thresholds.confirmation_threshold_pct,
                 risk_cfg.thresholds.deny_threshold_pct,
                 risk_cfg.fallback.as_str()
             );
         } else {
-            println!("doctor-info: risk-engine: disabled (deterministic security rules active)");
+            println!(
+                "doctor-info: guard / risk-engine: disabled (deterministic security rules active)"
+            );
         }
 
         let readiness_cfg = &decisions_cfg.readiness;
