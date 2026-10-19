@@ -2589,9 +2589,11 @@ fn test_status_and_resume_banners_with_mode() {
     // Organic mode banner
     let lines_organic = status_lines_with_mode(&ctx, Some(ExecutionMode::Organic)).unwrap();
     let text_organic = lines_organic.join("\n");
-    assert!(text_organic.contains("[Workflow Mode: Organic Driven Development (ODD Fast-Path)]"));
-    assert!(text_organic.contains("Tactical Execution Triad"));
-    assert!(text_organic.contains("Graduation Notice"));
+    assert!(
+        text_organic.contains("[Workflow Mode: Compound Agile Fast-Path (Direct / docs/plans/)]")
+    );
+    assert!(text_organic.contains("Agile Tactical Execution:"));
+    assert!(text_organic.contains("Scope Boundary"));
 
     // Compound mode banner
     let lines_compound = status_lines_with_mode(&ctx, Some(ExecutionMode::Compound)).unwrap();

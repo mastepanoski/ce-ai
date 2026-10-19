@@ -33,7 +33,7 @@ Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <
 | Document | Audience | Intent |
 | --- | --- | --- |
 | 🌱 [Getting Started](docs/user-guide/getting-started.md) | Beginner | Tutorial — install, adopt a project, and run a first workflow step |
-| 🎓 [CE-AI positioning](docs/user-guide/ce-ai-positioning.md) | Beginner / Senior | Explanation — agents, Compound Engineering, ODD, and CE-AI’s boundary |
+| 🎓 [CE-AI positioning](docs/user-guide/ce-ai-positioning.md) | Beginner / Senior | Explanation — agents, Compound Engineering, fast-path, and CE-AI’s boundary |
 | 🚀 [Quick Start Workflow Guide](docs/user-guide/quick-start-workflow-guide.md) | Beginner | Tutorial — first feature, bug fix, and workflow resumption |
 | 🎓 [Compound Workflow Explained](docs/user-guide/compound-engineering-workflow-explained.md) | Beginner | Explanation — how strategy becomes code and durable learning |
 | 🎓 [Documentation Debt & Hygiene](docs/user-guide/doc-hygiene-and-debt-explained.md) | Beginner | Explanation — keep specifications and guidance current |
@@ -41,7 +41,7 @@ Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <
 | 🎓 [Harnesses, Loops & Context](docs/user-guide/harnesses-loops-and-context-masterclass.md) | Beginner | Explanation — coding-agent hosts, context, and supporting tools |
 | 🎓 [Determinism Explained](docs/user-guide/determinism-explained.md) | Beginner | Explanation — what CE-AI can and cannot guarantee |
 | 🎓 [Zero-Step Drift Recovery](docs/user-guide/zero-step-drift-recovery-explained.md) | Beginner | Explanation — recover current repository state at session start |
-| ⚡ [ODD Fast-Path Masterclass](docs/user-guide/odd-fast-path-and-graduation-masterclass.md) | Beginner / Senior | Explanation — the lightweight path and when to graduate to formal artifacts |
+| ⚡ [Agile Fast-Path Masterclass](docs/user-guide/odd-fast-path-and-graduation-masterclass.md) | Beginner / Senior | Explanation — the lightweight path and when to adopt formal specifications |
 | 🛡️ [Agent Guardrails Guide](docs/user-guide/decision-engine-guide.md) | Both | How-to — command risk checks, security guardrails, and readiness |
 | 🔧 [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) | Both | How-to — install without overwriting existing configurations |
 | 🔄 [Fleet, Sync & Upgrade](docs/user-guide/sync-and-upgrade-mechanisms.md) | Both | How-to — multi-harness fleet governance, reconcile drift, and batch maintenance |

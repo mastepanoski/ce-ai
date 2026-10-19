@@ -9148,18 +9148,18 @@ fn test_cli_odd_mode_router_and_graduation_lifecycle() {
         .output()
         .unwrap();
 
-    // 2. Status on fix/* branch automatically routes to Organic Driven Development (ODD)
+    // 2. Status on fix/* branch automatically routes to Compound Agile Fast-Path
     ceai(&config_dir, &home)
         .current_dir(&repo_root)
         .args(["workflow", "status"])
         .assert()
         .success()
         .stdout(predicates::str::contains(
-            "[Workflow Mode: Organic Driven Development (ODD Fast-Path)]",
+            "[Workflow Mode: Compound Agile Fast-Path (Direct / docs/plans/)]",
         ))
-        .stdout(predicates::str::contains("Tactical Execution Triad"));
+        .stdout(predicates::str::contains("Agile Tactical Execution:"));
 
-    // 3. Create canonical ODD task brief at odd/tasks/fix-parser.md
+    // 3. Create canonical ODD task brief at odd/tasks/fix-parser.md (legacy fixture)
     let odd_dir = repo_root.join("odd").join("tasks");
     fs::create_dir_all(&odd_dir).unwrap();
     let odd_file = odd_dir.join("fix-parser.md");
@@ -9206,6 +9206,7 @@ Parser panics on empty input stream.
         .args(["graduate", "fix-parser"])
         .assert()
         .success()
+        .stderr(predicates::str::contains("deprecated"))
         .stdout(predicates::str::contains(
             "graduated ODD task 'fix-parser' to OpenSpec successfully!",
         ));
@@ -10989,7 +10990,7 @@ fn test_cli_workflow_guide_and_openspec_onboarding_guidance() {
     assert!(out_guide.status.success());
     let guide_stdout = String::from_utf8_lossy(&out_guide.stdout);
     assert!(guide_stdout.contains("Compound Engineering Workflow & OpenSpec Onboarding Guide"));
-    assert!(guide_stdout.contains("Organic Driven Development (ODD Fast-Path)"));
+    assert!(guide_stdout.contains("Compound Agile Fast-Path (Tactical & Bug Fixes)"));
     assert!(guide_stdout.contains("The OpenSpec Rule of Thumb"));
     assert!(guide_stdout.contains("Skip OpenSpec when"));
     assert!(guide_stdout.contains("Use OpenSpec when"));

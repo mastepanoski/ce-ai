@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-10-19
+
+### Changed
+- **Compound Agile Fast-Path Alignment & Decommissioned ODD Subsystem (`src/commands/workflow.rs`, `src/commands/gate.rs`)**:
+  - Re-aligned fast-path workflow mode in `ce-ai workflow status` and `ce-ai workflow guide` to **Compound Agile Fast-Path (Direct / docs/plans/)**, reflecting native Compound Engineering execution primitives (`docs/plans/`, `/ce-work`, `/ce-debug`).
+  - Deprecated `ce-ai workflow graduate <feature>` with clear migration guidance in accordance with Invariant 6 (*No Semantic Authority*); preserved execution logic exclusively as a backward-compatibility bridge for historical briefs.
+  - Updated `ce-ai gate check` advisory notices for diffs exceeding the 200 LOC ceiling to recommend formalizing in `openspec/changes/<feature>/` or structuring via `docs/plans/` without prompting `graduate`.
+  - Preserved `ExecutionMode::Organic` deserialization in `state.json` schema to guarantee 100% backward compatibility with existing configurations and test fixtures.
+  - Updated documentation (`README.md`, `docs/user-guide/ce-ai-positioning.md`, `docs/user-guide/cli-reference.md`, `docs/user-guide/odd-fast-path-and-graduation-masterclass.md`).
+  - Accreted `CONCEPTS.md` with *Compound Agile Fast-Path (Tactical & Bug Fixes)* entry and authored architectural solution document `docs/solutions/architecture/decommission-odd-and-align-compound-fast-path.md`.
+
 ## [3.4.0] - 2026-10-18
 
 ### Added
