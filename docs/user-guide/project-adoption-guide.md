@@ -156,6 +156,28 @@ ce-ai doctor --fix --all-projects
 > `block_version`. These hints are the intended signal prompting the re-run
 > above, not a regression.
 
+#### Migrating Legacy AGENTS.md Directives (`--migrate`)
+
+Repositories adopted with early versions of CE-AI may contain rigid, unmanaged workflow directives embedded directly in `AGENTS.md` outside the managed block. These include obsolete write-blocking gates (such as rigid Invariant 6, mandatory ASCII FSM diagrams, pre-decoupling Stage 2 constraints, and deprecated `ce-ai models` or `ce-ai decisions` commands).
+
+To surgically modernize legacy directives into decoupled Compound Engineering guidance while strictly preserving 100% of host project domain rules and custom governance policies:
+
+```bash
+# Preview planned modernization without writing changes (non-destructive)
+ce-ai init-prj /path/to/my-project --migrate --dry-run
+
+# Execute surgical migration (automatically creates /path/to/my-project/AGENTS.md.bak)
+ce-ai init-prj /path/to/my-project --migrate
+
+# Batch migrate all registered projects across your local fleet
+ce-ai init-prj --all --migrate
+```
+
+**Safety Guarantees**:
+1. **Host Rule Preservation**: Non-CE-AI content (domain rules, tech stack linters, security protocols) remains byte-for-byte untouched.
+2. **Automatic Backup**: A clean `AGENTS.md.bak` snapshot is written prior to mutating disk.
+3. **Doctor Auto-Repair**: `ce-ai doctor` flags unmanaged legacy directives during routine audits, and `ce-ai doctor --fix` automatically migrates them.
+
 ---
 
 ### De-adopting a Project (`ce-ai deinit-prj`)
