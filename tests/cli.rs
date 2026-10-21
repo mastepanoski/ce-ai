@@ -13,7 +13,7 @@ use tempfile::TempDir;
 /// embeds a block header must derive from this constant: a stale hardcoded
 /// version flips classifier branches after a bump (see
 /// docs/solutions/test-failures/adoption-block-version-bump-test-coordination-2026-08-25.md).
-const CUR_BLOCK_VERSION: u32 = 7;
+const CUR_BLOCK_VERSION: u32 = 8;
 
 fn block_begin_prefix(tier: &str) -> String {
     format!("<!-- ce-ai:block begin v={CUR_BLOCK_VERSION} tier={tier}")
@@ -2604,6 +2604,173 @@ fn init_prj_upgrades_stale_v6_block_to_v7_with_turn0_and_progressive_openspec() 
     let state_val: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(config_dir.join("state.json")).unwrap()).unwrap();
     assert_eq!(state_val["projects"][0]["block_version"], CUR_BLOCK_VERSION);
+}
+
+#[test]
+fn init_prj_upgrades_stale_v7_block_to_v8_with_decoupled_openspec() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("v7-adopted-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    let user_head = "# My Project\n\nCustom notes.\n\n";
+    let v7_block = "<!-- ce-ai:block begin v=7 tier=full sha256=abcdef123456 -->\n## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement\n\nLegacy v7 content.\n<!-- ce-ai:block end -->";
+    fs::write(
+        &agents_file,
+        format!("{}{}{}", user_head, v7_block, "\nTrailing notes.\n"),
+    )
+    .unwrap();
+
+    // Doctor reports stale version v=7
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("stale block version v=7"))
+        .stdout(predicate::str::contains(
+            "re-run ce-ai init-prj --tier full to upgrade",
+        ));
+
+    // Re-running init-prj upgrades to v8
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let updated_text = fs::read_to_string(&agents_file).unwrap();
+    assert!(updated_text.starts_with(user_head));
+    assert!(!updated_text.contains("Legacy v7 content."));
+    assert!(updated_text.contains(&block_begin_prefix("full")));
+    assert!(updated_text.contains("CE-AI enforces zero semantic authority: OpenSpec is decoupled"));
+    assert!(updated_text.contains("frozen Stage 2 contract"));
+
+    let state_val: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(config_dir.join("state.json")).unwrap()).unwrap();
+    assert_eq!(state_val["projects"][0]["block_version"], CUR_BLOCK_VERSION);
+}
+
+#[test]
+fn init_prj_migrate_flag_upgrades_legacy_unmanaged_directives_and_creates_backup() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("legacy-unmanaged-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    let legacy_unmanaged = r#"# Host Project Directives
+Custom project rule 1: Do not break SQL queries.
+
+## Hard-Gate Invariant Index
+6. **OpenSpec Required**: NO code changes without formal spec in `openspec/changes/<feature_name>/`.
+
+## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement
+[Stage 1: Ideation (ce-brainstorm)] ➔ [Stage 2: OpenSpec Definition (MANDATORY)] ➔ [Stage 3: Execution Plan (ce-plan)]
+
+### Stage 2 OpenSpec Enforcement Requirements
+Before creating any PR or writing feature code, agents MUST verify that `openspec/changes/<feature_name>/` contains all five files:
+
+### Single Source of Truth Rule
+Ideation artifacts are disposable inputs.
+
+## Custom Linting
+Run `make test` before pushing.
+"#;
+    let agents_file = prj_dir.join("AGENTS.md");
+    fs::write(&agents_file, legacy_unmanaged).unwrap();
+
+    // 1. Run with --dry-run: verifies preview and no modifications
+    ceai(&config_dir, &home)
+        .args([
+            "init-prj",
+            prj_dir.to_str().unwrap(),
+            "--migrate",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("dry-run: found"))
+        .stdout(predicate::str::contains("legacy directive(s)"))
+        .stdout(predicate::str::contains("PAT-INV-6"));
+
+    assert!(!prj_dir.join("AGENTS.md.bak").exists());
+    assert_eq!(fs::read_to_string(&agents_file).unwrap(), legacy_unmanaged);
+
+    // 2. Run real migration
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--migrate"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Created backup of legacy directives",
+        ))
+        .stdout(predicate::str::contains("Modernized"))
+        .stdout(predicate::str::contains("Adopted project"));
+
+    // Backup exists and matches exact legacy text
+    let backup_file = prj_dir.join("AGENTS.md.bak");
+    assert!(backup_file.exists());
+    assert_eq!(fs::read_to_string(backup_file).unwrap(), legacy_unmanaged);
+
+    // Migrated text preserves custom domain rules
+    let updated_text = fs::read_to_string(&agents_file).unwrap();
+    assert!(updated_text.contains("Custom project rule 1: Do not break SQL queries."));
+    assert!(updated_text.contains("Run `make test` before pushing."));
+
+    // Legacy rules replaced
+    assert!(!updated_text.contains("OpenSpec Required: NO code changes"));
+    assert!(updated_text.contains("No Semantic Authority & Optional OpenSpec"));
+    assert!(!updated_text.contains("[Stage 2: OpenSpec Definition (MANDATORY)]"));
+    assert!(updated_text.contains("[Stage 2: OpenSpec Definition (OPTIONAL)]"));
+    assert!(updated_text.contains("Proactive OpenSpec Triage & Guidance for Developers"));
+    assert!(updated_text.contains(&block_begin_prefix("full")));
+}
+
+#[test]
+fn doctor_reports_legacy_unmanaged_directives_warning() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("legacy-doctor-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    let legacy_unmanaged = r#"# Host Project Directives
+6. **OpenSpec Required**: NO code changes without formal spec in `openspec/changes/<feature_name>/`.
+"#;
+    let agents_file = prj_dir.join("AGENTS.md");
+    fs::write(&agents_file, legacy_unmanaged).unwrap();
+
+    // Adopt first without migrate (will append block)
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "minimal"])
+        .assert()
+        .success();
+
+    // Doctor reports legacy unmanaged directives warning
+    ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains(
+            "legacy unmanaged FSM / mandatory OpenSpec rules detected",
+        ))
+        .stdout(predicate::str::contains(
+            "run 'ce-ai init-prj --migrate' to modernize",
+        ));
+
+    // Doctor --fix automatically modernizes
+    ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args(["doctor", "--fix"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("doctor-fix: modernized"));
+
+    let fixed_text = fs::read_to_string(&agents_file).unwrap();
+    assert!(fixed_text.contains("No Semantic Authority & Optional OpenSpec"));
 }
 
 #[test]
@@ -10880,12 +11047,12 @@ fn test_cli_doctor_fix_repairs_stale_project_adoption_and_init_prj_all() {
         .args(["doctor", "--fix", "--all-projects"])
         .assert()
         .success()
-        .stdout(predicates::str::contains(
-            "doctor-fix: upgraded project adoption block from v=5 to v=7",
-        ));
+        .stdout(predicates::str::contains(format!(
+            "doctor-fix: upgraded project adoption block from v=5 to v={CUR_BLOCK_VERSION}"
+        )));
 
     let updated_content = fs::read_to_string(proj.join("AGENTS.md")).unwrap();
-    assert!(updated_content.contains("v=7"));
+    assert!(updated_content.contains(&format!("v={CUR_BLOCK_VERSION}")));
 
     // 6. Set back to stale v=6 and test init-prj --all
     fs::write(
@@ -10899,12 +11066,12 @@ fn test_cli_doctor_fix_repairs_stale_project_adoption_and_init_prj_all() {
         .args(["init-prj", "--all", "--force"])
         .assert()
         .success()
-        .stdout(predicates::str::contains(
-            "successfully updated 1 registered project(s) to block v=7",
-        ));
+        .stdout(predicates::str::contains(format!(
+            "successfully updated 1 registered project(s) to block v={CUR_BLOCK_VERSION}"
+        )));
 
     let init_all_content = fs::read_to_string(proj.join("AGENTS.md")).unwrap();
-    assert!(init_all_content.contains("v=7"));
+    assert!(init_all_content.contains(&format!("v={CUR_BLOCK_VERSION}")));
 }
 
 #[test]

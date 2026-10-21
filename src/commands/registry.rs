@@ -69,6 +69,9 @@ pub enum Commands {
         /// Force overwrite of modified managed blocks
         #[arg(long)]
         force: bool,
+        /// Migrate legacy AGENTS.md directives outside managed blocks
+        #[arg(long, default_value_t = false)]
+        migrate: bool,
         /// Skip auto-configuring RTK hook injection.
         #[arg(long, default_value_t = false)]
         skip_rtk: bool,
@@ -131,16 +134,20 @@ impl CeCommand for Commands {
                 tier,
                 all,
                 force,
+                migrate,
                 skip_rtk,
                 skip_companions,
             } => init_prj::run(
                 ctx,
                 path.clone(),
-                tier.as_deref(),
-                *all,
-                *force,
-                *skip_rtk,
-                *skip_companions,
+                init_prj::InitPrjOptions {
+                    tier: tier.clone(),
+                    all: *all,
+                    force: *force,
+                    migrate: *migrate,
+                    skip_rtk: *skip_rtk,
+                    skip_companions: *skip_companions,
+                },
             ),
             Commands::DeinitPrj { path } => deinit_prj::run(ctx, path.clone()),
             Commands::Guard(args) => guard::run(ctx, args),
