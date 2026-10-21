@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ideation: Legacy AGENTS.md & FSM Specification Migration</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --card-bg: #161922;
+      --card-border: #262b3a;
+      --text: #e1e4ea;
+      --text-muted: #8b949e;
+      --heading: #ffffff;
+      --primary: #3b82f6;
+      --primary-glow: rgba(59, 130, 246, 0.15);
+      --accent: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --code-bg: #1e2230;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 2rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 960px;
+      width: 100%;
+    }
+
+    header {
+      margin-bottom: 2.5rem;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 9999px;
+      background: var(--primary-glow);
+      color: var(--primary);
+      border: 1px solid var(--primary);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--heading);
+      letter-spacing: -0.025em;
+      margin-bottom: 0.75rem;
+    }
+
+    .metadata-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+      background: var(--card-bg);
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+    }
+
+    .metadata-item span {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metadata-item strong {
+      font-size: 0.95rem;
+      color: var(--heading);
+    }
+
+    section {
+      margin-bottom: 3rem;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-left: 4px solid var(--primary);
+      padding-left: 0.75rem;
+    }
+
+    p { margin-bottom: 1rem; }
+
+    .context-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .context-box ul {
+      list-style-type: none;
+      padding-left: 0;
+    }
+
+    .context-box li {
+      position: relative;
+      padding-left: 1.5rem;
+      margin-bottom: 0.6rem;
+      color: var(--text);
+    }
+
+    .context-box li::before {
+      content: "•";
+      position: absolute;
+      left: 0.5rem;
+      color: var(--primary);
+      font-weight: bold;
+    }
+
+    .axis-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .axis-pill {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+    }
+
+    .axis-pill strong {
+      color: var(--primary);
+      margin-right: 0.25rem;
+    }
+
+    .jump-nav {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .jump-nav-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .jump-links {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .jump-links a {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 0.95rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .jump-links a:hover {
+      text-decoration: underline;
+    }
+
+    .idea-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.75rem;
+      margin-bottom: 2rem;
+      transition: border-color 0.2s ease;
+    }
+
+    .idea-card:hover {
+      border-color: #3b455c;
+    }
+
+    .idea-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .idea-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--heading);
+    }
+
+    .idea-tags {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .tag {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+    }
+
+    .tag-confidence {
+      color: var(--accent);
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .tag-complexity {
+      color: var(--warning);
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+
+    .tag-axis {
+      color: var(--primary);
+      border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .idea-desc {
+      font-size: 1rem;
+      color: var(--text);
+      margin-bottom: 1.25rem;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+      background: var(--code-bg);
+      padding: 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    .field-row strong {
+      color: var(--heading);
+      display: inline-block;
+      width: 100px;
+    }
+
+    .field-row span.basis-tag {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      padding: 0.1rem 0.4rem;
+      background: rgba(59, 130, 246, 0.2);
+      color: #93c5fd;
+      border-radius: 3px;
+      margin-right: 0.5rem;
+    }
+
+    .diagram-container {
+      margin: 1.5rem 0;
+      padding: 1rem;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .diagram-caption {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.75rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    th {
+      background: var(--card-bg);
+      color: var(--heading);
+      font-weight: 600;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    footer.composition-signal {
+      margin-top: 4rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--card-border);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="badge">ce-ideate Candidate Exploration</span>
+      <h1>Migración y Modernización de AGENTS.md y FSM Heredado</h1>
+      <p style="color: var(--text-muted);">
+        Análisis de diagnóstico, opciones de migración y evolución arquitectónica para proyectos que contienen instrucciones rígidas del FSM anterior y especificaciones obligatorias de OpenSpec previas al desacoplamiento en CE-AI.
+      </p>
+      <div class="metadata-grid">
+        <div class="metadata-item">
+          <span>Date</span>
+          <strong>2026-10-21</strong>
+        </div>
+        <div class="metadata-item">
+          <span>Topic</span>
+          <strong>legacy-agents-fsm-migration</strong>
+        </div>
+        <div class="metadata-item">
+          <span>Mode</span>
+          <strong>repo-grounded</strong>
+        </div>
+        <div class="metadata-item">
+          <span>Focus</span>
+          <strong>Migración de AGENTS.md heredados</strong>
+        </div>
+      </div>
+    </header>
+
+    <section id="grounding">
+      <h2>1. Grounding Context (Codebase Context)</h2>
+      <div class="context-box">
+        <ul>
+          <li><strong>Evolución Histórica de CE-AI:</strong> Originalmente (agosto-septiembre 2026), CE-AI operaba con un FSM bloqueante y la Invariante 6 estricta: <em>"NO code changes without formal spec in openspec/changes/&lt;feature_name&gt;/"</em>. A partir de v1.77.0 y consolidado en v2.0/v3.0, OpenSpec se desacopló como herramienta opcional para cambios arquitectónicos (&gt; 200 LOC), eliminando la autoridad semántica mandatoria y transformando el FSM en un <strong>Motor de Observación Consultivo (Advisory Observation Engine)</strong>.</li>
+          <li><strong>Mecanismo Actual de Bloques Gestionados:</strong> <code>BLOCK_VERSION = 7</code> utiliza delimitadores <code>&lt;!-- ce-ai:block begin v=7 tier=&lt;tier&gt; sha256=&lt;hash&gt; --&gt;</code> y <code>&lt;!-- ce-ai:block end --&gt;</code> en <code>src/commands/init_prj.rs</code>. <code>ce-ai doctor</code> clasifica el estado en <code>Ok</code>, <code>StaleVersion</code>, <code>DriftDetected</code>, <code>MalformedBlock</code> y <code>BlockMissing</code>.</li>
+          <li><strong>Auto-reparación existente:</strong> En v3.1.0 (#482), se añadieron <code>ce-ai doctor --fix</code> y <code>ce-ai init-prj --all</code>, permitiendo actualizar bloques marcados como <code>StaleVersion</code> automáticamente.</li>
+          <li><strong>La Patología Actual ("Colisión Semántica"):</strong>
+            <br>
+            • Si un proyecto adoptó CE-AI con bloque delimitado, <code>doctor --fix</code> actualiza el bloque, pero el template <code>AdoptionTier::Full</code> en <code>render_block_content</code> aún conserva lenguaje estricto (<em>"Stage 2 OpenSpec Enforcement Requirements"</em>).
+            <br>
+            • Si un proyecto tiene un <code>AGENTS.md</code> donde las reglas viejas están <strong>fuera del bloque</strong> (creadas a mano, copiadas de versiones viejas de CE-AI o previas a los delimitadores), <code>init-prj</code> se limita a concatenar el bloque nuevo al final del archivo. El archivo resultante contiene directivas contradictorias: el encabezado exige OpenSpec obligatorio para cualquier cambio, mientras que las reglas modernas establecen guías consultivas. Los agentes de IA quedan bloqueados o sobre-estructurados.
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="axes">
+      <h2>2. Topic Axes (Dimensiones de Exploración)</h2>
+      <div class="axis-pills">
+        <div class="axis-pill"><strong>Eje 1:</strong> Diagnóstico y Detección de Directivas Heredadas</div>
+        <div class="axis-pill"><strong>Eje 2:</strong> Motor de Migración Quirúrgica (CLI)</div>
+        <div class="axis-pill"><strong>Eje 3:</strong> Modernización de Plantillas (Full Tier v=8)</div>
+        <div class="axis-pill"><strong>Eje 4:</strong> Gobernanza de Fleet y Multi-Harness</div>
+      </div>
+    </section>
+
+    <section id="jump-nav">
+      <div class="jump-nav">
+        <div class="jump-nav-title">Índice de Ideas Sobrevivientes</div>
+        <div class="jump-links">
+          <a href="#idea-1">1. Linter de Directivas Obsoletas en <code>ce-ai doctor</code> (Eje 1 · Confianza: 95% · Cx: Low)</a>
+          <a href="#idea-2">2. Comando de Migración Asistida <code>ce-ai init-prj --migrate</code> (Eje 2 · Confianza: 90% · Cx: Medium)</a>
+          <a href="#idea-3">3. Actualización de Plantilla Full Tier a Contrato Consultivo v=8 (Eje 3 · Confianza: 95% · Cx: Low)</a>
+          <a href="#idea-4">4. Modo de Envoltura y Cuarentena para AGENTS.md sin Delimitadores (Eje 2 · Confianza: 85% · Cx: Medium)</a>
+          <a href="#idea-5">5. Auditoría y Migración Masiva de Fleet <code>ce-ai fleet migrate</code> (Eje 4 · Confianza: 80% · Cx: Medium)</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="ranked-ideas">
+      <h2>3. Ranked Ideas</h2>
+
+      <!-- Idea 1 -->
+      <article class="idea-card" id="idea-1">
+        <div class="idea-header">
+          <h3 class="idea-title">1. Linter de Directivas Obsoletas en <code>ce-ai doctor</code></h3>
+          <div class="idea-tags">
+            <span class="tag tag-axis">Diagnóstico</span>
+            <span class="tag tag-confidence">Confianza: 95%</span>
+            <span class="tag tag-complexity">Complejidad: Low</span>
+          </div>
+        </div>
+        <p class="idea-desc">
+          Extender <code>check_project_adoption_health</code> en <code>src/commands/doctor.rs</code> para que no sólo verifique la etiqueta <code>&lt;!-- ce-ai:block begin --&gt;</code>, sino que además inspeccione el texto completo de <code>AGENTS.md</code> en busca de patrones heredados conocidos: "Stage 2: OpenSpec Definition (MANDATORY)", "NO code changes without formal spec", invocaciones obsoletas como <code>ce-ai models</code> o <code>ce-ai decisions</code>, y aserciones rígidas de FSM al 100%. Reporta <code>LegacyDirectivesDetected</code> con punteros específicos a las líneas conflictivas.
+        </p>
+        <div class="field-grid">
+          <div class="field-row">
+            <strong>Basis:</strong>
+            <span class="basis-tag">direct:</span> <code>src/commands/init_prj.rs:40-70</code> sólo verifica si el hash de <code>render_block_content</code> coincide dentro de los marcadores, ignorando colisiones fuera del bloque.
+          </div>
+          <div class="field-row">
+            <strong>Rationale:</strong> Proporciona observabilidad inmediata sin riesgo de escritura. Los usuarios descubren si sus archivos tienen "fantasmas regulatorios" que confunden a Claude o Gemini al ejecutar <code>ce-ai doctor</code>.
+          </div>
+          <div class="field-row">
+            <strong>Tradeoffs:</strong> Falsos positivos potenciales si el usuario documentó históricamente por qué removió OpenSpec o citó el término en notas del proyecto.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 2 -->
+      <article class="idea-card" id="idea-2">
+        <div class="idea-header">
+          <h3 class="idea-title">2. Comando de Migración Asistida <code>ce-ai init-prj --migrate</code></h3>
+          <div class="idea-tags">
+            <span class="tag tag-axis">Motor Quirúrgico</span>
+            <span class="tag tag-confidence">Confianza: 90%</span>
+            <span class="tag tag-complexity">Complejidad: Medium</span>
+          </div>
+        </div>
+        <p class="idea-desc">
+          Introducir un subcomando o flag (<code>ce-ai init-prj --migrate [path]</code> o <code>ce-ai migrate-agents</code>) que realice una transformación sintáctica no destructiva:
+          identifica bloques de FSM viejo (tablas ASCII del ciclo de 7 etapas con <em>MANDATORY</em>, Invariante 6 antigua) y los reescribe al estándar actual (Invariante 6 moderna: "No Semantic Authority & Optional OpenSpec", triage de 200 LOC, FSM consultivo). Conserva intactas todas las reglas de dominio del proyecto (lints, estándares de código, arquitectura de carpetas, Docker).
+        </p>
+
+        <div class="diagram-container">
+          <svg viewBox="0 0 760 160" width="100%" height="160" xmlns="http://www.w3.org/2000/svg">
+            <!-- Legacy File -->
+            <rect x="20" y="20" width="220" height="120" rx="6" fill="#1e2230" stroke="#ef4444" stroke-width="2"/>
+            <text x="35" y="45" fill="#f87171" font-family="sans-serif" font-weight="bold" font-size="13">AGENTS.md Heredado</text>
+            <text x="35" y="70" fill="#9ca3af" font-family="monospace" font-size="10">• Reglas de dominio proyecto</text>
+            <text x="35" y="90" fill="#f87171" font-family="monospace" font-size="10">• FSM rígido (MANDATORY)</text>
+            <text x="35" y="110" fill="#f87171" font-family="monospace" font-size="10">• OpenSpec Invariant 6 bloqueante</text>
+
+            <!-- Arrow -->
+            <path d="M 260 80 L 330 80" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+            <text x="265" y="70" fill="#60a5fa" font-family="sans-serif" font-size="10" font-weight="bold">--migrate</text>
+
+            <!-- Modern File -->
+            <rect x="350" y="20" width="380" height="120" rx="6" fill="#1e2230" stroke="#10b981" stroke-width="2"/>
+            <text x="365" y="45" fill="#34d399" font-family="sans-serif" font-weight="bold" font-size="13">AGENTS.md Modernizado</text>
+            <text x="365" y="70" fill="#9ca3af" font-family="monospace" font-size="10">✓ Reglas de dominio preservadas intactas</text>
+            <text x="365" y="90" fill="#34d399" font-family="monospace" font-size="10">✓ FSM consultivo (Advisory Observation Engine)</text>
+            <text x="365" y="110" fill="#34d399" font-family="monospace" font-size="10">✓ OpenSpec opcional con triaje &gt; 200 LOC</text>
+            <text x="365" y="130" fill="#60a5fa" font-family="monospace" font-size="10">✓ Bloque gestionado &lt;!-- ce-ai:block v=7/8 --&gt;</text>
+          </svg>
+          <div class="diagram-caption">Transformación quirúrgica: el motor aísla las directivas de CE-AI de las reglas de dominio del proyecto anfitrión.</div>
+        </div>
+
+        <div class="field-grid">
+          <div class="field-row">
+            <strong>Basis:</strong>
+            <span class="basis-tag">reasoned:</span> Los proyectos que adoptaron CE-AI en sus fases tempranas tienen reglas de su propio negocio mezcladas con las directivas de CE-AI. Un sobreescritura ciega borraría directivas de dominio; una concatenación crea esquizofrenia en los modelos.
+          </div>
+          <div class="field-row">
+            <strong>Rationale:</strong> Proporciona una ruta de actualización suave y determinista sin requerir que el desarrollador edite manualmente 200 líneas de markdown en múltiples repositorios.
+          </div>
+          <div class="field-row">
+            <strong>Tradeoffs:</strong> Requiere pruebas de cobertura sobre variaciones estilísticas de <code>AGENTS.md</code> para evitar ediciones destructivas de texto no relacionado.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 3 -->
+      <article class="idea-card" id="idea-3">
+        <div class="idea-header">
+          <h3 class="idea-title">3. Actualización de Plantilla Full Tier a Contrato Consultivo (v=8)</h3>
+          <div class="idea-tags">
+            <span class="tag tag-axis">Plantillas</span>
+            <span class="tag tag-confidence">Confianza: 95%</span>
+            <span class="tag tag-complexity">Complejidad: Low</span>
+          </div>
+        </div>
+        <p class="idea-desc">
+          Incrementar <code>BLOCK_VERSION</code> de 7 a 8 y actualizar el contenido de <code>AdoptionTier::Full</code> en <code>src/commands/init_prj.rs</code>. Actualmente, <code>AdoptionTier::Full</code> aún reza <em>"Stage 2 OpenSpec Enforcement Requirements"</em> y <em>"Before writing feature code, agents MUST verify openspec/changes/..."</em>. La nueva versión v=8 debe reflejar fielmente la directiva del propio repositorio: OpenSpec progresivo y desacoplado, triaje explícito para &gt; 200 LOC, y FSM como motor consultivo de observabilidad.
+        </p>
+        <div class="field-grid">
+          <div class="field-row">
+            <strong>Basis:</strong>
+            <span class="basis-tag">direct:</span> <code>src/commands/init_prj.rs:76-96</code> vs <code>AGENTS.md:12-14, 140-155</code>. El código fuente de <code>init_prj.rs</code> todavía inyecta la semántica estricta anterior a los proyectos que eligen <code>--tier full</code>.
+          </div>
+          <div class="field-row">
+            <strong>Rationale:</strong> Elimina la discrepancia interna entre lo que CE-AI predica en su propio <code>AGENTS.md</code> y lo que genera en los proyectos de sus usuarios.
+          </div>
+          <div class="field-row">
+            <strong>Tradeoffs:</strong> Requiere ejecutar <code>ce-ai doctor --fix</code> o <code>init-prj --all</code> para refrescar los proyectos ya registrados en <code>state.json</code>.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 4 -->
+      <article class="idea-card" id="idea-4">
+        <div class="idea-header">
+          <h3 class="idea-title">4. Modo de Envoltura y Cuarentena para AGENTS.md sin Delimitadores</h3>
+          <div class="idea-tags">
+            <span class="tag tag-axis">Motor Quirúrgico</span>
+            <span class="tag tag-confidence">Confianza: 85%</span>
+            <span class="tag tag-complexity">Complejidad: Medium</span>
+          </div>
+        </div>
+        <p class="idea-desc">
+          Cuando <code>ce-ai init-prj</code> detecta que un proyecto ya posee un <code>AGENTS.md</code> pero carece de delimitadores <code>&lt;!-- ce-ai:block begin --&gt;</code>, en lugar de realizar un append ciego al final del archivo, analiza si el archivo contiene secciones de Compound Engineering anteriores. Si las detecta, envuelve la sección heredada en un comentario de advertencia/cuarentena o inserta una directiva de precedencia clara en el encabezado indicando que las cláusulas del bloque inferior tienen precedencia normativa sobre cualquier FSM previo.
+        </p>
+        <div class="field-grid">
+          <div class="field-row">
+            <strong>Basis:</strong>
+            <span class="basis-tag">reasoned:</span> Los LLMs siguen órdenes en función del orden de lectura y la fuerza de las restricciones ("MUST", "NEVER"). Si la primera regla del archivo dice "NO code changes without formal spec", el modelo ignorará las guías más relajadas situadas 200 líneas más abajo.
+          </div>
+          <div class="field-row">
+            <strong>Rationale:</strong> Previene la parálisis inmediata de los agentes sin alterar destructivamente el contenido histórico del usuario.
+          </div>
+          <div class="field-row">
+            <strong>Tradeoffs:</strong> Deja texto redundante en el archivo hasta que el usuario decida borrarlo.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 5 -->
+      <article class="idea-card" id="idea-5">
+        <div class="idea-header">
+          <h3 class="idea-title">5. Auditoría y Migración Masiva de Fleet (<code>ce-ai fleet migrate</code>)</h3>
+          <div class="idea-tags">
+            <span class="tag tag-axis">Gobernanza Fleet</span>
+            <span class="tag tag-confidence">Confianza: 80%</span>
+            <span class="tag tag-complexity">Complejidad: Medium</span>
+          </div>
+        </div>
+        <p class="idea-desc">
+          Extender el comando <code>ce-ai fleet</code> con una capacidad de migración integral: evalúa todos los proyectos registrados en <code>~/.ce-ai/state.json</code>, revisa tanto los bloques gestionados como los archivos de instrucciones de arneses (<code>.cursor/rules</code>, <code>.github/copilot-instructions.md</code>, <code>CLAUDE.md</code>, <code>.grok/rules/</code>), reconcilia hooks de sesión Turn-0 faltantes (<code>ce-ai workflow resume --json</code>) y emite un reporte visual de paridad normativa antes y después de la migración.
+        </p>
+        <div class="field-grid">
+          <div class="field-row">
+            <strong>Basis:</strong>
+            <span class="basis-tag">direct:</span> <code>src/commands/fleet.rs</code> ya gestiona el estado y anclaje de múltiples proyectos, mientras que <code>src/commands/init_prj.rs:reconcile_project_harness_hooks</code> ya conoce la sincronización de arneses secundarios.
+          </div>
+          <div class="field-row">
+            <strong>Rationale:</strong> Permite a equipos con decenas de microservicios o bibliotecas actualizar todas sus reglas de agentes en un solo paso determinista.
+          </div>
+          <div class="field-row">
+            <strong>Tradeoffs:</strong> Impacto en git diffs a través de múltiples repositorios si se ejecuta con auto-commit.
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section id="rejection-summary">
+      <h2>4. Rejection Summary (Ideas Descartadas)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Candidato Descartado</th>
+            <th>Eje</th>
+            <th>Razón de Descarte</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Sobreescritura total de <code>AGENTS.md</code> en adopción</td>
+            <td>Motor</td>
+            <td><strong>Violación de Invariante:</strong> Destruiría configuraciones de dominio, linter commands y reglas de arquitectura propias del proyecto anfitrión.</td>
+          </tr>
+          <tr>
+            <td>Flag en runtime <code>--ignore-legacy-fsm</code></td>
+            <td>Diagnóstico</td>
+            <td><strong>Ineficaz:</strong> Las instrucciones son consumidas por el contexto del LLM (Claude/Gemini) antes de que la CLI de CE-AI sea ejecutada.</td>
+          </tr>
+          <tr>
+            <td>Inyección de prompts dinámicos vía shell hook</td>
+            <td>Arneses</td>
+            <td><strong>Sobrecarga:</strong> Añade latencia en cada invocación de shell y depende de hooks de entorno no portables en Windows o entornos restringidos.</td>
+          </tr>
+          <tr>
+            <td>Eliminación total del nivel <code>AdoptionTier::Full</code></td>
+            <td>Plantillas</td>
+            <td><strong>Pérdida de valor:</strong> Equipos regulados o de alta complejidad aún se benefician de OpenSpec y el ciclo formal de 7 etapas cuando se implementa de manera consultiva.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer class="composition-signal">
+      Composed 2026-10-21 by ce-ideate · Mode: repo-grounded · Grounded in <code>ce-ai</code> codebase
+    </footer>
+  </div>
+</body>
+</html>

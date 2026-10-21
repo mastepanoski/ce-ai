@@ -242,3 +242,7 @@ A fundamental security design invariant in `ce-ai`'s Guardrails Engine guarantee
 ### Compound Agile Fast-Path (Tactical & Bug Fixes)
 A lightweight, ceremony-free execution track in `ce-ai` optimized for rapid bug fixes, chores, and tactical changes (<200 LOC). Rather than requiring multi-document specification packages (`openspec/changes/`), the agile fast-path relies on native Compound Engineering execution primitives—either direct execution via `ce-work` / `ce-debug` or lightweight plans under `docs/plans/` (`ce-plan`). Replaces the experimental, custom `odd/tasks/` format and deprecated `ce-ai workflow graduate` bridge in accordance with Invariant 6 (No Semantic Authority), aligning `ce-ai` directly with native Compound Engineering contracts without creating disconnected intermediate file trees.
 
+### Assisted AGENTS Migration (`--migrate`)
+A surgical modernization mechanism in `ce-ai init-prj` (`--migrate`) and `ce-ai doctor --fix` that transforms unmanaged, historical CE-AI directives (such as mandatory OpenSpec FSM ASCII diagrams, deprecated `ce-ai models` and `ce-ai decisions` commands, and pre-decoupling Stage 2 blocking write gates) embedded directly in host project `AGENTS.md` files into modern, decoupled Compound Engineering instructions. The migration creates an automatic timestamp-free backup (`AGENTS.md.bak`), supports non-destructive preview via `--dry-run`, only replaces verified historical patterns, and guarantees 100% byte-for-byte preservation of host project domain rules and custom governance policies.
+
+

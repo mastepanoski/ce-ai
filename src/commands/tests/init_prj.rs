@@ -255,13 +255,13 @@ fn test_render_block_content_turn_0_and_progressive_openspec() {
         .contains("Only run `ce-ai workflow resume` yourself when no such context was injected"));
 
     // Stage 2: Progressive OpenSpec authoring
-    assert!(full.contains("### Stage 2 OpenSpec Enforcement Requirements"));
-    assert!(full.contains("OpenSpec is authored progressively. Before writing feature code, agents MUST verify `openspec/changes/<feature_name>/` contains the frozen Stage 2 contract:"));
+    assert!(full.contains("### Stage 2 OpenSpec Integration (Optional)"));
+    assert!(full.contains("CE-AI enforces zero semantic authority: OpenSpec is decoupled"));
     assert!(full.contains("`tasks.md` (the executable task checklist) is generated from that frozen contract in Stage 3 — do not require it before Stage 2 is complete, but do not open a PR without it."));
 
     // Verify tasks.md is NOT listed under the Stage 2 contract bullet points
     let stage2_section = full
-        .split("### Stage 2 OpenSpec Enforcement Requirements")
+        .split("### Stage 2 OpenSpec Integration (Optional)")
         .nth(1)
         .unwrap()
         .split("### Single Source of Truth Rule")
@@ -321,7 +321,15 @@ fn test_init_prj_all_updates_registered_projects() {
         verbose: false,
     };
 
-    let res = run(&ctx, None, None, true, true, false, false);
+    let res = run(
+        &ctx,
+        None,
+        InitPrjOptions {
+            all: true,
+            force: true,
+            ..Default::default()
+        },
+    );
     assert!(res.is_ok());
 
     let content_a = fs::read_to_string(prj_a.join("AGENTS.md")).unwrap();
@@ -338,4 +346,153 @@ fn test_init_prj_all_updates_registered_projects() {
     assert_eq!(updated_state.projects[0].tier, AdoptionTier::Full);
     assert_eq!(updated_state.projects[1].block_version, BLOCK_VERSION);
     assert_eq!(updated_state.projects[1].tier, AdoptionTier::Minimal);
+}
+
+#[test]
+fn test_scan_legacy_directives_identifies_all_patterns() {
+    let legacy_text = r#"# AGENTS.md
+6. **OpenSpec Required**: NO code changes without formal spec in `openspec/changes/<feature_name>/`.
+5. **Mandatory OpenSpec Before Code Changes**:
+   - NO code changes or feature implementations shall be made without creating or updating a formal spec under `openspec/changes/<feature_name>/` containing `proposal.md`, `exploration.md`, `design.md`, `spec.md`, and `tasks.md`.
+[Stage 2: OpenSpec Definition (MANDATORY)]
+### Stage 2 OpenSpec Enforcement Requirements
+├── models.rs      # ce-ai models set/list/profile implementation
+├── decisions.rs   # ce-ai decisions route model advisor
+so the repository FSM is left at ✓ Ready (100%) with zero unarchived change warnings before concluding
+"#;
+
+    let findings = scan_legacy_directives(legacy_text);
+    assert_eq!(findings.len(), 8);
+    assert!(findings.iter().any(|f| f.pattern_id == "PAT-INV-6"));
+    assert!(findings
+        .iter()
+        .any(|f| f.pattern_id == "PAT-CONSTRAINT-OPENSPEC"));
+    assert!(findings.iter().any(|f| f.pattern_id == "PAT-FSM-7"));
+    assert!(findings.iter().any(|f| f.pattern_id == "PAT-STAGE-2"));
+    assert!(findings.iter().any(|f| f.pattern_id == "PAT-CLI-MODELS"));
+    assert!(findings.iter().any(|f| f.pattern_id == "PAT-CLI-DECISIONS"));
+    assert!(findings.iter().any(|f| f.pattern_id == "PAT-FSM-READY"));
+}
+
+#[test]
+fn test_migrate_legacy_directives_preserves_custom_domain_rules() {
+    let text = r#"# Custom Project
+This is our unique custom architecture.
+
+## Custom Invariants
+1. Do not break database migrations.
+6. **OpenSpec Required**: NO code changes without formal spec in `openspec/changes/<feature_name>/`.
+
+## Development Cycle
+[Stage 1: Ideation (ce-brainstorm)] ➔ [Stage 2: OpenSpec Definition (MANDATORY)] ➔ [Stage 3: Execution Plan (ce-plan)]
+
+### Stage 2 OpenSpec Enforcement Requirements
+Before creating any PR or writing feature code, agents MUST verify that `openspec/changes/<feature_name>/` contains all five files:
+
+### Single Source of Truth Rule
+Ideation artifacts are disposable inputs.
+
+### Custom Project Linters
+Run `npm test` before committing.
+"#;
+
+    let (migrated, findings) = migrate_legacy_directives(text);
+    assert!(!findings.is_empty());
+    // Custom domain content preserved
+    assert!(migrated.contains("This is our unique custom architecture."));
+    assert!(migrated.contains("1. Do not break database migrations."));
+    assert!(migrated.contains("### Custom Project Linters"));
+    assert!(migrated.contains("Run `npm test` before committing."));
+
+    // Legacy directives replaced
+    assert!(!migrated.contains("OpenSpec Required: NO code changes"));
+    assert!(migrated.contains("No Semantic Authority & Optional OpenSpec"));
+    assert!(!migrated.contains("[Stage 2: OpenSpec Definition (MANDATORY)]"));
+    assert!(migrated.contains("[Stage 2: OpenSpec Definition (OPTIONAL)]"));
+    assert!(!migrated.contains("Stage 2 OpenSpec Enforcement Requirements"));
+    assert!(migrated.contains("Stage 2 OpenSpec Integration (Optional)"));
+    assert!(migrated.contains("Proactive OpenSpec Triage & Guidance for Developers"));
+}
+
+#[test]
+fn test_adopt_project_with_migrate_creates_backup_and_upgrades() {
+    let tmp = TempDir::new().unwrap();
+    let prj_dir = tmp.path().join("legacy-project");
+    let config_dir = tmp.path().join("config");
+    fs::create_dir_all(&prj_dir).unwrap();
+    fs::create_dir_all(&config_dir).unwrap();
+
+    let legacy_content = "# Project Notes\n\n6. **OpenSpec Required**: NO code changes without formal spec in `openspec/changes/<feature_name>/`.\n";
+    fs::write(prj_dir.join("AGENTS.md"), legacy_content).unwrap();
+
+    let ctx = Context {
+        config_dir: config_dir.clone(),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        quiet: true,
+        dry_run: false,
+        verbose: false,
+    };
+
+    let res = adopt_project(
+        &ctx,
+        &prj_dir,
+        AdoptionTier::Full,
+        false,
+        true, // migrate = true
+        false,
+        false,
+    );
+    assert!(res.is_ok());
+
+    // Backup created
+    let backup_path = prj_dir.join("AGENTS.md.bak");
+    assert!(backup_path.exists());
+    assert_eq!(fs::read_to_string(&backup_path).unwrap(), legacy_content);
+
+    // File modernized and managed block injected
+    let modernized = fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap();
+    assert!(modernized.contains("No Semantic Authority & Optional OpenSpec"));
+    assert!(modernized.contains(&format!("v={BLOCK_VERSION}")));
+}
+
+#[test]
+fn test_adopt_project_with_migrate_dry_run_leaves_disk_untouched() {
+    let tmp = TempDir::new().unwrap();
+    let prj_dir = tmp.path().join("dry-run-legacy");
+    let config_dir = tmp.path().join("config");
+    fs::create_dir_all(&prj_dir).unwrap();
+    fs::create_dir_all(&config_dir).unwrap();
+
+    let legacy_content = "# Project Notes\n\n6. **OpenSpec Required**: NO code changes without formal spec in `openspec/changes/<feature_name>/`.\n";
+    fs::write(prj_dir.join("AGENTS.md"), legacy_content).unwrap();
+
+    let ctx = Context {
+        config_dir: config_dir.clone(),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        quiet: true,
+        dry_run: true, // dry_run = true
+        verbose: false,
+    };
+
+    let res = adopt_project(
+        &ctx,
+        &prj_dir,
+        AdoptionTier::Full,
+        false,
+        true, // migrate = true
+        false,
+        false,
+    );
+    assert!(res.is_ok());
+
+    // Backup NOT created on dry-run
+    assert!(!prj_dir.join("AGENTS.md.bak").exists());
+
+    // File unchanged on disk
+    assert_eq!(
+        fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap(),
+        legacy_content
+    );
 }

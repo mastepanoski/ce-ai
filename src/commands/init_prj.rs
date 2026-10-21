@@ -19,7 +19,7 @@ pub const GITIGNORE_END_MARKER: &str = "# END CE-AI MANAGED BLOCK";
 
 /// Managed block schema version, shared by the on-disk header and the
 /// `state.json` adoption entry so the two cannot drift apart.
-pub const BLOCK_VERSION: u32 = 7;
+pub const BLOCK_VERSION: u32 = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -73,18 +73,20 @@ pub fn check_adoption_block_status(
 pub fn render_block_content(tier: AdoptionTier) -> &'static str {
     match tier {
         AdoptionTier::Full => {
-            r#"## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement
+            r#"## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Integration
 
 All AI agents MUST follow the 7-stage Compound Engineering development cycle:
-`[Stage 1: Ideation]` ➔ `[Stage 2: OpenSpec Definition]` ➔ `[Stage 3: Execution Plan]`
+`[Stage 1: Ideation]` ➔ `[Stage 2: OpenSpec Definition (Optional)]` ➔ `[Stage 3: Execution Plan]`
 ➔ `[Stage 4: TDD & Implementation]` ➔ `[Stage 5: Verification]` ➔ `[Stage 6: Knowledge Capture]`
 ➔ `[Stage 7: Git Shipping]`
 
 ### ⚡ Turn-0 Session Directives (Zero-Step Drift Recovery)
 `ce-ai` auto-installs a SessionStart hook on supported harnesses that runs `ce-ai workflow resume --json` and injects live FSM state (Git working tree, active branch, manifest SHA256 integrity, OpenSpec progress) into context before your first turn. If that state is already present at session start, treat it as current — do NOT re-run the command. Only run `ce-ai workflow resume` yourself when no such context was injected (harness without hook support, or the hook is disabled) or when you suspect the injected state has gone stale mid-session (e.g. after a `git` operation you didn't make through your own tool calls).
 
-### Stage 2 OpenSpec Enforcement Requirements
-OpenSpec is authored progressively. Before writing feature code, agents MUST verify `openspec/changes/<feature_name>/` contains the frozen Stage 2 contract:
+### Stage 2 OpenSpec Integration (Optional)
+CE-AI enforces zero semantic authority: OpenSpec is decoupled from the core workflow as an optional tool for architectural changes (> 200 LOC), schema changes, or cross-cutting features, rather than a mandatory write blocker. For bug fixes, minor tweaks, or tactical tasks (< 200 LOC), bypass OpenSpec and proceed directly with `/ce-plan` or `ce-work`.
+
+When formal specifications are activated for complex features, OpenSpec is authored progressively to establish the frozen Stage 2 contract:
 - `proposal.md`: Problem statement, in-scope/out-of-scope boundaries, and success criteria.
 - `exploration.md`: Technical investigation and architectural tradeoffs.
 - `design.md`: Technical design, system architecture, structs, and API/CLI contracts.
@@ -137,12 +139,241 @@ pub fn compute_sha256(content: &str) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+/// Represents a legacy directive or FSM clause discovered outside a managed block.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LegacyPatternFinding {
+    pub pattern_id: &'static str,
+    pub description: &'static str,
+    pub line: usize,
+}
+
+/// Extracts content outside of the managed block delimiters (or the entire content if no block exists).
+pub fn extract_unmanaged_content(content: &str) -> String {
+    if let Some(start_idx) = content.find(BLOCK_BEGIN_MARKER) {
+        if let Some(end_rel_idx) = content[start_idx..].find(BLOCK_END_MARKER) {
+            let end_idx = start_idx + end_rel_idx + BLOCK_END_MARKER.len();
+            let mut unmanaged = String::with_capacity(content.len());
+            unmanaged.push_str(&content[..start_idx]);
+            unmanaged.push_str(&content[end_idx..]);
+            return unmanaged;
+        }
+    }
+    content.to_string()
+}
+
+/// Scans unmanaged markdown content for legacy Compound Engineering directives and rigid FSM clauses.
+pub fn scan_legacy_directives(content: &str) -> Vec<LegacyPatternFinding> {
+    let unmanaged = extract_unmanaged_content(content);
+    let mut findings = Vec::new();
+
+    for (line_idx, line) in unmanaged.lines().enumerate() {
+        let line_num = line_idx + 1;
+        if (line.contains("OpenSpec Required") && line.contains("NO code changes without"))
+            || (line.trim_start().starts_with("6.") && line.contains("OpenSpec Required"))
+        {
+            findings.push(LegacyPatternFinding {
+                pattern_id: "PAT-INV-6",
+                description: "Legacy Invariant 6 enforcing mandatory OpenSpec",
+                line: line_num,
+            });
+        } else if line.contains("Mandatory OpenSpec Before Code Changes")
+            || (line.contains("NO code changes or feature implementations shall be made without creating or updating a formal spec"))
+        {
+            findings.push(LegacyPatternFinding {
+                pattern_id: "PAT-CONSTRAINT-OPENSPEC",
+                description: "Mandatory OpenSpec constraint before code changes",
+                line: line_num,
+            });
+        } else if line.contains("[Stage 2: OpenSpec Definition (MANDATORY)]") {
+            findings.push(LegacyPatternFinding {
+                pattern_id: "PAT-FSM-7",
+                description: "Mandatory Stage 2 in 7-stage development cycle diagram",
+                line: line_num,
+            });
+        } else if line.contains("Stage 2 OpenSpec Enforcement Requirements") {
+            findings.push(LegacyPatternFinding {
+                pattern_id: "PAT-STAGE-2",
+                description: "Stage 2 OpenSpec Enforcement heading",
+                line: line_num,
+            });
+        } else if line.contains("models.rs") && line.contains("ce-ai models") {
+            findings.push(LegacyPatternFinding {
+                pattern_id: "PAT-CLI-MODELS",
+                description: "Deprecated 'ce-ai models' CLI reference",
+                line: line_num,
+            });
+        } else if line.contains("decisions.rs") && line.contains("model advisor") {
+            findings.push(LegacyPatternFinding {
+                pattern_id: "PAT-CLI-DECISIONS",
+                description: "Deprecated 'ce-ai decisions' model advisor reference",
+                line: line_num,
+            });
+        } else if line.contains("Ready (100%) with zero unarchived change warnings") {
+            findings.push(LegacyPatternFinding {
+                pattern_id: "PAT-FSM-READY",
+                description: "Rigid FSM 100% Ready gate in post-merge lifecycle",
+                line: line_num,
+            });
+        }
+    }
+
+    findings
+}
+
+/// Surgically modernizes legacy directives in the unmanaged portion of an AGENTS.md file.
+pub fn migrate_legacy_directives(content: &str) -> (String, Vec<LegacyPatternFinding>) {
+    let findings = scan_legacy_directives(content);
+    if findings.is_empty() {
+        return (content.to_string(), findings);
+    }
+
+    // Split around managed block if present so we only modify unmanaged portions
+    let (prefix, managed_opt, suffix) = if let Some(start_idx) = content.find(BLOCK_BEGIN_MARKER) {
+        if let Some(end_rel_idx) = content[start_idx..].find(BLOCK_END_MARKER) {
+            let end_idx = start_idx + end_rel_idx + BLOCK_END_MARKER.len();
+            (
+                &content[..start_idx],
+                Some(&content[start_idx..end_idx]),
+                &content[end_idx..],
+            )
+        } else {
+            (content, None, "")
+        }
+    } else {
+        (content, None, "")
+    };
+
+    let transform_slice = |text: &str| -> String {
+        let mut out = String::with_capacity(text.len());
+        let mut lines = text.lines().peekable();
+
+        while let Some(line) = lines.next() {
+            // PAT-INV-6
+            if (line.contains("OpenSpec Required") && line.contains("NO code changes without"))
+                || (line.trim_start().starts_with("6.") && line.contains("OpenSpec Required"))
+            {
+                out.push_str("6. **No Semantic Authority & Optional OpenSpec**: CE-AI MUST NOT introduce mandatory workflow stages, artifacts, or blocking write gates beyond those defined by Compound Engineering contracts. OpenSpec is decoupled from the core domain as an optional, opt-in integration for high-complexity architectural changes, rather than an authoritarian write blocker.\n");
+                continue;
+            }
+
+            // PAT-CONSTRAINT-OPENSPEC
+            if line.contains("Mandatory OpenSpec Before Code Changes") {
+                out.push_str("5. **No Semantic Authority & Optional OpenSpec Integration**:\n   - CE-AI must not require artifacts that Compound Engineering itself does not require. OpenSpec change packages (`proposal.md`, `exploration.md`, `design.md`, `spec.md`, `tasks.md`) are optional tools for complex architectural work or formal compliance, not mandatory blockers for bug fixes, docs, or routine tasks.\n");
+                // Skip the immediate following bullet line if it describes the legacy requirement
+                if let Some(next_line) = lines.peek() {
+                    if next_line
+                        .contains("NO code changes or feature implementations shall be made")
+                    {
+                        lines.next();
+                    }
+                }
+                continue;
+            }
+
+            // PAT-FSM-7
+            if line.contains("[Stage 2: OpenSpec Definition (MANDATORY)]") {
+                let replaced = line.replace(
+                    "[Stage 2: OpenSpec Definition (MANDATORY)]",
+                    "[Stage 2: OpenSpec Definition (OPTIONAL)]",
+                );
+                out.push_str(&replaced);
+                out.push('\n');
+                continue;
+            }
+
+            // PAT-STAGE-2
+            if line.contains("Stage 2 OpenSpec Enforcement Requirements") {
+                out.push_str("### Stage 2 OpenSpec Integration (Optional)\n");
+                continue;
+            }
+            if line.contains("Before creating any PR or writing feature code, agents MUST verify that `openspec/changes/<feature_name>/` contains all five files:") {
+                out.push_str("When formal specifications are activated for complex or regulated features, OpenSpec is authored **progressively**: Stage 2 writes `proposal.md`, `exploration.md`, `design.md`, and `spec.md`; Stage 3 (`/ce-plan`) then generates the executable checklist `tasks.md` from the frozen contract. When OpenSpec is used, agents verify that `openspec/changes/<feature_name>/` contains:\n");
+                continue;
+            }
+
+            // PAT-CLI-MODELS
+            if line.contains("models.rs") && line.contains("ce-ai models") {
+                out.push_str(
+                    "    ├── fleet.rs       # ce-ai fleet pin/status/sync implementation\n",
+                );
+                continue;
+            }
+
+            // PAT-CLI-DECISIONS
+            if line.contains("decisions.rs") && line.contains("model advisor") {
+                out.push_str("    ├── guard.rs       # ce-ai guard agent guardrails & risk policy engine\n    ├── decisions.rs   # ce-ai decisions (legacy aliases & deprecated routing)\n");
+                continue;
+            }
+
+            // PAT-FSM-READY
+            if line.contains("so the repository FSM is left at ✓ Ready (100%) with zero unarchived change warnings before concluding") {
+                let replaced = line.replace(
+                    "so the repository FSM is left at ✓ Ready (100%) with zero unarchived change warnings before concluding",
+                    "and archive completed OpenSpec changes via `ce-ai archive <feature>` to seal change packages and maintain zero workflow drift",
+                );
+                out.push_str(&replaced);
+                out.push('\n');
+                continue;
+            }
+
+            out.push_str(line);
+            out.push('\n');
+        }
+
+        // Check if we migrated Stage 2 but Proactive Triage section is missing
+        if out.contains("### Stage 2 OpenSpec Integration (Optional)")
+            && !out.contains("Proactive OpenSpec Triage & Guidance for Developers")
+        {
+            let triage_block = r#"
+### 💡 Proactive OpenSpec Triage & Guidance for Developers
+AI agents MUST actively guide developers (especially onboarding/newbie contributors) on when to use OpenSpec:
+- **When to Suggest OpenSpec**: If a proposed feature involves architectural changes, schema or data migrations, public API mutations, or estimated scope > 200 LOC, the agent MUST proactively ask the developer:
+  > *"Esta funcionalidad tiene impacto arquitectónico o contratos (> 200 LOC). ¿Deseas que formalicemos una especificación OpenSpec (`openspec/changes/<feature>/`) para congelar el contrato antes de escribir código, o prefieres proceder con un plan ágil directo (`docs/plans/`)?"*
+- **When to Bypass OpenSpec**: For bug fixes, minor tweaks, documentation updates, or tactical tasks (< 200 LOC), agents MUST NOT require or suggest OpenSpec; proceed directly with `/ce-plan`, `ce-work`, or `ce-debug`.
+"#;
+            if let Some(pos) = out.find("### Single Source of Truth Rule") {
+                let mut with_triage = String::with_capacity(out.len() + triage_block.len());
+                with_triage.push_str(&out[..pos]);
+                with_triage.push_str(triage_block);
+                with_triage.push('\n');
+                with_triage.push_str(&out[pos..]);
+                out = with_triage;
+            } else {
+                out.push_str(triage_block);
+            }
+        }
+
+        out
+    };
+
+    let transformed_prefix = transform_slice(prefix);
+    let transformed_suffix = if suffix.is_empty() {
+        String::new()
+    } else {
+        transform_slice(suffix)
+    };
+
+    let mut result = String::with_capacity(content.len() + 512);
+    result.push_str(&transformed_prefix);
+    if let Some(managed) = managed_opt {
+        result.push_str(managed);
+        result.push_str(&transformed_suffix);
+    }
+
+    if content.ends_with('\n') && !result.ends_with('\n') {
+        result.push('\n');
+    }
+
+    (result, findings)
+}
+
 /// Adopts or upgrades a single project directory.
 pub fn adopt_project(
     ctx: &Context,
     target_dir: &Path,
     tier: AdoptionTier,
     force: bool,
+    migrate: bool,
     skip_rtk: bool,
     skip_companions: bool,
 ) -> Result<(), CeError> {
@@ -164,6 +395,48 @@ pub fn adopt_project(
         (String::new(), false)
     };
 
+    let findings = scan_legacy_directives(&existing_content);
+    let mut working_content = existing_content.clone();
+
+    if migrate && !findings.is_empty() {
+        if ctx.dry_run {
+            if !ctx.quiet {
+                println!(
+                    "dry-run: found {} legacy directive(s) in '{}':",
+                    findings.len(),
+                    agents_file.display()
+                );
+                for f in &findings {
+                    println!("  - [L{}] {}: {}", f.line, f.pattern_id, f.description);
+                }
+            }
+        } else {
+            let backup_file = target_dir.join("AGENTS.md.bak");
+            crate::state::write_atomic(&backup_file, existing_content.as_bytes())?;
+            if !ctx.quiet {
+                println!(
+                    "✓ Created backup of legacy directives at '{}'",
+                    backup_file.display()
+                );
+            }
+            let (migrated, _) = migrate_legacy_directives(&existing_content);
+            working_content = migrated;
+            if !ctx.quiet {
+                println!(
+                    "✓ Modernized {} legacy directive(s) in '{}'",
+                    findings.len(),
+                    agents_file.display()
+                );
+            }
+        }
+    } else if !findings.is_empty() && !ctx.quiet {
+        eprintln!(
+            "hint: {} legacy unmanaged directive(s) detected in '{}'. Re-run with --migrate to modernize them.",
+            findings.len(),
+            agents_file.display()
+        );
+    }
+
     let inner_body = render_block_content(tier);
     let body_sha256 = compute_sha256(inner_body);
 
@@ -182,17 +455,18 @@ pub fn adopt_project(
 
     // Check if block already exists
     let (new_content, is_already_up_to_date) =
-        if let Some(start_idx) = existing_content.find(BLOCK_BEGIN_MARKER) {
-            if let Some(end_rel_idx) = existing_content[start_idx..].find(BLOCK_END_MARKER) {
+        if let Some(start_idx) = working_content.find(BLOCK_BEGIN_MARKER) {
+            if let Some(end_rel_idx) = working_content[start_idx..].find(BLOCK_END_MARKER) {
                 let end_idx = start_idx + end_rel_idx + BLOCK_END_MARKER.len();
-                let existing_block = &existing_content[start_idx..end_idx];
+                let existing_block = &working_content[start_idx..end_idx];
 
-                let up_to_date = existing_block == full_block && !force;
+                let up_to_date =
+                    existing_block == full_block && !force && (!migrate || findings.is_empty());
 
                 let mut updated = String::new();
-                updated.push_str(&existing_content[..start_idx]);
+                updated.push_str(&working_content[..start_idx]);
                 updated.push_str(&full_block);
-                updated.push_str(&existing_content[end_idx..]);
+                updated.push_str(&working_content[end_idx..]);
                 (updated, up_to_date)
             } else {
                 return Err(CeError::Runtime(format!(
@@ -201,7 +475,7 @@ pub fn adopt_project(
                 )));
             }
         } else {
-            let mut appended = existing_content.clone();
+            let mut appended = working_content.clone();
             if !appended.is_empty() && !appended.ends_with('\n') && !appended.ends_with("\r\n") {
                 appended.push_str(newline);
             }
@@ -305,12 +579,22 @@ pub fn adopt_project(
 
     if ctx.dry_run {
         if !ctx.quiet {
-            println!(
-                "dry-run: would adopt project at '{}' (tier: {}, block SHA: {})",
-                target_dir.display(),
-                tier.as_str(),
-                &body_sha256[..8]
-            );
+            if migrate && !findings.is_empty() {
+                println!(
+                    "dry-run: would modernize {} legacy directive(s) and adopt project at '{}' (tier: {}, block SHA: {})",
+                    findings.len(),
+                    target_dir.display(),
+                    tier.as_str(),
+                    &body_sha256[..8]
+                );
+            } else {
+                println!(
+                    "dry-run: would adopt project at '{}' (tier: {}, block SHA: {})",
+                    target_dir.display(),
+                    tier.as_str(),
+                    &body_sha256[..8]
+                );
+            }
         }
         return Ok(());
     }
@@ -327,17 +611,24 @@ pub fn adopt_project(
     Ok(())
 }
 
+/// Options controlling project adoption and migration behavior.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InitPrjOptions {
+    pub tier: Option<String>,
+    pub all: bool,
+    pub force: bool,
+    pub migrate: bool,
+    pub skip_rtk: bool,
+    pub skip_companions: bool,
+}
+
 /// Executes `ce-ai init-prj`.
 pub fn run(
     ctx: &Context,
     target_path_opt: Option<PathBuf>,
-    tier_opt: Option<&str>,
-    all: bool,
-    force: bool,
-    skip_rtk: bool,
-    skip_companions: bool,
+    options: InitPrjOptions,
 ) -> Result<(), CeError> {
-    if all {
+    if options.all {
         let global_state_path = ctx.config_dir.join("state.json");
         let state = State::load(&global_state_path)?;
         if state.projects.is_empty() {
@@ -346,7 +637,7 @@ pub fn run(
             }
             return Ok(());
         }
-        let parsed_tier = match tier_opt {
+        let parsed_tier = match options.tier.as_deref() {
             Some(t) => Some(match t.to_lowercase().as_str() {
                 "full" => AdoptionTier::Full,
                 "minimal" => AdoptionTier::Minimal,
@@ -364,7 +655,15 @@ pub fn run(
         let mut count = 0;
         for p in &state.projects {
             let tier = parsed_tier.unwrap_or(p.tier);
-            adopt_project(ctx, &p.path, tier, force, skip_rtk, skip_companions)?;
+            adopt_project(
+                ctx,
+                &p.path,
+                tier,
+                options.force,
+                options.migrate,
+                options.skip_rtk,
+                options.skip_companions,
+            )?;
             count += 1;
         }
         if !ctx.quiet {
@@ -385,7 +684,7 @@ pub fn run(
         Err(_) => raw_target,
     };
 
-    let tier_str = tier_opt.unwrap_or("full");
+    let tier_str = options.tier.as_deref().unwrap_or("full");
     let tier = match tier_str.to_lowercase().as_str() {
         "full" => AdoptionTier::Full,
         "minimal" => AdoptionTier::Minimal,
@@ -398,7 +697,15 @@ pub fn run(
         }
     };
 
-    adopt_project(ctx, &target_dir, tier, force, skip_rtk, skip_companions)
+    adopt_project(
+        ctx,
+        &target_dir,
+        tier,
+        options.force,
+        options.migrate,
+        options.skip_rtk,
+        options.skip_companions,
+    )
 }
 
 /// Ensures the sentinel-bounded .gitignore block exists and contains both

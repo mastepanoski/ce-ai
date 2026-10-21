@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-10-21
+
+### Added
+- **Assisted AGENTS.md Legacy Migration Engine (`ce-ai init-prj --migrate`)**:
+  - Added `--migrate [path]` and `--all` flags to `ce-ai init-prj` (`src/commands/init_prj.rs`, `src/commands/registry.rs`) to automatically scan and surgically modernize unmanaged historical CE-AI directives embedded in host project `AGENTS.md` files.
+  - Implemented surgical replacement for 7 historical patterns (`PAT-INV-6`, `PAT-CONSTRAINT-OPENSPEC`, `PAT-FSM-7`, `PAT-STAGE-2`, `PAT-CLI-MODELS`, `PAT-CLI-DECISIONS`, `PAT-FSM-READY`), replacing blocking write gates and obsolete commands with decoupled Compound Engineering instructions and proactive 200 LOC OpenSpec triage guidance.
+  - Added safety guarantees: timestamp-free automatic backup (`AGENTS.md.bak`), `--dry-run` inspection preview with zero writes, and byte-for-byte preservation of host project domain rules and custom governance policies.
+  - Added unmanaged legacy directive scanning in `ce-ai doctor` with warning diagnostics and automated repair integration during `ce-ai doctor --fix`.
+
+### Changed
+- **Adoption Block Upgrade to v=8 (`src/commands/init_prj.rs`)**:
+  - Bumped `BLOCK_VERSION` from 7 to 8 across managed project adoption blocks.
+  - Modernized `AdoptionTier::Full` template to document decoupled OpenSpec workflows and proactive scope triage (>200 LOC) while strictly avoiding authoritarian write-blocking constraints.
+  - Accreted `CONCEPTS.md` with *Assisted AGENTS Migration (`--migrate`)* domain definition.
+
 ## [3.5.0] - 2026-10-19
 
 ### Changed

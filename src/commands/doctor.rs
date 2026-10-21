@@ -834,13 +834,48 @@ pub(crate) fn check_project_adoption_health(
     }
 
     let agents_file = p.path.join(&p.file);
-    let status = crate::commands::init_prj::check_adoption_block_status(&agents_file, p.tier);
     let mut block_repaired = false;
+
+    if agents_file.exists() {
+        if let Ok(content) = std::fs::read_to_string(&agents_file) {
+            let legacy_findings = crate::commands::init_prj::scan_legacy_directives(&content);
+            if !legacy_findings.is_empty() {
+                if fix && treat_as_finding {
+                    match crate::commands::init_prj::adopt_project(
+                        ctx, &p.path, p.tier, false, true, false, false,
+                    ) {
+                        Ok(_) => {
+                            println!(
+                                "doctor-fix: modernized {} legacy directive(s) in '{}' at '{}'",
+                                legacy_findings.len(),
+                                p.file,
+                                p.path.display()
+                            );
+                            block_repaired = true;
+                        }
+                        Err(e) => report(format!(
+                            "project-adoption: legacy unmanaged FSM / mandatory OpenSpec rules detected in '{}' at '{}' (migration failed: {e})",
+                            p.file,
+                            p.path.display()
+                        )),
+                    }
+                } else {
+                    report(format!(
+                        "project-adoption: legacy unmanaged FSM / mandatory OpenSpec rules detected in '{}' at '{}' — run 'ce-ai init-prj --migrate' to modernize",
+                        p.file,
+                        p.path.display()
+                    ));
+                }
+            }
+        }
+    }
+
+    let status = crate::commands::init_prj::check_adoption_block_status(&agents_file, p.tier);
     match status {
         crate::commands::init_prj::AdoptionBlockStatus::Ok => {}
         crate::commands::init_prj::AdoptionBlockStatus::FileMissing => {
             if fix && treat_as_finding {
-                match crate::commands::init_prj::adopt_project(ctx, &p.path, p.tier, false, false, false) {
+                match crate::commands::init_prj::adopt_project(ctx, &p.path, p.tier, false, false, false, false) {
                     Ok(_) => {
                         println!(
                             "doctor-fix: restored missing instruction file '{}' at '{}'",
@@ -865,7 +900,7 @@ pub(crate) fn check_project_adoption_health(
         }
         crate::commands::init_prj::AdoptionBlockStatus::StaleVersion { version } => {
             if fix && treat_as_finding {
-                match crate::commands::init_prj::adopt_project(ctx, &p.path, p.tier, false, false, false) {
+                match crate::commands::init_prj::adopt_project(ctx, &p.path, p.tier, false, false, false, false) {
                     Ok(_) => {
                         println!(
                             "doctor-fix: upgraded project adoption block from v={version} to v={} at '{}'",
@@ -894,7 +929,7 @@ pub(crate) fn check_project_adoption_health(
         | crate::commands::init_prj::AdoptionBlockStatus::BlockMissing
         | crate::commands::init_prj::AdoptionBlockStatus::ReadError => {
             if fix && treat_as_finding {
-                match crate::commands::init_prj::adopt_project(ctx, &p.path, p.tier, true, false, false) {
+                match crate::commands::init_prj::adopt_project(ctx, &p.path, p.tier, true, false, false, false) {
                     Ok(_) => {
                         println!(
                             "doctor-fix: repaired project adoption block at '{}'",
@@ -999,7 +1034,7 @@ pub(crate) fn check_project_adoption_health(
     if !missing_hooks.is_empty() {
         if fix && treat_as_finding {
             match crate::commands::init_prj::adopt_project(
-                ctx, &p.path, p.tier, false, false, false,
+                ctx, &p.path, p.tier, false, false, false, false,
             ) {
                 Ok(_) => {
                     println!(
