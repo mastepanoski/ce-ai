@@ -17,7 +17,7 @@ for complete arguments. Commands that mutate configuration support global
 
 | Command | Boundary |
 | --- | --- |
-| `init-prj [--tier <tier>] [--all]` | Injects non-destructive `AGENTS.md` rules, session-start hooks, and RTK token compression into the current repository. Use `--all` to batch-upgrade all registered projects across your local fleet. |
+| `init-prj [--tier <tier>] [--all] [--migrate]` | Injects non-destructive `AGENTS.md` rules, session-start hooks, and RTK token compression into the current repository. Use `--migrate` to surgically modernize historical unmanaged CE-AI clauses into decoupled Compound Engineering guidance (with automatic `AGENTS.md.bak` backup). Use `--all` to batch-upgrade or batch-migrate all registered projects. |
 | `deinit-prj` | Safely removes managed blocks and session hooks from the current repository without touching user code or custom rules. |
 | `doctor [--fix] [--all-projects]` | Diagnoses environment readiness, harness health, companion tools, and project adoptions. Use `--fix` for automated repair of drifted blocks, missing hooks, and stale adoptions. |
 | `status`, `backups`, `uninstall` | Inspect state, browse/restore pre-mutation configuration snapshots, or remove managed assets. |
