@@ -3104,9 +3104,10 @@ pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
                                 .spec_path
                                 .strip_prefix(&repo_root)
                                 .unwrap_or(&promo.spec_path);
+                            let rel_spec_str = rel_spec.to_string_lossy().replace('\\', "/");
                             println!(
                                 "  [dry-run] would promote {} requirement(s) from '{}' into domain spec '{}' ({})",
-                                promo.requirements_promoted, promo.change, promo.domain, rel_spec.display()
+                                promo.requirements_promoted, promo.change, promo.domain, rel_spec_str
                             );
                         }
                         Err(err) => {
@@ -3148,11 +3149,10 @@ pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
                             .spec_path
                             .strip_prefix(&repo_root)
                             .unwrap_or(&promo.spec_path);
+                        let rel_spec_str = rel_spec.to_string_lossy().replace('\\', "/");
                         println!(
                             "promoted: {} requirement(s) from '{}' into {}",
-                            promo.requirements_promoted,
-                            o.feature,
-                            rel_spec.display()
+                            promo.requirements_promoted, o.feature, rel_spec_str
                         );
                     }
                     Err(err) => {
@@ -3198,15 +3198,15 @@ pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
     } else {
         let dest_parent = crate::compat::arch::archive_dir(&repo_root);
         let rel_dest = dest_parent.strip_prefix(&repo_root).unwrap_or(&dest_parent);
+        let rel_dest_str = rel_dest.to_string_lossy().replace('\\', "/");
         let change_label = if repo_root.join("docs").join("arch").is_dir() {
             "change(s)"
         } else {
             "OpenSpec change(s)"
         };
         println!(
-            "archived {} completed {change_label} successfully to {}/",
+            "archived {} completed {change_label} successfully to {rel_dest_str}/",
             outcomes.len(),
-            rel_dest.display()
         );
     }
 

@@ -193,10 +193,13 @@ fn run_spec_show(repo_root: &Path, domain: &str) -> Result<(), CeError> {
     let spec_path = get_domain_spec_path(repo_root, domain);
     if !spec_path.is_file() {
         let specs_dir = crate::compat::arch::system_specs_dir(repo_root);
-        let rel_path = specs_dir.strip_prefix(repo_root).unwrap_or(&specs_dir);
+        let rel_path = specs_dir
+            .strip_prefix(repo_root)
+            .unwrap_or(&specs_dir)
+            .to_string_lossy()
+            .replace('\\', "/");
         return Err(CeError::Usage(format!(
-            "domain specification '{domain}' not found in {}/",
-            rel_path.display()
+            "domain specification '{domain}' not found in {rel_path}/"
         )));
     }
 
@@ -220,8 +223,12 @@ fn run_spec_validate(repo_root: &Path, json: bool) -> Result<(), CeError> {
 
     if report.specs_count == 0 {
         let specs_dir = crate::compat::arch::system_specs_dir(repo_root);
-        let rel_path = specs_dir.strip_prefix(repo_root).unwrap_or(&specs_dir);
-        println!("spec validate: warning: {}/ is empty", rel_path.display());
+        let rel_path = specs_dir
+            .strip_prefix(repo_root)
+            .unwrap_or(&specs_dir)
+            .to_string_lossy()
+            .replace('\\', "/");
+        println!("spec validate: warning: {rel_path}/ is empty");
         return Ok(());
     }
 
@@ -657,18 +664,21 @@ pub fn promote_delta_to_domain_spec(
 pub fn probe_specs_health(repo_root: &Path) -> Vec<String> {
     let mut warnings = Vec::new();
     let specs_dir = crate::compat::arch::system_specs_dir(repo_root);
-    let rel_specs = specs_dir.strip_prefix(repo_root).unwrap_or(&specs_dir);
+    let rel_specs = specs_dir
+        .strip_prefix(repo_root)
+        .unwrap_or(&specs_dir)
+        .to_string_lossy()
+        .replace('\\', "/");
 
     if !specs_dir.is_dir() {
-        warnings.push(format!("{}/ directory does not exist", rel_specs.display()));
+        warnings.push(format!("{rel_specs}/ directory does not exist"));
         return warnings;
     }
 
     let report = validate_domain_specs(repo_root);
     if report.specs_count == 0 {
         warnings.push(format!(
-            "{}/ is empty — run 'ce-ai spec validate' or seed domain specs",
-            rel_specs.display()
+            "{rel_specs}/ is empty — run 'ce-ai spec validate' or seed domain specs"
         ));
     } else {
         for f in &report.findings {
