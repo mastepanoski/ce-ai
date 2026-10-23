@@ -178,6 +178,28 @@ ce-ai init-prj --all --migrate
 2. **Automatic Backup**: A clean `AGENTS.md.bak` snapshot is written prior to mutating disk.
 3. **Doctor Auto-Repair**: `ce-ai doctor` flags unmanaged legacy directives during routine audits, and `ce-ai doctor --fix` automatically migrates them.
 
+#### Migrating Legacy OpenSpec to Living Architecture (`--migrate-arch`)
+
+Repositories maintaining specifications under legacy `openspec/` can be migrated to living architecture (`docs/arch/`) safely using `--migrate-arch`:
+
+```bash
+# Preview planned migration without moving assets
+ce-ai init-prj /path/to/my-project --migrate-arch --dry-run
+
+# Execute migration (requires a clean Git working tree)
+ce-ai init-prj /path/to/my-project --migrate-arch
+
+# Or repair via doctor during environment audits
+ce-ai doctor /path/to/my-project --fix --migrate-arch
+```
+
+**What it does**:
+1. Verifies the Git working tree is clean to prevent accidental asset clobbering.
+2. Migrates `openspec/specs/` to living domain specifications in `docs/arch/system/`.
+3. Migrates `openspec/changes/archive/` to historical milestones in `docs/arch/archive/`.
+4. Cleans up empty legacy directories and updates the managed block in `AGENTS.md` to version 9.
+5. Preserves unmigrated repositories seamlessly via the dual-path compatibility layer.
+
 ---
 
 ### De-adopting a Project (`ce-ai deinit-prj`)

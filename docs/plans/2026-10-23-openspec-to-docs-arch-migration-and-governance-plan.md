@@ -58,6 +58,15 @@ src/
 
 ## Implementation Units
 
+- [x] **U1: Módulo de Resolución de Rutas de Arquitectura y Lector Dual**
+- [x] **U2: Soporte de Constelaciones Multi-Repositorio y Caché de Contratos**
+- [x] **U3: Reestructuración de `ce-ai archive` y Compactación en `docs/arch/archive/`**
+- [x] **U4: Observabilidad de Progreso SSOT en `docs/plans/` y Checkpointing**
+- [x] **U5: Comando de Migración Asistida (`ce-ai init-prj --migrate-arch`)**
+- [x] **U6: Sondas de Diagnóstico y Auto-Reparación en `ce-ai doctor`**
+- [x] **U7: Especificación de Seguridad Normativa y Gobernanza de Invariantes**
+- [x] **U8: Alineación Transversal de Documentación y Guías de Usuario**
+
 ### U1. Módulo de Resolución de Rutas de Arquitectura y Lector Dual
 
 - Files to change:

@@ -82,7 +82,7 @@ These boundaries apply equally to human and AI-agent contributors. Documentation
 ### Counting Contract
 
 - Sum added + deleted lines across non-binary files (`numstat` binary rows report `-` and are skipped).
-- Excluded from the code budget: lockfiles (`Cargo.lock`, `*.lock`), pure documentation (`docs/**`), and OpenSpec specification packages (`openspec/changes/**`). Whitespace-only churn does not count.
+- Excluded from the code budget: lockfiles (`Cargo.lock`, `*.lock`), pure documentation (`docs/**`), and living architecture specification packages (`docs/arch/**` or legacy `openspec/changes/**`). Whitespace-only churn does not count.
 
 ### Bounded Correction Policy
 
@@ -98,9 +98,9 @@ changed lines per review cycle.
 - Maintainer-approved exceptions are documented in the PR.
 - Pure-documentation changes are exempt.
 
-### Work-Unit Budgets (OpenSpec)
+### Work-Unit Budgets (Implementation Plans)
 
-`tasks.md` work units target ~200 changed lines each; a rescope may only narrow a budget — widening requires a new spec revision.
+Implementation plan (`docs/plans/`) work units target ~200 changed lines each; a rescope may only narrow a budget — widening requires a new plan revision.
 
 ### Size Is Not Risk
 

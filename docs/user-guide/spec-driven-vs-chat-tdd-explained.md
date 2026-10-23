@@ -118,10 +118,10 @@ Separating specification authoring (Stage 2) from implementation (Stage 4) does 
           CE-AI Workflow Architecture
                      │
             Durable Specification
-            (Stage 2: OpenSpec Baseline)
+            (Stage 2: Architecture Baseline)
                      ↓
              Execution Planning
-            (Stage 3: tasks.md Decomposition)
+            (Stage 3: Plan Decomposition)
                      ↓
              Bounded Work Unit (~200 LOC)
                      │
@@ -169,9 +169,9 @@ Within each unit, the agent or developer can use TDD freely. The aim is for fast
 ### 4.3 Curated Durable Context vs. Accumulated Transcript History
 
 Instead of relying on an append-only chat history that accumulates ephemeral error traces and tool outputs, `ce-ai` builds working context from a curated set of durable artifacts:
-- The active specification (`spec.md`).
-- Architectural invariants (`design.md`, `CONCEPTS.md`).
-- The explicit task checklist (`tasks.md`).
+- The active specification (`docs/arch/system/` or `spec.md`).
+- Architectural invariants (`CONCEPTS.md`, ADRs in `docs/arch/adr/`).
+- The explicit task checklist in `docs/plans/` (or `tasks.md`).
 - Persistent project memory via companion MCP servers (such as Engram).
 
 Each unit therefore starts from curated, task-relevant context rather than an unmanaged transcript. Under a fixed context budget per work unit, per-unit context overhead remains bounded with respect to the number of previously completed units ($O(1)$), yielding $O(n)$ cumulative context processing across $n$ similarly bounded units. This bound is relative to the number of completed units, not to project size: if the artifacts loaded per unit (for example `design.md`) grow with the project, per-unit overhead grows with them, which is a reason to keep those artifacts concise.
@@ -181,7 +181,7 @@ Each unit therefore starts from curated, task-relevant context rather than an un
 In conversational micro-TDD, task orientation lives in the transcript. If an API outage interrupts the session or the context is compacted, the agent's progress can become ambiguous.
 
 `ce-ai` separates three kinds of state:
-- **Workflow state**: current stage, active feature, and completed task checkboxes (persisted in `state.json` and `tasks.md`).
+- **Workflow state**: current stage, active feature, and completed task checkboxes (persisted in `state.json` and `docs/plans/`).
 - **Repository state**: current git branch, uncommitted changes, and file drift (read directly from the filesystem).
 - **Reasoning state**: transient hypotheses and intermediate reasoning (ephemeral to the inference turn).
 
@@ -200,7 +200,7 @@ Because workflow and repository state live outside the transcript, the conversat
 | **Feedback mechanism** | Local test runner in IDE/terminal | Multi-turn conversational round-trips | Local compiler, test suite, and CI |
 | **Context overhead** | Human working memory (~3–5 chunks) | Accumulates in transcript ($O(n^2)$ naive) | Curated durable artifacts ($O(1)$ per unit w.r.t. completed units; $O(n)$ total) |
 | **Epistemic validation** | Human review and runtime feedback | Same model writes test and code in one context | External spec reviewable by humans or independent gates |
-| **Context reset handling** | Developer memory / git status | Transcript recovery or compaction | State recovery from `state.json` and `tasks.md` |
+| **Context reset handling** | Developer memory / git status | Transcript recovery or compaction | State recovery from `state.json` and `docs/plans/` |
 
 ---
 

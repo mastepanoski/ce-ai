@@ -245,4 +245,23 @@ A lightweight, ceremony-free execution track in `ce-ai` optimized for rapid bug 
 ### Assisted AGENTS Migration (`--migrate`)
 A surgical modernization mechanism in `ce-ai init-prj` (`--migrate`) and `ce-ai doctor --fix` that transforms unmanaged, historical CE-AI directives (such as mandatory OpenSpec FSM ASCII diagrams, deprecated `ce-ai models` and `ce-ai decisions` commands, and pre-decoupling Stage 2 blocking write gates) embedded directly in host project `AGENTS.md` files into modern, decoupled Compound Engineering instructions. The migration creates an automatic timestamp-free backup (`AGENTS.md.bak`), supports non-destructive preview via `--dry-run`, only replaces verified historical patterns, and guarantees 100% byte-for-byte preservation of host project domain rules and custom governance policies.
 
+### Repository Constellations
+A declarative multi-repository topology pattern in `ce-ai` (`docs/arch/system.yaml`) representing a federated, decoupled system architecture across multiple Git repositories. Operating on a "Local-First, Remote-Graceful" principle, constellation manifests declare system identities, component boundaries, and inter-repository dependencies without enforcing monorepo coupling or requiring all member repositories to be locally cloned. Constellation scopes can be targeted directly in fleet governance commands via `ce-ai fleet status --system <id>`.
+
+### Lean Living Architecture Domain
+The canonical, unified living architecture directory structure (`docs/arch/`) that consolidates system models, architecture decision records, interface contracts, and feature deltas under a single domain tree. By replacing disconnected 5-file OpenSpec packages with living system specifications (`docs/arch/system/`), ADRs (`docs/arch/adr/`), interface contracts (`docs/arch/contracts/`), active deltas (`docs/arch/deltas/`), and milestone-compacted archives (`docs/arch/archive/`), living architecture accretes monotonically across development cycles without ceremonial overhead.
+
+### Normative Cybersecurity Invariants
+A set of non-negotiable security and governance constraints enforced deterministically by `ce-ai` across all runtime operations, formalized in `docs/arch/system/security.md`. Drawing from ISO/IEC 27001/27002, OWASP LLM-02, and NIST SP 800-53/AI RMF, these invariants guarantee SHA256 cryptographic asset integrity, fail-closed URL anti-credential validation, zero-token leak diagnostics, atomic file mutation resilience (`write_atomic`), and sandboxed execution boundaries.
+
+### Dual-Path Architecture Reader
+A backward-compatibility resolution subsystem (`src/compat/arch.rs`) that dynamically detects and routes architecture queries between legacy OpenSpec locations (`openspec/specs/`, `openspec/changes/`) and modern living architecture locations (`docs/arch/system/`, `docs/arch/deltas/`, `docs/arch/archive/`). By prioritizing `docs/arch/` when present and seamlessly falling back to `openspec/`, the dual-path reader ensures unmigrated repositories continue operating without forced upgrade interruptions.
+
+### Assisted Architecture Migration (`--migrate-arch`)
+An automated migration mechanism (`ce-ai init-prj --migrate-arch` and `ce-ai doctor --fix --migrate-arch`) that safely modernizes a repository from legacy OpenSpec (`openspec/`) to living architecture (`docs/arch/`). It checks for a clean Git working tree, copies existing living specifications into `docs/arch/system/` and archived changes into `docs/arch/archive/`, removes legacy empty directories, and updates the managed block in `AGENTS.md` to version 9 with lean living architecture directives.
+
+### Single Source of Truth (SSOT) Progress
+The operational principle in `ce-ai` establishing markdown implementation plans in `docs/plans/` (or active deltas in `docs/arch/deltas/`) as the definitive, singular source of truth for task progress tracking and FSM lifecycle stage deduction. By inspecting `- [x]` completion directly in agile plans, `ce-ai` eliminates the cognitive overhead and false-positive desync warnings previously caused by dual-tracking tasks in OpenSpec `tasks.md` packages.
+
+
 
