@@ -3,7 +3,7 @@ title: "Plan de Implementación: Migración de OpenSpec a docs/arch/, Gobernanza
 date: "2026-10-23"
 type: plan
 origin: "docs/brainstorms/2026-10-23-openspec-to-docs-arch-migration-and-lean-governance-requirements.md"
-status: "ready_for_execution"
+status: "completed"
 ---
 
 # Plan: Migración de OpenSpec a docs/arch/, Gobernanza Lean y Alineación Documental
