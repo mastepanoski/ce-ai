@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-10-23
+
+### Added
+- **Lean Living Architecture Unification (`docs/arch/`)**:
+  - Unified living architecture under `docs/arch/` (`system/`, `adr/`, `contracts/`, `deltas/`, `archive/`), replacing rigid 5-file OpenSpec SDD packages with evergreen domain specifications and architecture decision records.
+  - Implemented dual-path architecture resolver (`src/compat/arch.rs`) providing seamless backward compatibility for unmigrated `openspec/` repositories.
+  - Added normative security and compliance specification in `docs/arch/system/security.md` (ISO/IEC 27001 & 27002, OWASP LLM-02, NIST SP 800-53 / AI RMF 1.0) and formalized ADR-0001 in `docs/arch/adr/0001-lean-architecture-and-docs-arch-unification.md`.
+- **Multi-Repository Constellation Governance (`docs/arch/system.yaml`)**:
+  - Added declarative constellation manifest support (`docs/arch/system.yaml`) operating on a "Local-First, Remote-Graceful" principle.
+  - Added `--system <id>` filtering flag to `ce-ai fleet status` and `ce-ai fleet sync` (`src/commands/fleet.rs`).
+  - Implemented strict remote repository URL anti-credential validation (`validate_remote_repo_url`) adhering to OWASP LLM-02.
+- **Assisted Architecture Migration Engine (`ce-ai init-prj --migrate-arch`)**:
+  - Added `--migrate-arch` flag to `ce-ai init-prj` and `ce-ai doctor --fix` for non-destructive atomic migration of legacy `openspec/` directories to `docs/arch/`.
+  - Added dirty working tree safety check (`check_git_working_tree_clean`) with `--force` override.
+  - Bumped managed project adoption block version to `v=9` with lean living architecture directives.
+- **Single Source of Truth (SSOT) Progress & Stage Deduction**:
+  - Decoupled `ObservableWorkflowState` and FSM stage inference from `tasks.md`, reading progress directly from implementation plans in `docs/plans/*.md` (`- [x]` checkboxes).
+- **Architecture Health Probes in `ce-ai doctor`**:
+  - Added `probe_legacy_openspec_dir` to detect unmigrated `openspec/` directories and `probe_system_manifest_integrity` to validate `system.yaml` and required contracts in `docs/arch/contracts/`.
+
+### Fixed
+- **Supply Chain Security & Cross-Platform Normalization**:
+  - Upgraded `ctutils` to v0.4.5, resolving RUSTSEC-2026-0385.
+  - Normalized relative path separators across spec validation, doctor diagnostics, and archive outputs for deterministic execution across Windows, macOS, and Linux runners.
+
 ## [3.6.0] - 2026-10-21
 
 ### Added
