@@ -331,3 +331,24 @@ Initial requirement.
     assert!(content.contains("R1. New Harness"));
     assert!(content.contains("<!-- promoted-from: change:feat-y"));
 }
+
+#[test]
+fn test_security_spec_schema_valid() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let report = validate_domain_specs(&repo_root);
+    assert!(
+        report.valid,
+        "docs/arch/system specifications should be valid, findings: {:?}",
+        report.findings
+    );
+    assert!(
+        report.specs_count >= 1,
+        "should find at least 1 domain specification in docs/arch/system"
+    );
+
+    let summaries = list_domain_specs(&repo_root).expect("should list domain specs");
+    assert!(
+        summaries.iter().any(|s| s.domain == "security"),
+        "expected domain 'security' to be found in docs/arch/system"
+    );
+}
