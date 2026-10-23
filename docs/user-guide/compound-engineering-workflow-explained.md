@@ -15,8 +15,8 @@ Think of it as a **6-level product management and software engineering funnel**:
 flowchart TD
     STRATEGY["Level 0: ce-strategy (Product Vision & North Star)"] --> IDEATE["Level 1: ce-ideate (Opportunity Discovery)"]
     IDEATE --> BRAINSTORM["Level 2: ce-brainstorm (Epic & Problem Definition)"]
-    BRAINSTORM --> OPENSPEC["Level 3: OpenSpec (Formal Contracts & Acceptance Criteria)"]
-    OPENSPEC --> WORK["Level 4: ce-plan / ce-work (Sprint Execution & TDD Coding)"]
+    BRAINSTORM --> ARCHITECTURE["Level 3: Living Architecture (docs/arch/)"]
+    ARCHITECTURE --> WORK["Level 4: ce-plan / ce-work (Sprint Execution & TDD Coding)"]
     WORK --> COMPOUND["Level 5: ce-compound (Knowledge Capitalization)"]
 ```
 
@@ -31,8 +31,8 @@ If you are familiar with Agile software development, each level in Compound Engi
 | **Level 0** | **`ce-strategy`** | **Product Vision & OKRs** | *"Where is the product heading over the next 6–12 months?"* | `STRATEGY.md` / `ROADMAP.md` |
 | **Level 1** | **`ce-ideate`** | **Opportunity Discovery** | *"What options or improvements could we explore?"* | 3–5 evaluated alternatives |
 | **Level 2** | **`ce-brainstorm`** | **Epic & Problem Definition** | *"Which option did we pick, and what is the scope of this Epic?"* | `docs/brainstorms/` |
-| **Level 3** | **OpenSpec** | **User Stories & Acceptance Criteria** | *"What are the exact formal rules (`WHEN..THEN`) and API contracts?"* | `openspec/changes/<feature>/` |
-| **Level 4** | **`ce-plan` / `ce-work`** | **Sprint Backlog & Coding** | *"How do we write code and pass atomic tests (Red-Green-Refactor)?"* | Rust / TypeScript Code + TDD Tests |
+| **Level 3** | **Living Architecture** | **Architecture & Contracts** | *"What are the exact formal rules (`WHEN..THEN`) and API contracts?"* | `docs/arch/system/` or `docs/arch/deltas/` |
+| **Level 4** | **`ce-plan` / `ce-work`** | **Sprint Backlog & Coding** | *"How do we write code and pass atomic tests (Red-Green-Refactor)?"* | `docs/plans/` + TDD Tests |
 | **Level 5** | **`ce-compound`** | **Retrospective & Knowledge Base** | *"What did we learn so the team never has to re-investigate this?"* | `docs/solutions/` |
 
 ---
@@ -52,51 +52,51 @@ If you are familiar with Agile software development, each level in Compound Engi
 - **Role**: Convergent thinking. Takes the chosen idea and frames the problem in depth.
 - **Why it matters**: Clarifies user intent, identifies edge cases, and outlines the broad technical approach before writing any formal specifications.
 
-### 📐 Level 3: OpenSpec (Formal Contracts & Acceptance Criteria)
-A common beginner question is: *"Why do we need OpenSpec if we already did a brainstorm?"*
+### 📐 Level 3: Living Architecture & Contracts (`docs/arch/`)
+A common beginner question is: *"Why do we need architecture specifications if we already did a brainstorm?"*
 - **The Difference**:
   - `ce-brainstorm` is **narrative and conversational** (the story of why and how options were evaluated).
-  - OpenSpec is **contractual and testable**. It converts the brainstorm into formal, verifiable specifications in `openspec/changes/<feature_name>/`:
-    - `proposal.md`: Strict In-Scope vs. Out-of-Scope boundaries.
-    - `exploration.md`: Technical investigation and tradeoff analysis.
-    - `design.md`: Component architecture, structs, and API contracts.
-    - `spec.md`: Formal behavioral rules written in `WHEN [condition] THEN [expected result]` format.
+  - Living Architecture is **contractual, durable, and testable**. It formalizes core requirements under `docs/arch/`:
+    - `docs/arch/system/<domain>.md`: Living domain specifications aggregating capabilities across features.
+    - `docs/arch/adr/NNNN-<slug>.md`: Architecture Decision Records capturing irreversible architectural choices.
+    - `docs/arch/contracts/`: Formal interface schemas and protocol contracts.
+    - `docs/arch/deltas/<feature>/`: Temporary delta packages during development, auto-promoted to system specs upon archive.
 
 ### ⚡ Level 4: `ce-plan` & `ce-work` (Sprint Backlog & TDD Execution)
-- **Where does `/ce-plan` fit relative to OpenSpec?**
-  - **`/ce-plan` runs AFTER OpenSpec specification (`proposal.md`, `design.md`, `spec.md`).**
-  - You cannot plan the construction sequence (the *HOW*) without freezing the business rules (`spec.md`) and technical design (`design.md`) (the *WHAT*).
-  - `/ce-plan` takes `spec.md` and `design.md` as inputs and **writes the executable checklist into `openspec/changes/<feature_name>/tasks.md`**.
+- **Where does `/ce-plan` fit relative to Architecture?**
+  - **`/ce-plan` creates the executable implementation plan in `docs/plans/`.**
+  - `/ce-plan` organizes the build into vertical Scrum slices with explicit TDD test triads (red-green-refactor) and changed-line targets (~200 LOC).
+  - Checkboxes (`- [x]`) in `docs/plans/` serve as the single source of truth for task progress, freeing developers from redundant task packages.
 - **`/ce-work` Execution Loop**:
-  - Reads `tasks.md`, executes TDD (Red-Green-Refactor), and marks checkboxes (`- [x] Task 1`).
-  - **Bounded Work Units**: Executes in bounded slices (~200 changed LOC heuristic) verified by local build tools (`cargo test`, `make e2e`) rather than method-by-method conversational turns. For the experimental data and context economics behind this approach, see [Spec-Driven Planning with Bounded Work Units](spec-driven-vs-chat-tdd-explained.md).
-  - **Tasks Desync Diagnostic Guard**: If code modifications or branch commits exist while `tasks.md` remains unmarked (`0/N`), `ce-ai` flags a non-blocking desync warning across `workflow resume`, `status`, `checkpoint`, and `doctor`, prompting the agent or developer to update progress and guarding automated stage advancement.
+  - Reads `docs/plans/`, executes TDD (Red-Green-Refactor), and marks checkboxes (`- [x] Unit 1`).
+  - **Bounded Work Units**: Executes in bounded slices (~200 changed LOC heuristic) verified by local build tools (`cargo test`, `make e2e`).
 
 ---
 
-## 🔄 4. OpenSpec is a Living, Progressive Directory
+## 🔄 4. Living Architecture Accretion
 
-OpenSpec is **not a static document written once**. It is a **living directory (`openspec/changes/<feature_name>/`) that evolves progressively across Compound Engineering stages**:
+Living Architecture is **not static documentation written once**. It is an **accreting domain tree (`docs/arch/`) that evolves progressively across Compound Engineering stages**:
 
 ```mermaid
 flowchart TD
-    STAGE1["Stage 1: ce-brainstorm"] -->|"Creates proposal.md and exploration.md"| OPENSPEC_DIR["openspec/changes/feature_name/"]
-    STAGE2["Stage 2: Specifying"] -->|"Creates design.md and spec.md"| OPENSPEC_DIR
-    STAGE3["Stage 3: ce-plan"] -->|"Generates tasks.md checklist"| OPENSPEC_DIR
-    STAGE4["Stage 4: ce-work"] -->|"Updates tasks.md and records Spec Deltas"| OPENSPEC_DIR
-    STAGE5["Stage 5: Verification"] -->|"Proves every spec.md WHEN/THEN scenario green"| GATE["Mandatory gate: no ship without green tests"]
-    STAGE6["Stage 6: ce-compound"] -->|"Consolidates solution into docs/solutions/"| DOCS_SOLUTIONS["docs/solutions/"]
-    STAGE4 --> STAGE5 --> STAGE6
+    STAGE1["Stage 1: ce-brainstorm"] -->|"Frames requirements"| STAGE2["Stage 2: Architecture & Deltas"]
+    STAGE2 -->|"Freezes contracts in docs/arch/"| STAGE3["Stage 3: ce-plan (docs/plans/)"]
+    STAGE3 -->|"Generates TDD slices"| STAGE4["Stage 4: ce-work (TDD Implementation)"]
+    STAGE4 -->|"Marks checkboxes in docs/plans/"| STAGE5["Stage 5: Verification"]
+    STAGE5 -->|"Proves WHEN/THEN contracts green"| STAGE6["Stage 6: ce-compound"]
+    STAGE6 -->|"Captures solutions into docs/solutions/"| STAGE7["Stage 7: Git Shipping & Archive"]
+    STAGE7 -->|"ce-ai archive auto-promotes deltas"| ARCH_SYSTEM["docs/arch/system/ (Living Specs)"]
 ```
 
-| Lifecycle Phase | Active Agent / Command | Files Added / Updated in `openspec/changes/<feature>/` |
+| Lifecycle Phase | Active Agent / Command | Files Added / Updated in `docs/arch/` & `docs/plans/` |
 | :--- | :--- | :--- |
-| **Ideation & Framing** | `ce-brainstorm` | Creates `proposal.md` (Scope) & `exploration.md` (Tradeoffs) |
-| **Specification** | OpenSpec Definition | Creates `design.md` (Structs/APIs) & `spec.md` (`WHEN..THEN`) |
-| **Planning** | `ce-plan` | Reads `spec.md`/`design.md` and generates `tasks.md` |
-| **Development** | `ce-work` | Updates `tasks.md` (`- [x]`) and updates `spec.md` if design changes |
-| **Verification** | Project test suite, linters & E2E gates | Proves every `spec.md` WHEN/THEN scenario — non-negotiable before shipping |
-| **Capitalization** | `ce-compound` | Consolidates learnings into permanent `docs/solutions/` |
+| **Ideation & Framing** | `ce-brainstorm` | Produces framing in `docs/brainstorms/` |
+| **Architecture** | Architectural Definition | Living specs in `docs/arch/system/` or deltas in `docs/arch/deltas/<feature>/` |
+| **Planning** | `ce-plan` | Implementation plan in `docs/plans/` with TDD checklist |
+| **Development** | `ce-work` | Updates `docs/plans/` (`- [x]`) and executes red-green-refactor code |
+| **Verification** | Project test suite, linters & E2E gates | Proves every WHEN/THEN requirement green before shipping |
+| **Capitalization** | `ce-compound` | Consolidates learnings into permanent `docs/solutions/` and `CONCEPTS.md` |
+| **Archive** | `ce-ai archive` | Moves deltas to `docs/arch/archive/` and auto-promotes requirements to living specs |
 
 ---
 
@@ -108,9 +108,9 @@ Progress is tracked at **two complementary levels**:
 
 ```mermaid
 flowchart LR
-    TASK_LEVEL["1. Task & Code Level: openspec/changes/feature/tasks.md"]
+    TASK_LEVEL["1. Task & Code Level: docs/plans/*.md (SSOT)"]
     WORKFLOW_LEVEL["2. Workflow Orchestration Level: ce-ai workflow status"]
 ```
 
-1. **Granular Task & Code Progress**: Followed directly in `openspec/changes/<feature_name>/tasks.md`. As `ce-work` completes TDD tasks, checkboxes are marked `- [x]`. (Checkbox marks inside `docs/plans/*.md` bodies are not progress state — the OpenSpec ledger and git history are. If code changes exist but `tasks.md` remains unmarked, `ce-ai` flags a non-blocking desync warning across `workflow resume`, `status`, `checkpoint`, and `doctor`.)
+1. **Granular Task & Code Progress**: Followed directly in the implementation plan under `docs/plans/*.md` (or active delta package). As `ce-work` completes TDD units, checkboxes are marked `- [x]`. `ce-ai` treats `docs/plans/` as the definitive Single Source of Truth for progress.
 2. **High-Level Workflow Progress**: Followed using `ce-ai workflow status` (or `ce-ai status`), showing which of the 7 stages the project is currently executing.

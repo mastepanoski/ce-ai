@@ -21,6 +21,9 @@ pub enum FleetActionCommand {
         /// Emit status report in JSON format.
         #[arg(long)]
         json: bool,
+        /// Filter by repository constellation system identifier.
+        #[arg(long)]
+        system: Option<String>,
     },
     /// Pin target Compound Engineering version for the fleet.
     Pin {
@@ -32,21 +35,103 @@ pub enum FleetActionCommand {
         /// Preview planned actions without writing.
         #[arg(long)]
         dry_run: bool,
+        /// Filter by repository constellation system identifier.
+        #[arg(long)]
+        system: Option<String>,
     },
 }
 
 pub fn run(ctx: &Context, args: Args) -> Result<(), CeError> {
-    let action = args
-        .action
-        .unwrap_or(FleetActionCommand::Status { json: false });
+    let action = args.action.unwrap_or(FleetActionCommand::Status {
+        json: false,
+        system: None,
+    });
     match action {
-        FleetActionCommand::Status { json } => handle_status(ctx, json),
+        FleetActionCommand::Status { json, system } => handle_status(ctx, json, system.as_deref()),
         FleetActionCommand::Pin { version } => handle_pin(ctx, &version),
-        FleetActionCommand::Sync { dry_run } => handle_sync(ctx, dry_run),
+        FleetActionCommand::Sync { dry_run, system } => {
+            handle_sync_with_filter(ctx, dry_run, system.as_deref())
+        }
     }
 }
 
-fn handle_status(ctx: &Context, json: bool) -> Result<(), CeError> {
+pub fn handle_status(
+    ctx: &Context,
+    json: bool,
+    system_filter: Option<&str>,
+) -> Result<(), CeError> {
+    let repo_root = ctx.repo_root();
+    let current_manifest = crate::compat::arch::load_system_manifest(&repo_root)?;
+
+    if let Some(target_system) = system_filter {
+        let manifest = match current_manifest.as_ref() {
+            Some(m) if m.system == target_system => m,
+            Some(m) => {
+                return Err(CeError::Usage(format!(
+                    "current repository system '{}' does not match requested constellation '{target_system}'",
+                    m.system
+                )));
+            }
+            None => {
+                return Err(CeError::Usage(format!(
+                    "no system.yaml found in current repository; cannot filter by constellation '{target_system}'"
+                )));
+            }
+        };
+
+        let mut dep_statuses = Vec::new();
+        for dep in &manifest.dependencies {
+            let status = crate::compat::arch::resolve_dependency_status(&repo_root, dep);
+            dep_statuses.push((dep, status));
+        }
+
+        if json {
+            let report = generate_fleet_status_report(ctx)?;
+            let payload = serde_json::json!({
+                "system": manifest.system,
+                "component": manifest.component,
+                "role": manifest.role,
+                "dependencies": dep_statuses.iter().map(|(dep, st)| {
+                    serde_json::json!({
+                        "component": dep.component,
+                        "role": dep.role,
+                        "path": dep.path,
+                        "remote_repo": dep.remote_repo,
+                        "contract": dep.contract,
+                        "status": st.display_label(),
+                    })
+                }).collect::<Vec<_>>(),
+                "fleet_governance": report,
+            });
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&payload).map_err(CeError::Json)?
+            );
+            return Ok(());
+        }
+
+        println!("Repository Constellation Governance:");
+        println!("  System:    {}", manifest.system);
+        let role_label = manifest.role.as_deref().unwrap_or("unspecified");
+        println!("  Component: {} ({role_label})", manifest.component);
+        println!();
+        println!("Dependencies (Local-First, Remote-Graceful):");
+        if dep_statuses.is_empty() {
+            println!("  (no external constellation dependencies declared)");
+        } else {
+            for (dep, status) in &dep_statuses {
+                let dep_role = dep.role.as_deref().unwrap_or("component");
+                println!(
+                    "  - {} ({}): {}",
+                    dep.component,
+                    dep_role,
+                    status.display_label()
+                );
+            }
+        }
+        println!();
+    }
+
     let report = generate_fleet_status_report(ctx)?;
     if json {
         let serialized = serde_json::to_string_pretty(&report).map_err(CeError::Json)?;
@@ -147,6 +232,38 @@ pub fn handle_pin(ctx: &Context, raw_version: &str) -> Result<(), CeError> {
 }
 
 pub fn handle_sync(ctx: &Context, dry_run: bool) -> Result<(), CeError> {
+    handle_sync_with_filter(ctx, dry_run, None)
+}
+
+pub fn handle_sync_with_filter(
+    ctx: &Context,
+    dry_run: bool,
+    system_filter: Option<&str>,
+) -> Result<(), CeError> {
+    if let Some(target_system) = system_filter {
+        let repo_root = ctx.repo_root();
+        let current_manifest = crate::compat::arch::load_system_manifest(&repo_root)?;
+        match current_manifest {
+            Some(ref m) if m.system == target_system => {
+                println!(
+                    "Constellation filter active: verified repository belongs to constellation '{}' (component: {}).",
+                    m.system, m.component
+                );
+            }
+            Some(ref m) => {
+                return Err(CeError::Usage(format!(
+                    "current repository system '{}' does not match requested constellation '{target_system}'",
+                    m.system
+                )));
+            }
+            None => {
+                return Err(CeError::Usage(format!(
+                    "no system.yaml found in current repository; cannot filter sync by constellation '{target_system}'"
+                )));
+            }
+        }
+    }
+
     let effective_dry_run = dry_run || ctx.dry_run;
     let state_file = ctx.state_path();
     let mut state = if state_file.exists() {
@@ -379,5 +496,74 @@ mod tests {
             settings_val["compound_engineering_version"],
             serde_json::json!("v3.30.5")
         );
+    }
+
+    #[test]
+    fn test_fleet_status_with_system_filter_matching_and_mismatch() {
+        let temp = tempdir().unwrap();
+        let ws = temp.path().join("workspace");
+        let arch_dir = ws.join("docs").join("arch");
+        std::fs::create_dir_all(&arch_dir).unwrap();
+
+        let system_yaml = r#"
+system: payments-platform
+component: billing-service
+role: service
+dependencies:
+  - component: auth-service
+    contract: auth.json
+"#;
+        std::fs::write(arch_dir.join("system.yaml"), system_yaml).unwrap();
+
+        let ctx = Context {
+            config_dir: temp.path().join(".ce-ai"),
+            opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: Some(ws.clone()),
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        // 1. Matching system filter succeeds
+        assert!(handle_status(&ctx, false, Some("payments-platform")).is_ok());
+        // JSON mode succeeds
+        assert!(handle_status(&ctx, true, Some("payments-platform")).is_ok());
+
+        // 2. Mismatching system filter returns Usage error
+        let err = handle_status(&ctx, false, Some("logistics-platform")).unwrap_err();
+        assert_eq!(err.exit_code(), 2);
+        assert!(err
+            .to_string()
+            .contains("does not match requested constellation"));
+    }
+
+    #[test]
+    fn test_fleet_sync_with_system_filter_validation() {
+        let temp = tempdir().unwrap();
+        let ws = temp.path().join("workspace");
+        let arch_dir = ws.join("docs").join("arch");
+        std::fs::create_dir_all(&arch_dir).unwrap();
+
+        let system_yaml = r#"
+system: core-platform
+component: gateway
+"#;
+        std::fs::write(arch_dir.join("system.yaml"), system_yaml).unwrap();
+
+        let ctx = Context {
+            config_dir: temp.path().join(".ce-ai"),
+            opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: Some(ws),
+            dry_run: true,
+            verbose: false,
+            quiet: false,
+        };
+
+        // Mismatched constellation fails before checking pinned version
+        let err = handle_sync_with_filter(&ctx, true, Some("unrelated-system")).unwrap_err();
+        assert_eq!(err.exit_code(), 2);
+        assert!(err
+            .to_string()
+            .contains("does not match requested constellation"));
     }
 }

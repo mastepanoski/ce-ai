@@ -737,6 +737,19 @@ pub fn resume_lines_with_mode(
                     lines.push(format!("  {warn}"));
                 }
             }
+        } else if let Some(plan_obs) =
+            crate::observation::state::observe_plan(&repo_root, branch.as_deref())
+        {
+            if !plan_obs.is_requirements_only && plan_obs.total_items > 0 {
+                lines.push(String::new());
+                let title = plan_obs.title.as_deref().unwrap_or("Active Plan");
+                lines.push(format!("== [Context Re-hydration: {}] ==", title));
+                lines.push(format!("  plan location: {}", plan_obs.path.display()));
+                lines.push(format!(
+                    "  tasks progress: {}/{} completed ([x])",
+                    plan_obs.completed_items, plan_obs.total_items
+                ));
+            }
         }
     } else if let Some(odd) = probe_active_odd_task(&repo_root, &wf) {
         lines.push(String::new());
@@ -1774,12 +1787,16 @@ pub fn probe_repo_state_with_mode(
 
     let task_desync = openspec_context.as_ref().and_then(|info| {
         let touched_files = probe_feature_touched_files(&repo_root);
-        reconcile_tasks_with_git(
-            &repo_root,
-            &info.feature,
-            &info.path.join("tasks.md"),
-            &touched_files,
-        )
+        let tasks_file = if info.path.join("tasks.md").exists() {
+            info.path.join("tasks.md")
+        } else if let Some(plan_obs) =
+            crate::observation::state::observe_plan(&repo_root, git_branch.as_deref())
+        {
+            plan_obs.path
+        } else {
+            info.path.join("tasks.md")
+        };
+        reconcile_tasks_with_git(&repo_root, &info.feature, &tasks_file, &touched_files)
     });
 
     let unarchived_completed_changes = probe_unarchived_completed_changes(&repo_root);
@@ -1832,7 +1849,12 @@ pub fn probe_repo_state_with_mode(
 }
 
 pub fn probe_openspec_has_uncommitted(repo_root: &Path, feature: &str) -> bool {
-    let change_rel_path = format!("openspec/changes/{feature}");
+    let modern_path = format!("docs/arch/deltas/{feature}");
+    let change_rel_path = if repo_root.join(&modern_path).is_dir() {
+        modern_path
+    } else {
+        format!("openspec/changes/{feature}")
+    };
     let mut cmd = std::process::Command::new("git");
     for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
         cmd.env_remove(var);
@@ -1873,7 +1895,12 @@ pub fn probe_openspec_context_in(
     repo_root: &Path,
     wf: &Option<WorkflowState>,
 ) -> Option<OpenSpecContextInfo> {
-    let openspec_dir = repo_root.join("openspec").join("changes");
+    let deltas = crate::compat::arch::deltas_dir(repo_root);
+    let openspec_dir = if deltas.is_dir() {
+        deltas
+    } else {
+        repo_root.join("openspec").join("changes")
+    };
     if !openspec_dir.is_dir() {
         return None;
     }
@@ -1925,12 +1952,18 @@ pub fn probe_openspec_context_in(
     let has_proposal = change_dir.join("proposal.md").exists();
     let has_spec = change_dir.join("spec.md").exists();
     let tasks_path = change_dir.join("tasks.md");
-    let has_tasks = tasks_path.exists();
+    let has_tasks_file = tasks_path.exists();
 
-    let (completed_tasks, total_tasks) = if has_tasks {
-        count_task_checkboxes(&tasks_path)
+    let plan_branch = probe_git_branch(repo_root);
+    let plan_obs = crate::observation::state::observe_plan(repo_root, plan_branch.as_deref());
+
+    let (completed_tasks, total_tasks, has_tasks) = if has_tasks_file {
+        let (c, t) = count_task_checkboxes(&tasks_path);
+        (c, t, true)
+    } else if let Some(ref p) = plan_obs {
+        (p.completed_items, p.total_items, p.total_items > 0)
     } else {
-        (0, 0)
+        (0, 0, false)
     };
 
     let is_uncommitted = probe_openspec_has_uncommitted(repo_root, &target_feature);
@@ -1977,7 +2010,12 @@ pub fn count_task_checkboxes(tasks_path: &Path) -> (usize, usize) {
 /// Scans openspec/changes/ across the entire repository for completed features that have not been moved to archive/.
 /// Gracefully ignores unreadable directories/files (TOCTOU resilience).
 pub fn probe_unarchived_completed_changes(repo_root: &Path) -> Vec<UnarchivedChange> {
-    let openspec_dir = repo_root.join("openspec").join("changes");
+    let deltas = crate::compat::arch::deltas_dir(repo_root);
+    let openspec_dir = if deltas.is_dir() {
+        deltas
+    } else {
+        repo_root.join("openspec").join("changes")
+    };
     let mut completed_changes = Vec::new();
     let entries = match std::fs::read_dir(&openspec_dir) {
         Ok(read) => read,
@@ -1998,11 +2036,15 @@ pub fn probe_unarchived_completed_changes(repo_root: &Path) -> Vec<UnarchivedCha
         }
 
         let tasks_path = path.join("tasks.md");
-        if !tasks_path.is_file() {
-            continue;
-        }
-
-        let (completed, total) = count_task_checkboxes(&tasks_path);
+        let (completed, total) = if tasks_path.is_file() {
+            count_task_checkboxes(&tasks_path)
+        } else if let Some(plan_obs) =
+            crate::observation::state::observe_plan(repo_root, Some(dir_name))
+        {
+            (plan_obs.completed_items, plan_obs.total_items)
+        } else {
+            (0, 0)
+        };
         if total > 0 && completed == total {
             completed_changes.push(UnarchivedChange {
                 feature: dir_name.to_string(),
@@ -2678,15 +2720,34 @@ pub fn validate_and_archive_feature(
         return Err(CeError::Usage(format!("invalid feature name '{feature}'")));
     }
 
-    let source_path = repo_root.join("openspec").join("changes").join(feature);
+    let deltas = crate::compat::arch::deltas_dir(repo_root);
+    let source_path = if deltas.join(feature).is_dir() {
+        deltas.join(feature)
+    } else if repo_root
+        .join("openspec")
+        .join("changes")
+        .join(feature)
+        .is_dir()
+    {
+        repo_root.join("openspec").join("changes").join(feature)
+    } else {
+        deltas.join(feature)
+    };
+
+    let change_label = if repo_root.join("docs").join("arch").is_dir() {
+        "change"
+    } else {
+        "openspec change"
+    };
+
     if !source_path.is_dir() {
         return Err(CeError::Usage(format!(
-            "openspec change '{feature}' not found at '{}'",
+            "{change_label} '{feature}' not found at '{}'",
             source_path.display()
         )));
     }
 
-    let dest_parent = repo_root.join("openspec").join("changes").join("archive");
+    let dest_parent = crate::compat::arch::archive_dir(repo_root);
     let dest_path = dest_parent.join(feature);
     if dest_path.exists() {
         return Err(CeError::State(format!(
@@ -2719,21 +2780,22 @@ pub fn validate_and_archive_feature(
         }
     } else {
         return Err(CeError::Verification(format!(
-            "openspec change '{feature}' has {} open task(s) ({completed}/{total} completed); complete all tasks (Criterion 1) or supply --status '<evidence>' (Criterion 2)",
+            "change '{feature}' has {} open task(s) ({completed}/{total} completed); complete all tasks (Criterion 1) or supply --status '<evidence>' (Criterion 2)",
             total.saturating_sub(completed)
         )));
     };
 
     let (is_clean, modified_files) = probe_git_dirty_files(repo_root);
     if !is_clean {
-        let feature_prefix = format!("openspec/changes/{feature}/");
+        let rel_source = source_path.strip_prefix(repo_root).unwrap_or(&source_path);
+        let feature_prefix = format!("{}/", rel_source.display());
         let foreign_modified: Vec<&String> = modified_files
             .iter()
             .filter(|f| f.starts_with(&feature_prefix) && !f.ends_with("tasks.md"))
             .collect();
         if !foreign_modified.is_empty() {
             return Err(CeError::Verification(format!(
-                "openspec change '{feature}' contains uncommitted modifications in non-tasks files: {foreign_modified:?}"
+                "change '{feature}' contains uncommitted modifications in non-tasks files: {foreign_modified:?}"
             )));
         }
     }
@@ -2766,8 +2828,9 @@ pub fn validate_and_archive_feature(
 
         if !git_mv_success {
             std::fs::rename(&source_path, &dest_path).map_err(CeError::Io)?;
+            let rel_dest = dest_parent.strip_prefix(repo_root).unwrap_or(&dest_parent);
             let _ = std::process::Command::new("git")
-                .args(["add", "-A", "openspec/changes"])
+                .args(["add", "-A", rel_dest.to_str().unwrap_or_default()])
                 .current_dir(repo_root)
                 .output();
         }
@@ -2790,11 +2853,8 @@ pub fn sync_archive_readme_ledger(
     if dry_run || outcomes.is_empty() {
         return Ok(());
     }
-    let readme_path = repo_root
-        .join("openspec")
-        .join("changes")
-        .join("archive")
-        .join("README.md");
+    let archive_dir = crate::compat::arch::archive_dir(repo_root);
+    let readme_path = archive_dir.join("README.md");
     if !readme_path.is_file() {
         return Ok(());
     }
@@ -2833,8 +2893,9 @@ pub fn sync_archive_readme_ledger(
     updated.push_str(&entry);
 
     crate::state::write_atomic(&readme_path, updated.as_bytes())?;
+    let rel_readme = readme_path.strip_prefix(repo_root).unwrap_or(&readme_path);
     let _ = std::process::Command::new("git")
-        .args(["add", "openspec/changes/archive/README.md"])
+        .args(["add", rel_readme.to_str().unwrap_or_default()])
         .current_dir(repo_root)
         .output();
 
@@ -3025,25 +3086,38 @@ pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
             }
         }
 
-        if args.promote {
+        let should_promote = args.promote
+            || crate::compat::arch::detect_system_specs_source(&repo_root)
+                == crate::compat::arch::ArchSource::DocsArch;
+
+        if should_promote {
             for o in &outcomes {
-                match crate::commands::spec::promote_delta_to_domain_spec(
-                    &repo_root,
-                    &o.feature,
-                    args.domain.as_deref(),
-                    true,
-                ) {
-                    Ok(promo) => {
-                        println!(
-                            "  [dry-run] would promote {} requirement(s) from '{}' into domain spec '{}'",
-                            promo.requirements_promoted, promo.change, promo.domain
-                        );
-                    }
-                    Err(err) => {
-                        eprintln!(
-                            "warning: [dry-run] failed to preview promotion for '{}': {err}",
-                            o.feature
-                        );
+                if crate::commands::spec::find_change_spec_path(&repo_root, &o.feature).is_some() {
+                    match crate::commands::spec::promote_delta_to_domain_spec(
+                        &repo_root,
+                        &o.feature,
+                        args.domain.as_deref(),
+                        true,
+                    ) {
+                        Ok(promo) => {
+                            let rel_spec = promo
+                                .spec_path
+                                .strip_prefix(&repo_root)
+                                .unwrap_or(&promo.spec_path);
+                            let rel_spec_str = rel_spec.to_string_lossy().replace('\\', "/");
+                            println!(
+                                "  [dry-run] would promote {} requirement(s) from '{}' into domain spec '{}' ({})",
+                                promo.requirements_promoted, promo.change, promo.domain, rel_spec_str
+                            );
+                        }
+                        Err(err) => {
+                            if args.promote {
+                                eprintln!(
+                                    "warning: [dry-run] failed to preview promotion for '{}': {err}",
+                                    o.feature
+                                );
+                            }
+                        }
                     }
                 }
             }
@@ -3057,25 +3131,38 @@ pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
     let archived_names: Vec<String> = outcomes.iter().map(|o| o.feature.clone()).collect();
     reconcile_state_active_feature(ctx, &archived_names, false)?;
 
-    if args.promote {
+    let should_promote = args.promote
+        || crate::compat::arch::detect_system_specs_source(&repo_root)
+            == crate::compat::arch::ArchSource::DocsArch;
+
+    if should_promote {
         for o in &outcomes {
-            match crate::commands::spec::promote_delta_to_domain_spec(
-                &repo_root,
-                &o.feature,
-                args.domain.as_deref(),
-                false,
-            ) {
-                Ok(promo) => {
-                    println!(
-                        "promoted: {} requirement(s) from '{}' into openspec/specs/{}.md",
-                        promo.requirements_promoted, o.feature, promo.domain
-                    );
-                }
-                Err(err) => {
-                    eprintln!(
-                        "warning: failed to promote requirements for '{}': {err}",
-                        o.feature
-                    );
+            if crate::commands::spec::find_change_spec_path(&repo_root, &o.feature).is_some() {
+                match crate::commands::spec::promote_delta_to_domain_spec(
+                    &repo_root,
+                    &o.feature,
+                    args.domain.as_deref(),
+                    false,
+                ) {
+                    Ok(promo) => {
+                        let rel_spec = promo
+                            .spec_path
+                            .strip_prefix(&repo_root)
+                            .unwrap_or(&promo.spec_path);
+                        let rel_spec_str = rel_spec.to_string_lossy().replace('\\', "/");
+                        println!(
+                            "promoted: {} requirement(s) from '{}' into {}",
+                            promo.requirements_promoted, o.feature, rel_spec_str
+                        );
+                    }
+                    Err(err) => {
+                        if args.promote {
+                            eprintln!(
+                                "warning: failed to promote requirements for '{}': {err}",
+                                o.feature
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -3109,9 +3196,17 @@ pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
             }
         }
     } else {
+        let dest_parent = crate::compat::arch::archive_dir(&repo_root);
+        let rel_dest = dest_parent.strip_prefix(&repo_root).unwrap_or(&dest_parent);
+        let rel_dest_str = rel_dest.to_string_lossy().replace('\\', "/");
+        let change_label = if repo_root.join("docs").join("arch").is_dir() {
+            "change(s)"
+        } else {
+            "OpenSpec change(s)"
+        };
         println!(
-            "archived {} completed OpenSpec change(s) successfully to openspec/changes/archive/",
-            outcomes.len()
+            "archived {} completed {change_label} successfully to {rel_dest_str}/",
+            outcomes.len(),
         );
     }
 
@@ -3143,6 +3238,11 @@ impl TaskDesyncReport {
     }
 
     pub fn warning_line(&self) -> String {
+        let filename = self
+            .tasks_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("tasks.md");
         if !self.desynced_tasks.is_empty() {
             let count = self.desynced_tasks.len();
             let mut sample_files: Vec<String> = Vec::new();
@@ -3163,12 +3263,12 @@ impl TaskDesyncReport {
                 )
             };
             format!(
-                "! Warning: Tasks desync detected — {count} unchecked task(s) reference modified files ({preview}), but tasks.md shows {}/{} completed. Update tasks.md (- [x]) to reflect progress.",
+                "! Warning: Tasks desync detected — {count} unchecked task(s) reference modified files ({preview}), but {filename} shows {}/{} completed. Update {filename} (- [x]) to reflect progress.",
                 self.completed_tasks, self.total_tasks
             )
         } else if self.is_aggregate_desync {
             format!(
-                "! Warning: Tasks desync detected — working tree / branch contains modified code, but tasks.md shows 0/{} completed. Update tasks.md (- [x]) to reflect progress.",
+                "! Warning: Tasks desync detected — working tree / branch contains modified code, but {filename} shows 0/{} completed. Update {filename} (- [x]) to reflect progress.",
                 self.total_tasks
             )
         } else {
@@ -3665,7 +3765,12 @@ pub fn infer_stage_from_repo(
         return None;
     }
 
-    let openspec_dir = repo_root.join("openspec").join("changes");
+    let deltas = crate::compat::arch::deltas_dir(repo_root);
+    let openspec_dir = if deltas.is_dir() {
+        deltas
+    } else {
+        repo_root.join("openspec").join("changes")
+    };
 
     // 1. Resolve feature candidate from branch or probe
     let candidate = branch.map(sanitize_feature_name);
@@ -3678,14 +3783,16 @@ pub fn infer_stage_from_repo(
             (None, None)
         };
 
-    // 2. OpenSpec deduction (Stages 2, 3, 4, 5, 6, 7)
+    let plan_obs = crate::observation::state::observe_plan(repo_root, branch);
+
+    // 2. OpenSpec / Delta deduction (Stages 2, 3, 4, 5, 6, 7)
     if let Some(ref feat) = resolved_feature {
         let change_dir = openspec_dir.join(feat);
         let has_proposal = change_dir.join("proposal.md").exists();
         let has_spec = change_dir.join("spec.md").exists();
         let tasks_path = change_dir.join("tasks.md");
 
-        if tasks_path.exists() {
+        let (has_tasks_source, completed_tasks, total_tasks) = if tasks_path.exists() {
             let mut completed_tasks = 0;
             let mut total_tasks = 0;
             if let Ok(content) = std::fs::read_to_string(&tasks_path) {
@@ -3699,7 +3806,14 @@ pub fn infer_stage_from_repo(
                     }
                 }
             }
+            (total_tasks > 0, completed_tasks, total_tasks)
+        } else if let Some(ref p) = plan_obs {
+            (p.total_items > 0, p.completed_items, p.total_items)
+        } else {
+            (false, 0, 0)
+        };
 
+        if has_tasks_source {
             if total_tasks > 0 && completed_tasks == 0 {
                 return Some((
                     WorkflowStage::ExecutionPlan,
@@ -3758,6 +3872,74 @@ pub fn infer_stage_from_repo(
                 Some(feat.clone()),
                 resolution,
             ));
+        }
+    }
+
+    // 2b. Plan deduction without OpenSpec (Native Compound Engineering)
+    if let Some(ref p) = plan_obs {
+        if !p.is_requirements_only && p.total_items > 0 {
+            let feat_name = branch.map(sanitize_feature_name).unwrap_or_else(|| {
+                p.path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("active-plan")
+                    .to_string()
+            });
+            let plan_res = if branch.is_some() {
+                FeatureResolution::Branch
+            } else {
+                FeatureResolution::Plan
+            };
+
+            if p.completed_items == 0 {
+                return Some((
+                    WorkflowStage::ExecutionPlan,
+                    format!("Execution plan authored for {feat_name}"),
+                    Some(feat_name),
+                    Some(plan_res),
+                ));
+            } else if p.completed_items < p.total_items {
+                return Some((
+                    WorkflowStage::WorkTdd,
+                    format!(
+                        "Implementing tasks ({}/{} completed) for {feat_name}",
+                        p.completed_items, p.total_items
+                    ),
+                    Some(feat_name),
+                    Some(plan_res),
+                ));
+            } else {
+                if check_gh_pr_shipping(repo_root) {
+                    return Some((
+                        WorkflowStage::GitShipping,
+                        format!("Shipping changes / pull request for {feat_name}"),
+                        Some(feat_name),
+                        Some(plan_res),
+                    ));
+                }
+
+                let (_, modified_files) = probe_git_dirty_files(repo_root);
+                let has_solutions_dirty = modified_files
+                    .iter()
+                    .any(|f| f.starts_with("docs/solutions/") && f.ends_with(".md"));
+                let has_solutions_committed = has_committed_solutions_on_branch(repo_root);
+
+                if has_solutions_dirty || has_solutions_committed {
+                    return Some((
+                        WorkflowStage::KnowledgeCapture,
+                        format!("Capturing solution in docs/solutions/ for {feat_name}"),
+                        Some(feat_name),
+                        Some(plan_res),
+                    ));
+                }
+
+                return Some((
+                    WorkflowStage::Verification,
+                    format!("Verifying test gates for {feat_name}"),
+                    Some(feat_name),
+                    Some(plan_res),
+                ));
+            }
         }
     }
 

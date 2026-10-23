@@ -13,7 +13,7 @@ use tempfile::TempDir;
 /// embeds a block header must derive from this constant: a stale hardcoded
 /// version flips classifier branches after a bump (see
 /// docs/solutions/test-failures/adoption-block-version-bump-test-coordination-2026-08-25.md).
-const CUR_BLOCK_VERSION: u32 = 8;
+const CUR_BLOCK_VERSION: u32 = 9;
 
 fn block_begin_prefix(tier: &str) -> String {
     format!("<!-- ce-ai:block begin v={CUR_BLOCK_VERSION} tier={tier}")
@@ -2647,8 +2647,59 @@ fn init_prj_upgrades_stale_v7_block_to_v8_with_decoupled_openspec() {
     assert!(updated_text.starts_with(user_head));
     assert!(!updated_text.contains("Legacy v7 content."));
     assert!(updated_text.contains(&block_begin_prefix("full")));
-    assert!(updated_text.contains("CE-AI enforces zero semantic authority: OpenSpec is decoupled"));
-    assert!(updated_text.contains("frozen Stage 2 contract"));
+    assert!(updated_text
+        .contains("CE-AI enforces zero semantic authority: architecture deltas are decoupled"));
+    assert!(updated_text.contains("Stage 2 Living Architecture & Deltas (Optional)"));
+
+    let state_val: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(config_dir.join("state.json")).unwrap()).unwrap();
+    assert_eq!(state_val["projects"][0]["block_version"], CUR_BLOCK_VERSION);
+}
+
+#[test]
+fn init_prj_upgrades_stale_v8_block_to_v9_with_docs_arch() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("v8-adopted-project");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let agents_file = prj_dir.join("AGENTS.md");
+    let user_head = "# My Project\n\nCustom notes.\n\n";
+    let v8_block = "<!-- ce-ai:block begin v=8 tier=full sha256=abcdef123456 -->\n## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Integration\n\nLegacy v8 content.\n<!-- ce-ai:block end -->";
+    fs::write(
+        &agents_file,
+        format!("{}{}{}", user_head, v8_block, "\nTrailing notes.\n"),
+    )
+    .unwrap();
+
+    // Doctor reports stale version v=8
+    ceai(&config_dir, &home)
+        .arg("doctor")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("stale block version v=8"))
+        .stdout(predicate::str::contains(
+            "re-run ce-ai init-prj --tier full to upgrade",
+        ));
+
+    // Re-running init-prj upgrades to v9
+    ceai(&config_dir, &home)
+        .args(["init-prj", prj_dir.to_str().unwrap(), "--tier", "full"])
+        .assert()
+        .success();
+
+    let updated_text = fs::read_to_string(&agents_file).unwrap();
+    assert!(updated_text.starts_with(user_head));
+    assert!(!updated_text.contains("Legacy v8 content."));
+    assert!(updated_text.contains(&block_begin_prefix("full")));
+    assert!(updated_text
+        .contains("CE-AI enforces zero semantic authority: architecture deltas are decoupled"));
+    assert!(updated_text.contains("Stage 2 Living Architecture & Deltas (Optional)"));
 
     let state_val: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(config_dir.join("state.json")).unwrap()).unwrap();

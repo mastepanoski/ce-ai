@@ -254,14 +254,16 @@ fn test_render_block_content_turn_0_and_progressive_openspec() {
     assert!(full
         .contains("Only run `ce-ai workflow resume` yourself when no such context was injected"));
 
-    // Stage 2: Progressive OpenSpec authoring
-    assert!(full.contains("### Stage 2 OpenSpec Integration (Optional)"));
-    assert!(full.contains("CE-AI enforces zero semantic authority: OpenSpec is decoupled"));
-    assert!(full.contains("`tasks.md` (the executable task checklist) is generated from that frozen contract in Stage 3 — do not require it before Stage 2 is complete, but do not open a PR without it."));
+    // Stage 2: Living Architecture & Deltas authoring
+    assert!(full.contains("### Stage 2 Living Architecture & Deltas (Optional)"));
+    assert!(
+        full.contains("CE-AI enforces zero semantic authority: architecture deltas are decoupled")
+    );
+    assert!(full.contains("The execution plan and task checklist reside in `docs/plans/` (`- [x]` checkboxes) as the single source of truth for progress."));
 
     // Verify tasks.md is NOT listed under the Stage 2 contract bullet points
     let stage2_section = full
-        .split("### Stage 2 OpenSpec Integration (Optional)")
+        .split("### Stage 2 Living Architecture & Deltas (Optional)")
         .nth(1)
         .unwrap()
         .split("### Single Source of Truth Rule")
@@ -495,4 +497,237 @@ fn test_adopt_project_with_migrate_dry_run_leaves_disk_untouched() {
         fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap(),
         legacy_content
     );
+}
+
+#[test]
+fn test_migrate_arch_dry_run() {
+    let tmp = TempDir::new().unwrap();
+    let prj_dir = tmp.path().join("dry-run-arch");
+    let config_dir = tmp.path().join("config");
+    fs::create_dir_all(&config_dir).unwrap();
+
+    let openspec_dir = prj_dir.join("openspec");
+    fs::create_dir_all(openspec_dir.join("specs")).unwrap();
+    fs::create_dir_all(
+        openspec_dir
+            .join("changes")
+            .join("archive")
+            .join("old-feat"),
+    )
+    .unwrap();
+    fs::write(openspec_dir.join("specs").join("core.md"), "# Core Spec").unwrap();
+    fs::write(
+        openspec_dir
+            .join("changes")
+            .join("archive")
+            .join("old-feat")
+            .join("tasks.md"),
+        "- [x] Done\n",
+    )
+    .unwrap();
+
+    let ctx = Context {
+        config_dir,
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        quiet: true,
+        dry_run: true,
+        verbose: false,
+    };
+
+    let options = InitPrjOptions {
+        migrate_arch: true,
+        force: true,
+        ..Default::default()
+    };
+
+    let res = run(&ctx, Some(prj_dir.clone()), options);
+    assert!(res.is_ok());
+
+    // Legacy openspec still exists, modern docs/arch NOT created
+    assert!(openspec_dir.join("specs").join("core.md").exists());
+    assert!(!prj_dir.join("docs").join("arch").exists());
+}
+
+#[test]
+fn test_migrate_arch_execution() {
+    let tmp = TempDir::new().unwrap();
+    let prj_dir = tmp.path().join("exec-arch");
+    let config_dir = tmp.path().join("config");
+    fs::create_dir_all(&config_dir).unwrap();
+
+    let openspec_dir = prj_dir.join("openspec");
+    fs::create_dir_all(openspec_dir.join("specs")).unwrap();
+    fs::create_dir_all(
+        openspec_dir
+            .join("changes")
+            .join("archive")
+            .join("old-feat"),
+    )
+    .unwrap();
+    fs::create_dir_all(openspec_dir.join("changes").join("active-feat")).unwrap();
+    fs::write(openspec_dir.join("specs").join("core.md"), "# Core Spec").unwrap();
+    fs::write(
+        openspec_dir
+            .join("changes")
+            .join("archive")
+            .join("old-feat")
+            .join("tasks.md"),
+        "- [x] Done\n",
+    )
+    .unwrap();
+    fs::write(
+        openspec_dir
+            .join("changes")
+            .join("active-feat")
+            .join("proposal.md"),
+        "# Active Proposal\n",
+    )
+    .unwrap();
+
+    let ctx = Context {
+        config_dir,
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        quiet: true,
+        dry_run: false,
+        verbose: false,
+    };
+
+    let options = InitPrjOptions {
+        migrate_arch: true,
+        force: true,
+        ..Default::default()
+    };
+
+    let res = run(&ctx, Some(prj_dir.clone()), options);
+    assert!(res.is_ok());
+
+    // Destination docs/arch structure populated
+    let arch_dir = prj_dir.join("docs").join("arch");
+    assert!(arch_dir.join("system").join("core.md").exists());
+    assert_eq!(
+        fs::read_to_string(arch_dir.join("system").join("core.md")).unwrap(),
+        "# Core Spec"
+    );
+    assert!(arch_dir
+        .join("archive")
+        .join("old-feat")
+        .join("tasks.md")
+        .exists());
+    assert!(arch_dir
+        .join("deltas")
+        .join("active-feat")
+        .join("proposal.md")
+        .exists());
+
+    // Legacy openspec root removed
+    assert!(!openspec_dir.exists());
+}
+
+#[test]
+fn test_migrate_arch_updates_agents_block() {
+    let tmp = TempDir::new().unwrap();
+    let prj_dir = tmp.path().join("block-arch");
+    let config_dir = tmp.path().join("config");
+    fs::create_dir_all(&config_dir).unwrap();
+
+    let openspec_dir = prj_dir.join("openspec");
+    fs::create_dir_all(&openspec_dir).unwrap();
+
+    let ctx = Context {
+        config_dir,
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        quiet: true,
+        dry_run: false,
+        verbose: false,
+    };
+
+    let options = InitPrjOptions {
+        migrate_arch: true,
+        force: true,
+        tier: Some("full".to_string()),
+        ..Default::default()
+    };
+
+    let res = run(&ctx, Some(prj_dir.clone()), options);
+    assert!(res.is_ok());
+
+    let agents_content = fs::read_to_string(prj_dir.join("AGENTS.md")).unwrap();
+    assert!(agents_content.contains(&format!("v={BLOCK_VERSION}")));
+    assert!(agents_content.contains("Stage 2 Living Architecture & Deltas (Optional)"));
+    assert!(agents_content.contains("docs/arch/system/"));
+}
+
+#[test]
+fn test_migrate_arch_aborts_on_dirty_working_tree() {
+    let tmp = TempDir::new().unwrap();
+    let prj_dir = tmp.path().join("dirty-arch");
+    let config_dir = tmp.path().join("config");
+    fs::create_dir_all(&prj_dir).unwrap();
+    fs::create_dir_all(&config_dir).unwrap();
+
+    // Initialize real git repo
+    let run_git = |args: &[&str]| {
+        let mut cmd = std::process::Command::new("git");
+        for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
+            cmd.env_remove(var);
+        }
+        cmd.args(args).current_dir(&prj_dir).output().unwrap()
+    };
+    run_git(&["init"]);
+    run_git(&["config", "user.email", "test@example.com"]);
+    run_git(&["config", "user.name", "Test"]);
+
+    let openspec_dir = prj_dir.join("openspec");
+    fs::create_dir_all(openspec_dir.join("specs")).unwrap();
+    fs::write(openspec_dir.join("specs").join("core.md"), "# Core").unwrap();
+
+    run_git(&["add", "."]);
+    run_git(&["commit", "-m", "Initial commit"]);
+
+    // Create an uncommitted dirty file
+    fs::write(prj_dir.join("dirty.txt"), "uncommitted changes").unwrap();
+
+    let ctx = Context {
+        config_dir,
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        quiet: true,
+        dry_run: false,
+        verbose: false,
+    };
+
+    // Without --force: must fail with Usage error
+    let options = InitPrjOptions {
+        migrate_arch: true,
+        force: false,
+        ..Default::default()
+    };
+    let res = run(&ctx, Some(prj_dir.clone()), options);
+    assert!(res.is_err());
+    match res {
+        Err(CeError::Usage(msg)) => assert!(msg.contains("dirty")),
+        other => panic!(
+            "expected CeError::Usage with dirty tree message, got {:?}",
+            other
+        ),
+    }
+
+    // With --force: must succeed
+    let options_force = InitPrjOptions {
+        migrate_arch: true,
+        force: true,
+        ..Default::default()
+    };
+    let res_force = run(&ctx, Some(prj_dir.clone()), options_force);
+    assert!(res_force.is_ok());
+    assert!(!openspec_dir.exists());
+    assert!(prj_dir
+        .join("docs")
+        .join("arch")
+        .join("system")
+        .join("core.md")
+        .exists());
 }

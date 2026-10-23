@@ -217,12 +217,12 @@ fn extract_markdown_summary(path: &Path, section_trigger: &str, max_len: usize) 
     }
 }
 
-/// Collects all candidate archive packages from `openspec/changes/archive/`.
+/// Collects all candidate archive packages from `docs/arch/archive/` (or legacy `openspec/changes/archive/`).
 pub fn collect_compaction_candidates(
     repo_root: &Path,
     before: Option<chrono::NaiveDate>,
 ) -> Vec<CompactionCandidate> {
-    let archive_dir = repo_root.join("openspec").join("changes").join("archive");
+    let archive_dir = crate::compat::arch::archive_dir(repo_root);
     let mut candidates = Vec::new();
 
     let entries = match std::fs::read_dir(&archive_dir) {
@@ -487,7 +487,7 @@ pub fn probe_archive_compaction(
     repo_root: &Path,
     config: &DocHygieneConfig,
 ) -> ProbeStatus<ArchiveCompactionFinding> {
-    let archive_dir = repo_root.join("openspec").join("changes").join("archive");
+    let archive_dir = crate::compat::arch::archive_dir(repo_root);
     if !archive_dir.is_dir() {
         return ProbeStatus::Clean;
     }
@@ -539,7 +539,7 @@ pub fn probe_archive_compaction(
 /// Main execution logic for `ce-ai archive compact`.
 pub fn run_archive_compact(ctx: &Context, args: &CompactArgs) -> Result<(), CeError> {
     let repo_root = ctx.repo_root();
-    let archive_dir = repo_root.join("openspec").join("changes").join("archive");
+    let archive_dir = crate::compat::arch::archive_dir(&repo_root);
 
     if !archive_dir.is_dir() {
         println!(
@@ -612,13 +612,16 @@ pub fn run_archive_compact(ctx: &Context, args: &CompactArgs) -> Result<(), CeEr
                 tb_note,
                 loose_note
             );
+            let rel_archive = archive_dir.strip_prefix(&repo_root).unwrap_or(&archive_dir);
             println!(
-                "      rollup: openspec/changes/archive/milestones/{}.md",
+                "      rollup: {}/milestones/{}.md",
+                rel_archive.display(),
                 milestone
             );
             if !args.no_tarball {
                 println!(
-                    "      tarball: openspec/changes/archive/milestones/archive-{}.tar.gz",
+                    "      tarball: {}/milestones/archive-{}.tar.gz",
+                    rel_archive.display(),
                     milestone
                 );
             }

@@ -85,24 +85,24 @@ The system enforces a **Scope-Aware Configuration Hierarchy**.
 ### 📐 Architectural Concept
 AI-assisted development in `ce-ai` is governed by a **Finite State Machine (FSM)** structuring the lifecycle into 7 fixed stages directly enforcing the **Compound Engineering Flywheel** (stage bookkeeping is deterministic; agent execution within each stage is probabilistic):
 
-$$\text{Ideation} \xrightarrow{1} \text{OpenSpec} \xrightarrow{2} \text{Plan} \xrightarrow{3} \text{Work/TDD} \xrightarrow{4} \text{Verify} \xrightarrow{5} \text{Compound} \xrightarrow{6} \text{Ship}$$
+$$\text{Ideation} \xrightarrow{1} \text{Architecture} \xrightarrow{2} \text{Plan} \xrightarrow{3} \text{Work/TDD} \xrightarrow{4} \text{Verify} \xrightarrow{5} \text{Compound} \xrightarrow{6} \text{Ship}$$
 
 ### 💡 Architectural Rationale
 - **Compound Engineering Alignment**: Compound Engineering uses a self-reinforcing flywheel: solved bugs, design decisions, and features should compound knowledge over time. The FSM records Stage 6: Compound (`ce-compound`); the team workflow supplies the documentation evidence in `docs/solutions/` and `CONCEPTS.md`.
 - **FSM Sub-Loops & Diagnostic Interrupts**:
-  - *Idea Discovery Sub-Loop (`ce-ideate` in Stage 1)*: Generates and ranks candidate directions into a `docs/ideation/` dossier (no code, no requirements) before transitioning to `ce-brainstorm` for structured requirements framing; the chosen idea and rejected alternatives distill into OpenSpec's `exploration.md`.
+  - *Idea Discovery Sub-Loop (`ce-ideate` in Stage 1)*: Generates and ranks candidate directions into a `docs/ideation/` dossier (no code, no requirements) before transitioning to `ce-brainstorm` for structured requirements framing; the chosen idea and rejected alternatives distill into architecture or plan documents.
   - *Diagnostic Interrupt Sub-Loop (`ce-debug` in Stage 4/5)*: Triggered on test failure or bug detection. Freezes task state, enters an iterative diagnosis loop (hypothesis ➔ log extraction ➔ minimal reproducer ➔ root cause fix), and once verified, transitions control back to `ce-work` or `Verify` while tagging `ce-compound` if a non-obvious learning was uncovered.
   - *Refactoring Sub-Loop (`ce-simplify-code` in Stage 4)*: Executes non-behavioral code tidying and simplification passes post-Green TDD implementation.
-- **Determinism over Probability**: Code generation with LLMs is inherently probabilistic. Without an FSM enforcing formal specifications (`OpenSpec`), plans (`Plan`), and test-driven verification (`TDD`), execution degrades into superficial patches.
+- **Determinism over Probability**: Code generation with LLMs is inherently probabilistic. Without an FSM enforcing living architecture (`docs/arch/`), plans (`Plan`), and test-driven verification (`TDD`), execution degrades into superficial patches.
 - **Checkpointing, Cross-Session Resumption & Multi-Harness Handoffs**:
   - *Problem*: During long-running tasks or multi-harness workflows, an LLM's context window undergoes compaction or a developer switches editors (e.g. from Claude Code to Cursor or Antigravity).
-  - *Solution*: `ce-ai workflow checkpoint` atomically serializes the FSM phase and active subtask to disk. `ce-ai workflow resume` re-probes local repository, manifest, and OpenSpec state alongside that checkpoint; configured memory sidecars remain a separate harness concern.
+  - *Solution*: `ce-ai workflow checkpoint` atomically serializes the FSM phase and active subtask to disk. `ce-ai workflow resume` re-probes local repository, manifest, and plan progress alongside that checkpoint; configured memory sidecars remain a separate harness concern.
 - **Git Worktree Scope Isolation (`ce-worktree`)**:
   - *Problem*: Concurrent feature development across multiple Git worktrees can pollute shared configs or CodeGraph indices.
   - *Solution*: Running `codegraph init` and `ce-ai init-prj` inside a sibling worktree isolates workflow hooks, companions, and call-graph indices to that worktree's root, while `ce-ai fleet sync` ensures harnesses run the pinned Compound Engineering version.
 - **Spec-Driven Development (SDD / `gentle-ai`) Compatibility & Upgrade**:
   - *Problem*: Projects migrating from Spec-Driven Development (SDD) or OpenSpec fear losing existing specs (`proposal.md`, `spec.md`, `tasks.md`).
-  - *Solution*: Stage 2 of `ce-ai` natively consumes OpenSpec format without breaking changes. Compound Engineering upgrades SDD by appending **Stage 6 (`ce-compound`)**, turning linear spec execution into a self-reinforcing knowledge flywheel.
+  - *Solution*: `ce-ai` supports a dual-path architecture resolver (`docs/arch/` prioritized, `openspec/` backward-compatible) and provides assisted migration via `ce-ai init-prj --migrate-arch`. Compound Engineering upgrades SDD by appending **Stage 6 (`ce-compound`)**, turning linear spec execution into a self-reinforcing knowledge flywheel.
 - **Methodology Flexibility (TDD, Code-First, BDD, Spikes)**:
   - *Problem*: Teams using Code-First, Behavior-Driven Development (BDD), or R&D Spikes may feel restricted by strict TDD.
   - *Solution*: The FSM decouples *creation order* from *verification rigor*. Developers can write code before tests (Code-First) or explore fast prototypes (`ce-ideate` to rank directions, then a throwaway PoC on a scratch branch), provided that **Stage 5 (Empirical Verification)** passes 100% green before shipping.

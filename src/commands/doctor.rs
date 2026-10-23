@@ -35,6 +35,10 @@ pub struct Args {
     #[arg(long)]
     pub archive_stale: bool,
 
+    /// When --fix is set, also migrate legacy openspec/ directory to docs/arch/.
+    #[arg(long)]
+    pub migrate_arch: bool,
+
     /// Status to assign when archiving stale changes (e.g. 'superseded').
     #[arg(long)]
     pub status: Option<String>,
@@ -504,6 +508,13 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     // OpenSpec Tasks Desync & Worktree/Resolution Health Probes (Issues #313, #337):
     let repo_root = ctx.repo_root();
+
+    // Legacy openspec/ directory probe (Issue #345)
+    probe_legacy_openspec_dir(&repo_root, args.fix && args.migrate_arch, ctx);
+
+    // Living Architecture System Manifest integrity probe
+    probe_system_manifest_integrity(&repo_root);
+
     let branch = crate::commands::workflow::probe_git_branch(&repo_root);
     let current_wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
     let openspec_info =
@@ -1269,6 +1280,82 @@ pub(crate) fn probe_decision_engine_health(
             "doctor-info: decision-engine: not configured (optional System 1 decision layer; run 'ce-ai decisions setup' to enable fast probabilistic routing & risk checks)"
         );
     }
+}
+
+/// Probes for legacy openspec/ directory in repo_root. Emits doctor-warn or repairs if fix is enabled.
+pub fn probe_legacy_openspec_dir(
+    repo_root: &std::path::Path,
+    fix: bool,
+    ctx: &Context,
+) -> Option<String> {
+    let legacy = repo_root.join("openspec");
+    if !legacy.is_dir() {
+        return None;
+    }
+
+    if fix {
+        match crate::commands::init_prj::migrate_arch_repository(ctx, repo_root, true) {
+            Ok(_) => {
+                println!(
+                    "doctor-fix: migrated legacy 'openspec/' to 'docs/arch/' in '{}'",
+                    repo_root.display()
+                );
+                None
+            }
+            Err(e) => {
+                let msg = format!("legacy 'openspec/' migration failed: {e}");
+                println!("doctor-warn: {msg}");
+                Some(msg)
+            }
+        }
+    } else {
+        println!(
+            "doctor-warn: legacy 'openspec/' directory detected — run 'ce-ai init-prj --migrate-arch'"
+        );
+        Some(
+            "legacy 'openspec/' directory detected — run 'ce-ai init-prj --migrate-arch'"
+                .to_string(),
+        )
+    }
+}
+
+/// Probes docs/arch/system.yaml for syntactic and contract integrity.
+pub fn probe_system_manifest_integrity(repo_root: &std::path::Path) -> Vec<String> {
+    let manifest_path = crate::compat::arch::system_manifest_path(repo_root);
+    if !manifest_path.is_file() {
+        return Vec::new();
+    }
+
+    let mut warnings = Vec::new();
+    let manifest = match crate::compat::arch::load_system_manifest(repo_root) {
+        Ok(Some(m)) => m,
+        Ok(None) => return Vec::new(),
+        Err(e) => {
+            let msg = format!("system.yaml: invalid manifest: {e}");
+            println!("doctor-warn: {msg}");
+            warnings.push(msg);
+            return warnings;
+        }
+    };
+
+    let contracts_dir = crate::compat::arch::contracts_dir(repo_root);
+    for dep in &manifest.dependencies {
+        if let Some(ref contract_file) = dep.contract {
+            let direct = contracts_dir.join(contract_file);
+            if !direct.is_file() {
+                let msg = format!(
+                    "system.yaml: dependency '{}' references missing contract '{}' in {}",
+                    dep.component,
+                    contract_file,
+                    contracts_dir.display()
+                );
+                println!("doctor-warn: {msg}");
+                warnings.push(msg);
+            }
+        }
+    }
+
+    warnings
 }
 
 #[cfg(test)]

@@ -1082,11 +1082,12 @@ fn test_doctor_scopes_project_adoption_to_active_project() {
     )
     .unwrap();
 
-    // Project A is adopted and healthy (v=7 block)
+    // Project A is adopted and healthy (current block)
+    let cur_v = crate::commands::init_prj::BLOCK_VERSION;
     let block_a =
         crate::commands::init_prj::render_block_content(crate::state::state::AdoptionTier::Full);
     let block_a_str = format!(
-        "<!-- ce-ai:block begin v=7 tier=full sha256={} -->\n{}\n<!-- ce-ai:block end -->\n",
+        "<!-- ce-ai:block begin v={cur_v} tier=full sha256={} -->\n{}\n<!-- ce-ai:block end -->\n",
         crate::commands::init_prj::compute_sha256(block_a),
         block_a
     );
@@ -1104,7 +1105,7 @@ fn test_doctor_scopes_project_adoption_to_active_project() {
         path: prj_a.clone(),
         file: "AGENTS.md".into(),
         tier: crate::state::state::AdoptionTier::Full,
-        block_version: 7,
+        block_version: cur_v,
         block_sha256: crate::commands::init_prj::compute_sha256(block_a),
         created_file: false,
         adopted_at: "2026-10-07T00:00:00Z".into(),
@@ -1146,4 +1147,88 @@ fn test_doctor_scopes_project_adoption_to_active_project() {
 
     let content_b = std::fs::read_to_string(prj_b.join("AGENTS.md")).unwrap();
     assert!(content_b.contains(&format!("v={}", crate::commands::init_prj::BLOCK_VERSION)));
+}
+
+#[test]
+fn test_doctor_warns_on_legacy_openspec_dir() {
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path().join("workspace");
+    std::fs::create_dir_all(repo_root.join("openspec")).unwrap();
+
+    let ctx = Context {
+        config_dir: tmp.path().join("config"),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let warn = probe_legacy_openspec_dir(&repo_root, false, &ctx);
+    assert!(warn.is_some());
+    assert!(warn
+        .unwrap()
+        .contains("legacy 'openspec/' directory detected"));
+}
+
+#[test]
+fn test_doctor_fix_repairs_openspec_migration() {
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path().join("workspace");
+    let specs = repo_root.join("openspec").join("specs");
+    std::fs::create_dir_all(&specs).unwrap();
+    std::fs::write(specs.join("core.md"), "# Core Spec").unwrap();
+
+    let ctx = Context {
+        config_dir: tmp.path().join("config"),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: Some(repo_root.clone()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let warn = probe_legacy_openspec_dir(&repo_root, true, &ctx);
+    assert!(warn.is_none());
+    assert!(!repo_root.join("openspec").exists());
+    assert!(repo_root
+        .join("docs")
+        .join("arch")
+        .join("system")
+        .join("core.md")
+        .exists());
+}
+
+#[test]
+fn test_doctor_validates_system_manifest() {
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path().join("workspace");
+    let arch_dir = repo_root.join("docs").join("arch");
+    std::fs::create_dir_all(&arch_dir).unwrap();
+
+    // 1. Syntactic invalid YAML
+    std::fs::write(arch_dir.join("system.yaml"), "system: [unclosed").unwrap();
+    let warns_syntax = probe_system_manifest_integrity(&repo_root);
+    assert!(!warns_syntax.is_empty());
+    assert!(warns_syntax[0].contains("invalid manifest"));
+
+    // 2. Valid YAML with missing contract
+    let manifest_yaml = r#"
+system: constellation-a
+component: auth-service
+dependencies:
+  - component: payments-service
+    contract: payments-api.json
+"#;
+    std::fs::write(arch_dir.join("system.yaml"), manifest_yaml).unwrap();
+    let warns_contract = probe_system_manifest_integrity(&repo_root);
+    assert!(!warns_contract.is_empty());
+    assert!(warns_contract[0].contains("references missing contract 'payments-api.json'"));
+
+    // 3. Contract created -> cleanly validates
+    let contracts_dir = arch_dir.join("contracts");
+    std::fs::create_dir_all(&contracts_dir).unwrap();
+    std::fs::write(contracts_dir.join("payments-api.json"), "{}").unwrap();
+    let warns_clean = probe_system_manifest_integrity(&repo_root);
+    assert!(warns_clean.is_empty());
 }

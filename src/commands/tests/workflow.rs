@@ -1367,6 +1367,120 @@ fn test_reconcile_state_active_feature_clearing() {
 }
 
 #[test]
+fn test_archive_moves_to_docs_arch_archive() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+    run_git(repo, &["init", "-b", "main"]);
+
+    let deltas_dir = repo
+        .join("docs")
+        .join("arch")
+        .join("deltas")
+        .join("feat-modern");
+    std::fs::create_dir_all(&deltas_dir).unwrap();
+    std::fs::write(
+        deltas_dir.join("tasks.md"),
+        "# Tasks\n- [x] 1. Task A\n- [x] 2. Task B\n",
+    )
+    .unwrap();
+    run_git(repo, &["add", "."]);
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "add feat-modern",
+        ],
+    );
+
+    let archive_dir = repo.join("docs").join("arch").join("archive");
+    std::fs::create_dir_all(&archive_dir).unwrap();
+    std::fs::write(archive_dir.join("README.md"), "# Archive\n\nLedger:\n").unwrap();
+
+    let outcome = validate_and_archive_feature(repo, "feat-modern", None, false).unwrap();
+    assert_eq!(outcome.feature, "feat-modern");
+    assert!(!deltas_dir.exists());
+    assert!(archive_dir.join("feat-modern").join("tasks.md").exists());
+
+    sync_archive_readme_ledger(repo, &[outcome], false).unwrap();
+    let updated_readme = std::fs::read_to_string(archive_dir.join("README.md")).unwrap();
+    assert!(updated_readme.contains("feat-modern: archived (2/2 tasks) under criterion (1)"));
+}
+
+#[test]
+fn test_archive_auto_promotes_requirements_in_docs_arch() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path();
+    run_git(repo, &["init", "-b", "main"]);
+
+    // Modern architecture setup
+    let system_dir = repo.join("docs").join("arch").join("system");
+    std::fs::create_dir_all(&system_dir).unwrap();
+    std::fs::write(
+        system_dir.join("workflow.md"),
+        "---\ntitle: Workflow\ndomain: workflow\nversion: 1.0.0\nlast_updated: 2026-10-01\n---\n\n# Specs\n\n### R0. Base\nBase req.\n",
+    )
+    .unwrap();
+
+    let deltas_dir = repo
+        .join("docs")
+        .join("arch")
+        .join("deltas")
+        .join("feat-promo");
+    std::fs::create_dir_all(&deltas_dir).unwrap();
+    std::fs::write(deltas_dir.join("tasks.md"), "- [x] Complete\n").unwrap();
+    std::fs::write(
+        deltas_dir.join("spec.md"),
+        "---\ntitle: Feature Promo\ndomain: workflow\n---\n\n### R1. Auto Promo\nWHEN delta archived\nTHEN promote automatically.\n",
+    )
+    .unwrap();
+
+    run_git(repo, &["add", "."]);
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "add delta with spec",
+        ],
+    );
+
+    let ctx = Context {
+        config_dir: tmp.path().join(".ce-ai"),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: Some(repo.to_path_buf()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let args = ArchiveArgs {
+        feature: Some("feat-promo".to_string()),
+        all: false,
+        stale: false,
+        status: None,
+        promote: false, // In docs/arch, promote happens automatically!
+        domain: None,
+        dry_run: false,
+        subcommand: None,
+    };
+
+    run_archive(&ctx, &args).unwrap();
+
+    let updated_system_spec = std::fs::read_to_string(system_dir.join("workflow.md")).unwrap();
+    assert!(updated_system_spec.contains("R1. Auto Promo"));
+    assert!(updated_system_spec.contains("<!-- promoted-from: change:feat-promo"));
+}
+
+#[test]
 fn test_doc_debt_probe_status_tri_state_behavior() {
     let clean: ProbeStatus<Vec<String>> = ProbeStatus::Clean;
     assert!(clean.is_clean());
@@ -2692,4 +2806,50 @@ fn test_resolve_hook_context() {
     assert_eq!(ev, None);
     assert_eq!(active, None);
     assert!(!from_stdin);
+}
+
+#[test]
+fn test_workflow_resume_reads_plan_progress() {
+    let (_tmp, mut ctx) = ctx();
+    let ws = _tmp.path().join("workspace");
+    std::fs::create_dir_all(&ws).unwrap();
+    ctx.workspace_root = Some(ws.clone());
+
+    let plans_dir = ws.join("docs").join("plans");
+    std::fs::create_dir_all(&plans_dir).unwrap();
+    let plan_file = plans_dir.join("2026-10-23-active-feat-plan.md");
+    std::fs::write(
+        &plan_file,
+        "# Active Feat Implementation Plan\n\n- [x] Unit 1\n- [ ] Unit 2\n",
+    )
+    .unwrap();
+
+    let lines = resume_lines(&ctx).unwrap().join("\n");
+    assert!(lines.contains("== [Context Re-hydration: Active Feat Implementation Plan] =="));
+    assert!(lines.contains("tasks progress: 1/2 completed ([x])"));
+}
+
+#[test]
+fn test_checkpoint_records_stage4_with_plan() {
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path();
+
+    let plans_dir = repo_root.join("docs").join("plans");
+    std::fs::create_dir_all(&plans_dir).unwrap();
+    let plan_file = plans_dir.join("2026-10-23-tdd-feat-plan.md");
+    std::fs::write(&plan_file, "# TDD Feat\n\n- [x] Unit 1\n- [ ] Unit 2\n").unwrap();
+
+    let (stage, desc, feat, resolution) =
+        infer_stage_from_repo(repo_root, Some("feat/tdd-feat")).expect("must infer stage");
+    assert_eq!(stage, WorkflowStage::WorkTdd);
+    assert!(desc.contains("1/2 completed"));
+    assert_eq!(feat.as_deref(), Some("tdd-feat"));
+    assert_eq!(resolution, Some(FeatureResolution::Branch));
+
+    // When 100% completed
+    std::fs::write(&plan_file, "# TDD Feat\n\n- [x] Unit 1\n- [x] Unit 2\n").unwrap();
+    let (stage_v, desc_v, _, _) =
+        infer_stage_from_repo(repo_root, Some("feat/tdd-feat")).expect("must infer stage 5");
+    assert_eq!(stage_v, WorkflowStage::Verification);
+    assert!(desc_v.contains("Verifying test gates"));
 }

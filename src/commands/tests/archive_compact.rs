@@ -478,3 +478,41 @@ fn test_multibyte_utf8_resilience() {
     assert!(milestones_dir.join("2026-Q3.md").exists());
     assert!(milestones_dir.join("archive-2026-Q3.tar.gz").exists());
 }
+
+#[test]
+fn test_archive_compact_in_docs_arch() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path();
+    let archive_dir = root.join("docs").join("arch").join("archive");
+    std::fs::create_dir_all(&archive_dir).unwrap();
+
+    create_sample_package(
+        &archive_dir,
+        "2026-08-10-feat-lean-arch",
+        "Lean architecture migration",
+        "Specs living under docs/arch",
+        2,
+        2,
+    );
+
+    let ctx = crate::commands::Context {
+        config_dir: tmp.path().join(".ce-ai"),
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: Some(root.to_path_buf()),
+        dry_run: false,
+        verbose: false,
+        quiet: true,
+    };
+
+    let args = CompactArgs {
+        keep_loose: false,
+        no_tarball: false,
+        ..Default::default()
+    };
+    run_archive_compact(&ctx, &args).unwrap();
+
+    let milestones_dir = archive_dir.join("milestones");
+    assert!(milestones_dir.join("2026-Q3.md").exists());
+    assert!(milestones_dir.join("archive-2026-Q3.tar.gz").exists());
+    assert!(!archive_dir.join("2026-08-10-feat-lean-arch").exists());
+}

@@ -12,11 +12,11 @@ All AI agents MUST enforce these hard invariants deterministically at every sess
 3. **Atomic File Writes**: Mutations to `state.json` or `opencode.json` MUST use `crate::state::write_atomic`.
 4. **Preserve User Configs**: NEVER overwrite unmanaged custom plugins or custom skills in `opencode.json`.
 5. **No Dummy Fallbacks**: NEVER comment out failing assertions, mask errors with empty catches, or ignore CLI errors.
-6. **No Semantic Authority & Optional OpenSpec**: CE-AI MUST NOT introduce mandatory workflow stages, artifacts, or blocking write gates beyond those defined by Compound Engineering contracts. OpenSpec is decoupled from the core domain as an optional, opt-in integration for high-complexity architectural changes, rather than an authoritarian write blocker.
+6. **No Semantic Authority & Lean Living Architecture**: CE-AI MUST NOT introduce mandatory workflow stages, artifacts, or blocking write gates beyond those defined by Compound Engineering contracts. Living architecture resides in `docs/arch/` (`system/`, `adr/`, `contracts/`, `deltas/`, `archive/`) and `docs/plans/` serves as the sole Single Source of Truth (SSOT) for task progress, eliminating rigid 5-file SDD packages and blocking write gates.
 7. **Strict Exit Codes**: Map all errors to `CeError` enum exit codes (`0` Success, `1` Runtime, `2` Usage, `3` State, `4` IO, `5` Network, `6` Verification).
 8. **Preserve Active Worktrees**: NEVER run `git worktree remove` or delete sibling worktrees in `<repo>-worktrees/` without explicit USER permission or verifying creation within the current turn.
 9. **Mandatory Versioning & CHANGELOG**: Every merged feature/fix MUST bump SemVer in `Cargo.toml`, update `CHANGELOG.md`, tag release (`vX.Y.Z`), and create a GitHub Release. Homebrew distribution is owned exclusively by the `mastepanoski/homebrew-ce-ai` tap (self-updating); no formula is maintained in this repository.
-10. **Post-Merge Lifecycle & Clean State**: Immediately after merging a PR, switch to `main`, run `git pull`, delete merged local branches (`git branch -d`), prune remotes (`git fetch --prune`), remove turn-created temporary worktrees, and run `ce-ai workflow status`. If any completed OpenSpec changes exist, the AI agent MUST run `ce-ai archive <feature>` (and submit the corresponding archive PR) so the repository FSM is left at `✓ Ready (100%)` with zero unarchived change warnings before concluding.
+10. **Post-Merge Lifecycle & Clean State**: Immediately after merging a PR, switch to `main`, run `git pull`, delete merged local branches (`git branch -d`), prune remotes (`git fetch --prune`), remove turn-created temporary worktrees, and run `ce-ai workflow status`. If any completed architecture deltas or legacy OpenSpec changes exist, the AI agent MUST run `ce-ai archive <feature>` (and submit the corresponding archive PR) so the repository FSM is left at `✓ Ready (100%)` with zero unarchived change warnings before concluding.
 11. **Zero AI Attribution & No Co-Author Trailers**: AI agents MUST NEVER add "Co-Authored-By", AI attribution trailers, or "Generated with [Agent]" footers/badges to git commit messages or PR descriptions. All commits MUST use clean Conventional Commits only.
 12. **Monotonic Concept Accretion**: `CONCEPTS.md` MUST NEVER suffer destructive deletion or blind overwrite. Agents MUST use surgical edits (`Edit`/append), execute a mandatory pre-read, and verify changes with `ce-ai doc lint --strict`.
 13. **Strict Bug Triage Boundary**: NEVER file or propose `ce-ai report-bug` for errors in the host project's domain code or test failures. Upstream bug reporting is strictly reserved for internal `ce-ai` binary/harness crashes and command failures, requiring user consent and zero-token leak sanitization.
@@ -94,8 +94,8 @@ src/
      make e2e
      ```
 
-5. **No Semantic Authority & Optional OpenSpec Integration**:
-   - CE-AI must not require artifacts that Compound Engineering itself does not require. OpenSpec change packages (`proposal.md`, `exploration.md`, `design.md`, `spec.md`, `tasks.md`) are optional tools for complex architectural work or formal compliance, not mandatory blockers for bug fixes, docs, or routine tasks.
+5. **No Semantic Authority & Lean Living Architecture**:
+   - CE-AI must not require artifacts that Compound Engineering itself does not require. Living architecture specifications reside in `docs/arch/` and implementation plans in `docs/plans/` serve as the SSOT for progress. 5-file OpenSpec packages are not mandatory blockers for bug fixes, docs, or routine tasks.
 
 6. **Standardized Exit Code Compliance**:
    - Errors MUST map to standard `CeError` exit codes: `0` (Success), `1` (Runtime), `2` (Usage), `3` (State), `4` (IO), `5` (Network), `6` (Verification).
@@ -129,33 +129,33 @@ src/
 
 ---
 
-## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Integration
+## 🔄 Mandatory 7-Stage Development Cycle & Lean Living Architecture
 
-Regardless of whether Compound Engineering, Spec-Driven Development, or pair programming workflows are used, all AI agents MUST strictly follow the 7-stage development cycle:
+Regardless of whether Compound Engineering, agile fast-path, or pair programming workflows are used, all AI agents MUST strictly follow the 7-stage development cycle:
 
 ```
-[Stage 1: Ideation (ce-brainstorm)] ➔ [Stage 2: OpenSpec Definition (OPTIONAL)] ➔ [Stage 3: Execution Plan (ce-plan)]
+[Stage 1: Ideation (ce-brainstorm)] ➔ [Stage 2: Architecture & Contracts (OPTIONAL)] ➔ [Stage 3: Execution Plan (ce-plan)]
    ➔ [Stage 4: TDD & Implementation (ce-work)] ➔ [Stage 5: Verification (project quality gates)]
    ➔ [Stage 6: Knowledge Capture (ce-compound)] ➔ [Stage 7: Git Shipping (ce-commit-push-pr)]
 ```
 
-### Stage 2 OpenSpec Integration (Optional)
-When formal specifications are activated for complex or regulated features, OpenSpec is authored **progressively**: Stage 2 writes `proposal.md`, `exploration.md`, `design.md`, and `spec.md`; Stage 3 (`/ce-plan`) then generates the executable checklist `tasks.md` from the frozen contract. When OpenSpec is used, agents verify that `openspec/changes/<feature_name>/` contains:
-- `proposal.md`: Problem statement, in-scope/out-of-scope boundaries, risk evaluation, and success criteria.
-- `exploration.md`: Technical investigation, evaluated options, and architectural tradeoffs.
-- `design.md`: Technical design, system architecture, structs, data schemas, and API/CLI contracts.
-- `spec.md`: Formal requirements using `WHEN ... THEN ...` format and explicit acceptance criteria.
-- `tasks.md`: Atomic, executable task checklist with TDD verification steps (generated by `/ce-plan`).
-- When authoring `tasks.md`, work units MUST carry per-work-unit changed-line estimates (~200 LOC target; rescopes may only narrow them) so the PR-level forecast is derivable — see [CONTRIBUTING.md](CONTRIBUTING.md) §4. (Adopted policy, v1.22.1.)
+### Stage 2 Living Architecture & Contracts (Optional)
+When formal specifications are activated for complex or regulated features, specifications and contracts reside under `docs/arch/`:
+- `docs/arch/system/<domain>.md`: Living domain specifications aggregating capabilities across features.
+- `docs/arch/adr/NNNN-<slug>.md`: Architecture Decision Records capturing irreversible technical choices.
+- `docs/arch/contracts/`: Formal interface schemas and protocol contracts.
+- `docs/arch/deltas/<feature>/`: Optional active architecture delta requirements, automatically promoted to system specs upon archive.
 
-### 💡 Proactive OpenSpec Triage & Guidance for Developers
-AI agents MUST actively guide developers (especially onboarding/newbie contributors) on when to use OpenSpec:
-- **When to Suggest OpenSpec**: If a proposed feature involves architectural changes, schema or data migrations, public API mutations, or estimated scope > 200 LOC, the agent MUST proactively ask the developer:
-  > *"Esta funcionalidad tiene impacto arquitectónico o contratos (> 200 LOC). ¿Deseas que formalicemos una especificación OpenSpec (`openspec/changes/<feature>/`) para congelar el contrato antes de escribir código, o prefieres proceder con un plan ágil directo (`docs/plans/`)?"*
-- **When to Bypass OpenSpec**: For bug fixes, minor tweaks, documentation updates, or tactical tasks (< 200 LOC), agents MUST NOT require or suggest OpenSpec; proceed directly with `/ce-plan`, `ce-work`, or `ce-debug`.
+Stage 3 (`/ce-plan`) creates the executable implementation plan in `docs/plans/` as vertical Scrum slices with TDD test triads. The checklist `- [x]` in `docs/plans/` serves as the sole Single Source of Truth (SSOT) for progress tracking and FSM stage deduction, eliminating redundant `tasks.md` packages.
+
+### 💡 Proactive Architecture Triage & Guidance for Developers
+AI agents MUST actively guide developers (especially onboarding/newbie contributors) on when to use formal architecture specifications:
+- **When to Suggest Architecture Specs**: If a proposed feature involves multi-repo contracts, schema migrations, public API mutations, or estimated scope > 200 LOC, the agent MUST proactively ask the developer:
+  > *"Esta funcionalidad tiene impacto arquitectónico o contratos (> 200 LOC). ¿Deseas que formalicemos especificaciones en `docs/arch/` (o deltas en `docs/arch/deltas/<feature>/`) para congelar el contrato antes de escribir código, o prefieres proceder con un plan ágil directo (`docs/plans/`)?"*
+- **When to Bypass**: For bug fixes, minor tweaks, documentation updates, or tactical tasks (< 200 LOC), agents MUST NOT require or suggest formal architecture specs; proceed directly with `/ce-plan`, `ce-work`, or `ce-debug`.
 
 ### Single Source of Truth Rule
-Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into the OpenSpec files above (`proposal.md`, `exploration.md`) and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with OpenSpec — that duplicates work and burns tokens. Ideation artifacts are retained by default as the permanent raw-history record that OpenSpec deliberately does not duplicate — "disposable" never means deleting them; removal is an ordinary reversible git decision, never a workflow step. Skip ideation skills entirely when requirements and approach are already clear.
+Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into architecture specs or implementation plans and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with implementation plans — that duplicates work and burns tokens. Ideation artifacts are retained by default as the permanent raw-history record that living specs deliberately do not duplicate — "disposable" never means deleting them; removal is an ordinary reversible git decision, never a workflow step. Skip ideation skills entirely when requirements and approach are already clear.
 
 ### Stage 7 PR & Review Readiness Directives ("A Change That Explains Itself")
 When creating Pull Requests (`ce-commit-push-pr`), agents MUST ensure the change explains itself:
@@ -224,7 +224,7 @@ Before declaring any task or issue completed, an AI agent MUST satisfy all crite
 - [ ] All GitHub Actions CI jobs pass green across Linux, macOS, and Windows.
 - [ ] Definition of Done (DoD) criteria fully satisfied.
 
-<!-- ce-ai:block begin v=7 tier=minimal sha256=0b96d6153224fe2d8db634928e94010079841528114282b9273966896e9041f2 -->
+<!-- ce-ai:block begin v=9 tier=minimal sha256=0b96d6153224fe2d8db634928e94010079841528114282b9273966896e9041f2 -->
 ## 🔄 Compound Engineering Workflow Guidelines
 
 AI agents operating on this codebase should follow structured planning and verification:

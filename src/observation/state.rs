@@ -321,9 +321,14 @@ pub fn observe_knowledge(repo_root: &Path, modified_files: &[String]) -> Knowled
     }
 }
 
-/// Inspects `openspec/changes/` for optional active change packages.
+/// Inspects architecture deltas directory for active change packages.
 pub fn observe_openspec(repo_root: &Path, branch: Option<&str>) -> Option<OpenSpecObservation> {
-    let changes_dir = repo_root.join("openspec").join("changes");
+    let deltas = crate::compat::arch::deltas_dir(repo_root);
+    let changes_dir = if deltas.is_dir() {
+        deltas
+    } else {
+        repo_root.join("openspec").join("changes")
+    };
     if !changes_dir.is_dir() {
         return None;
     }
@@ -373,7 +378,7 @@ pub fn observe_openspec(repo_root: &Path, branch: Option<&str>) -> Option<OpenSp
         }
     };
 
-    // Check if tasks.md is fully completed
+    // Check if tasks.md is fully completed, or fall back to observe_plan in docs/plans/
     let tasks_path = path.join("tasks.md");
     let is_sealed = if let Ok(tasks_content) = fs::read_to_string(&tasks_path) {
         let mut completed = 0;
@@ -387,6 +392,8 @@ pub fn observe_openspec(repo_root: &Path, branch: Option<&str>) -> Option<OpenSp
             }
         }
         completed > 0 && incomplete == 0
+    } else if let Some(plan_obs) = observe_plan(repo_root, branch) {
+        plan_obs.total_items > 0 && plan_obs.completed_items == plan_obs.total_items
     } else {
         false
     };

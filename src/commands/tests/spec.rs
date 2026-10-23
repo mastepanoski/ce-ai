@@ -215,3 +215,140 @@ Original requirement.
     assert!(content_after_apply.contains("WHEN feature X is enabled"));
     assert!(content_after_apply.contains("<!-- promoted-from: change:feat-x"));
 }
+
+#[test]
+fn test_list_domain_specs_from_docs_arch_system() {
+    let temp = tempdir().unwrap();
+    let root = temp.path();
+
+    let system_dir = root.join("docs").join("arch").join("system");
+    fs::create_dir_all(&system_dir).unwrap();
+
+    let spec_content = r#"---
+title: "Doctor Diagnostic Engine"
+domain: doctor
+version: 1.1.0
+last_updated: "2026-10-23"
+---
+
+# Specification: Doctor
+
+## 2. Capabilities & Requirements
+
+### R1. Health Probing
+WHEN doctor runs
+THEN probes evaluate system.
+"#;
+    fs::write(system_dir.join("doctor.md"), spec_content).unwrap();
+
+    let specs = list_domain_specs(root).expect("should list specs from docs/arch/system");
+    assert_eq!(specs.len(), 1);
+    assert_eq!(specs[0].domain, "doctor");
+    assert_eq!(specs[0].title, "Doctor Diagnostic Engine");
+    assert_eq!(specs[0].version, "1.1.0");
+    assert_eq!(specs[0].requirement_count, 1);
+    assert_eq!(specs[0].file_path, system_dir.join("doctor.md"));
+}
+
+#[test]
+fn test_get_domain_spec_path_dual_path() {
+    let temp = tempdir().unwrap();
+    let root = temp.path();
+
+    // 1. In empty repo -> defaults to modern docs/arch/system
+    assert_eq!(
+        get_domain_spec_path(root, "doctor"),
+        root.join("docs")
+            .join("arch")
+            .join("system")
+            .join("doctor.md")
+    );
+
+    // 2. In legacy repo with openspec/specs
+    let legacy_specs = root.join("openspec").join("specs");
+    fs::create_dir_all(&legacy_specs).unwrap();
+    assert_eq!(
+        get_domain_spec_path(root, "doctor"),
+        legacy_specs.join("doctor.md")
+    );
+
+    // 3. When docs/arch/system exists, it takes precedence
+    let modern_system = root.join("docs").join("arch").join("system");
+    fs::create_dir_all(&modern_system).unwrap();
+    assert_eq!(
+        get_domain_spec_path(root, "doctor"),
+        modern_system.join("doctor.md")
+    );
+}
+
+#[test]
+fn test_promote_delta_to_docs_arch_system() {
+    let temp = tempdir().unwrap();
+    let root = temp.path();
+
+    let deltas_dir = root.join("docs").join("arch").join("deltas").join("feat-y");
+    fs::create_dir_all(&deltas_dir).unwrap();
+    let delta_spec = r#"---
+title: "Feature Y"
+domain: harnesses
+---
+
+# Specification
+
+## Requirements
+
+### R1. New Harness
+WHEN harness initialized
+THEN configure isolation.
+"#;
+    fs::write(deltas_dir.join("spec.md"), delta_spec).unwrap();
+
+    let system_dir = root.join("docs").join("arch").join("system");
+    fs::create_dir_all(&system_dir).unwrap();
+    let base_spec = r#"---
+title: "Harness Integration"
+domain: harnesses
+version: 1.0.0
+last_updated: "2026-10-01"
+---
+
+# Specification: Harnesses
+
+## 2. Capabilities & Requirements
+
+### R0. Core Engine
+Initial requirement.
+"#;
+    fs::write(system_dir.join("harnesses.md"), base_spec).unwrap();
+
+    let res = promote_delta_to_domain_spec(root, "feat-y", None, false)
+        .expect("should promote into docs/arch/system");
+    assert_eq!(res.domain, "harnesses");
+    assert_eq!(res.requirements_promoted, 1);
+    assert_eq!(res.spec_path, system_dir.join("harnesses.md"));
+
+    let content = fs::read_to_string(system_dir.join("harnesses.md")).unwrap();
+    assert!(content.contains("R1. New Harness"));
+    assert!(content.contains("<!-- promoted-from: change:feat-y"));
+}
+
+#[test]
+fn test_security_spec_schema_valid() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let report = validate_domain_specs(&repo_root);
+    assert!(
+        report.valid,
+        "docs/arch/system specifications should be valid, findings: {:?}",
+        report.findings
+    );
+    assert!(
+        report.specs_count >= 1,
+        "should find at least 1 domain specification in docs/arch/system"
+    );
+
+    let summaries = list_domain_specs(&repo_root).expect("should list domain specs");
+    assert!(
+        summaries.iter().any(|s| s.domain == "security"),
+        "expected domain 'security' to be found in docs/arch/system"
+    );
+}

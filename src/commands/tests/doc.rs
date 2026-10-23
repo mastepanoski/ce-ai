@@ -459,3 +459,17 @@ fn test_repair_solution_frontmatter_creates_frontmatter_if_missing() {
     assert!(updated.contains("problem_type: best_practice"));
     assert!(updated.contains("applies_when:"));
 }
+
+#[test]
+fn test_readme_line_count_within_limit() {
+    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let readme_path = repo_root.join("README.md");
+    if readme_path.is_file() {
+        let content = std::fs::read_to_string(&readme_path).unwrap();
+        let line_count = content.lines().count();
+        assert!(
+            line_count <= 100,
+            "README.md exceeds 100 lines limit (current: {line_count})"
+        );
+    }
+}
