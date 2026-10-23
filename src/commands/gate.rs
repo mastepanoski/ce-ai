@@ -226,7 +226,12 @@ pub fn write_gate_receipt(
     // 1. Write .validation.json into feature change folder if it exists
     let feature = &receipt.feature;
     if !feature.is_empty() && feature != "unknown" {
-        let change_dir = repo_root.join("openspec").join("changes").join(feature);
+        let deltas = crate::compat::arch::deltas_dir(repo_root);
+        let change_dir = if deltas.is_dir() {
+            deltas.join(feature)
+        } else {
+            repo_root.join("openspec").join("changes").join(feature)
+        };
         if change_dir.is_dir() {
             let validation_path = change_dir.join(".validation.json");
             let json_bytes = serde_json::to_vec_pretty(receipt)
@@ -570,7 +575,12 @@ pub fn run_gate_check(ctx: &Context, args: &GateCheckArgs) -> Result<(), CeError
     let (has_proposal, has_spec, has_tasks) = feature_name
         .as_deref()
         .map(|f| {
-            let change_dir = repo_root.join("openspec").join("changes").join(f);
+            let deltas = crate::compat::arch::deltas_dir(&repo_root);
+            let change_dir = if deltas.is_dir() {
+                deltas.join(f)
+            } else {
+                repo_root.join("openspec").join("changes").join(f)
+            };
             let has_p = change_dir.join("proposal.md").is_file()
                 && std::fs::metadata(change_dir.join("proposal.md"))
                     .map(|m| m.len() > 0)
@@ -579,10 +589,14 @@ pub fn run_gate_check(ctx: &Context, args: &GateCheckArgs) -> Result<(), CeError
                 && std::fs::metadata(change_dir.join("spec.md"))
                     .map(|m| m.len() > 0)
                     .unwrap_or(false);
-            let has_t = change_dir.join("tasks.md").is_file()
+            let has_t_file = change_dir.join("tasks.md").is_file()
                 && std::fs::metadata(change_dir.join("tasks.md"))
                     .map(|m| m.len() > 0)
                     .unwrap_or(false);
+            let has_plan = crate::observation::state::observe_plan(&repo_root, None)
+                .map(|p| p.total_items > 0)
+                .unwrap_or(false);
+            let has_t = has_t_file || has_plan;
             (has_p, has_s, has_t)
         })
         .unwrap_or((false, false, false));

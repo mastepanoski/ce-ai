@@ -146,3 +146,44 @@ fn test_knowledge_detection() {
     assert!(k2.doc_detected);
     assert_eq!(k2.doc_path, Some(sol_file));
 }
+
+#[test]
+fn test_observe_plan_computes_progress_without_tasks_md() {
+    let temp_repo = tempdir().expect("tempdir");
+    let plans_dir = temp_repo.path().join("docs").join("plans");
+    fs::create_dir_all(&plans_dir).expect("create plans dir");
+
+    let deltas_dir = temp_repo
+        .path()
+        .join("docs")
+        .join("arch")
+        .join("deltas")
+        .join("tdd-feat");
+    fs::create_dir_all(&deltas_dir).expect("create deltas dir");
+    fs::write(deltas_dir.join("proposal.md"), "# Proposal").expect("write proposal");
+    fs::write(deltas_dir.join("spec.md"), "# Spec").expect("write spec");
+
+    // Plan with 1 completed, 1 incomplete
+    let plan_file = plans_dir.join("2026-10-23-tdd-feat-plan.md");
+    fs::write(
+        &plan_file,
+        "# TDD Feature Plan\n\n- [x] Unit 1\n- [ ] Unit 2\n",
+    )
+    .expect("write plan");
+
+    let obs = observe_openspec(temp_repo.path(), Some("feat/tdd-feat"))
+        .expect("should observe active delta");
+    assert_eq!(obs.feature, "tdd-feat");
+    assert!(!obs.is_sealed);
+
+    // Now update plan to 100% completed
+    fs::write(
+        &plan_file,
+        "# TDD Feature Plan\n\n- [x] Unit 1\n- [x] Unit 2\n",
+    )
+    .expect("write sealed plan");
+
+    let obs_sealed = observe_openspec(temp_repo.path(), Some("feat/tdd-feat"))
+        .expect("should observe active delta");
+    assert!(obs_sealed.is_sealed);
+}

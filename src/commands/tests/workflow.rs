@@ -2807,3 +2807,49 @@ fn test_resolve_hook_context() {
     assert_eq!(active, None);
     assert!(!from_stdin);
 }
+
+#[test]
+fn test_workflow_resume_reads_plan_progress() {
+    let (_tmp, mut ctx) = ctx();
+    let ws = _tmp.path().join("workspace");
+    std::fs::create_dir_all(&ws).unwrap();
+    ctx.workspace_root = Some(ws.clone());
+
+    let plans_dir = ws.join("docs").join("plans");
+    std::fs::create_dir_all(&plans_dir).unwrap();
+    let plan_file = plans_dir.join("2026-10-23-active-feat-plan.md");
+    std::fs::write(
+        &plan_file,
+        "# Active Feat Implementation Plan\n\n- [x] Unit 1\n- [ ] Unit 2\n",
+    )
+    .unwrap();
+
+    let lines = resume_lines(&ctx).unwrap().join("\n");
+    assert!(lines.contains("== [Context Re-hydration: Active Feat Implementation Plan] =="));
+    assert!(lines.contains("tasks progress: 1/2 completed ([x])"));
+}
+
+#[test]
+fn test_checkpoint_records_stage4_with_plan() {
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path();
+
+    let plans_dir = repo_root.join("docs").join("plans");
+    std::fs::create_dir_all(&plans_dir).unwrap();
+    let plan_file = plans_dir.join("2026-10-23-tdd-feat-plan.md");
+    std::fs::write(&plan_file, "# TDD Feat\n\n- [x] Unit 1\n- [ ] Unit 2\n").unwrap();
+
+    let (stage, desc, feat, resolution) =
+        infer_stage_from_repo(repo_root, Some("feat/tdd-feat")).expect("must infer stage");
+    assert_eq!(stage, WorkflowStage::WorkTdd);
+    assert!(desc.contains("1/2 completed"));
+    assert_eq!(feat.as_deref(), Some("tdd-feat"));
+    assert_eq!(resolution, Some(FeatureResolution::Branch));
+
+    // When 100% completed
+    std::fs::write(&plan_file, "# TDD Feat\n\n- [x] Unit 1\n- [x] Unit 2\n").unwrap();
+    let (stage_v, desc_v, _, _) =
+        infer_stage_from_repo(repo_root, Some("feat/tdd-feat")).expect("must infer stage 5");
+    assert_eq!(stage_v, WorkflowStage::Verification);
+    assert!(desc_v.contains("Verifying test gates"));
+}

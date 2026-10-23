@@ -132,6 +132,7 @@ pub enum WorkflowSource {
 pub enum FeatureResolution {
     Branch,
     MtimeFallback,
+    Plan,
 }
 
 impl FeatureResolution {
@@ -139,6 +140,7 @@ impl FeatureResolution {
         match self {
             FeatureResolution::Branch => "branch",
             FeatureResolution::MtimeFallback => "mtime_fallback",
+            FeatureResolution::Plan => "plan",
         }
     }
 }
