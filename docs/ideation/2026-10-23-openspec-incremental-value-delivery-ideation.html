@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ideation: OpenSpec Incremental Value Delivery & Compound Engineering</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --card-bg: #161922;
+      --card-border: #262b3a;
+      --text: #e1e4ea;
+      --text-muted: #8b949e;
+      --heading: #ffffff;
+      --primary: #3b82f6;
+      --primary-glow: rgba(59, 130, 246, 0.15);
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.15);
+      --warning: #f59e0b;
+      --warning-glow: rgba(245, 158, 11, 0.15);
+      --danger: #ef4444;
+      --code-bg: #1e2230;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 2.5rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 980px;
+      width: 100%;
+    }
+
+    header {
+      margin-bottom: 2.5rem;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 9999px;
+      background: var(--primary-glow);
+      color: var(--primary);
+      border: 1px solid var(--primary);
+      margin-bottom: 0.75rem;
+    }
+
+    .badge-accent {
+      background: var(--accent-glow);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--heading);
+      letter-spacing: -0.025em;
+      margin-bottom: 0.75rem;
+    }
+
+    .metadata-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .meta-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .meta-value {
+      font-weight: 600;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+    }
+
+    section {
+      margin-bottom: 3rem;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    h2::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 1.25rem;
+      background: var(--primary);
+      border-radius: 2px;
+    }
+
+    p {
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .axes-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+
+    .axis-item {
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 1rem;
+    }
+
+    .axis-title {
+      font-weight: 600;
+      color: var(--heading);
+      margin-bottom: 0.25rem;
+      font-size: 0.95rem;
+    }
+
+    .axis-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0;
+    }
+
+    .jump-list {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .jump-list-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .jump-list-items {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .jump-item {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.35rem 0.5rem;
+      border-radius: 4px;
+      transition: background 0.15s ease;
+    }
+
+    .jump-item:hover {
+      background: var(--primary-glow);
+      color: var(--primary);
+    }
+
+    .jump-number {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--primary);
+      font-size: 0.85rem;
+      min-width: 1.5rem;
+    }
+
+    .jump-axis {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .idea-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.75rem;
+      margin-bottom: 2rem;
+      scroll-margin-top: 2rem;
+    }
+
+    .idea-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .idea-title-area {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+    }
+
+    .idea-number {
+      font-family: var(--font-mono);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .idea-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--heading);
+    }
+
+    .idea-badges {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 500;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+    }
+
+    .tag-conf {
+      background: var(--accent-glow);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .tag-cx {
+      background: var(--warning-glow);
+      color: var(--warning);
+      border-color: var(--warning);
+    }
+
+    .idea-field {
+      margin-bottom: 1rem;
+    }
+
+    .idea-field-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .idea-field-content {
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    .basis-box {
+      background: var(--code-bg);
+      border-left: 3px solid var(--primary);
+      padding: 0.75rem 1rem;
+      border-radius: 0 4px 4px 0;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .basis-tag {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--primary);
+      margin-right: 0.5rem;
+    }
+
+    .diagram-box {
+      margin: 1.25rem 0;
+      padding: 1.25rem;
+      background: #0b0d13;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+
+    .rejection-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin-top: 1rem;
+    }
+
+    .rejection-table th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      background: var(--code-bg);
+      color: var(--text-muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--card-border);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .rejection-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--card-border);
+      vertical-align: top;
+    }
+
+    .rejection-table tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    footer.composition-signal {
+      margin-top: 4rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--card-border);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+      font-family: var(--font-mono);
+    }
+
+    code {
+      font-family: var(--font-mono);
+      background: var(--code-bg);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85em;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge">Ce-Ideate Discovery Artifact</div>
+      <h1>OpenSpec Incremental Value Delivery & Compound Engineering</h1>
+      <p style="color: var(--text-muted); font-size: 1.05rem;">
+        Estrategias para transformar OpenSpec en un motor de entrega de unidades de valor verticales (incrementos estilo Scrum) combinadas con TDD y arquitectura global evolutiva, en estricta compatibilidad con Compound Engineering.
+      </p>
+
+      <div class="metadata-grid">
+        <div class="meta-item">
+          <span class="meta-label">Fecha</span>
+          <span class="meta-value">2026-10-23</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Topic</span>
+          <span class="meta-value">openspec-incremental-value-delivery</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Modo</span>
+          <span class="meta-value">repo-grounded (ce-ai)</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Enfoque</span>
+          <span class="meta-value">Unidades de valor Scrum, TDD, Arquitectura Global</span>
+        </div>
+      </div>
+    </header>
+
+    <section id="grounding">
+      <h2>Contexto y Fundamentos de Partida</h2>
+      <div class="card">
+        <p>
+          <strong>El dilema arquitectónico:</strong> Con frecuencia, herramientas de especificación formal como OpenSpec (con sus artefactos <code>proposal.md</code>, <code>exploration.md</code>, <code>design.md</code>, <code>spec.md</code> y <code>tasks.md</code>) son malinterpretadas como un retorno al diseño inicial masivo en cascada (<em>Big Upfront Design</em> / BUFD). Esto conduce a paquetes gigantescos que generan PRs inabarcables, ramas desincronizadas y fatiga de revisión.
+        </p>
+        <p>
+          <strong>La tesis del usuario:</strong> OpenSpec debe operar como el garante de una <em>arquitectura global coherente</em>, pero su ritmo de ejecución debe ser <em>incremental y basado en unidades de valor</em> (estilo Scrum), guiado por <em>Test-Driven Development (TDD)</em> y totalmente alineado con <em>Compound Engineering</em> (donde cada paso capitaliza conocimiento y no impone barreras burocráticas artificiales).
+        </p>
+        <p>
+          <strong>Invariantes del repositorio (ce-ai):</strong>
+        </p>
+        <ul style="margin-left: 1.5rem; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem;">
+          <li><code>AGENTS.md</code> Invariante 6: <em>No Semantic Authority & Optional OpenSpec</em> (OpenSpec es optativo para iniciativas complejas, jamás un bloqueador de escritura universal).</li>
+          <li><code>CONTRIBUTING.md</code> §4: Presupuesto objetivo de ~200 líneas modificadas (LOC) por unidad de trabajo en <code>tasks.md</code>.</li>
+          <li><code>CONCEPTS.md</code>: Especificaciones Vivas del Sistema (<em>Living System Specs</em> en <code>openspec/specs/</code>) y Motor de Promoción de Deltas (<code>ce-ai archive --promote</code>).</li>
+          <li><code>AGENTS.md</code> Invariante 10: Ciclo de vida post-merge limpio y archivado determinista para mantener FSM en 100% Ready.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="axes">
+      <h2>Ejes de Exploración de la Superficie</h2>
+      <div class="axes-list">
+        <div class="axis-item">
+          <div class="axis-title">1. Vertical Value Slicing</div>
+          <div class="axis-desc">Descomposición en rodajas verticales de valor utilizable (walking skeletons) frente a capas técnicas horizontales.</div>
+        </div>
+        <div class="axis-item">
+          <div class="axis-title">2. Global Architecture Evolution</div>
+          <div class="axis-desc">Coherencia de la arquitectura global (specs vivas) mediante la acumulación continua de deltas pequeños.</div>
+        </div>
+        <div class="axis-item">
+          <div class="axis-title">3. TDD Specification Rhythm</div>
+          <div class="axis-desc">Integración del ciclo Red-Green-Refactor en los contratos formales y checklists de ejecución.</div>
+        </div>
+        <div class="axis-item">
+          <div class="axis-title">4. Compound Knowledge Accretion</div>
+          <div class="axis-desc">Captura sistemática de aprendizajes, alternativas descartadas y evidencia empírica en cada incremento.</div>
+        </div>
+        <div class="axis-item">
+          <div class="axis-title">5. Developer Guidance & Triage</div>
+          <div class="axis-desc">Asistencia contextual para dimensionar cambios y alternar entre fast-path ágil y OpenSpec vertical sin fricción.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="jump-list">
+      <div class="jump-list">
+        <div class="jump-list-title">Ideas Seleccionadas (Sobrevivientes Clasificados)</div>
+        <div class="jump-list-items">
+          <a href="#idea-1" class="jump-item">
+            <span class="jump-number">#1</span>
+            <span>Andamiaje de Rodaja Vertical en OpenSpec (<code>ce-ai spec new --vertical</code>)</span>
+            <span class="jump-axis">vertical-value-slicing</span>
+          </a>
+          <a href="#idea-2" class="jump-item">
+            <span class="jump-number">#2</span>
+            <span>Tríadas TDD en Unidades de Trabajo (<code>tasks.md</code> Red-Green-Refactor)</span>
+            <span class="jump-axis">tdd-specification-rhythm</span>
+          </a>
+          <a href="#idea-3" class="jump-item">
+            <span class="jump-number">#3</span>
+            <span>Arquitectura Dual: Columna Vertebral Viva con Acoplamientos Ágiles</span>
+            <span class="jump-axis">global-architecture-evolution</span>
+          </a>
+          <a href="#idea-4" class="jump-item">
+            <span class="jump-number">#4</span>
+            <span>Promoción Continua de Deltas en Archivador (Auto-Promote on Archive)</span>
+            <span class="jump-axis">global-architecture-evolution</span>
+          </a>
+          <a href="#idea-5" class="jump-item">
+            <span class="jump-number">#5</span>
+            <span>Siembra Automática de Soluciones desde las Disyuntivas de Exploración</span>
+            <span class="jump-axis">compound-knowledge-accretion</span>
+          </a>
+          <a href="#idea-6" class="jump-item">
+            <span class="jump-number">#6</span>
+            <span>Motor de Triaje Heurístico para OpenSpec vs Fast-Path (<code>ce-ai triage</code>)</span>
+            <span class="jump-axis">developer-guidance-triage</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section id="ranked-ideas">
+      <h2>Ideas Seleccionadas y Detalle de Diseño</h2>
+
+      <!-- Idea 1 -->
+      <article class="idea-card" id="idea-1">
+        <div class="idea-header">
+          <div class="idea-title-area">
+            <span class="idea-number">01</span>
+            <h3 class="idea-title">Andamiaje de Rodaja Vertical en OpenSpec (<code>ce-ai spec new --vertical</code>)</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="tag tag-conf">Conf: 95%</span>
+            <span class="tag tag-cx">Cx: Media</span>
+            <span class="tag">Eje: vertical-value-slicing</span>
+          </div>
+        </div>
+
+        <div class="basis-box">
+          <span class="basis-tag">direct: CONTRIBUTING.md:101-103</span>
+          "<code>tasks.md</code> work units target ~200 changed lines each; a rescope may only narrow a budget — widening requires a new spec revision."
+          <br>
+          <span class="basis-tag">external:</span>
+          Modelo de incremento ágil de Henrik Kniberg (Skateboard -> Bicycle -> Motorcycle -> Car) y Walking Skeleton de Alistair Cockburn.
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Descripción</div>
+          <div class="idea-field-content">
+            Cuando un desarrollador o agente crea un paquete OpenSpec tradicional, el sesgo cognitivo habitual divide el trabajo horizontalmente por capas técnicas (ej. <em>"Spec 1: Esquema de base de datos"</em>, <em>"Spec 2: Lógica de negocio"</em>, <em>"Spec 3: CLI/UI"</em>). Ninguno de esos PRs individuales entrega valor funcional autónomo. Esta iniciativa introduce una plantilla y comando de andamiaje (<code>ce-ai spec new --vertical</code>) que fuerza a descomponer la funcionalidad en <strong>rodajas verticales delgadas</strong> (desde el punto de entrada CLI/API hasta el almacenamiento), garantizando que cada incremento pueda ser compilado, probado mediante TDD y desplegado como un incremento Scrum potencialmente entregable en ≤ 200 LOC.
+          </div>
+        </div>
+
+        <div class="diagram-box">
+          <svg viewBox="0 0 780 180" width="100%" height="180" xmlns="http://www.w3.org/2000/svg">
+            <!-- Background grids -->
+            <rect x="10" y="10" width="360" height="160" rx="8" fill="#161922" stroke="#ef4444" stroke-dasharray="4" />
+            <text x="30" y="35" fill="#ef4444" font-weight="700" font-size="12" font-family="sans-serif">ANTIPATRÓN: DIVISIÓN HORIZONTAL (CAPAS MUERTAS)</text>
+            <rect x="30" y="50" width="320" height="25" rx="4" fill="#1e2230" stroke="#262b3a"/>
+            <text x="40" y="67" fill="#8b949e" font-size="11" font-family="sans-serif">PR 1: Solo CLI / UI (Sin backend = Falla en ejecución)</text>
+            <rect x="30" y="85" width="320" height="25" rx="4" fill="#1e2230" stroke="#262b3a"/>
+            <text x="40" y="102" fill="#8b949e" font-size="11" font-family="sans-serif">PR 2: Solo Dominio (Sin interfaz = Código durmiente)</text>
+            <rect x="30" y="120" width="320" height="25" rx="4" fill="#1e2230" stroke="#262b3a"/>
+            <text x="40" y="137" fill="#8b949e" font-size="11" font-family="sans-serif">PR 3: Solo Storage (Sin conexión = Valor 0 para el usuario)</text>
+
+            <!-- Vertical slice box -->
+            <rect x="410" y="10" width="360" height="160" rx="8" fill="#161922" stroke="#10b981" />
+            <text x="430" y="35" fill="#10b981" font-weight="700" font-size="12" font-family="sans-serif">RECOMENDADO: RODAJA VERTICAL (WALKING SKELETON)</text>
+            <rect x="430" y="50" width="95" height="95" rx="6" fill="rgba(16, 185, 129, 0.1)" stroke="#10b981"/>
+            <text x="440" y="75" fill="#ffffff" font-weight="600" font-size="11" font-family="sans-serif">Incremento 1</text>
+            <text x="440" y="95" fill="#8b949e" font-size="10" font-family="sans-serif">Walking Skeleton</text>
+            <text x="440" y="112" fill="#8b949e" font-size="10" font-family="sans-serif">End-to-End TDD</text>
+            <text x="440" y="130" fill="#10b981" font-weight="700" font-size="10" font-family="sans-serif">✓ Valor en main</text>
+
+            <rect x="540" y="50" width="95" height="95" rx="6" fill="#1e2230" stroke="#262b3a"/>
+            <text x="550" y="75" fill="#e1e4ea" font-weight="600" font-size="11" font-family="sans-serif">Incremento 2</text>
+            <text x="550" y="95" fill="#8b949e" font-size="10" font-family="sans-serif">Edge cases +</text>
+            <text x="550" y="112" fill="#8b949e" font-size="10" font-family="sans-serif">Validaciones</text>
+            <text x="550" y="130" fill="#3b82f6" font-size="10" font-family="sans-serif">+200 LOC TDD</text>
+
+            <rect x="650" y="50" width="95" height="95" rx="6" fill="#1e2230" stroke="#262b3a"/>
+            <text x="660" y="75" fill="#e1e4ea" font-weight="600" font-size="11" font-family="sans-serif">Incremento 3</text>
+            <text x="660" y="95" fill="#8b949e" font-size="10" font-family="sans-serif">Optimización +</text>
+            <text x="660" y="112" fill="#8b949e" font-size="10" font-family="sans-serif">Métricas</text>
+            <text x="660" y="130" fill="#3b82f6" font-size="10" font-family="sans-serif">+150 LOC TDD</text>
+          </svg>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Por qué es relevante (Rationale)</div>
+          <div class="idea-field-content">
+            Alinea OpenSpec con el corazón de la agilidad Scrum: cada merge en <code>main</code> añade una unidad de valor observable y comprobable por el usuario o cliente, en lugar de ramas de integración de larga duración que acumulan conflictos de fusión y deuda técnica oculta.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Costes y Compromisos (Downsides)</div>
+          <div class="idea-field-content">
+            Exige mayor disciplina al diseñar interfaces iniciales: requiere crear dobles de prueba (fakes/stubs) temporales para partes del sistema que aún no existen, a fin de permitir que la rodaja vertical compile y se verifique de extremo a extremo.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 2 -->
+      <article class="idea-card" id="idea-2">
+        <div class="idea-header">
+          <div class="idea-title-area">
+            <span class="idea-number">02</span>
+            <h3 class="idea-title">Tríadas TDD en Unidades de Trabajo (<code>tasks.md</code> Red-Green-Refactor)</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="tag tag-conf">Conf: 90%</span>
+            <span class="tag tag-cx">Cx: Baja</span>
+            <span class="tag">Eje: tdd-specification-rhythm</span>
+          </div>
+        </div>
+
+        <div class="basis-box">
+          <span class="basis-tag">direct: AGENTS.md:142-143</span>
+          "<code>spec.md</code>: Formal requirements using WHEN ... THEN ... format and explicit acceptance criteria. <code>tasks.md</code>: Atomic, executable task checklist with TDD verification steps (generated by /ce-plan)."
+          <br>
+          <span class="basis-tag">reasoned:</span>
+          Los agentes de IA tienden a escribir la implementación completa primero y luego escribir tests que simplemente reflejan lo que el código ya hace, perdiendo el valor de diseño preventivo de TDD.
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Descripción</div>
+          <div class="idea-field-content">
+            Estructura formalmente cada unidad de trabajo en <code>tasks.md</code> como una <strong>tríada TDD atómica</strong>:
+            <ol style="margin-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; color: var(--text);">
+              <li><code>[ ] Unit X.1 (RED)</code>: Escribir test unitario o de integración fallido basado estrictamente en el criterio <code>WHEN ... THEN ...</code> de <code>spec.md</code>.</li>
+              <li><code>[ ] Unit X.2 (GREEN)</code>: Implementación mínima para hacer pasar el test, verificando con <code>cargo test</code>.</li>
+              <li><code>[ ] Unit X.3 (REFACTOR)</code>: Limpieza de deuda, cumplimiento de clippy (<code>-D warnings</code>), formateo y optimización sin romper el contrato.</li>
+            </ol>
+            El reconciliador de tareas de <code>ce-ai</code> valida que existan cambios en tests antes de permitir el marcado de tareas de implementación.
+          </div>
+        </div>
+
+        <div class="diagram-box">
+          <svg viewBox="0 0 780 120" width="100%" height="120" xmlns="http://www.w3.org/2000/svg">
+            <rect x="30" y="30" width="200" height="60" rx="6" fill="rgba(239, 68, 68, 0.15)" stroke="#ef4444"/>
+            <text x="50" y="55" fill="#ef4444" font-weight="700" font-size="12" font-family="sans-serif">1. FASE ROJA (RED)</text>
+            <text x="50" y="75" fill="#text" font-size="11" font-family="sans-serif">Test de contrato fallido</text>
+
+            <path d="M 235 60 L 285 60" stroke="#8b949e" stroke-width="2" marker-end="url(#arrow)" />
+
+            <rect x="290" y="30" width="200" height="60" rx="6" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981"/>
+            <text x="310" y="55" fill="#10b981" font-weight="700" font-size="12" font-family="sans-serif">2. FASE VERDE (GREEN)</text>
+            <text x="310" y="75" fill="#text" font-size="11" font-family="sans-serif">Implementación mínima</text>
+
+            <path d="M 495 60 L 545 60" stroke="#8b949e" stroke-width="2" marker-end="url(#arrow)" />
+
+            <rect x="550" y="30" width="200" height="60" rx="6" fill="rgba(59, 130, 246, 0.15)" stroke="#3b82f6"/>
+            <text x="570" y="55" fill="#3b82f6" font-weight="700" font-size="12" font-family="sans-serif">3. REFACTOR & DOD</text>
+            <text x="570" y="75" fill="#text" font-size="11" font-family="sans-serif">Clippy, fmt y types</text>
+          </svg>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Por qué es relevante (Rationale)</div>
+          <div class="idea-field-content">
+            Evita que los agentes de IA cometan "falso TDD" (escribir 200 líneas de código y añadir un test trivial al final). Al hacer que la especificación en <code>spec.md</code> se traduzca de forma determinista en el test de la fase roja, la especificación se convierte en una barrera de regresión ejecutable.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Costes y Compromisos (Downsides)</div>
+          <div class="idea-field-content">
+            Incrementa ligeramente el número de líneas en <code>tasks.md</code> al triplicar los ítems de verificación, requiriendo que la herramienta de reconciliación agrupe la tríada para no sobrecargar el resumen visual del estado.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 3 -->
+      <article class="idea-card" id="idea-3">
+        <div class="idea-header">
+          <div class="idea-title-area">
+            <span class="idea-number">03</span>
+            <h3 class="idea-title">Arquitectura Dual: Columna Vertebral Viva con Acoplamientos Ágiles</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="tag tag-conf">Conf: 92%</span>
+            <span class="tag tag-cx">Cx: Media</span>
+            <span class="tag">Eje: global-architecture-evolution</span>
+          </div>
+        </div>
+
+        <div class="basis-box">
+          <span class="basis-tag">direct: docs/solutions/architecture/decoupling-semantic-authority-and-openspec.md:44-48</span>
+          "Optional Integrations: OpenSpec operates as an external, opt-in integration via ce-ai spec commands... when making trivial edits or debugging, OpenSpec is completely bypassed without friction."
+          <br>
+          <span class="basis-tag">direct: CONCEPTS.md:209-211</span>
+          "Decoupled OpenSpec Integration: An optional, opt-in integration architecture... While formal OpenSpec remains available and recommended for high-complexity architectural initiatives..."
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Descripción</div>
+          <div class="idea-field-content">
+            Rompe el dilema de tener que elegir entre <em>"OpenSpec burocrático para todo"</em> o <em>"cero arquitectura y anarquía"</em>. Establece un modelo dual:
+            <ul>
+              <li><strong>La Columna Vertebral (Spine):</strong> Las especificaciones vivas canónicas permanentes en <code>openspec/specs/*.md</code> definen la arquitectura global del sistema, sus invariantes innegociables y su mapa de capacidades.</li>
+              <li><strong>Los Acoplamientos Ágiles (Fast-Path Plans):</strong> Los incrementos diarios pequeños (<200 LOC) utilizan planes ágiles directos en <code>docs/plans/</code> (creados mediante <code>/ce-plan</code>), pero con un enlace declarativo en su cabecera: <code>targets_requirement: REQ-WORKFLOW-03</code>.</li>
+            </ul>
+            De este modo, se trabaja a velocidad ágil de Scrum sin redactar 5 documentos por cada pequeño cambio, pero todo cambio queda anclado y contribuye a la arquitectura global.
+          </div>
+        </div>
+
+        <div class="diagram-box">
+          <svg viewBox="0 0 780 160" width="100%" height="160" xmlns="http://www.w3.org/2000/svg">
+            <!-- Spine -->
+            <rect x="20" y="20" width="280" height="120" rx="8" fill="#1e2230" stroke="#3b82f6" stroke-width="2"/>
+            <text x="35" y="45" fill="#3b82f6" font-weight="700" font-size="12" font-family="sans-serif">COLUMNA ARQUITECTÓNICA (SPINE)</text>
+            <text x="35" y="65" fill="#text" font-size="11" font-family="sans-serif"><code>openspec/specs/workflow.md</code></text>
+            <text x="35" y="85" fill="#text-muted" font-size="10" font-family="sans-serif">• REQ-WORKFLOW-01: FSM Transitions</text>
+            <text x="35" y="105" fill="#text-muted" font-size="10" font-family="sans-serif">• REQ-WORKFLOW-02: Branch Isolation</text>
+            <text x="35" y="125" fill="#text-muted" font-size="10" font-family="sans-serif">• REQ-WORKFLOW-03: Desync Reconciliation</text>
+
+            <!-- Arrows -->
+            <path d="M 305 75 L 430 45" stroke="#10b981" stroke-width="2" stroke-dasharray="3" />
+            <path d="M 305 115 L 430 115" stroke="#10b981" stroke-width="2" stroke-dasharray="3" />
+
+            <!-- Agile increments -->
+            <rect x="435" y="20" width="320" height="50" rx="6" fill="#161922" stroke="#10b981"/>
+            <text x="450" y="40" fill="#10b981" font-weight="600" font-size="11" font-family="sans-serif">Incremento Ágil A (docs/plans/plan-a.md)</text>
+            <text x="450" y="58" fill="#text-muted" font-size="10" font-family="sans-serif">Fast-path PR ≤ 200 LOC -> Perfecciona REQ-01</text>
+
+            <rect x="435" y="90" width="320" height="50" rx="6" fill="#161922" stroke="#10b981"/>
+            <text x="450" y="110" fill="#10b981" font-weight="600" font-size="11" font-family="sans-serif">Incremento Ágil B (docs/plans/plan-b.md)</text>
+            <text x="450" y="128" fill="#text-muted" font-size="10" font-family="sans-serif">Fast-path PR ≤ 200 LOC -> Perfecciona REQ-03</text>
+          </svg>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Por qué es relevante (Rationale)</div>
+          <div class="idea-field-content">
+            Resuelve de raíz el conflicto entre la agilidad extrema de desarrollo y la gobernanza arquitectónica corporativa. Permite a equipos Scrum operar a máxima cadencia diaria sin perder el mapa ni desviar la arquitectura global.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Costes y Compromisos (Downsides)</div>
+          <div class="idea-field-content">
+            Requiere que el comando <code>ce-ai doctor</code> y el analizador de planes validen que los identificadores de requisitos (<code>REQ-*</code>) existan en las especificaciones vivas para evitar referencias rotas.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 4 -->
+      <article class="idea-card" id="idea-4">
+        <div class="idea-header">
+          <div class="idea-title-area">
+            <span class="idea-number">04</span>
+            <h3 class="idea-title">Promoción Continua de Deltas en Archivador (Auto-Promote on Archive)</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="tag tag-conf">Conf: 94%</span>
+            <span class="tag tag-cx">Cx: Baja</span>
+            <span class="tag">Eje: global-architecture-evolution</span>
+          </div>
+        </div>
+
+        <div class="basis-box">
+          <span class="basis-tag">direct: docs/solutions/architecture/living-system-specifications-and-delta-promotion.md:27-32</span>
+          "Delta Ephemerality: After a feature is archived to openspec/changes/archive/, its spec.md represents a past delta rather than the current truth of the system... Living System Specifications (openspec/specs/) and the Delta Promotion Engine (ce-ai spec and ce-ai archive --promote)."
+          <br>
+          <span class="basis-tag">direct: AGENTS.md:16-17</span>
+          "Invariant 10: Post-Merge Lifecycle & Clean State ... AI agent MUST run ce-ai archive <feature> so the repository FSM is left at Ready (100%)"
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Descripción</div>
+          <div class="idea-field-content">
+            Actualmente, la promoción de requisitos desde los deltas efímeros (<code>openspec/changes/<feat>/spec.md</code>) a las especificaciones vivas globales (<code>openspec/specs/<domain>.md</code>) requiere una bandera manual opcional (<code>--promote</code>). Al invertir esta convención y hacer que <code>ce-ai archive &lt;feat&gt;</code> promueva por defecto los requisitos del delta hacia el dominio correspondiente (con deduplicación semántica), la arquitectura global se mantiene permanentemente actualizada de forma 100% automática con cada PR mergeado, cerrando el ciclo de retroalimentación de la arquitectura evolutiva.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Por qué es relevante (Rationale)</div>
+          <div class="idea-field-content">
+            Elimina la "muerte de las especificaciones". En la mayoría de proyectos de software, las especificaciones se escriben una vez y quedan obsoletas al cabo de dos semanas. Con la promoción automática post-merge, la arquitectura viva evoluciona en lock-step con el código de producción.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Costes y Compromisos (Downsides)</div>
+          <div class="idea-field-content">
+            Si un cambio fue una prueba de concepto o un parche experimental que no debería consolidarse como estándar de dominio, el desarrollador deberá usar explícitamente <code>--no-promote</code> para evitar contaminar la especificación canónica.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 5 -->
+      <article class="idea-card" id="idea-5">
+        <div class="idea-header">
+          <div class="idea-title-area">
+            <span class="idea-number">05</span>
+            <h3 class="idea-title">Siembra Automática de Soluciones desde las Disyuntivas de Exploración</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="tag tag-conf">Conf: 91%</span>
+            <span class="tag tag-cx">Cx: Baja</span>
+            <span class="tag">Eje: compound-knowledge-accretion</span>
+          </div>
+        </div>
+
+        <div class="basis-box">
+          <span class="basis-tag">direct: AGENTS.md:155-162</span>
+          "Stage 7 PR & Review Readiness Directives ('A Change That Explains Itself'): What It Ruled Out, Which Rule Decided It, Upfront Evidence in collapsible &lt;details&gt;&lt;summary&gt; blocks."
+          <br>
+          <span class="basis-tag">direct: docs/solutions/architecture/self-explaining-pr-directives-and-review-readiness.md</span>
+          "A change that explains itself minimizes human review friction by stating rejected alternatives, cited rules, and embedding passing verification proofs."
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Descripción</div>
+          <div class="idea-field-content">
+            En la Etapa 2 de OpenSpec, el documento <code>exploration.md</code> captura la investigación técnica, las opciones evaluadas y las alternativas descartadas. Sin embargo, al finalizar el trabajo, este conocimiento frecuentemente queda sepultado en el archivo. Esta idea implementa un puente automático en <code>ce-ai archive</code> que extrae la sección de <em>"Alternativas descartadas y por qué"</em> de <code>exploration.md</code> y genera automáticamente un borrador candidato en <code>docs/solutions/architecture/</code> con su frontmatter YAML correspondiente, a la vez que inyecta la explicación en el cuerpo del Pull Request bajo el bloque <em>"What It Ruled Out"</em>.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Por qué es relevante (Rationale)</div>
+          <div class="idea-field-content">
+            Materializa el principio de <em>Compound Engineering</em>: no resolver dos veces el mismo problema. Al convertir las decisiones de descarte arquitectónico en documentos de soluciones institucionales permanentes, los siguientes sprints e ingenieros saben exactamente qué caminos no tomar.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Costes y Compromisos (Downsides)</div>
+          <div class="idea-field-content">
+            Riesgo de generar documentos de solución superficiales si la exploración inicial fue escasa. Debe implementarse un filtro de calidad que solo genere la solución si el análisis de disyuntivas contiene argumentos sustantivos.
+          </div>
+        </div>
+      </article>
+
+      <!-- Idea 6 -->
+      <article class="idea-card" id="idea-6">
+        <div class="idea-header">
+          <div class="idea-title-area">
+            <span class="idea-number">06</span>
+            <h3 class="idea-title">Motor de Triaje Heurístico para OpenSpec vs Fast-Path (<code>ce-ai triage</code>)</h3>
+          </div>
+          <div class="idea-badges">
+            <span class="tag tag-conf">Conf: 88%</span>
+            <span class="tag tag-cx">Cx: Media</span>
+            <span class="tag">Eje: developer-guidance-triage</span>
+          </div>
+        </div>
+
+        <div class="basis-box">
+          <span class="basis-tag">direct: AGENTS.md:146-154</span>
+          "Proactive OpenSpec Triage & Guidance for Developers: If a proposed feature involves architectural changes, schema or data migrations, public API mutations, or estimated scope > 200 LOC, the agent MUST proactively ask... When to Bypass OpenSpec: For bug fixes, minor tweaks... proceed directly with /ce-plan, ce-work, or ce-debug."
+          <br>
+          <span class="basis-tag">direct: docs/solutions/architecture/legacy-agents-assisted-migration-and-v8-block.md</span>
+          "Assisted migration eliminates rigid mandatory FSM roadblocks and aligns repositories with decoupled advisory OpenSpec."
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Descripción</div>
+          <div class="idea-field-content">
+            Actualmente, la guía proactiva en <code>AGENTS.md</code> delega en el desarrollador o en el LLM la estimación subjetiva de si un cambio tendrá más de 200 LOC o impacto de contrato. Proponemos añadir un subcomando de asistencia interactiva (<code>ce-ai triage [descripción | rama | diff]</code>) que evalúe heurísticamente:
+            <ul style="margin-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; color: var(--text);">
+              <li>¿Se modifican interfaces públicas o contratos de API expuestos?</li>
+              <li>¿Se alteran esquemas de persistencia o formatos de configuración en disco?</li>
+              <li>¿El cambio toca más de 3 subsistemas independientes?</li>
+              <li>¿Se trata de una corrección puntual de bug o refactor cosmético?</li>
+            </ul>
+            El comando emite una recomendación accionable con nivel de certeza (ej. <em>"Recomendación: Fast-path con /ce-plan (certeza 92%) — Alcance estimado: 80 LOC, 1 archivo"</em> o <em>"Recomendación: OpenSpec Vertical (certeza 95%) — Afecta contrato de comandos y formato de estado"</em>).
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Por qué es relevante (Rationale)</div>
+          <div class="idea-field-content">
+            Reduce drásticamente la fricción y la parálisis por análisis de desarrolladores que se incorporan al equipo o agentes autónomos que dudan si abrir un OpenSpec completo o seguir el camino ágil directo, manteniendo la disciplina sin burocracia innecesaria.
+          </div>
+        </div>
+
+        <div class="idea-field">
+          <div class="idea-field-label">Costes y Compromisos (Downsides)</div>
+          <div class="idea-field-content">
+            Debe mantenerse como una herramienta puramente consultiva y de asesoramiento (en cumplimiento del Invariante 6: No Semantic Authority), sin bloquear la terminal si el desarrollador decide optar por la otra vía.
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section id="rejections">
+      <h2>Resumen de Filtrado Adversarial y Descartes</h2>
+      <div class="card">
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+          Se generaron 16 candidatos iniciales en paralelo a través de 6 marcos de ideación. A continuación se detallan las propuestas descartadas o fusionadas durante la fase de crítica adversarial:
+        </p>
+
+        <table class="rejection-table">
+          <thead>
+            <tr>
+              <th style="width: 28%;">Idea Candidata</th>
+              <th style="width: 22%;">Marco de Origen</th>
+              <th>Motivo del Descarte / Fusión</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Living Architecture Drift Linter</strong></td>
+              <td>Pain and Friction</td>
+              <td>Descartada por solapamiento con las comprobaciones existentes en <code>ce-ai doctor</code> y alta complejidad de análisis sintáctico respecto al valor aportado frente a la promoción automática.</td>
+            </tr>
+            <tr>
+              <td><strong>Contract-Driven Test Skeleton Synthesis</strong></td>
+              <td>Inversion, Removal, or Automation</td>
+              <td>Descartada por alto riesgo de fragilidad en la generación heurística de código (template slop); el flujo TDD en <code>tasks.md</code> es superior y más robusto sin codegen.</td>
+            </tr>
+            <tr>
+              <td><strong>Zero-Ceremony Task Checkbox Auto-Reconciliation</strong></td>
+              <td>Inversion, Removal, or Automation</td>
+              <td>Descartada porque viola la soberanía del desarrollador y genera falsos positivos; el reconciliador de desync de <code>workflow.rs</code> ya diagnostica esto sin marcar cajas a ciegas.</td>
+            </tr>
+            <tr>
+              <td><strong>Incremental Release Notes & Value Ledger</strong></td>
+              <td>Leverage and Compounding</td>
+              <td>Descartada por redundancia: el Invariante 9 y la gestión de <code>CHANGELOG.md</code> con commits convencionales ya resuelven esto eficazmente.</td>
+            </tr>
+            <tr>
+              <td><strong>Database Schema Migrations Analogy</strong></td>
+              <td>Cross-Domain Analogy</td>
+              <td>Fusionada conceptualmente dentro de las Ideas 3 y 4 (Columna Vertebral y Promoción de Deltas), enriqueciendo su fundamento sin requerir un comando aparte.</td>
+            </tr>
+            <tr>
+              <td><strong>Subway Map Transit Analogy</strong></td>
+              <td>Cross-Domain Analogy</td>
+              <td>Fusionada dentro de la Idea 1 (Andamiaje de Rodaja Vertical) como marco visual y pedagógico para el equipo.</td>
+            </tr>
+            <tr>
+              <td><strong>Extreme PR Budget Flip (1-Task, 1-Test, 1-Commit)</strong></td>
+              <td>Constraint-Flipping</td>
+              <td>Descartada por ser impracticable como mandato dogmático; satura las colas de CI y fragmenta innecesariamente el historial de Git frente al límite probado de ~200 LOC.</td>
+            </tr>
+            <tr>
+              <td><strong>Zero-File OpenSpec (Inline Test Annotations)</strong></td>
+              <td>Constraint-Flipping</td>
+              <td>Descartada por sustitución de sujeto: destruye la naturaleza declarativa agnóstica de OpenSpec en Markdown y la acopla rígidamente a macros de Rust, rompiendo la interoperabilidad multi-harness.</td>
+            </tr>
+            <tr>
+              <td><strong>OpenSpec Incremental Milestone Ledger for Epics</strong></td>
+              <td>Pain and Friction</td>
+              <td>Sintetizada dentro de la Idea 3 (Arquitectura Dual) para evitar inventar nuevos esquemas de carpetas anidadas en <code>openspec/changes/</code>.</td>
+            </tr>
+            <tr>
+              <td><strong>Executable Architectural Contracts (Fitness Functions)</strong></td>
+              <td>Assumption-Breaking</td>
+              <td>Sintetizada como pilar conceptual de la Idea 2 (Tríadas TDD en <code>tasks.md</code>).</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="composition-signal">
+      Composed 2026-10-23 by ce-ideate in repository <code>ce-ai</code> · Artifact: <code>docs/ideation/2026-10-23-openspec-incremental-value-delivery-ideation.html</code>
+    </footer>
+  </div>
+</body>
+</html>
