@@ -118,9 +118,9 @@ pub fn run_spec(ctx: &Context, args: &SpecArgs) -> Result<(), CeError> {
     }
 }
 
-/// Lists all domain specifications in `openspec/specs/`.
+/// Lists all domain specifications (preferring `docs/arch/system/` with fallback to `openspec/specs/`).
 pub fn list_domain_specs(repo_root: &Path) -> Result<Vec<DomainSpecSummary>, CeError> {
-    let specs_dir = repo_root.join("openspec").join("specs");
+    let specs_dir = crate::compat::arch::system_specs_dir(repo_root);
     if !specs_dir.is_dir() {
         return Ok(Vec::new());
     }
@@ -163,7 +163,12 @@ fn run_spec_list(repo_root: &Path, json: bool) -> Result<(), CeError> {
     }
 
     if summaries.is_empty() {
-        println!("spec: no domain specifications found in openspec/specs/");
+        let specs_dir = crate::compat::arch::system_specs_dir(repo_root);
+        let rel_path = specs_dir.strip_prefix(repo_root).unwrap_or(&specs_dir);
+        println!(
+            "spec: no domain specifications found in {}/",
+            rel_path.display()
+        );
         return Ok(());
     }
 
@@ -187,8 +192,11 @@ fn run_spec_list(repo_root: &Path, json: bool) -> Result<(), CeError> {
 fn run_spec_show(repo_root: &Path, domain: &str) -> Result<(), CeError> {
     let spec_path = get_domain_spec_path(repo_root, domain);
     if !spec_path.is_file() {
+        let specs_dir = crate::compat::arch::system_specs_dir(repo_root);
+        let rel_path = specs_dir.strip_prefix(repo_root).unwrap_or(&specs_dir);
         return Err(CeError::Usage(format!(
-            "domain specification '{domain}' not found in openspec/specs/"
+            "domain specification '{domain}' not found in {}/",
+            rel_path.display()
         )));
     }
 
@@ -211,7 +219,9 @@ fn run_spec_validate(repo_root: &Path, json: bool) -> Result<(), CeError> {
     }
 
     if report.specs_count == 0 {
-        println!("spec validate: warning: openspec/specs/ is empty");
+        let specs_dir = crate::compat::arch::system_specs_dir(repo_root);
+        let rel_path = specs_dir.strip_prefix(repo_root).unwrap_or(&specs_dir);
+        println!("spec validate: warning: {}/ is empty", rel_path.display());
         return Ok(());
     }
 
@@ -273,12 +283,9 @@ fn run_spec_promote(
     Ok(())
 }
 
-/// Returns the path to `openspec/specs/<domain>.md`.
+/// Returns the path to the domain specification file (`docs/arch/system/<domain>.md` or fallback).
 pub fn get_domain_spec_path(repo_root: &Path, domain: &str) -> PathBuf {
-    repo_root
-        .join("openspec")
-        .join("specs")
-        .join(format!("{domain}.md"))
+    crate::compat::arch::system_specs_dir(repo_root).join(format!("{domain}.md"))
 }
 
 /// Extracts YAML frontmatter between `---` boundaries and remainder content.
@@ -352,9 +359,9 @@ pub fn count_requirements(content: &str) -> usize {
         .count()
 }
 
-/// Validates all specifications in `openspec/specs/`.
+/// Validates all domain specifications in `docs/arch/system/` (or fallback `openspec/specs/`).
 pub fn validate_domain_specs(repo_root: &Path) -> SpecValidationReport {
-    let specs_dir = repo_root.join("openspec").join("specs");
+    let specs_dir = crate::compat::arch::system_specs_dir(repo_root);
     let mut findings = Vec::new();
 
     if !specs_dir.is_dir() {
@@ -493,8 +500,20 @@ pub fn extract_requirements_from_spec_md(content: &str) -> Vec<(String, String)>
     requirements
 }
 
-/// Locates `spec.md` for a change in either active changes or archive.
+/// Locates `spec.md` for a change across modern deltas/archive or legacy openspec changes/archive.
 pub fn find_change_spec_path(repo_root: &Path, change_name: &str) -> Option<PathBuf> {
+    let modern_delta = crate::compat::arch::deltas_dir(repo_root)
+        .join(change_name)
+        .join("spec.md");
+    if modern_delta.is_file() {
+        return Some(modern_delta);
+    }
+    let modern_archive = crate::compat::arch::archive_dir(repo_root)
+        .join(change_name)
+        .join("spec.md");
+    if modern_archive.is_file() {
+        return Some(modern_archive);
+    }
     let active_spec = repo_root
         .join("openspec")
         .join("changes")
@@ -637,18 +656,20 @@ pub fn promote_delta_to_domain_spec(
 /// Probes living domain specifications health for `ce-ai doctor`.
 pub fn probe_specs_health(repo_root: &Path) -> Vec<String> {
     let mut warnings = Vec::new();
-    let specs_dir = repo_root.join("openspec").join("specs");
+    let specs_dir = crate::compat::arch::system_specs_dir(repo_root);
+    let rel_specs = specs_dir.strip_prefix(repo_root).unwrap_or(&specs_dir);
 
     if !specs_dir.is_dir() {
-        warnings.push("openspec/specs/ directory does not exist".to_string());
+        warnings.push(format!("{}/ directory does not exist", rel_specs.display()));
         return warnings;
     }
 
     let report = validate_domain_specs(repo_root);
     if report.specs_count == 0 {
-        warnings.push(
-            "openspec/specs/ is empty — run 'ce-ai spec validate' or seed domain specs".to_string(),
-        );
+        warnings.push(format!(
+            "{}/ is empty — run 'ce-ai spec validate' or seed domain specs",
+            rel_specs.display()
+        ));
     } else {
         for f in &report.findings {
             let name = f.file.file_name().and_then(|n| n.to_str()).unwrap_or("");
@@ -657,7 +678,7 @@ pub fn probe_specs_health(repo_root: &Path) -> Vec<String> {
     }
 
     // Check active unarchived changes for domain frontmatter
-    let changes_dir = repo_root.join("openspec").join("changes");
+    let changes_dir = crate::compat::arch::deltas_dir(repo_root);
     if let Ok(entries) = fs::read_dir(&changes_dir) {
         for entry in entries.flatten() {
             let p = entry.path();
