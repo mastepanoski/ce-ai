@@ -91,8 +91,8 @@ flowchart TD
 | Stage | Stage Name | Canonical CE Skills | Real-World Analogy | What Happens Here? |
 | :--- | :--- | :--- | :--- | :--- |
 | **Stage 1** | **Ideation** | `ce-brainstorm`<br>`ce-ideate`<br>`ce-strategy` | Architectural Blueprint Discussion | Exploring vague ideas (`ce-ideate`), framing constraints (`ce-brainstorm`), and setting product strategy (`ce-strategy`). |
-| **Stage 2** | **OpenSpec Definition** | `openspec/changes/*/` | Formal Contract & Spec Sheet | Authoring the contract progressively (`proposal.md`, `exploration.md`, `design.md`, `spec.md`). |
-| **Stage 3** | **Execution Plan** | `ce-plan`<br>`ce-doc-review` | Construction Milestone Breakdown | Generating the executable checklist (`openspec/changes/<feature>/tasks.md`) from `spec.md`/`design.md`, structuring implementation units, file lists, test scenarios, and reviewing doc rigor (`ce-doc-review`). |
+| **Stage 2** | **Living Arch & Deltas (Optional)** | `docs/arch/deltas/`<br>`docs/arch/system/` | Formal Contract & Spec Sheet | Authoring contracts/deltas progressively when scope > 200 LOC, APIs, or schema changes (legacy `openspec/` supported). |
+| **Stage 3** | **Execution Plan** | `ce-plan`<br>`ce-doc-review` | Construction Milestone Breakdown | Generating the executable checklist in `docs/plans/*.md` (SSOT), structuring vertical Scrum slices with TDD triads, file lists, and test scenarios. |
 | **Stage 4** | **TDD & Work** | `ce-work`<br>`ce-debug`<br>`ce-simplify-code` | Laying Bricks & Wiring | Writing tests first (Red), implementing code (Green), running diagnostic debug sub-loops (`ce-debug`), and refactoring (`ce-simplify-code`). |
 | **Stage 5** | **Verification** | `ce-code-review`<br>`ce-test-browser`<br>project test suite | Safety Inspector Audit | Running the project's linters and test suite, browser tests (`ce-test-browser`), plus any containerized/E2E gates your stack defines. |
 | **Stage 6** | **Knowledge Capture** | `ce-compound`<br>`ce-compound-refresh` | Updating Operations Manual | Documenting hard-earned discoveries in `docs/solutions/` (`ce-compound`) and auditing stale docs (`ce-compound-refresh`). |
@@ -118,15 +118,15 @@ flowchart TD
         SIMPLIFY --> WORK
     end
 
-    STAGE_1 --> STAGE_2[Stage 2: OpenSpec]
-    STAGE_2 --> STAGE_3[Stage 3: Plan]
+    STAGE_1 --> STAGE_2[Stage 2: Architecture & Deltas (Optional)]
+    STAGE_2 --> STAGE_3[Stage 3: Plan (docs/plans/ SSOT)]
     STAGE_3 --> STAGE_4
 ```
 
 ### 1. How `ce-ideate` Operates in Stage 1 (Ideation)
 - **Role**: `ce-ideate` is an **Idea Discovery Sub-Loop** within **Stage 1 (Ideation)**.
 - **Behavior**: When a user or agent doesn't have a concrete feature description yet, `ce-ideate` runs first to generate and evaluate candidate directions. It writes a ranked dossier to `docs/ideation/` — it does **not** produce requirements, plans, or code.
-- **Transition**: Once an idea is chosen from the dossier, the FSM transitions to `ce-brainstorm` (to build the formal requirements document) and then moves forward to Stage 2 (`OpenSpec`), where the chosen idea plus one-line rejection reasons for the alternatives are distilled into `exploration.md`. The dossier itself is disposable input — kept as raw history, not a maintained document.
+- **Transition**: Once an idea is chosen from the dossier, the FSM transitions to `ce-brainstorm` (to build the formal requirements document) and then moves forward to Stage 2 (Architecture/Deltas or ADRs in `docs/arch/`), where the chosen idea plus one-line rejection reasons for the alternatives are distilled. For tasks < 200 LOC, it proceeds directly to Stage 3 (`docs/plans/`). The dossier itself is disposable input — kept as raw history, not a maintained document.
 
 ### 2. How `ce-debug` Operates in Stage 4/5 (Diagnostic Sub-Loop & Direct Entry Point)
 
@@ -182,7 +182,7 @@ flowchart TD
 
 Large Language Models have a fixed memory limit called a **Context Window**. When a chat session becomes very long:
 1. The AI interface automatically compresses earlier messages (**Context Compaction**).
-2. The AI may lose track of which subtasks in `tasks.md` were completed and which are pending.
+2. The AI may lose track of which subtasks in the execution plan (`docs/plans/`) were completed and which are pending.
 
 **The Solution**: By running `ce-ai workflow checkpoint`, the state is written directly to disk (`~/.ce-ai/state.json`) using atomic writes (`write_atomic`). Disk state survives session resets, compaction, and process terminations.
 
@@ -203,9 +203,9 @@ ce-ai workflow status
 **Output**:
 ```text
 == [Workflow FSM & Progress Recovery Status] ==
-7-Stage Cycle: [1:Ideation] ➔ [2:OpenSpec] ➔ [3:Plan] ➔ [4:Work/TDD] ➔ [5:Verify] ➔ [6:Compound] ➔ [7:Ship]
+7-Stage Cycle: [1:Ideation] ➔ [2:Architecture] ➔ [3:Plan] ➔ [4:Work/TDD] ➔ [5:Verify] ➔ [6:Compound] ➔ [7:Ship]
 current phase: Stage 4: TDD & Work
-active subtask: Unit 2: Companion Tools Manager (tasks.md 2/4 completed)
+active subtask: Unit 2: Companion Tools Manager (docs/plans/ 2/4 completed)
 recovery status: Ready (100% state preserved)
 ```
 
@@ -216,7 +216,7 @@ recovery status: Ready (100% state preserved)
 The AI agent executes Stage 4 (TDD & Work):
 1. Writes a unit test for the feature.
 2. Implements the minimum code to make the test pass.
-3. Updates `openspec/changes/<feature>/tasks.md` marking the checklist item as completed `[x]`.
+3. Updates `docs/plans/<date>-<feature>-plan.md` marking the checklist item as completed `[x]`.
 
 ---
 
@@ -262,9 +262,9 @@ workflow: re-hydrated context successfully. Proceeding with active task.
 
 The new agent immediately knows **where it is**, **what was already built**, and **what needs to be done next**—without asking the user or re-doing completed work.
 
-#### ⚠️ What Happens When Tasks Desync? (`tasks.md` vs. Git Reality)
+#### ⚠️ What Happens When Tasks Desync? (`docs/plans/` vs. Git Reality)
 
-If an agent or developer implements code changes or makes commits on the feature branch, but forgets to update `openspec/changes/<feature>/tasks.md` (leaving checkboxes unchecked at `- [ ]`):
+If an agent or developer implements code changes or makes commits on the feature branch, but forgets to update the checklist in `docs/plans/<date>-<feature>-plan.md` (or legacy `tasks.md`), leaving checkboxes unchecked at `- [ ]`:
 
 ```bash
 ce-ai workflow status
@@ -273,10 +273,10 @@ ce-ai workflow status
 **Output with Desync Warning**:
 ```text
 == [Workflow FSM & Progress Recovery Status] ==
-7-Stage Cycle: [1:Ideation] ➔ [2:OpenSpec] ➔ [3:Plan] ➔ [4:Work/TDD] ➔ [5:Verify] ➔ [6:Compound] ➔ [7:Ship]
+7-Stage Cycle: [1:Ideation] ➔ [2:Architecture] ➔ [3:Plan] ➔ [4:Work/TDD] ➔ [5:Verify] ➔ [6:Compound] ➔ [7:Ship]
 current phase: Stage 4: TDD & Work
-active subtask: Unit 2: Companion Tools Manager (tasks.md 0/4 completed)
-! Warning: Tasks desync detected — 1 unchecked task(s) reference modified files (src/commands/workflow.rs), but tasks.md shows 0/4 completed. Update tasks.md (- [x]) to reflect progress.
+active subtask: Unit 2: Companion Tools Manager (docs/plans/ 0/4 completed)
+! Warning: Tasks desync detected — 1 unchecked task(s) reference modified files (src/commands/workflow.rs), but docs/plans shows 0/4 completed. Update docs/plans (- [x]) to reflect progress.
 recovery status: Ready (100% state preserved)
 ```
 
@@ -285,12 +285,12 @@ The warning banner is non-blocking to preserve operator control:
 - In `ce-ai workflow resume`, the banner is injected directly into the context re-hydration block under `tasks progress`.
 - In `ce-ai doctor`, a non-fatal diagnostic warning is emitted without failing the health check (exit code 0):
   ```text
-  doctor-warn: openspec tasks desync in 'my-feature': 1 unchecked task(s) with git modifications (progress: 0/4)
+  doctor-warn: plan tasks desync in 'my-feature': 1 unchecked task(s) with git modifications (progress: 0/4)
   ```
 - In automated inference (`maybe_auto_checkpoint`), the FSM is guarded from auto-advancing past Stage 4 to Stage 5 (Verification), Stage 6 (Knowledge Capture), or Stage 7 (Git Shipping) while desync is active.
 
 > [!NOTE]
-> **Persistent Desync Banners Across Sessions**: If a tasks desync warning banner appears to persist across sessions without apparent cause in the filesystem or after `tasks.md` has been updated, the cause is typically an AI memory plugin (such as Engram) re-surfacing verbatim user prompt history containing the historical banner text. This is an LLM behavioral artifact of prompt re-hydration, not a `ce-ai` state bug. See [`docs/solutions/architecture/engram-context-echo-behavioral-risk.md`](../solutions/architecture/engram-context-echo-behavioral-risk.md).
+> **Persistent Desync Banners Across Sessions**: If a tasks desync warning banner appears to persist across sessions without apparent cause in the filesystem or after the plan has been updated, the cause is typically an AI memory plugin (such as Engram) re-surfacing verbatim user prompt history containing the historical banner text. This is an LLM behavioral artifact of prompt re-hydration, not a `ce-ai` state bug. See [`docs/solutions/architecture/engram-context-echo-behavioral-risk.md`](../solutions/architecture/engram-context-echo-behavioral-risk.md).
 
 ---
 
@@ -306,11 +306,11 @@ In adopted projects (`ce-ai init-prj`), `ce-ai` configures native lifecycle hook
 - **OpenCode**: `session.created`, `session.idle` event subscriptions plus `context`/`compaction` session hooks in `.opencode/plugins/compound-engineering.js` (OpenCode V2 plugin API)
 
 These hooks execute at turn boundaries and before context compaction, evaluating repository state through `infer_stage_from_repo`:
-- **Stage 1 (Ideation)**: `docs/brainstorms/*.md` or `docs/ideation/*.md` present without OpenSpec changes.
-- **Stage 2 (OpenSpec)**: `proposal.md` and `spec.md` present under `openspec/changes/<feature>/` without tasks.
-- **Stage 3 (Execution Plan)**: `tasks.md` present with zero completed tasks.
-- **Stage 4 (TDD & Work)**: `tasks.md` with in-progress tasks, OR **Direct Entry** (`fix/*` or `feat/*` branch with uncommitted changes, bypassing ideation for fast bug repair via `ce-debug`).
-- **Stage 5 (Verification)**: All tasks in `tasks.md` marked completed (`[x]`) and no active tasks desync (auto-advancement is guarded if unchecked tasks reference touched files or aggregate code changes are detected).
+- **Stage 1 (Ideation)**: `docs/brainstorms/*.md` or `docs/ideation/*.md` present without active plan/spec.
+- **Stage 2 (Architecture & Deltas)**: Contracts or deltas present under `docs/arch/deltas/<feature>/` (or legacy `openspec/changes/<feature>/`) without an execution plan.
+- **Stage 3 (Execution Plan)**: Plan present in `docs/plans/*.md` (or legacy `tasks.md`) with zero completed tasks (`0%`).
+- **Stage 4 (TDD & Work)**: `docs/plans/*.md` with in-progress tasks (`- [x]`), OR **Direct Entry** (`fix/*` or `feat/*` branch with uncommitted changes, bypassing ideation for fast bug repair via `ce-debug`).
+- **Stage 5 (Verification)**: All tasks in `docs/plans/*.md` marked completed (`- [x]`, 100%) and no active tasks desync (auto-advancement is guarded if unchecked tasks reference touched files or aggregate code changes are detected).
 - **Stage 6 (Knowledge Capture)**: New or modified solutions in `docs/solutions/*.md`.
 - **Stage 7 (Git Shipping)**: Active PR created on GitHub or branch merged.
 
@@ -319,7 +319,7 @@ These hooks execute at turn boundaries and before context compaction, evaluating
 - **Monotonic Progression**: Automated checkpoints only advance forward (`source: "inferred"`).
 - **Adoption Opt-In**: Repositories must be adopted via `ce-ai init-prj` for hooks and automated checkpointing to activate.
 - **Configurable Opt-Out**: Users can disable automated checkpointing by setting `"auto_checkpoint": false` in `state.json`.
-- **Tasks Checkbox Desync Guard**: When modified working tree files or branch commits are detected while `tasks.md` has unchecked items, automated checkpoint advancement past Stage 4 is inhibited, and diagnostic warnings are surfaced in `workflow resume`, `status`, `checkpoint`, and `ce-ai doctor`.
+- **Tasks Checkbox Desync Guard**: When modified working tree files or branch commits are detected while `docs/plans/` has unchecked items, automated checkpoint advancement past Stage 4 is inhibited, and diagnostic warnings are surfaced in `workflow resume`, `status`, `checkpoint`, and `ce-ai doctor`.
 
 ---
 

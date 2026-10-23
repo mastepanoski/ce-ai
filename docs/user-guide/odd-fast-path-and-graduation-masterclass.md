@@ -28,8 +28,8 @@ Consider two vessels navigating an ocean:
 | :--- | :--- | :--- |
 | **Origin & Philosophy** | Lean agile execution (Alan Buscaglia / Gentle AI insight) | Compound Engineering (Formal, stage-gated, compounding) |
 | **Primary Scope** | Bug fixes, chores, spikes, small tasks (< 200 LOC) | Greenfield features, multi-file refactors, architecture changes |
-| **Artifact Footprint** | Lightweight plan in `docs/plans/` or direct execution | Full directory: `openspec/changes/<feature>/` (5 files) |
-| **Lifecycle Model** | Direct execution (`probe ➔ execute ➔ gate`) | 7-stage FSM (`Ideation ➔ OpenSpec ➔ Plan ➔ Work ➔ Verify ➔ Compound ➔ Ship`) |
+| **Artifact Footprint** | Lightweight plan in `docs/plans/` or direct execution | Architecture delta in `docs/arch/deltas/<feature>/` (or legacy `openspec/changes/`) |
+| **Lifecycle Model** | Direct execution (`probe ➔ execute ➔ gate`) | 7-stage FSM (`Ideation ➔ Architecture ➔ Plan ➔ Work ➔ Verify ➔ Compound ➔ Ship`) |
 | **Knowledge Capture** | Optional / Engram session notes / targeted solution doc | Mandatory: `docs/solutions/` + `CONCEPTS.md` |
 | **Ceremony Overhead** | ~0 seconds | Structured planning and reviews |
 
@@ -56,7 +56,7 @@ flowchart TD
     StateCheck -- Yes --> StateApply[Apply Configured Mode]
     StateCheck -- No --> DiskProbe[Probe Project Filesystem]
 
-    DiskProbe --> SpecExists{openspec/changes/<branch>/<br/>exists?}
+    DiskProbe --> SpecExists{docs/arch/deltas/ or<br/>openspec/changes/ exists?}
     SpecExists -- Yes --> TrackCompound[Track: Compound Engineering]
     SpecExists -- No --> BranchCheck{Branch name prefix?}
 
@@ -70,7 +70,7 @@ The mode router evaluates the environment using a strict hierarchical cascade:
 
 1. **Environment Override**: `CE_AI_EXECUTION_MODE=organic` or `CE_AI_EXECUTION_MODE=compound`. Used in automated CI runners or headless scripts.
 2. **Persistent Configuration**: The `execution_mode` key in `state.json` (`"auto"`, `"organic"`, or `"compound"`).
-3. **Active OpenSpec Change**: If `openspec/changes/<feature>/proposal.md` exists for the current branch or active feature, the project is explicitly in the **Compound Track**.
+3. **Active Architecture Delta or OpenSpec Change**: If `docs/arch/deltas/<feature>/proposal.md` (or legacy `openspec/changes/<feature>/proposal.md`) exists for the current branch or active feature, the project is explicitly in the **Compound Track**.
 4. **Branch Name Heuristics**:
    - Prefixes `fix/`, `chore/`, `spike/`, `hotfix/` default to the **Compound Agile Fast-Path**.
    - Prefixes `feat/`, `feature/`, `rf/`, `refactor/`, or any other branch default to the **Compound Track**.
@@ -180,7 +180,7 @@ To prevent lightweight tasks from ballooning into untracked, unreviewed monolith
 
 ```text
 [gate-check:observe-only] Fast-path task 'fix-auth-race' diff is 342 lines (> 200 LOC ceiling).
-Recommendation: Formalize this change with OpenSpec ('openspec/changes/fix-auth-race/') or structure via 'docs/plans/'.
+Recommendation: Formalize this change with living architecture ('docs/arch/deltas/fix-auth-race/') or structure via 'docs/plans/'.
 ```
 
 > [!NOTE]
@@ -188,9 +188,8 @@ Recommendation: Formalize this change with OpenSpec ('openspec/changes/fix-auth-
 > A gate that hard-fails an urgent bugfix because it changed 205 lines causes developers to bypass tooling (`--no-verify`, disabling hooks). In accordance with ISO 42001 and NIST AI RMF governance principles, `ce-ai` treats the 200 LOC ceiling as an **empirically observed risk indicator**, not a bureaucratic blocker. The system informs the engineer and the agent, providing clear architectural guidance without halting emergency remediation.
 
 This advisory does not make the whole command observe-only. For a Stage 4 code
-write, `ce-ai gate check` defaults to `enforce`: it blocks when the active
-OpenSpec change lacks `proposal.md`, `spec.md`, or `tasks.md`. Pass
-`--mode observe` to record a would-block result instead.
+write, `ce-ai gate check` defaults to `enforce`: it validates against active contracts
+or deltas when present. Pass `--mode observe` to record a would-block result instead.
 
 ---
 
@@ -201,10 +200,10 @@ OpenSpec change lacks `proposal.md`, `spec.md`, or `tasks.md`. Pass
 #### Anti-Pattern 1: The Infinite Spike
 - **Symptom**: An agent continues working on a tactical fix across 15 files and 900 lines of code without architectural planning.
 - **Consequence**: The repository loses architecture history, no solutions document is authored in `docs/solutions/`, and subsequent agents have no record of design decisions.
-- **Remedy**: As soon as a spike touches multiple subsystems or crosses 200 LOC, formalize it immediately using an OpenSpec change package (`openspec/changes/<feature>/`) or an architectural plan in `docs/plans/`.
+- **Remedy**: As soon as a spike touches multiple subsystems or crosses 200 LOC, formalize it immediately using an architecture delta package (`docs/arch/deltas/<feature>/`) or an architectural plan in `docs/plans/`.
 
 #### Anti-Pattern 2: The Ceremonial Typo
-- **Symptom**: Creating a full 5-document OpenSpec change package for updating a broken documentation URL or fixing a compiler warning.
+- **Symptom**: Creating a full multi-document specification package for updating a broken documentation URL or fixing a compiler warning.
 - **Consequence**: High token waste, cognitive overload, and delayed PR delivery.
 - **Remedy**: Use the Compound Agile Fast-Path. Make the fix directly using `ce-work` or `ce-debug`, verify with tests, and ship.
 
@@ -223,9 +222,9 @@ Use this matrix when starting a new task:
 flowchart LR
     Task([New Work Item]) --> Eval{Is it a small bug, chore,<br/>or tactical spike?}
     Eval -- Yes (< 200 LOC) --> TrackFastPath["1. Execute via ce-work / ce-debug<br/>2. (Optional) Plan in docs/plans/<br/>3. Verify via ce-ai gate check<br/>4. Ship"]
-    Eval -- No (> 200 LOC / Multi-file / Architectural) --> TrackCE["1. Stage 1: ce-brainstorm / ce-ideate<br/>2. Stage 2: Formal OpenSpec<br/>3. Stage 3: ce-plan<br/>4. Stage 4-7: Flywheel Execution"]
+    Eval -- No (> 200 LOC / Multi-file / Architectural) --> TrackCE["1. Stage 1: ce-brainstorm / ce-ideate<br/>2. Stage 2: Architecture in docs/arch/ (Optional)<br/>3. Stage 3: ce-plan (docs/plans/ SSOT)<br/>4. Stage 4-7: Flywheel Execution"]
 
-    TrackFastPath -. Scope Expands .-> Plan["Formalize via openspec/changes/<feature>/"]
+    TrackFastPath -. Scope Expands .-> Plan["Formalize via docs/arch/deltas/<feature>/ or docs/plans/"]
     Plan -. Transitions to .-> TrackCE
 ```
 

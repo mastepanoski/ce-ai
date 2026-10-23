@@ -171,7 +171,7 @@ Within each unit, the agent or developer can use TDD freely. The aim is for fast
 Instead of relying on an append-only chat history that accumulates ephemeral error traces and tool outputs, `ce-ai` builds working context from a curated set of durable artifacts:
 - The active specification (`docs/arch/system/` or `spec.md`).
 - Architectural invariants (`CONCEPTS.md`, ADRs in `docs/arch/adr/`).
-- The explicit task checklist in `docs/plans/` (or `tasks.md`).
+- The explicit task checklist in `docs/plans/` (with legacy `tasks.md` support).
 - Persistent project memory via companion MCP servers (such as Engram).
 
 Each unit therefore starts from curated, task-relevant context rather than an unmanaged transcript. Under a fixed context budget per work unit, per-unit context overhead remains bounded with respect to the number of previously completed units ($O(1)$), yielding $O(n)$ cumulative context processing across $n$ similarly bounded units. This bound is relative to the number of completed units, not to project size: if the artifacts loaded per unit (for example `design.md`) grow with the project, per-unit overhead grows with them, which is a reason to keep those artifacts concise.
