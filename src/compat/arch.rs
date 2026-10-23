@@ -308,7 +308,7 @@ pub fn archive_dir(repo_root: &Path) -> PathBuf {
     }
 
     let legacy = repo_root.join("openspec").join("changes").join("archive");
-    if legacy.is_dir() {
+    if legacy.is_dir() || repo_root.join("openspec").is_dir() {
         return legacy;
     }
 
@@ -326,7 +326,7 @@ pub fn deltas_dir(repo_root: &Path) -> PathBuf {
     }
 
     let legacy = repo_root.join("openspec").join("changes");
-    if legacy.is_dir() {
+    if legacy.is_dir() || repo_root.join("openspec").is_dir() {
         return legacy;
     }
 

@@ -2678,15 +2678,34 @@ pub fn validate_and_archive_feature(
         return Err(CeError::Usage(format!("invalid feature name '{feature}'")));
     }
 
-    let source_path = repo_root.join("openspec").join("changes").join(feature);
+    let deltas = crate::compat::arch::deltas_dir(repo_root);
+    let source_path = if deltas.join(feature).is_dir() {
+        deltas.join(feature)
+    } else if repo_root
+        .join("openspec")
+        .join("changes")
+        .join(feature)
+        .is_dir()
+    {
+        repo_root.join("openspec").join("changes").join(feature)
+    } else {
+        deltas.join(feature)
+    };
+
+    let change_label = if repo_root.join("docs").join("arch").is_dir() {
+        "change"
+    } else {
+        "openspec change"
+    };
+
     if !source_path.is_dir() {
         return Err(CeError::Usage(format!(
-            "openspec change '{feature}' not found at '{}'",
+            "{change_label} '{feature}' not found at '{}'",
             source_path.display()
         )));
     }
 
-    let dest_parent = repo_root.join("openspec").join("changes").join("archive");
+    let dest_parent = crate::compat::arch::archive_dir(repo_root);
     let dest_path = dest_parent.join(feature);
     if dest_path.exists() {
         return Err(CeError::State(format!(
@@ -2719,21 +2738,22 @@ pub fn validate_and_archive_feature(
         }
     } else {
         return Err(CeError::Verification(format!(
-            "openspec change '{feature}' has {} open task(s) ({completed}/{total} completed); complete all tasks (Criterion 1) or supply --status '<evidence>' (Criterion 2)",
+            "change '{feature}' has {} open task(s) ({completed}/{total} completed); complete all tasks (Criterion 1) or supply --status '<evidence>' (Criterion 2)",
             total.saturating_sub(completed)
         )));
     };
 
     let (is_clean, modified_files) = probe_git_dirty_files(repo_root);
     if !is_clean {
-        let feature_prefix = format!("openspec/changes/{feature}/");
+        let rel_source = source_path.strip_prefix(repo_root).unwrap_or(&source_path);
+        let feature_prefix = format!("{}/", rel_source.display());
         let foreign_modified: Vec<&String> = modified_files
             .iter()
             .filter(|f| f.starts_with(&feature_prefix) && !f.ends_with("tasks.md"))
             .collect();
         if !foreign_modified.is_empty() {
             return Err(CeError::Verification(format!(
-                "openspec change '{feature}' contains uncommitted modifications in non-tasks files: {foreign_modified:?}"
+                "change '{feature}' contains uncommitted modifications in non-tasks files: {foreign_modified:?}"
             )));
         }
     }
@@ -2766,8 +2786,9 @@ pub fn validate_and_archive_feature(
 
         if !git_mv_success {
             std::fs::rename(&source_path, &dest_path).map_err(CeError::Io)?;
+            let rel_dest = dest_parent.strip_prefix(repo_root).unwrap_or(&dest_parent);
             let _ = std::process::Command::new("git")
-                .args(["add", "-A", "openspec/changes"])
+                .args(["add", "-A", rel_dest.to_str().unwrap_or_default()])
                 .current_dir(repo_root)
                 .output();
         }
@@ -2790,11 +2811,8 @@ pub fn sync_archive_readme_ledger(
     if dry_run || outcomes.is_empty() {
         return Ok(());
     }
-    let readme_path = repo_root
-        .join("openspec")
-        .join("changes")
-        .join("archive")
-        .join("README.md");
+    let archive_dir = crate::compat::arch::archive_dir(repo_root);
+    let readme_path = archive_dir.join("README.md");
     if !readme_path.is_file() {
         return Ok(());
     }
@@ -2833,8 +2851,9 @@ pub fn sync_archive_readme_ledger(
     updated.push_str(&entry);
 
     crate::state::write_atomic(&readme_path, updated.as_bytes())?;
+    let rel_readme = readme_path.strip_prefix(repo_root).unwrap_or(&readme_path);
     let _ = std::process::Command::new("git")
-        .args(["add", "openspec/changes/archive/README.md"])
+        .args(["add", rel_readme.to_str().unwrap_or_default()])
         .current_dir(repo_root)
         .output();
 
@@ -3025,25 +3044,37 @@ pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
             }
         }
 
-        if args.promote {
+        let should_promote = args.promote
+            || crate::compat::arch::detect_system_specs_source(&repo_root)
+                == crate::compat::arch::ArchSource::DocsArch;
+
+        if should_promote {
             for o in &outcomes {
-                match crate::commands::spec::promote_delta_to_domain_spec(
-                    &repo_root,
-                    &o.feature,
-                    args.domain.as_deref(),
-                    true,
-                ) {
-                    Ok(promo) => {
-                        println!(
-                            "  [dry-run] would promote {} requirement(s) from '{}' into domain spec '{}'",
-                            promo.requirements_promoted, promo.change, promo.domain
-                        );
-                    }
-                    Err(err) => {
-                        eprintln!(
-                            "warning: [dry-run] failed to preview promotion for '{}': {err}",
-                            o.feature
-                        );
+                if crate::commands::spec::find_change_spec_path(&repo_root, &o.feature).is_some() {
+                    match crate::commands::spec::promote_delta_to_domain_spec(
+                        &repo_root,
+                        &o.feature,
+                        args.domain.as_deref(),
+                        true,
+                    ) {
+                        Ok(promo) => {
+                            let rel_spec = promo
+                                .spec_path
+                                .strip_prefix(&repo_root)
+                                .unwrap_or(&promo.spec_path);
+                            println!(
+                                "  [dry-run] would promote {} requirement(s) from '{}' into domain spec '{}' ({})",
+                                promo.requirements_promoted, promo.change, promo.domain, rel_spec.display()
+                            );
+                        }
+                        Err(err) => {
+                            if args.promote {
+                                eprintln!(
+                                    "warning: [dry-run] failed to preview promotion for '{}': {err}",
+                                    o.feature
+                                );
+                            }
+                        }
                     }
                 }
             }
@@ -3057,25 +3088,39 @@ pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
     let archived_names: Vec<String> = outcomes.iter().map(|o| o.feature.clone()).collect();
     reconcile_state_active_feature(ctx, &archived_names, false)?;
 
-    if args.promote {
+    let should_promote = args.promote
+        || crate::compat::arch::detect_system_specs_source(&repo_root)
+            == crate::compat::arch::ArchSource::DocsArch;
+
+    if should_promote {
         for o in &outcomes {
-            match crate::commands::spec::promote_delta_to_domain_spec(
-                &repo_root,
-                &o.feature,
-                args.domain.as_deref(),
-                false,
-            ) {
-                Ok(promo) => {
-                    println!(
-                        "promoted: {} requirement(s) from '{}' into openspec/specs/{}.md",
-                        promo.requirements_promoted, o.feature, promo.domain
-                    );
-                }
-                Err(err) => {
-                    eprintln!(
-                        "warning: failed to promote requirements for '{}': {err}",
-                        o.feature
-                    );
+            if crate::commands::spec::find_change_spec_path(&repo_root, &o.feature).is_some() {
+                match crate::commands::spec::promote_delta_to_domain_spec(
+                    &repo_root,
+                    &o.feature,
+                    args.domain.as_deref(),
+                    false,
+                ) {
+                    Ok(promo) => {
+                        let rel_spec = promo
+                            .spec_path
+                            .strip_prefix(&repo_root)
+                            .unwrap_or(&promo.spec_path);
+                        println!(
+                            "promoted: {} requirement(s) from '{}' into {}",
+                            promo.requirements_promoted,
+                            o.feature,
+                            rel_spec.display()
+                        );
+                    }
+                    Err(err) => {
+                        if args.promote {
+                            eprintln!(
+                                "warning: failed to promote requirements for '{}': {err}",
+                                o.feature
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -3109,9 +3154,17 @@ pub fn run_archive(ctx: &Context, args: &ArchiveArgs) -> Result<(), CeError> {
             }
         }
     } else {
+        let dest_parent = crate::compat::arch::archive_dir(&repo_root);
+        let rel_dest = dest_parent.strip_prefix(&repo_root).unwrap_or(&dest_parent);
+        let change_label = if repo_root.join("docs").join("arch").is_dir() {
+            "change(s)"
+        } else {
+            "OpenSpec change(s)"
+        };
         println!(
-            "archived {} completed OpenSpec change(s) successfully to openspec/changes/archive/",
-            outcomes.len()
+            "archived {} completed {change_label} successfully to {}/",
+            outcomes.len(),
+            rel_dest.display()
         );
     }
 
