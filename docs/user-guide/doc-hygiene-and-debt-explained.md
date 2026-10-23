@@ -32,19 +32,19 @@ When documentation falls behind your code, we call this **Documentation Technica
 
 ## 2. The Three Common Forms of Documentation Debt
 
-In projects powered by the Compound Engineering methodology, work moves through structured specifications (`openspec/changes/`) and persistent learnings (`docs/solutions/`). Over time, three specific types of documentation debt naturally accumulate:
+In projects powered by the Compound Engineering methodology, work moves through architecture deltas (`docs/arch/deltas/` or legacy `openspec/changes/`), execution plans (`docs/plans/`), and persistent learnings (`docs/solutions/`). Over time, three specific types of documentation debt naturally accumulate:
 
-### A. Stranded OpenSpecs (Desynchronization)
-An engineer or an AI agent implements a feature, merges the branch into `main`, and ships the release to production. But they forgot to check off the remaining checkboxes in `openspec/changes/<feature>/tasks.md`.
+### A. Stranded Plans & Deltas (Desynchronization)
+An engineer or an AI agent implements a feature, merges the branch into `main`, and ships the release to production. But they forgot to check off the remaining checkboxes in `docs/plans/<plan>.md` (or legacy `tasks.md`).
 
 - **The Danger**: When the next AI agent arrives and checks the repository state, it sees open checkboxes and assumes the feature is unfinished. It may waste hours and thousands of tokens attempting to rewrite code that is already in production!
 - **How `ce-ai` Spots It**: The diagnostic engine notices that all parent tasks are complete while subtasks remain open, or that git commits modifying the feature already landed on `main`, or that the version tag cited in the spec was surpassed by `Cargo.toml`.
 
-### B. Stale or Abandoned Specs (Inactivity)
-Someone starts an ambitious brainstorm or technical design for an experimental feature, writes a spec, and then priorities change. The change folder remains in `openspec/changes/` untouched for months.
+### B. Stale or Abandoned Architecture Deltas (Inactivity)
+Someone starts an ambitious brainstorm or technical design for an experimental feature, writes an architecture delta, and then priorities change. The delta folder remains in `docs/arch/deltas/` (or legacy `openspec/changes/`) untouched for months.
 
-- **The Danger**: Active planning folders represent in-flight commitments. Lingering dormant specs clutter the workspace and confuse contributors about what is actually being built.
-- **How `ce-ai` Spots It**: The inactivity watchdog calculates the elapsed days since the last commit or filesystem modification. If an incomplete spec sits idle for more than 21 days (configurable), `ce-ai` flags it as stale.
+- **The Danger**: Active delta folders represent in-flight commitments. Lingering dormant deltas clutter the workspace and confuse contributors about what is actually being built.
+- **How `ce-ai` Spots It**: The inactivity watchdog calculates the elapsed days since the last commit or filesystem modification. If an incomplete delta sits idle for more than 21 days (configurable), `ce-ai` flags it as stale.
 
 ### C. Solution Library Drift (Dead Paths & Missing Metadata)
 `docs/solutions/` contains curated post-mortem learnings explaining how tricky architectural bugs were solved. But months later, an engineer refactors a module (e.g. moving `src/tui.rs` into a module directory `src/tui/`).
@@ -124,8 +124,8 @@ When no documentation debt exists, it reports:
 
 | Diagnostic Output | What it means | How to fix |
 | :--- | :--- | :--- |
-| `doctor-warn: openspec change 'feat' is complete with open subtasks` | Code is finished, but checklist has open subtasks. | Complete `tasks.md`, then run `ce-ai archive <feat>`. |
-| `doctor-warn: openspec change 'feat' has been pending for 34 days...` | Spec has been inactive for longer than `stale_spec_days`. | Resume the work, shelve it, or run `ce-ai archive <feat> --status "superseded"` |
+| `doctor-warn: change 'feat' is complete with open subtasks` | Code is finished, but checklist has open subtasks. | Complete checkboxes in `docs/plans/`, then run `ce-ai archive <feat>`. |
+| `doctor-warn: change 'feat' has been pending for 34 days...` | Delta has been inactive for longer than `stale_spec_days`. | Resume the work, shelve it, or run `ce-ai archive <feat> --status "superseded"` |
 | `doctor-warn: solution '...' references non-existent path 'src/...'` | A solution file references a deleted or moved source file. | Update the path in the solution or run `/ce-compound-refresh` |
 | `doctor-warn: solution '...' missing required YAML frontmatter: ...` | Solution file is missing required metadata fields. | Add the missing YAML key (`title`, `category`, `problem_type`, `tags`, `applies_when`) |
 

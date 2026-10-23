@@ -47,18 +47,18 @@ flowchart LR
    - Run `/ce-brainstorm` when requirements are fuzzy. Only run `/ce-ideate` first if even the technical approach is uncertain (see Section 7 FAQ 0).
    - *Goal*: Clarify scope, user constraints, and out-of-scope boundaries. Writes `docs/brainstorms/<date>-<name>-requirements.md` — disposable input for Stage 2 (retained on disk as raw history, never deleted by rule), never a second source of truth.
 
-2. **Stage 2: OpenSpec Definition — Contract Authoring (Progressive Lifecycle)**
-   - Create a dedicated change directory: `openspec/changes/<feature_name>/`.
+2. **Stage 2: Living Architecture & Contracts (`docs/arch/`) — Optional for Scope > 200 LOC**
+   - Formalize architecture deltas under `docs/arch/deltas/<feature_name>/` (or legacy `openspec/changes/<feature_name>/`) when modifying schemas, multi-repo contracts, or public APIs.
    - Author the contract progressively:
      - `proposal.md`: Problem statement, scope boundaries, risk assessment, and success criteria.
      - `exploration.md`: Technical investigation, evaluated options, and trade-offs.
      - `design.md`: System architecture, struct definitions, data schemas, and API contracts.
      - `spec.md`: Formal behavioral rules in explicit `WHEN ... THEN ...` format.
-   - *How to Instruct an AI Agent*: Provide the path `openspec/changes/<feature_name>/` to your AI harness.
+   - *How to Instruct an AI Agent*: Provide the path `docs/arch/deltas/<feature_name>/` (or legacy `openspec/changes/`) to your AI harness. For bug fixes, minor tasks, or scope < 200 LOC, skip Stage 2 and proceed directly to `/ce-plan` or `/ce-work`.
 
-3. **Stage 3: Technical Execution Plan — `tasks.md` Generation**
+3. **Stage 3: Technical Execution Plan (`docs/plans/` SSOT)**
    - Run `/ce-plan` (and optionally `/ce-doc-review` to audit plan rigor).
-   - *Goal*: `/ce-plan` reads `spec.md` + `design.md` and **generates the executable checklist** `openspec/changes/<feature_name>/tasks.md` (atomic units with TDD verification steps), plus the sequencing plan under `docs/plans/`. When you reach Stage 4, OpenSpec is complete.
+   - *Goal*: `/ce-plan` creates the executable implementation plan in `docs/plans/<date>-<feature_name>-plan.md` broken into vertical Scrum slices with explicit TDD triads (Red ➔ Green ➔ Refactor ≤ 200 LOC). The checkboxes (`- [x]`) in `docs/plans/` serve as the Single Source of Truth (SSOT) for progress tracking and FSM stage deduction. (Legacy `tasks.md` remains supported transparently via the dual-path reader). When you reach Stage 4, planning is complete.
 
 4. **Stage 4: TDD & Work**
    - Run `/ce-work` (or `/ce-simplify-code` after implementing).
@@ -172,7 +172,7 @@ If you need to stop working and continue hours or days later:
 
 ### 2. Multi-Harness Collaboration (Harness Handoffs)
 
-You are not locked into a single AI harness! Because `ce-ai` stores state in shared, standardized disk files (`state.json`, `openspec/changes/`, `docs/solutions/`), different AI tools can handle different stages of the exact same task:
+You are not locked into a single AI harness! Because `ce-ai` stores state in shared, standardized disk files (`state.json`, `docs/plans/`, `docs/arch/`, `docs/solutions/`, with backward compatibility for legacy `openspec/changes/`), different AI tools can handle different stages of the exact same task:
 
 ```mermaid
 flowchart LR
@@ -217,8 +217,8 @@ flowchart TD
     INIT["1. mkdir & git init"] --> ADOPT["2. codegraph init && ce-ai init-prj"]
     ADOPT --> FLEET["3. ce-ai fleet sync && ce-ai doctor"]
     FLEET --> STRAT["4. ce-strategy / ce-brainstorm"]
-    STRAT --> SPEC["5. Initial OpenSpec (001-initial-scaffold)"]
-    SPEC --> PLAN["6. ce-plan & ce-work (Boilerplate & Test Pipeline)"]
+    STRAT --> SPEC["5. Living Architecture / Deltas in docs/arch/ (Optional)"]
+    SPEC --> PLAN["6. ce-plan & ce-work (docs/plans/ SSOT & Test Pipeline)"]
     PLAN --> VERIFY["7. Verify linters & tests"]
     VERIFY --> COMP["8. ce-compound (Initialize CONCEPTS.md)"]
     COMP --> SHIP["9. ce-commit-push-pr (PR #1)"]
@@ -240,20 +240,20 @@ flowchart TD
    - Run `/ce-strategy`.
    - *Goal*: Establish tech stack (e.g. Rust, TypeScript, React), macro goals, and architectural principles in `STRATEGY.md`.
 
-3. **Bridge from Strategy to OpenSpec: When to use `/ce-ideate` vs `/ce-brainstorm`**:
-   - **Do I need `/ce-ideate` or `/ce-brainstorm` before drafting OpenSpec?**
+3. **Bridge from Strategy to Architecture: When to use `/ce-ideate` vs `/ce-brainstorm`**:
+   - **Do I need `/ce-ideate` or `/ce-brainstorm` before drafting architecture specifications?**
      - **Option A (Feature Scope is Known)**: Run `/ce-brainstorm`.
-       - *Why*: `/ce-brainstorm` refines your feature idea, resolves user constraints, and defines explicit out-of-scope boundaries. The output (`docs/brainstorms/`) feeds directly into drafting `openspec/changes/<feature_name>/`.
+       - *Why*: `/ce-brainstorm` refines your feature idea, resolves user constraints, and defines explicit out-of-scope boundaries. The output (`docs/brainstorms/`) feeds directly into drafting living specs in `docs/arch/` or the execution plan in `docs/plans/`.
       - **Option B (Uncertain Technical Approach or Architecture Alternatives)**: Run `/ce-ideate` first, then `/ce-brainstorm`.
-        - *Why*: `/ce-ideate` generates and ranks mechanism-level directions with explicit rejection reasons in `docs/ideation/`. Once one direction is chosen, run `/ce-brainstorm` to lock requirements before writing OpenSpec; the chosen idea and rejected alternatives distill into `exploration.md`.
-     - **Option C (Standard Repository Scaffolding)**: Skip both and write `openspec/changes/001-initial-scaffold/` directly.
-       - *Why*: Basic repository boilerplate (`Cargo.toml`, linter configs, directory tree) is standard and un-ambiguous.
+        - *Why*: `/ce-ideate` generates and ranks mechanism-level directions with explicit rejection reasons in `docs/ideation/`. Once one direction is chosen, run `/ce-brainstorm` to lock requirements; the chosen idea and rejected alternatives distill into ADRs (`docs/arch/adr/`) or `exploration.md`.
+     - **Option C (Standard Repository Scaffolding)**: Skip both and proceed directly to `/ce-plan` or initial scaffolding.
+       - *Why*: Basic repository boilerplate (`Cargo.toml`, linter configs, directory tree) is standard and unambiguous.
 
-4. **Draft Initial Scaffold OpenSpec (Stage 2: OpenSpec)**:
-   - Create `openspec/changes/001-initial-scaffold/` containing `proposal.md` and `spec.md` (`ce-plan` generates `tasks.md` at Stage 3).
+4. **Draft Living Architecture & Contracts (Stage 2: Optional)**:
+   - For architecture-defining greenfield projects, formalize domain specifications under `docs/arch/system/` (or temporary deltas in `docs/arch/deltas/`). For tactical scaffolding, skip directly to Step 5.
 
 5. **Build Boilerplate & Test Pipeline (Stage 3 & 4: Plan & Work/TDD)**:
-   - Run `/ce-plan` ➔ `/ce-work`. Build initial files, configure linters (`clippy`, `eslint`), and set up tests.
+   - Run `/ce-plan` ➔ `/ce-work`. Build initial files, configure linters (`clippy`, `eslint`), and set up tests with progress tracked in `docs/plans/`.
 
 6. **Establish Verification Gates (Stage 5: Verification)**:
    - Configure and run the project's test suite (`cargo test`, `npm test`, `pytest`, …) to keep it green.
@@ -299,27 +299,28 @@ flowchart TD
 
 > ⚠️ **The Non-Negotiable Rule**: Regardless of whether you use TDD, Code-First, or BDD, **Stage 5 (Empirical Verification)** and **Stage 6 (`ce-compound`)** remain mandatory: code must be verified empirically via tests, and discoveries must be documented in `docs/solutions/`.
 
-### 6. Practical Guide: How to Author & Instruct OpenSpec Specifications
+### 6. Practical Guide: How to Author Architecture & Delta Specifications
 
-OpenSpec is the formal contract engine in Stage 2. Here is how to author and instruct AI agents using OpenSpec:
+Living architecture and contracts reside under `docs/arch/` (with seamless backward compatibility for legacy `openspec/changes/` via `src/compat/arch.rs`):
 
 ```mermaid
 flowchart TD
-    DIR["1. Create Folder: openspec/changes/<feature_name>/"] --> FILES["2. Author Contract: proposal, exploration, design, spec"]
+    DIR["1. Living Architecture: docs/arch/deltas/<feature>/ (or system/)"] --> FILES["2. Author Contract: proposal, exploration, design, spec"]
     FILES --> PROP["proposal.md: Problem & Scope Boundaries"]
-    FILES --> EXPL["exploration.md: Tech Options & Trade-offs"]
+    FILES --> EXPL["exploration.md / ADR: Tech Options & Trade-offs"]
     FILES --> DES["design.md: Schemas & Struct Definitions"]
     FILES --> SPEC["spec.md: WHEN...THEN Acceptance Scenarios"]
 
-    FILES --> PLAN["3. ce-plan Generates tasks.md (Stage 3)"]
-    TASK["tasks.md: Executable Checklist (- [ ] Task)"] --> INSTRUCT["4. Instruct Agent: Execute tasks.md via ce-work"]
+    FILES --> PLAN["3. ce-plan Generates docs/plans/ (Stage 3 SSOT)"]
+    PLAN --> TASK["docs/plans/*.md: Executable Checklist (- [ ] Unit)"]
+    TASK --> INSTRUCT["4. Instruct Agent: Execute via ce-work & track in docs/plans/"]
 ```
 
-#### The Standard OpenSpec Files:
+#### The Canonical Specification Components:
 
 1. **`proposal.md`**:
    - Defines the problem statement, in-scope vs. out-of-scope boundaries, risk evaluation, and success criteria.
-2. **`exploration.md`**:
+2. **`exploration.md` / ADR (`docs/arch/adr/`)**:
    - Documents technical research, evaluated libraries, architectural trade-offs, and prototype findings.
 3. **`design.md`**:
    - Details technical architecture, data schemas, API contracts, struct fields, and error exit code mappings.
@@ -330,7 +331,7 @@ flowchart TD
       WHEN the user runs `ce-ai init-prj` inside a Git repository
       THEN it MUST inject harness workflow files and configure companion hooks without clobbering user configs.
       ```
-5. **`tasks.md`** — *generated by `/ce-plan` in Stage 3*, not hand-authored in Stage 2:
+5. **Execution Plan (`docs/plans/`)** — *generated by `/ce-plan` in Stage 3*, serving as the SSOT:
    - Contains checkable tasks (`- [ ]`) broken into atomic implementation units:
       ```markdown
       - [ ] Unit 1: Add `--tier` CLI flag parsing in `src/commands/init_prj.rs`
@@ -338,9 +339,9 @@ flowchart TD
       - [ ] Unit 3: Add integration tests in `tests/cli.rs`
       ```
 
-#### How to Instruct an AI Agent with OpenSpec:
+#### How to Instruct an AI Agent with Living Architecture:
 - **Prompt Example**:
-  > *"Execute the tasks defined in `openspec/changes/001-workspace-scope/tasks.md` using the `/ce-work` skill. Update each checklist item to `- [x]` as tests pass."*
+  > *"Execute the tasks defined in `docs/plans/2026-10-23-workspace-scope-plan.md` using the `/ce-work` skill. Update each checklist item to `- [x]` as tests pass."*
 
 ---
 
@@ -357,22 +358,26 @@ flowchart TD
     CE_WORKFLOW["Compound Engineering Workflow\n(Specs ➔ Plan ➔ Code ➔ Verify ➔ COMPOUND ➔ Flywheel)"] -->|"Stage 6: ce-compound"| FLYWHEEL["docs/solutions/ & CONCEPTS.md\n(Compounding Knowledge Flywheel)"]
 ```
 
-- **100% Backward Compatibility**: `ce-ai`'s Stage 2 **IS** OpenSpec / SDD. All existing specifications in `openspec/changes/<feature_name>/` (`proposal.md`, `exploration.md`, `design.md`, `spec.md`, `tasks.md`) remain valid and untouched.
+- **100% Backward Compatibility**: `ce-ai` provides a dual-path architecture resolver. All legacy specifications in `openspec/changes/<feature_name>/` and `openspec/specs/` continue to work automatically without breakage.
+- **Assisted Modernization**: Run `ce-ai init-prj --migrate-arch` to migrate legacy `openspec/` directories to canonical `docs/arch/` structures (`system/`, `adr/`, `archive/`).
 
-#### The Mental Model: OpenSpec Is the Contract — CE Skills Wrap Around It, Never Rewrite It
+#### The Mental Model: Architecture Defines Contracts — Plans in `docs/plans/` Track Progress
 
-> 💡 **KISS · YAGNI · DRY**: Write each fact exactly once. The OpenSpec files are the **single source of truth** for *what* to build and *when it is done*. Every other skill either **feeds** them, **completes** them, **executes** them, or **learns from** them. If you find yourself copying the same content into two documents, stop — one of them should reference the other.
+> 💡 **KISS · YAGNI · DRY**: Write each fact exactly once. Living architecture in `docs/arch/` defines *what* to build and system contracts; `docs/plans/` is the **single source of truth (SSOT)** for *progress tracking*. Every other skill either **feeds** them, **executes** them, or **learns from** them. If you find yourself copying the same content into two documents, stop — one of them should reference the other.
 
 **Who touches what (and what each stage adds):**
 
-| Stage | Skill | Reads (Input) | Writes (Output) | Relationship to OpenSpec |
+| Stage | Skill | Reads (Input) | Writes (Output) | Role in Architecture & Progress |
 | :--- | :--- | :--- | :--- | :--- |
-| 0. Idea Discovery *(optional)* | `/ce-ideate` | Focus hint + repo scan | `docs/ideation/*.md` dossier | **Feeds it**: the chosen idea plus rejected alternatives distill into `exploration.md`. Dossier is disposable input — retained as raw history, not a maintained document. Expensive (~9 sub-agents) — skip when the approach is already known |
-| 1. Ideation | `/ce-brainstorm` | Your idea + constraints | `docs/brainstorms/*.md` | **Feeds it**: raw material to distill into `proposal.md` / `exploration.md` |
-| 2. Spec | You (+ agent) | Brainstorm doc | `proposal.md`, `exploration.md`, `design.md`, `spec.md` | **IS the contract**: single source of truth |
+| 0. Idea Discovery *(optional)* | `/ce-ideate` | Focus hint + repo scan | `docs/ideation/*.md` dossier | **Feeds it**: the chosen idea plus rejected alternatives distill into ADRs or `exploration.md`. Dossier is disposable input — retained as raw history, not a maintained document. Expensive (~9 sub-agents) — skip when the approach is already known |
+| 1. Ideation | `/ce-brainstorm` | Your idea + constraints | `docs/brainstorms/*.md` | **Feeds it**: raw material to distill into `proposal.md` / `exploration.md` or directly into `docs/plans/` |
+| 2. Living Arch & Deltas *(optional)* | You (+ agent) | Brainstorm doc | `docs/arch/deltas/` or `system/` | **Defines contracts**: frozen acceptance behavior for scope > 200 LOC |
 | Gate | `/ce-doc-review` | Brainstorm or plan docs | Findings only | **Audits it**: flags gaps; never rewrites specs |
-| 3. Plan | `/ce-plan` | `spec.md` + `design.md` | `openspec/.../tasks.md` + `docs/plans/*.md` | **Completes it**: generates the executable checklist (`tasks.md`) from the contract and sequences units by ID with file/test mapping — by Stage 4, OpenSpec is complete |
-| 4. Work | `/ce-work` | `tasks.md` + plan | Code + green tests | **Executes it**: ticks `- [x]` items — `tasks.md` is the progress ledger |
+| 3. Execution Plan | `/ce-plan` | Specs / Brainstorms | `docs/plans/*.md` | **SSOT Progress Ledger**: generates vertical Scrum slices with TDD triads (`- [ ] Unit N`) |
+| 4. Work | `/ce-work` | `docs/plans/*.md` | Code + green tests | **Executes it**: ticks `- [x]` items — `docs/plans/` is the progress ledger |
+| 5. Verify | Tests / E2E | Code | Evidence | **Validates it**: proves every contract or test scenario green |
+| 6. Capture | `/ce-compound` | Session learnings | `docs/solutions/`, `CONCEPTS.md` | **Extends beyond it**: knowledge the spec never contained |
+| 7. Ship | `/ce-commit-push-pr` | Branch | PR + Archive | **Delivers it**: code + evidence + `ce-ai archive` promotes deltas |
 | 5. Verify | Tests / E2E | Code | Evidence | **Validates it**: proves every `spec.md` WHEN/THEN scenario |
 | 6. Capture | `/ce-compound` | Session learnings | `docs/solutions/`, `CONCEPTS.md` | **Extends beyond it**: knowledge the spec never contained |
 | 7. Ship | `/ce-commit-push-pr` | Branch | PR | **Delivers it**: spec + code + evidence together |
@@ -394,21 +399,21 @@ flowchart TD
    ```
    After this entry exists, the dossier is conversation history, not a maintained document.
 
-2. *"Doesn't `/ce-plan` duplicate `tasks.md`?"*
-   No — under the progressive lifecycle there is nothing to duplicate: `/ce-plan` **generates** `tasks.md` from the frozen contract (`spec.md` + `design.md`) in Stage 3, then adds execution order and file/test mapping per unit (referencing IDs like `U2`) in its `docs/plans/` document. Each fact lives exactly once: acceptance behavior in `spec.md`, task breakdown in `tasks.md`, sequencing in the plan.
+2. *"Where does the progress checklist live?"*
+   Under lean living architecture, the implementation plan in `docs/plans/<date>-<feature>-plan.md` is the **sole Single Source of Truth (SSOT)** for progress tracking and FSM stage deduction (`- [x]` checkboxes). This completely eliminates the need to author or maintain redundant `tasks.md` packages.
 
 3. *"When I run `/ce-work`, which document does it follow?"*
-   All three, with distinct roles: `tasks.md` is the **checklist it ticks** (`- [x]`, the OpenSpec ledger); the plan is the **execution order**; `spec.md`'s WHEN/THEN blocks define **done**.
+   `/ce-work` directly follows the implementation plan in `docs/plans/`, executing vertical Scrum slices with TDD triads (Red ➔ Green ➔ Refactor) and updating checklist items to `- [x]` as automated tests pass.
 
 4. *"What about the review/test loop and human QA?"*
    `/ce-code-review` findings send you back into Stage 4 iterations until tests are 100% green. Human QA happens after `/ce-compound`, before opening/merging the PR (Stage 7).
 
-**Migration Steps** (from traditional SDD):
+**Migration Steps** (from traditional SDD / legacy OpenSpec):
 1. Run `ce-ai init-prj` in the repository (and `codegraph init` if not yet indexed).
-2. Run `ce-ai fleet sync` to ensure active coding agent harnesses are synchronized.
-3. Keep all existing `openspec/` files intact — they are already your Stage 2 contract.
+2. Run `ce-ai init-prj --migrate-arch` to automatically migrate legacy `openspec/` directories to canonical `docs/arch/system/` and `docs/arch/archive/`.
+3. Run `ce-ai fleet sync` to ensure active coding agent harnesses are synchronized.
 4. Run `/ce-compound-refresh` once to audit historical learnings against the codebase.
-5. Continue writing OpenSpecs as before in Stage 2, enjoying the automatic compounding flywheel!
+5. Create new plans natively in `docs/plans/`, enjoying the automatic compounding flywheel!
 
 ---
 
@@ -416,11 +421,11 @@ flowchart TD
 
 | Task Goal | Entry Skill | Workflow Stages Used | Deliverable Output |
 | :--- | :--- | :--- | :--- |
-| **New Feature** | `/ce-brainstorm` | Full Stages 1 ➔ 7 | OpenSpec + Implementation + Solution + PR |
-| **Implementation Plan** | `/ce-plan` | Stage 3 | Numbered unit plan in `docs/plans/` |
-| **Implement / TDD Execution** | `/ce-work` | Stage 4 | Code + green tests, `tasks.md` items ticked |
+| **New Feature** | `/ce-brainstorm` | Full Stages 1 ➔ 7 | Plan (`docs/plans/`) + Implementation + Solution + PR |
+| **Implementation Plan** | `/ce-plan` | Stage 3 | Numbered unit plan in `docs/plans/` (SSOT) |
+| **Implement / TDD Execution** | `/ce-work` | Stage 4 | Code + green tests, `docs/plans/` items ticked |
 | **Doc / Plan Quality Audit** | `/ce-doc-review` | Gate after Stages 1 & 3 | Review findings (no rewrites) |
-| **Approach Uncertain (pre-feature)** | `/ce-ideate` | Stage 0/1 Sub-Loop ➔ Stage 2 | Idea dossier in `docs/ideation/` → distills into `exploration.md` |
+| **Approach Uncertain (pre-feature)** | `/ce-ideate` | Stage 0/1 Sub-Loop ➔ Stage 2/3 | Idea dossier in `docs/ideation/` → distills into plan or ADR |
 | **Standalone Research / Survey** | `/ce-ideate` / Subagents | Targeted Pass (bypass) | Research report for the user only |
 | **Adopt / Switch / Revisit a Technology** | `/ce-pov` | Targeted Pass (bypass) | Decisive, project-grounded verdict — no options list |
 | **Bug Fix / Crash Repair** | `/ce-debug` | Direct Entry: Stage 4 ➔ 7 | Reproducer Test + Fix + Solution + PR |
