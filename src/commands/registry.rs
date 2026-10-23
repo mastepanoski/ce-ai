@@ -72,6 +72,9 @@ pub enum Commands {
         /// Migrate legacy AGENTS.md directives outside managed blocks
         #[arg(long, default_value_t = false)]
         migrate: bool,
+        /// Migrate legacy openspec/ structure to docs/arch/ living architecture model
+        #[arg(long, default_value_t = false)]
+        migrate_arch: bool,
         /// Skip auto-configuring RTK hook injection.
         #[arg(long, default_value_t = false)]
         skip_rtk: bool,
@@ -135,6 +138,7 @@ impl CeCommand for Commands {
                 all,
                 force,
                 migrate,
+                migrate_arch,
                 skip_rtk,
                 skip_companions,
             } => init_prj::run(
@@ -145,6 +149,7 @@ impl CeCommand for Commands {
                     all: *all,
                     force: *force,
                     migrate: *migrate,
+                    migrate_arch: *migrate_arch,
                     skip_rtk: *skip_rtk,
                     skip_companions: *skip_companions,
                 },

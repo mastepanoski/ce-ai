@@ -1082,11 +1082,12 @@ fn test_doctor_scopes_project_adoption_to_active_project() {
     )
     .unwrap();
 
-    // Project A is adopted and healthy (v=7 block)
+    // Project A is adopted and healthy (current block)
+    let cur_v = crate::commands::init_prj::BLOCK_VERSION;
     let block_a =
         crate::commands::init_prj::render_block_content(crate::state::state::AdoptionTier::Full);
     let block_a_str = format!(
-        "<!-- ce-ai:block begin v=7 tier=full sha256={} -->\n{}\n<!-- ce-ai:block end -->\n",
+        "<!-- ce-ai:block begin v={cur_v} tier=full sha256={} -->\n{}\n<!-- ce-ai:block end -->\n",
         crate::commands::init_prj::compute_sha256(block_a),
         block_a
     );
@@ -1104,7 +1105,7 @@ fn test_doctor_scopes_project_adoption_to_active_project() {
         path: prj_a.clone(),
         file: "AGENTS.md".into(),
         tier: crate::state::state::AdoptionTier::Full,
-        block_version: 7,
+        block_version: cur_v,
         block_sha256: crate::commands::init_prj::compute_sha256(block_a),
         created_file: false,
         adopted_at: "2026-10-07T00:00:00Z".into(),

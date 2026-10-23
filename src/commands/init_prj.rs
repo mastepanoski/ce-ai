@@ -19,7 +19,7 @@ pub const GITIGNORE_END_MARKER: &str = "# END CE-AI MANAGED BLOCK";
 
 /// Managed block schema version, shared by the on-disk header and the
 /// `state.json` adoption entry so the two cannot drift apart.
-pub const BLOCK_VERSION: u32 = 8;
+pub const BLOCK_VERSION: u32 = 9;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -73,40 +73,42 @@ pub fn check_adoption_block_status(
 pub fn render_block_content(tier: AdoptionTier) -> &'static str {
     match tier {
         AdoptionTier::Full => {
-            r#"## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Integration
+            r#"## 🔄 Mandatory 7-Stage Development Cycle & Architecture Guidelines
 
 All AI agents MUST follow the 7-stage Compound Engineering development cycle:
-`[Stage 1: Ideation]` ➔ `[Stage 2: OpenSpec Definition (Optional)]` ➔ `[Stage 3: Execution Plan]`
+`[Stage 1: Ideation]` ➔ `[Stage 2: Architecture & Deltas (Optional)]` ➔ `[Stage 3: Execution Plan]`
 ➔ `[Stage 4: TDD & Implementation]` ➔ `[Stage 5: Verification]` ➔ `[Stage 6: Knowledge Capture]`
 ➔ `[Stage 7: Git Shipping]`
 
 ### ⚡ Turn-0 Session Directives (Zero-Step Drift Recovery)
-`ce-ai` auto-installs a SessionStart hook on supported harnesses that runs `ce-ai workflow resume --json` and injects live FSM state (Git working tree, active branch, manifest SHA256 integrity, OpenSpec progress) into context before your first turn. If that state is already present at session start, treat it as current — do NOT re-run the command. Only run `ce-ai workflow resume` yourself when no such context was injected (harness without hook support, or the hook is disabled) or when you suspect the injected state has gone stale mid-session (e.g. after a `git` operation you didn't make through your own tool calls).
+`ce-ai` auto-installs a SessionStart hook on supported harnesses that runs `ce-ai workflow resume --json` and injects live FSM state (Git working tree, active branch, manifest SHA256 integrity, plan progress) into context before your first turn. If that state is already present at session start, treat it as current — do NOT re-run the command. Only run `ce-ai workflow resume` yourself when no such context was injected (harness without hook support, or the hook is disabled) or when you suspect the injected state has gone stale mid-session (e.g. after a `git` operation you didn't make through your own tool calls).
 
-### Stage 2 OpenSpec Integration (Optional)
-CE-AI enforces zero semantic authority: OpenSpec is decoupled from the core workflow as an optional tool for architectural changes (> 200 LOC), schema changes, or cross-cutting features, rather than a mandatory write blocker. For bug fixes, minor tweaks, or tactical tasks (< 200 LOC), bypass OpenSpec and proceed directly with `/ce-plan` or `ce-work`.
+### Stage 2 Living Architecture & Deltas (Optional)
+Living architecture specifications reside under `docs/arch/`:
+- `docs/arch/system/`: Living domain specifications.
+- `docs/arch/adr/`: Architecture Decision Records (`NNNN-title.md`).
+- `docs/arch/contracts/`: Formal data contracts and API interfaces.
+- `docs/arch/deltas/`: Temporary feature changes during development.
+- `docs/arch/archive/`: Archived changes and historical milestones.
 
-When formal specifications are activated for complex features, OpenSpec is authored progressively to establish the frozen Stage 2 contract:
-- `proposal.md`: Problem statement, in-scope/out-of-scope boundaries, and success criteria.
-- `exploration.md`: Technical investigation and architectural tradeoffs.
-- `design.md`: Technical design, system architecture, structs, and API/CLI contracts.
-- `spec.md`: Formal requirements using `WHEN ... THEN ...` format and explicit acceptance criteria.
+CE-AI enforces zero semantic authority: architecture deltas are decoupled from the core workflow as an optional tool for architectural changes (> 200 LOC), schema changes, or cross-cutting features, rather than a mandatory write blocker. For bug fixes, minor tweaks, or tactical tasks (< 200 LOC), proceed directly with `/ce-plan` or `ce-work`.
 
-`tasks.md` (the executable task checklist) is generated from that frozen contract in Stage 3 — do not require it before Stage 2 is complete, but do not open a PR without it.
+When formal specifications are activated for complex features, OpenSpec is authored progressively in `docs/arch/deltas/<feature>/` (or legacy `openspec/changes/<feature>/`) to establish the frozen Stage 2 contract.
+The execution plan and task checklist reside in `docs/plans/` (`- [x]` checkboxes) as the single source of truth for progress.
 
 ### Single Source of Truth Rule
-Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into the OpenSpec files above (`proposal.md`, `exploration.md`) and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with OpenSpec. Ideation artifacts are retained by default as the permanent raw-history record OpenSpec intentionally does not duplicate; "disposable" never means deleting them. Skip ideation skills entirely when requirements and approach are already clear.
+Ideation artifacts (`docs/brainstorms/*.md`, `docs/ideation/*.md`) are disposable inputs, NOT parallel specifications. Distill their conclusions into architecture or plan docs and reference the source doc instead of copying content. Never maintain brainstorm/ideation documents in sync with architecture deltas. Ideation artifacts are retained by default as the permanent raw-history record that specifications intentionally do not duplicate; "disposable" never means deleting them. Skip ideation skills entirely when requirements and approach are already clear.
 
 ### 🚀 Self-Explaining Pull Requests & Review Readiness
 When creating Pull Requests (Stage 7), agents MUST ensure the change explains itself:
-- **What It Ruled Out**: State rejected alternatives and discarded trade-offs (distilled from `exploration.md`).
-- **Which Rule Decided It**: Cite the specific invariant, rule, architectural boundary, or compliance constraint (from `AGENTS.md` or `design.md`) that determined the solution.
+- **What It Ruled Out**: State rejected alternatives and discarded trade-offs.
+- **Which Rule Decided It**: Cite the specific invariant, rule, architectural boundary, or compliance constraint (from `AGENTS.md`) that determined the solution.
 - **Upfront Evidence**: Attach empirical validation proof (test run summaries, CLI logs, reproduction traces, or browser check results) directly to the PR body using collapsible `<details><summary>` blocks (`not asked for later`).
 - **Pre-Review Automated Checks**: Run and verify 100% green status across all local linters, unit tests, and browser/E2E checks BEFORE requesting human review or marking the PR ready.
 - **Reviewer Routing**: Identify domain owners or `CODEOWNERS` and assign appropriate reviewers.
 
 ### 🧹 Post-Merge Lifecycle & Clean State
-Immediately after merging a PR on `main`, agents MUST run `ce-ai workflow status` and archive completed OpenSpec changes via `ce-ai archive <feature>` to seal change packages and maintain zero workflow drift."#
+Immediately after merging a PR on `main`, agents MUST run `ce-ai workflow status` and archive completed changes via `ce-ai archive <feature>` to seal change packages and maintain zero workflow drift."#
         }
         AdoptionTier::Minimal => {
             r#"## 🔄 Compound Engineering Workflow Guidelines
@@ -126,8 +128,8 @@ Orchestrator agents MUST delegate domain tasks to specialized subagents:
 - Use `ce-code-review` before opening Pull Requests.
 - Enforce self-explaining PRs: mandate that subagents document rejected alternatives, governing rules, and attach empirical verification evidence in collapsible blocks before requesting review.
 - Enforce strict PR CI status check gates before merging.
-- Post-merge, ensure completed OpenSpec changes are sealed via `ce-ai archive <feature>`.
-- Ideation outputs (`docs/brainstorms/`, `docs/ideation/`) are disposable inputs: distill them into the specs before delegation; never maintain them in parallel; retain them as raw history instead of deleting them."#
+- Post-merge, ensure completed changes are sealed via `ce-ai archive <feature>`.
+- Ideation outputs (`docs/brainstorms/`, `docs/ideation/`) are disposable inputs: distill them into specs or plans before delegation; never maintain them in parallel; retain them as raw history instead of deleting them."#
         }
     }
 }
@@ -611,6 +613,177 @@ pub fn adopt_project(
     Ok(())
 }
 
+/// Checks if the git working tree in `repo_root` is clean.
+pub fn check_git_working_tree_clean(repo_root: &Path) -> bool {
+    let mut cmd = std::process::Command::new("git");
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX"] {
+        cmd.env_remove(var);
+    }
+    let out = match cmd
+        .args(["status", "--porcelain=v1"])
+        .current_dir(repo_root)
+        .output()
+    {
+        Ok(o) if o.status.success() => o,
+        _ => return true,
+    };
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    stdout.trim().is_empty()
+}
+
+fn copy_dir_recursive(src: &Path, dest: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dest)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let dest_child = dest.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir_recursive(&entry.path(), &dest_child)?;
+        } else {
+            fs::copy(entry.path(), dest_child)?;
+        }
+    }
+    Ok(())
+}
+
+fn move_path_or_copy(src: &Path, dest: &Path) -> std::io::Result<()> {
+    if fs::rename(src, dest).is_ok() {
+        return Ok(());
+    }
+    if src.is_dir() {
+        copy_dir_recursive(src, dest)?;
+        fs::remove_dir_all(src)?;
+    } else {
+        fs::copy(src, dest)?;
+        fs::remove_file(src)?;
+    }
+    Ok(())
+}
+
+/// Migrates a repository from legacy openspec/ structure to modern docs/arch/ living architecture model.
+pub fn migrate_arch_repository(
+    ctx: &Context,
+    repo_root: &Path,
+    force: bool,
+) -> Result<(), CeError> {
+    // 1. Working tree cleanliness check
+    if !force && !check_git_working_tree_clean(repo_root) {
+        return Err(CeError::Usage(
+            "git working tree is dirty; commit or stash changes before running --migrate-arch, or pass --force"
+                .to_string(),
+        ));
+    }
+
+    let openspec_dir = repo_root.join("openspec");
+    if !openspec_dir.is_dir() {
+        if !ctx.quiet {
+            println!(
+                "no legacy 'openspec/' directory found in '{}'",
+                repo_root.display()
+            );
+        }
+        return Ok(());
+    }
+
+    let arch_dir = repo_root.join("docs").join("arch");
+    let system_dir = arch_dir.join("system");
+    let adr_dir = arch_dir.join("adr");
+    let archive_dir = arch_dir.join("archive");
+    let deltas_dir = arch_dir.join("deltas");
+
+    if ctx.dry_run {
+        if !ctx.quiet {
+            println!(
+                "[dry-run] Planned architecture migration in '{}':",
+                repo_root.display()
+            );
+            println!("  create directory: {}", system_dir.display());
+            println!("  create directory: {}", adr_dir.display());
+            println!("  create directory: {}", archive_dir.display());
+            println!("  create directory: {}", deltas_dir.display());
+            if openspec_dir.join("specs").is_dir() {
+                println!(
+                    "  move specs: {} -> {}",
+                    openspec_dir.join("specs").display(),
+                    system_dir.display()
+                );
+            }
+            if openspec_dir.join("changes").join("archive").is_dir() {
+                println!(
+                    "  move archive: {} -> {}",
+                    openspec_dir.join("changes").join("archive").display(),
+                    archive_dir.display()
+                );
+            }
+            if openspec_dir.join("changes").is_dir() {
+                println!(
+                    "  move active changes: {} -> {}",
+                    openspec_dir.join("changes").display(),
+                    deltas_dir.display()
+                );
+            }
+            println!("  remove legacy directory: {}", openspec_dir.display());
+        }
+        return Ok(());
+    }
+
+    // 2. Create destination directories
+    fs::create_dir_all(&system_dir)?;
+    fs::create_dir_all(&adr_dir)?;
+    fs::create_dir_all(&archive_dir)?;
+    fs::create_dir_all(&deltas_dir)?;
+
+    // 3. Move openspec/specs/* -> docs/arch/system/
+    let specs_dir = openspec_dir.join("specs");
+    if specs_dir.is_dir() {
+        if let Ok(entries) = fs::read_dir(&specs_dir) {
+            for entry in entries.flatten() {
+                let dest = system_dir.join(entry.file_name());
+                move_path_or_copy(&entry.path(), &dest)?;
+            }
+        }
+    }
+
+    // 4. Move openspec/changes/archive/* -> docs/arch/archive/
+    let archive_src = openspec_dir.join("changes").join("archive");
+    if archive_src.is_dir() {
+        if let Ok(entries) = fs::read_dir(&archive_src) {
+            for entry in entries.flatten() {
+                let dest = archive_dir.join(entry.file_name());
+                move_path_or_copy(&entry.path(), &dest)?;
+            }
+        }
+        let _ = fs::remove_dir_all(&archive_src);
+    }
+
+    // 5. Move remaining openspec/changes/* -> docs/arch/deltas/
+    let changes_src = openspec_dir.join("changes");
+    if changes_src.is_dir() {
+        if let Ok(entries) = fs::read_dir(&changes_src) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if name_str == "archive" || name_str.starts_with('.') {
+                    continue;
+                }
+                let dest = deltas_dir.join(&name);
+                move_path_or_copy(&entry.path(), &dest)?;
+            }
+        }
+    }
+
+    // 6. Remove openspec/ directory
+    fs::remove_dir_all(&openspec_dir)?;
+
+    if !ctx.quiet {
+        println!(
+            "✓ Migrated legacy 'openspec/' to 'docs/arch/' in '{}'",
+            repo_root.display()
+        );
+    }
+
+    Ok(())
+}
+
 /// Options controlling project adoption and migration behavior.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct InitPrjOptions {
@@ -618,6 +791,7 @@ pub struct InitPrjOptions {
     pub all: bool,
     pub force: bool,
     pub migrate: bool,
+    pub migrate_arch: bool,
     pub skip_rtk: bool,
     pub skip_companions: bool,
 }
@@ -654,6 +828,9 @@ pub fn run(
 
         let mut count = 0;
         for p in &state.projects {
+            if options.migrate_arch {
+                migrate_arch_repository(ctx, &p.path, options.force)?;
+            }
             let tier = parsed_tier.unwrap_or(p.tier);
             adopt_project(
                 ctx,
@@ -696,6 +873,10 @@ pub fn run(
             )))
         }
     };
+
+    if options.migrate_arch {
+        migrate_arch_repository(ctx, &target_dir, options.force)?;
+    }
 
     adopt_project(
         ctx,
