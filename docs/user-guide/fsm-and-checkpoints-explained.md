@@ -254,7 +254,7 @@ ce-ai workflow resume
 ```text
 workflow: resuming execution from latest checkpoint...
 == [Workflow FSM & Progress Recovery Status] ==
-7-Stage Cycle: [1:Ideation] ➔ [2:OpenSpec] ➔ [3:Plan] ➔ [4:Work/TDD] ➔ [5:Verify] ➔ [6:Compound] ➔ [7:Ship]
+7-Stage Cycle: [1:Ideation] ➔ [2:Architecture] ➔ [3:Plan] ➔ [4:Work/TDD] ➔ [5:Verify] ➔ [6:Compound] ➔ [7:Ship]
 current phase: Stage 4: TDD & Work
 active subtask: 4.2 Companion Tools Manager Implemented
 workflow: re-hydrated context successfully. Proceeding with active task.

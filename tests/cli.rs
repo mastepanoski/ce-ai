@@ -1694,7 +1694,7 @@ fn test_workflow_status_advisory_matrix_and_json() {
         .stdout(predicate::str::contains("Plan Observation"))
         .stdout(predicate::str::contains("Verification"))
         .stdout(predicate::str::contains("Knowledge Capture"))
-        .stdout(predicate::str::contains("OpenSpec Integration"));
+        .stdout(predicate::str::contains("Architecture Integration"));
 
     // 2. JSON output includes structured observable_state
     let output = ceai(&config_dir, &home)
@@ -11209,9 +11209,9 @@ fn test_cli_workflow_guide_and_openspec_onboarding_guidance() {
     let guide_stdout = String::from_utf8_lossy(&out_guide.stdout);
     assert!(guide_stdout.contains("Compound Engineering Workflow & OpenSpec Onboarding Guide"));
     assert!(guide_stdout.contains("Compound Agile Fast-Path (Tactical & Bug Fixes)"));
-    assert!(guide_stdout.contains("The OpenSpec Rule of Thumb"));
-    assert!(guide_stdout.contains("Skip OpenSpec when"));
-    assert!(guide_stdout.contains("Use OpenSpec when"));
+    assert!(guide_stdout.contains("The Architecture & Deltas Rule of Thumb"));
+    assert!(guide_stdout.contains("Skip formal specs when"));
+    assert!(guide_stdout.contains("Use formal architecture/deltas when"));
 
     // 2. ce-ai workflow status outputs guidance tip when OpenSpec is inactive
     let out_status = ceai(&config_dir, &home)
@@ -11222,7 +11222,7 @@ fn test_cli_workflow_guide_and_openspec_onboarding_guidance() {
     assert!(out_status.status.success());
     let status_stdout = String::from_utf8_lossy(&out_status.stdout);
     assert!(status_stdout.contains(
-        "OpenSpec Integration ➔ Inactive (Optional — tip: recommended for scope > 200 LOC"
+        "Architecture Integration ➔ Inactive (Optional — tip: recommended for scope > 200 LOC"
     ));
-    assert!(status_stdout.contains("💡 OpenSpec Guidance:"));
+    assert!(status_stdout.contains("💡 Architecture Guidance:"));
 }

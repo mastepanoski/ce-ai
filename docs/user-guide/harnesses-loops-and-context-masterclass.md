@@ -123,14 +123,12 @@ flowchart TD
 
 ## 5. Ecosystem Credits and Boundaries
 
-CE-AI combines independent projects with different roles. [Compound Engineering](https://github.com/EveryInc/compound-engineering-plugin) is EveryInc’s official methodology and skill plugin; it is not a Gentle AI project. [Organic Driven Development (ODD)](https://github.com/Gentleman-Programming/gentle-ai/blob/main/docs/intended-usage.md) was created by [Alan Buscaglia](https://github.com/Alan-TheGentleman) through Gentle AI. CE-AI adapts ODD as an optional path and uses Compound Engineering as its methodological foundation.
+CE-AI combines independent projects with different roles. [Compound Engineering](https://github.com/EveryInc/compound-engineering-plugin) is EveryInc’s official methodology and skill plugin; it is not a Gentle AI project. Early exploration of agile fast-paths drew inspiration from [Alan Buscaglia’s](https://github.com/Alan-TheGentleman) Gentle AI, while CE-AI uses Compound Engineering as its methodological foundation.
 
 ```mermaid
 flowchart TD
     CE_AI["CE-AI: engineering workflow for coding agents"] --> CE["EveryInc Compound Engineering
 methodology and skills"]
-    CE_AI --> ODD["Alan Buscaglia / Gentle AI
-Organic Driven Development"]
     CE_AI --> ENGRAM["Engram
 Persistent memory"]
     CE_AI --> CODEGRAPH["CodeGraph
@@ -146,7 +144,7 @@ Structured reasoning"]
 ### Key ecosystem tools
 
 1. **[Compound Engineering](https://github.com/EveryInc/compound-engineering-plugin)**: EveryInc’s methodology and multi-host skill plugin. CE-AI complements it with project-level workflow state and artifacts; it does not replace it.
-2. **[Gentle AI](https://github.com/Gentleman-Programming/gentle-ai)**: The home of ODD, created by Alan Buscaglia. ODD informs CE-AI’s lightweight, recoverable execution path.
+2. **[Gentle AI](https://github.com/Gentleman-Programming/gentle-ai)**: Created by Alan Buscaglia. Early exploration of agile fast-paths in Gentle AI informed CE-AI’s lightweight tactical execution path.
 3. **[Engram](https://github.com/Gentleman-Programming/engram)**: Persistent memory sidecar powered by SQLite and FTS5 for decisions, discoveries, bug fixes, and preferences across sessions.
 4. **[CodeGraph](https://github.com/colbymchenry/codegraph)**: Codebase intelligence for AST symbols, callers, callees, and blast-radius analysis.
 5. **[Context7](https://github.com/upstash/context7)**: Current library and framework documentation retrieval.

@@ -99,7 +99,7 @@ pub enum Commands {
     /// Graduate an ODD task brief to formal OpenSpec change package (alias for workflow graduate).
     #[command(hide = true)]
     Graduate(crate::commands::workflow::GraduateArgs),
-    /// Manage living system specifications in openspec/specs/.
+    /// Manage living system specifications in docs/arch/system/ (or legacy openspec/specs/).
     Spec(crate::commands::spec::SpecArgs),
     /// Solution library clustering, deduplication, and refresh engine.
     Doc(doc::DocArgs),

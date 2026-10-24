@@ -327,14 +327,14 @@ pub fn status_lines_with_mode(
             "  • Quality & Testing     ➔ Verify tests, clippy, and formatting before commit"
                 .to_string(),
         );
-        lines.push("  * Scope Boundary        ➔ For architecture or scope > 200 LOC, formalize in openspec/changes/.".to_string());
+        lines.push("  * Scope Boundary        ➔ For architecture or scope > 200 LOC, formalize under docs/arch/deltas/ (or docs/plans/).".to_string());
         lines.push(String::new());
     } else {
         lines.push("== [Workflow FSM & Progress Recovery Status] ==".to_string());
         lines.push("7-Stage Cycle (Compound Engineering Skill Mappings):".to_string());
         lines.push("  • [1: Ideation]   ➔ ce-brainstorm / ce-ideate / ce-strategy".to_string());
         lines.push(
-            "  • [2: OpenSpec]   ➔ Formal Spec Definition (Optional: for scope > 200 LOC, APIs, or schemas)".to_string(),
+            "  • [2: Architecture] ➔ Living Architecture & Deltas (Optional: for scope > 200 LOC, APIs, or schemas)".to_string(),
         );
         lines.push("  • [3: Plan]       ➔ ce-plan / ce-doc-review".to_string());
         lines.push("  • [4: Work/TDD]   ➔ ce-work / ce-debug (Direct Entry Point for Bug Fixes) / ce-simplify-code".to_string());
@@ -423,12 +423,12 @@ pub fn status_lines_with_mode(
             }
             None => "Inactive (Optional — tip: recommended for scope > 200 LOC or API contracts; run 'ce-ai workflow guide')".to_string(),
         };
-        lines.push(format!("  • OpenSpec Integration ➔ {openspec_display}"));
+        lines.push(format!("  • Architecture Integration ➔ {openspec_display}"));
         if obs.openspec.is_none() && mode == ExecutionMode::Compound {
             let stage_num = wf.as_ref().map(|w| w.stage.number()).unwrap_or(1);
             if stage_num <= 2 {
-                lines.push("  💡 OpenSpec Guidance: If this task involves architecture changes, new APIs, or >200 LOC,".to_string());
-                lines.push("     formalize in openspec/changes/ or run 'ce-ai workflow graduate'. Otherwise, skip directly to /ce-plan or /ce-work.".to_string());
+                lines.push("  💡 Architecture Guidance: If this task involves architecture changes, new APIs, or >200 LOC,".to_string());
+                lines.push("     formalize under docs/arch/deltas/ (or docs/plans/). Otherwise, skip directly to /ce-plan or /ce-work.".to_string());
             }
         }
         lines.push(String::new());
@@ -1732,29 +1732,29 @@ pub fn guide_lines() -> Vec<String> {
         "  1. Compound Agile Fast-Path (Tactical & Bug Fixes):".to_string(),
         "     • Best for: Bug fixes, minor tweaks, docs, tests, and tactical work (< 200 LOC).".to_string(),
         "     • Workflow: Direct execution via /ce-debug or /ce-work, or lightweight planning in docs/plans/.".to_string(),
-        "     • Fast execution: proceed directly without formal OpenSpec change packages.".to_string(),
+        "     • Fast execution: proceed directly without formal architecture deltas or change packages.".to_string(),
         String::new(),
         "  2. 7-Stage Compound Engineering Cycle:".to_string(),
         "     • [1: Ideation]   ➔ ce-brainstorm / ce-ideate / ce-strategy".to_string(),
-        "     • [2: OpenSpec]   ➔ Formal Spec Definition (Optional — see criteria below)".to_string(),
+        "     • [2: Architecture] ➔ Living Architecture & Deltas (Optional — see criteria below)".to_string(),
         "     • [3: Plan]       ➔ ce-plan / ce-doc-review".to_string(),
         "     • [4: Work/TDD]   ➔ ce-work / ce-debug (direct entry for bug fixes)".to_string(),
         "     • [5: Verify]     ➔ Empirical test gates (cargo test, make e2e)".to_string(),
         "     • [6: Compound]   ➔ Capture durable learnings (docs/solutions/, CONCEPTS.md)".to_string(),
         "     • [7: Ship]       ➔ Self-explaining PRs (ce-commit-push-pr)".to_string(),
         String::new(),
-        "💡 The OpenSpec Rule of Thumb (When to use vs When to skip):".to_string(),
-        "  • ❌ Skip OpenSpec when:".to_string(),
+        "💡 The Architecture & Deltas Rule of Thumb (When to use vs When to skip):".to_string(),
+        "  • ❌ Skip formal specs when:".to_string(),
         "     - Fixing bugs, refining UI/CSS, updating docs, adding tests, or small tasks (< 200 LOC).".to_string(),
         "     - Forcing formal specs on trivial work causes friction and documentation debt.".to_string(),
-        "  • ✅ Use OpenSpec when:".to_string(),
+        "  • ✅ Use formal architecture/deltas when:".to_string(),
         "     - Introducing cross-cutting architecture, database schema changes, or public APIs.".to_string(),
         "     - Multi-agent or regulated work requiring frozen contracts before implementation.".to_string(),
         "     - Estimated scope exceeds ~200 LOC.".to_string(),
         String::new(),
         "Core Workflow Commands:".to_string(),
         "  • ce-ai workflow status          ➔ Inspect active phase, uncommitted drift, and capabilities.".to_string(),
-        "  • ce-ai spec list                ➔ View living system specifications in openspec/specs/.".to_string(),
+        "  • ce-ai spec list                ➔ View living system specifications in docs/arch/system/ (or openspec/specs/).".to_string(),
         "  • ce-ai workflow archive <feat>  ➔ Archive completed change package post-merge to maintain clean state.".to_string(),
     ]
 }

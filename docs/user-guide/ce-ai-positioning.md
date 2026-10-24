@@ -1,5 +1,5 @@
 <!-- Diátaxis Quadrant: Explanation | Audience: Beginner / Senior -->
-# CE-AI, Compound Engineering, and ODD
+# CE-AI and Compound Engineering Positioning
 
 CE-AI is an **engineering workflow for coding agents**. It does not try to replace the agent that writes code. Instead, it makes the surrounding engineering process explicit: what is being changed, what constraints apply, what has been verified, and what the next task can learn from this one.
 
@@ -22,7 +22,7 @@ methodology and reusable skills (/ce-...)
               ├── Fleet Version Governance: declarative multi-harness parity (ce-ai fleet)
               ├── Project Adoption & Health: non-destructive AGENTS.md rules & hooks (init-prj)
               ├── Agent Guardrails & Risk Engine: pre-execution command policy & safety (ce-ai guard)
-              └── Advisory Workflow: 7-stage observation & ODD fast-path (workflow)
+              └── Advisory Workflow: 7-stage observation & agile fast-path (workflow)
 ```
 
 The layers have distinct jobs:
