@@ -1,9 +1,9 @@
 <!-- Diátaxis Quadrant: Explanation | Audience: Senior -->
-# 🎓 Why CE-AI Uses Spec-Driven Planning with Bounded Work Units Instead of Conversational Micro-TDD: Context Economics and Workflow Architecture for Coding Agents
+# 🎓 Why CE-AI Uses Living Architecture & Bounded Work Units Instead of Conversational Micro-TDD: Context Economics and Workflow Architecture for Coding Agents
 
 > **Audience**: Senior / Contributor · **Intent**: Explanation
 >
-> This document explains the technical and architectural rationale behind `ce-ai`'s 7-stage workflow, OpenSpec execution baselines, and bounded work units. It analyzes how conversational agent loops interact with Test-Driven Development (TDD), draws on a small published experiment with Claude Code working through MCP tools, and explains why CE-AI positions TDD as an implementation technique within bounded work units rather than as the granularity of the agent's orchestration loop.
+> This document explains the technical and architectural rationale behind `ce-ai`'s 7-stage workflow, living architecture baselines (`docs/arch/`), and bounded work units in `docs/plans/`. It analyzes how conversational agent loops interact with Test-Driven Development (TDD), draws on a published experiment with Claude Code working through MCP tools, and explains why CE-AI positions TDD as an implementation technique within bounded work units rather than as the granularity of the agent's orchestration loop.
 
 > **Core principle**: TDD remains an implementation technique within bounded work units rather than the granularity of the agent's orchestration loop.
 
@@ -73,12 +73,12 @@ Conversational Micro-TDD (Turn-by-Turn Orchestration):
                 Total input token processing compounds with transcript depth
 
 CE-AI Workflow Architecture (Decoupled Orchestration):
-[Stage 2: OpenSpec Baseline] ──(Baseline)──► [Stage 3: Bounded Units (~200 LOC)]
-                                                    │
-                                                    ▼
-                                        [Stage 4: Local Work & TDD]
-                                        Local compiler & test runner
-                                        Context: curated durable task specification
+[Stage 2: Living Arch / Baseline] ──(Baseline)──► [Stage 3: Bounded Units in docs/plans/]
+                                                           │
+                                                           ▼
+                                               [Stage 4: Local Work & TDD]
+                                               Local compiler & test runner
+                                               Context: curated durable task specification
 ```
 
 ### 3.1 Token Processing in Append-Only Transcripts
@@ -103,7 +103,7 @@ Separating specification authoring (Stage 2) from implementation (Stage 4) does 
 
 ---
 
-## 4. The CE-AI Approach: Spec-Driven Planning with Bounded Work Units
+## 4. The CE-AI Approach: Living Architecture and Plan-Driven Bounded Units
 
 `ce-ai` addresses these concerns not by discarding test-first discipline, but by **decoupling the orchestration loop from the implementation technique**:
 
@@ -117,13 +117,13 @@ Separating specification authoring (Stage 2) from implementation (Stage 4) does 
 
           CE-AI Workflow Architecture
                      │
-            Durable Specification
-            (Stage 2: Architecture Baseline)
+            Living Architecture
+      (Stage 2: Architecture Baseline)
                      ↓
              Execution Planning
-            (Stage 3: Plan Decomposition)
+        (Stage 3: Plan in docs/plans/)
                      ↓
-             Bounded Work Unit (~200 LOC)
+        Bounded Work Unit (~200 LOC)
                      │
              ┌───────┴───────┐
              ↓               ↓
@@ -140,18 +140,18 @@ Separating specification authoring (Stage 2) from implementation (Stage 4) does 
 Each layer preserves a different property:
 
 ```text
-OpenSpec (Stage 2)        → external behavioral baseline
-Bounded unit + local TDD  → Red → Green → Refactor at implementation level
-Verification (Stage 5)    → conformance to the contract
+Living Arch / Deltas (Stage 2) → external behavioral baseline (docs/arch/)
+Bounded unit + local TDD       → Red → Green → Refactor in docs/plans/
+Verification (Stage 5)         → conformance to the contract
 ```
 
-### 4.1 Specification as an Execution Baseline (Stage 2: OpenSpec)
+### 4.1 Specification as an Execution Baseline (Stage 2: Living Architecture & Contracts)
 
-Before implementation begins, Stage 2 captures one important benefit associated with test-first development—making expected behavior and interfaces explicit from the consumer's perspective—while moving part of that design activity into a durable specification artifact:
-- `spec.md` specifies behavior with `WHEN ... THEN ...` clauses and explicit acceptance criteria.
-- `design.md` defines types, contracts, and boundaries.
+Before implementation begins for architectural changes (> 200 LOC, multi-repo schemas, or API contracts), Stage 2 captures one important benefit associated with test-first development—making expected behavior and interfaces explicit from the consumer's perspective—while moving part of that design activity into a durable specification artifact under `docs/arch/` (domain specs in `system/`, ADRs in `adr/`, and temporary deltas in `deltas/`, with legacy `openspec/` compatibility):
+- `spec.md` or domain specifications specify behavior with `WHEN ... THEN ...` clauses and explicit acceptance criteria.
+- `design.md` or contracts define types, schemas, and API boundaries.
 
-OpenSpec is not TDD and does not replace it: it does not provide Red-Green-Refactor feedback. It provides the baseline that local TDD and verification are measured against.
+Living architecture is not TDD and does not replace it: it does not provide Red-Green-Refactor feedback. It provides the baseline that local TDD and verification are measured against. For bug fixes and tactical tasks (< 200 LOC), this stage is optional and bypassed directly into Stage 3 or 4.
 
 The specification is an **execution baseline**, not an immutable document: if implementation in Stage 4 reveals an unworkable constraint or an incomplete requirement, the workflow requires an explicit specification revision rather than silent drift during implementation.
 
@@ -191,15 +191,15 @@ Because workflow and repository state live outside the transcript, the conversat
 
 ## 5. Architectural Comparison
 
-| Dimension | Human Micro-TDD (Beck) | Naive Conversational Micro-TDD | CE-AI Spec-Driven Architecture |
+| Dimension | Human Micro-TDD (Beck) | Naive Conversational Micro-TDD | CE-AI Plan & Living Architecture |
 | :--- | :--- | :--- | :--- |
 | **Primary actor** | Human software engineer | LLM agent in chat/tool loop | LLM agent governed by a deterministic CLI and staged workflow |
 | **Role of TDD** | Design and feedback discipline | Conversational orchestration protocol | Implementation technique within bounded units |
-| **Cycle cadence** | Minutes-level increments | 1–2 API requests per micro-change | Bounded work units (~200 LOC heuristic) |
-| **Behavioral baseline** | May exist externally (stories, acceptance criteria); executable design evolves incrementally through tests | May be explicit or emerge conversationally; vulnerable to drift if not externalized | Externalized baseline before execution (Stage 2) |
+| **Cycle cadence** | Minutes-level increments | 1–2 API requests per micro-change | Bounded work units (~200 LOC heuristic in `docs/plans/`) |
+| **Behavioral baseline** | May exist externally (stories, acceptance criteria); executable design evolves incrementally through tests | May be explicit or emerge conversationally; vulnerable to drift if not externalized | Externalized baseline before execution (`docs/arch/`, optional Stage 2) |
 | **Feedback mechanism** | Local test runner in IDE/terminal | Multi-turn conversational round-trips | Local compiler, test suite, and CI |
 | **Context overhead** | Human working memory (~3–5 chunks) | Accumulates in transcript ($O(n^2)$ naive) | Curated durable artifacts ($O(1)$ per unit w.r.t. completed units; $O(n)$ total) |
-| **Epistemic validation** | Human review and runtime feedback | Same model writes test and code in one context | External spec reviewable by humans or independent gates |
+| **Epistemic validation** | Human review and runtime feedback | Same model writes test and code in one context | External spec / plan reviewable by humans or independent gates |
 | **Context reset handling** | Developer memory / git status | Transcript recovery or compaction | State recovery from `state.json` and `docs/plans/` |
 
 ---
@@ -208,7 +208,7 @@ Because workflow and repository state live outside the transcript, the conversat
 
 The relationship between TDD and AI coding agents is not a binary choice between "TDD" and "Spec-Driven Development", and CE-AI does not need to show that TDD lacks external specifications, or that it produces worse design, to justify its architecture.
 
-> **For AI coding agents, using fine-grained micro-TDD as the conversational orchestration protocol can incur substantial interaction overhead and token-processing costs, while long transcripts introduce additional context-utilization risks. CE-AI therefore externalizes behavioral intent into durable OpenSpec baselines and uses bounded work units as the granularity of agent orchestration. TDD remains available inside those units as an implementation and design technique, while deterministic local tooling handles rapid verification without requiring every Red-Green-Refactor transition to become a conversational inference turn.**
+> **For AI coding agents, using fine-grained micro-TDD as the conversational orchestration protocol can incur substantial interaction overhead and token-processing costs, while long transcripts introduce additional context-utilization risks. CE-AI therefore externalizes behavioral intent into durable living architecture baselines (`docs/arch/`) and uses plan-driven bounded work units (`docs/plans/`, ~200 LOC) as the granularity of agent orchestration. TDD remains available inside those units as an implementation and design technique, while deterministic local tooling handles rapid verification without requiring every Red-Green-Refactor transition to become a conversational inference turn.**
 
 ---
 
