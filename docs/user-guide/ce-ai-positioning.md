@@ -71,7 +71,7 @@ The sequence is a mental model, not a demand for ceremony on every edit:
 - **Implement and Validate** turn the plan into code and evidence.
 - **Learn and Compound** preserve reusable conclusions so future work does not rediscover the same facts.
 
-For substantial architectural work (> 200 LOC or cross-cutting contracts), CE-AI can coordinate optional OpenSpec change packages. For routine, tactical work, developers use the agile fast-path (`docs/plans/` or direct execution via `/ce-work` / `/ce-debug`).
+For substantial architectural work (> 200 LOC or cross-cutting contracts), CE-AI can coordinate optional living architecture deltas under `docs/arch/deltas/` (with legacy OpenSpec support). For routine, tactical work, developers use the agile fast-path (`docs/plans/` or direct execution via `/ce-work` / `/ce-debug`).
 
 ## Agile Fast-Path: Bounded Tactical Execution
 
@@ -80,4 +80,4 @@ Originally adapted from [Alan Buscaglia's](https://github.com/Alan-TheGentleman)
 In CE-AI, this fast-path is aligned natively with Compound Engineering:
 - Tactical bugfixes run directly via `/ce-debug` or `/ce-work`.
 - Lightly planned tasks maintain a single plan in `docs/plans/`.
-- The artificial `odd/tasks/` directory and `workflow graduate` commands are deprecated in favor of native planning and direct OpenSpec adoption only when architectural complexity warrants it. See the [Agile Fast-Path Masterclass](odd-fast-path-and-graduation-masterclass.md) for details.
+- Direct execution and lightweight planning in `docs/plans/` eliminate proprietary file formats (`odd/tasks/`) and redundant 5-file packages, keeping tactical work fast and unburdened. For deeper context on why bounded units beat conversational micro-TDD, see [Architecture vs. Chat TDD](spec-driven-vs-chat-tdd-explained.md).

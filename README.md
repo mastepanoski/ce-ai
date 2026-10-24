@@ -41,7 +41,6 @@ Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <
 | 🎓 [Harnesses, Loops & Context](docs/user-guide/harnesses-loops-and-context-masterclass.md) | Beginner | Explanation — coding-agent hosts, context, and supporting tools |
 | 🎓 [Determinism Explained](docs/user-guide/determinism-explained.md) | Beginner | Explanation — what CE-AI can and cannot guarantee |
 | 🎓 [Zero-Step Drift Recovery](docs/user-guide/zero-step-drift-recovery-explained.md) | Beginner | Explanation — recover current repository state at session start |
-| ⚡ [Agile Fast-Path Masterclass](docs/user-guide/odd-fast-path-and-graduation-masterclass.md) | Beginner / Senior | Explanation — the lightweight path and when to adopt formal specifications |
 | 🛡️ [Agent Guardrails Guide](docs/user-guide/decision-engine-guide.md) | Both | How-to — command risk checks, security guardrails, and readiness |
 | 🔧 [Installation & Coexistence](docs/user-guide/installation-and-coexistence-mechanisms.md) | Both | How-to — install without overwriting existing configurations |
 | 🔄 [Fleet, Sync & Upgrade](docs/user-guide/sync-and-upgrade-mechanisms.md) | Both | How-to — multi-harness fleet governance, reconcile drift, and batch maintenance |

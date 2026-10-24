@@ -8,7 +8,7 @@
 
 ### The Core Adoption Dilemma
 
-Imagine you are a senior developer or technical team lead introducing Compound Engineering AI directives into an existing software repository. You want your AI coding assistants (such as Claude Code, OpenCode, Cursor, or Copilot) to strictly follow the **7-stage development cycle**, enforce **OpenSpec specifications**, and run **TDD verification gates** before making pull requests.
+Imagine you are a senior developer or technical team lead introducing Compound Engineering AI directives into an existing software repository. You want your AI coding assistants (such as Claude Code, OpenCode, Cursor, or Copilot) to strictly follow the **7-stage development cycle**, enforce **living architecture specifications**, and run **TDD verification gates** before making pull requests.
 
 However, your repository already has content! It might contain pre-existing developer documentation in `AGENTS.md`, custom coding style guides, or specialized project setup notes.
 
@@ -60,8 +60,8 @@ Custom project guidelines written by the developer stay here.
 ## 🛡️ Governance & Compliance Standards
 All AI agent operations MUST follow ISO/IEC 27001/27002, ISO/IEC 42001, and NIST AI RMF 1.0.
 
-## 🔄 Mandatory 7-Stage Development Cycle & OpenSpec Enforcement
-[Stage 1: Ideation] ➔ [Stage 2: OpenSpec Definition] ➔ [Stage 3: Execution Plan]
+## 🔄 Mandatory 7-Stage Development Cycle & Architecture Guidelines
+[Stage 1: Ideation] ➔ [Stage 2: Architecture & Deltas (Optional)] ➔ [Stage 3: Execution Plan]
 ➔ [Stage 4: TDD & Implementation] ➔ [Stage 5: Verification] ➔ [Stage 6: Knowledge Capture]
 ➔ [Stage 7: Git Shipping]
 <!-- ce-ai:block end -->
@@ -110,7 +110,7 @@ ce-ai init-prj --all
 
 | Tier | Purpose | Recommended for |
 | :--- | :--- | :--- |
-| `full` **(Default)** | Complete 7-stage development cycle, OpenSpec requirements, Single Source of Truth rule (ideation artifacts are retained as raw history — "disposable" never means deleting them), DoD checklist, and security policies. | Production repositories, core services, critical products. |
+| `full` **(Default)** | Complete 7-stage development cycle, living architecture guidelines, Single Source of Truth rule (ideation artifacts are retained as raw history — "disposable" never means deleting them), DoD checklist, and security policies. | Production repositories, core services, critical products. |
 | `minimal` | Core DoD guidelines, atomic write rules, and basic testing verification. | Small libraries, scripts, internal tools. |
 | `orchestrator` | Multi-repo orchestration directives and delegation protocols, plus a directive to distill ideation outputs into specs rather than maintaining them in parallel — and retain them as raw history instead of deleting them. | Monorepos, parent workspace folders. |
 

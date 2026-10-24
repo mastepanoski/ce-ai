@@ -252,7 +252,7 @@ workflow: resuming execution from latest checkpoint...
   adoption block: ok (SHA256 verified)
 
 == [Context Re-hydration: user-authentication] ==
-  spec location: openspec/changes/user-authentication
+  spec location: docs/arch/deltas/user-authentication
   has proposal: true
   has spec: true
   has tasks: true
@@ -312,7 +312,7 @@ If you see this warning:
 | :--- | :--- |
 | **Environment Drift** | Files or branches changed outside the AI's chat context. |
 | **Turn-0 Recovery** | Syncing disk state *before* the AI plans its next move. |
-| **`RepoState`** | The structured snapshot of Git, Manifest, and OpenSpec progress. |
+| **`RepoState`** | The structured snapshot of Git, Manifest, and plan/architecture progress. |
 | **Deterministic SHA256** | File integrity is proven by exact hashes, never guessed by timestamps. |
 | **Workspace & Worktree Isolation** | Checkpoint and FSM state are scoped per workspace root in `~/.ce-ai/state.json`; parallel worktrees never collide. |
 | **Non-Blocking** | Drift warnings alert you without breaking or crashing your workflow. |

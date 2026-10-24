@@ -7,7 +7,7 @@ Welcome! If you are new to **Compound Engineering** and **`ce-ai`**, this guide 
 
 ## 1. The Big Picture: The 6-Level Product & Engineering Hierarchy
 
-A common point of confusion for newcomers is understanding how slash commands like `/ce-strategy`, `/ce-ideate`, `/ce-brainstorm`, `/ce-plan`, `/ce-work`, `/ce-compound`, and **OpenSpec** fit together without duplicating effort.
+A common point of confusion for newcomers is understanding how slash commands like `/ce-strategy`, `/ce-ideate`, `/ce-brainstorm`, `/ce-plan`, `/ce-work`, `/ce-compound`, and **Living Architecture (`docs/arch/`)** fit together without duplicating effort.
 
 Think of it as a **6-level product management and software engineering funnel**:
 

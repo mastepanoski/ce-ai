@@ -28,7 +28,7 @@ for complete arguments. Commands that mutate configuration support global
 | Command | Boundary |
 | --- | --- |
 | `workflow`, `archive` | Persist/recover workflow state, read SSOT progress from `docs/plans/`, and archive completed features into `docs/arch/archive/` (or legacy `openspec/changes/archive/`). |
-| `graduate` (deprecated) | Legacy command for migrating historical `odd/tasks/` briefs to OpenSpec; new work uses `docs/plans/` or direct OpenSpec changes. |
+| `graduate` (deprecated) | Legacy command for migrating historical `odd/tasks/` briefs to specifications; new work uses `docs/plans/` or living architecture (`docs/arch/`). |
 | `gate check` | Enforces a complete Stage 4 contract by default; `--mode observe` records the decision without blocking. The agile LOC notice is advisory. |
 | `spec`, `doc` | Inspect/promote living specifications (`docs/arch/system/` or `openspec/specs/`) and run documentation hygiene/linting (`doc lint`, `doc refresh`, `doc stats`). |
 
