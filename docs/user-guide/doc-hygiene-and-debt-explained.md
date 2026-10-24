@@ -24,7 +24,7 @@ When documentation falls behind your code, we call this **Documentation Technica
 [Repository Code & Architecture] ──── evolves rapidly ───► [New Reality]
                                                                   ▲
                                                                   │ (DRIFT!)
-[OpenSpecs & Solution Notes]    ──── left untouched ─────────────┘
+[Living Specs & Solution Notes] ──── left untouched ─────────────┘
                                      (outdated map)
 ```
 
@@ -79,7 +79,7 @@ AI agents do **not** have human intuition or informal hallway conversations. AI 
          ▼                       ▼                       ▼
  ┌───────────────┐       ┌───────────────┐       ┌───────────────┐
  │    Probe 1    │       │    Probe 2    │       │    Probe 5    │
- │OpenSpec Desync│       │ Stale Pending │       │Solution Drift │
+ │ Delta Desync  │       │ Stale Pending │       │Solution Drift │
  └───────┬───────┘       └───────┬───────┘       └───────┬───────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘

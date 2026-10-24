@@ -248,5 +248,5 @@ If you ever need to roll back or remove the setup:
 
 *Related reading:*
 - [Quick Start Workflow Guide](quick-start-workflow-guide.md) — the full 7-stage cycle: features, bug fixes, resuming work.
-- [Compound Workflow Explained](compound-engineering-workflow-explained.md) — how `/ce-strategy`, `/ce-ideate`, `/ce-brainstorm`, OpenSpec, and `/ce-work` fit together without duplicating effort.
+- [Compound Workflow Explained](compound-engineering-workflow-explained.md) — how `/ce-strategy`, `/ce-ideate`, `/ce-brainstorm`, Living Architecture, and `/ce-work` fit together without duplicating effort.
 - [Harnesses, Loops & Context Masterclass](harnesses-loops-and-context-masterclass.md) — what a "harness" actually is, for readers still fuzzy on that term.

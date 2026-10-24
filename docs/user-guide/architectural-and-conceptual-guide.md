@@ -152,6 +152,6 @@ $$\text{Ideation} \xrightarrow{1} \text{Architecture} \xrightarrow{2} \text{Plan
 
 ---
 
-## 7. Spec-Driven Planning and Bounded TDD vs. Conversational Micro-TDD
+## 7. Living Architecture & Plan-Driven Bounded Units vs. Conversational Micro-TDD
 
-For a deep dive into the experimental data, context economics, and workflow architecture that justify CE-AI's 7-stage workflow over naive conversational micro-TDD, see [Spec-Driven Planning with Bounded Work Units](spec-driven-vs-chat-tdd-explained.md).
+For a deep dive into the experimental data, context economics, and workflow architecture that justify CE-AI's 7-stage workflow over naive conversational micro-TDD, see [Living Architecture & Plan-Driven Bounded Units](spec-driven-vs-chat-tdd-explained.md).

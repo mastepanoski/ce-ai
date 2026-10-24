@@ -31,7 +31,7 @@ Three properties fall out of that, and none of them are available to a memory wr
 
 1. **Validated, not just recorded.** Every write is checked against the FSM's legal-transition rules before it touches disk — reset to Stage 1, stay, advance exactly one stage, or rewind exactly one. Stage 2 → Stage 5 is rejected with exit code 2, full stop. See [FSM & Checkpoints Masterclass](fsm-and-checkpoints-explained.md) for the full transition table, and [Determinism & ce-ai Explained](determinism-explained.md) §3 for why this is one of the few things `ce-ai` can actually guarantee.
 2. **One canonical location, fixed schema.** State lives in `~/.ce-ai/state.json` as a small typed struct (stage, task, feature name, timestamp) — atomically written, machine-parseable (`--json`), diffable, and independent of which harness or which agent wrote it.
-3. **Re-probed live, not replayed from memory.** `ce-ai workflow resume` doesn't just print back what was last saved — it re-runs git, the manifest drift check, and the OpenSpec task checklist **at the moment you resume**, every time. A handoff note or a memory entry is a snapshot frozen at write time; it goes stale the second the disk changes underneath it.
+3. **Re-probed live, not replayed from memory.** `ce-ai workflow resume` doesn't just print back what was last saved — it re-runs git, the manifest drift check, and the task checklist in `docs/plans/` (or active delta) **at the moment you resume**, every time. A handoff note or a memory entry is a snapshot frozen at write time; it goes stale the second the disk changes underneath it.
 
 ---
 
@@ -47,7 +47,7 @@ What Engram (or a "handoff" note built on top of it) cannot do is answer "is it 
 
 The checkpoint write is two short string arguments passed to a compiled binary — comparable in cost to a one-line commit message, not to writing a report. No LLM call is required to *produce* `state.json`; the CLI just validates and serializes what it was given.
 
-Compare the read side too: `ce-ai workflow resume` prints a **bounded** set of status lines — current stage, active task, git branch, drift count, OpenSpec checklist progress — pulled fresh from disk probes each time. A handoff document or memory entry meant to fully capture "everything needed to resume" has no such bound: it tends to grow with how much the session accumulated, and its cost is paid **twice** — once to generate it, again in full every time it's read back in a future session. The checkpoint mechanism's cost stays flat regardless of how long the surrounding conversation gets.
+Compare the read side too: `ce-ai workflow resume` prints a **bounded** set of status lines — current stage, active task, git branch, drift count, plan checklist progress — pulled fresh from disk probes each time. A handoff document or memory entry meant to fully capture "everything needed to resume" has no such bound: it tends to grow with how much the session accumulated, and its cost is paid **twice** — once to generate it, again in full every time it's read back in a future session. The checkpoint mechanism's cost stays flat regardless of how long the surrounding conversation gets.
 
 ---
 

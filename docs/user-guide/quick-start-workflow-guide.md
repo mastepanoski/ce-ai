@@ -33,7 +33,7 @@ When introducing a new capability, UI screen, or major architectural change, fol
 
 ```mermaid
 flowchart LR
-    S1[1. ce-brainstorm] --> S2[2. OpenSpec]
+    S1[1. ce-brainstorm] --> S2[2. Living Arch & Deltas]
     S2 --> S3[3. ce-plan]
     S3 --> S4[4. ce-work]
     S4 --> S5[5. ce-code-review]
@@ -80,7 +80,7 @@ flowchart LR
 
 ## 🐞 Scenario 2: Fixing a Bug or Production Crash
 
-When fixing a defect, you **do not** need to write feature briefs or OpenSpec documents! You enter the workflow directly at Stage 4.
+When fixing a defect, you **do not** need to write feature briefs or architecture documents! You enter the workflow directly at Stage 4.
 
 ```mermaid
 flowchart TD
@@ -131,14 +131,14 @@ flowchart TD
 
 ### 1. Research & Codebase Surveys
 - **Use**: `/ce-ideate` or dispatch read-only research subagents.
-- **Workflow**: Bypasses OpenSpec, execution plans, and PR delivery. Generates a summary report or dossier directly for the user.
+- **Workflow**: Bypasses architecture specifications, execution plans, and PR delivery. Generates a summary report or dossier directly for the user.
 - ⚠️ **Two distinct uses of `/ce-ideate` — do not confuse them**:
   - **Use A — Standalone research (this scenario)**: you want ideas or a survey as the *final deliverable*. Nothing feeds forward; full bypass.
   - **Use B — Upstream of a feature**: you run ideation because the approach is uncertain, then continue into `ce-brainstorm` → Stage 2. In that case it is NOT a bypass: the chosen idea and rejected alternatives distill into `exploration.md` (see Section 7, FAQ 1b).
 
 ### 2. Technology & Architecture Decisions
 - **Use**: `/ce-pov`.
-- **Workflow**: Bypasses OpenSpec entirely for a single, decisive question — "should this project adopt/switch to/revisit X?" — judged against the current codebase, not in the abstract. Also fits a CVE, deprecation, or ecosystem shift landing mid-session: is it actually load-bearing for *this* project?
+- **Workflow**: Bypasses formal specifications entirely for a single, decisive question — "should this project adopt/switch to/revisit X?" — judged against the current codebase, not in the abstract. Also fits a CVE, deprecation, or ecosystem shift landing mid-session: is it actually load-bearing for *this* project?
 - ⚠️ **`/ce-ideate` vs `/ce-pov` — do not confuse them**: `/ce-ideate` is *divergent* — it generates and ranks several candidate directions when you don't yet know what to build. `/ce-pov` is *convergent* — it takes one specific external candidate you already have in mind (a library, a pattern, a platform) and returns a single decisive verdict grounded in this project. If you need options, use `/ce-ideate`; if you need a yes/no on one already-named option, use `/ce-pov`. If the verdict is "adopt," continue into `/ce-brainstorm` → Stage 2 like any other upstream idea.
 
 ### 3. Documentation Generation & Knowledge Audits
@@ -166,7 +166,7 @@ If you need to stop working and continue hours or days later:
    ce-ai workflow resume
    ```
 3. **What Happens Behind the Scenes**:
-   - `ce-ai` reads `state.json` and re-probes repository, manifest, and OpenSpec state to restore the recorded phase, active task string, and current checklist context. Engram retrieval, when configured in a harness, remains separate from this command.
+   - `ce-ai` reads `state.json` and re-probes repository, manifest, and plan/architecture state to restore the recorded phase, active task string, and current checklist context. Engram retrieval, when configured in a harness, remains separate from this command.
 
 ---
 
@@ -176,12 +176,12 @@ You are not locked into a single AI harness! Because `ce-ai` stores state in sha
 
 ```mermaid
 flowchart LR
-    CLAUDE[Claude Code: Stage 1 & 2 Ideation & OpenSpec] --> CURSOR[Cursor: Stage 4 TDD & Code Editing]
+    CLAUDE[Claude Code: Stage 1 & 2 Ideation & Architecture] --> CURSOR[Cursor: Stage 4 TDD & Code Editing]
     CURSOR --> AGY[Antigravity / OpenCode: Stage 5 & 6 Verification & ce-compound]
 ```
 
 - **Example Workflow**:
-  - Use **Claude Code** for Stage 1 (`ce-brainstorm`) and Stage 2 (`OpenSpec`).
+  - Use **Claude Code** for Stage 1 (`ce-brainstorm`) and Stage 2 (`Living Architecture / Deltas`).
   - Use **Cursor** or **Copilot** for Stage 4 (`ce-work` / TDD code editing).
   - Use **Antigravity CLI (`agy`)** or **OpenCode** for Stage 5 (`Verify`), Stage 6 (`ce-compound`), and Stage 7 (`ce-commit-push-pr`).
 - **Handoff Mechanism**: In any harness, simply execute `ce-ai workflow status` or `ce-ai workflow resume`. The active harness reads the shared state on disk and seamlessly continues from the previous tool's checkpoint.
@@ -276,7 +276,7 @@ flowchart TD
     CHOICE -->|"TDD (Default)"| TDD["TDD: Write Failing Test Red ➔ Code Fix Green ➔ Refactor"]
     CHOICE -->|"Code-First"| CODE_FIRST["Code-First: Implement Code ➔ Write Tests ➔ Verify"]
     CHOICE -->|"BDD / Scenario-First"| BDD["BDD: Write WHEN-THEN Scenarios ➔ Implement ➔ Verify"]
-    CHOICE -->|"Spike / R&D Spike"| SPIKE["R&D Spike: Quick PoC ➔ Evaluate ➔ Convert to OpenSpec"]
+    CHOICE -->|"Spike / R&D Spike"| SPIKE["R&D Spike: Quick PoC ➔ Evaluate ➔ Convert to Living Spec"]
 
     TDD --> GATE["Stage 5: Mandatory Verification - project quality gates"]
     CODE_FIRST --> GATE
@@ -287,15 +287,15 @@ flowchart TD
 #### How Non-TDD Variants Work in the FSM:
 
 1. **Code-First + Post-Verification**:
-   - *Flow*: Implement code directly in Stage 4 based on OpenSpec requirements (`spec.md`), then write tests afterwards.
+   - *Flow*: Implement code directly in Stage 4 based on specification requirements (`spec.md` or living domain specs), then write tests afterwards.
    - *FSM Rule*: The FSM does not restrict whether code or test files were written first. However, **Stage 5 (Empirical Verification)** requires — by workflow contract and review policy, not by a CLI gate — that unit/integration tests exist and pass 100% green before shipping.
 
 2. **Behavior-Driven Development (BDD)**:
-   - *Flow*: Define acceptance scenarios using explicit `WHEN <condition> THEN <expected outcome>` blocks in Stage 2 (`OpenSpec`). Tests are written to validate high-level behavior contracts.
+   - *Flow*: Define acceptance scenarios using explicit `WHEN <condition> THEN <expected outcome>` blocks in Stage 2 (`Living Architecture / Deltas`). Tests are written to validate high-level behavior contracts.
 
 3. **Spike Prototyping / R&D Spikes**:
    - *Flow*: Run `/ce-ideate` to generate and rank candidate directions (it produces an idea dossier in `docs/ideation/`, **not code**). Once one direction is chosen, build the throwaway PoC yourself or with `/ce-work` in a scratch branch — no tests or specs at this point.
-   - *Transition*: If the spike proves viable, convert the learnings into Stage 2 (`OpenSpec`) and proceed through standard verification. If not, discard the branch — the only durable output was the decision recorded in the dossier.
+   - *Transition*: If the spike proves viable, convert the learnings into Stage 2 (`Living Architecture / Deltas`) and proceed through standard verification. If not, discard the branch — the only durable output was the decision recorded in the dossier.
 
 > ⚠️ **The Non-Negotiable Rule**: Regardless of whether you use TDD, Code-First, or BDD, **Stage 5 (Empirical Verification)** and **Stage 6 (`ce-compound`)** remain mandatory: code must be verified empirically via tests, and discoveries must be documented in `docs/solutions/`.
 
@@ -384,16 +384,16 @@ flowchart TD
 
 **Newbie FAQ — "Where does the duplication go?"**
 
-0. *"Do I always need `/ce-ideate` or `/ce-brainstorm` before OpenSpec?"*
-   No. KISS: if requirements AND approach are clear, write OpenSpec directly. Brainstorm only when requirements are fuzzy; ideate only when even the approach is uncertain (and remember it dispatches ~9 sub-agents — the most expensive skill in the pipeline).
+0. *"Do I always need `/ce-ideate` or `/ce-brainstorm` before formal architecture?"*
+   No. KISS: if requirements AND approach are clear, write living architecture specs directly. Brainstorm only when requirements are fuzzy; ideate only when even the approach is uncertain (and remember it dispatches ~9 sub-agents — the most expensive skill in the pipeline).
 
 1. *"If I already wrote `proposal.md`, does `/ce-brainstorm` duplicate it?"*
-   No. Run brainstorm **before** Stage 2. Its conclusions get distilled into `proposal.md`; the brainstorm doc is disposable input — retained on disk as raw history, never a second source of truth.
+   No. Run brainstorm **before** Stage 2. Its conclusions get distilled into `proposal.md` under `docs/arch/deltas/<feature>/` (or legacy `openspec/changes/`); the brainstorm doc is disposable input — retained on disk as raw history, never a second source of truth.
 
 1b. *"Doesn't `/ce-ideate` duplicate `exploration.md`?"*
    No — same distillation rule, different target. The ideation dossier (`docs/ideation/`) lists many ideas with critiques; `exploration.md` records only the ONE chosen direction plus one-line reasons for the rejected alternatives, linking back to the dossier:
    ```markdown
-   # openspec/changes/auth-refactor/exploration.md
+   # docs/arch/deltas/auth-refactor/exploration.md (or legacy openspec/changes/auth-refactor/exploration.md)
    Chosen: session-as-entity (survivor #1 of ideation run 2026-08-22)
    Rejected: JWT-stateless — revocation would require a token blacklist (docs/ideation/auth-ideas.md §critique)
    ```

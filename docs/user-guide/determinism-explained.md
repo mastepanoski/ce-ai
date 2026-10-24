@@ -59,7 +59,7 @@ Some ce-ai decisions are relative to *your machine's state*. They are consistent
 
 | Behavior | Where | Why it varies |
 | :--- | :--- | :--- |
-| `workflow resume` infers the feature from directory modification times | `openspec/changes/` | Git operations rewrite mtimes |
+| `workflow resume` infers the feature from directory modification times | `docs/arch/deltas/` or `openspec/changes/` | Git operations rewrite mtimes |
 | Skill resolution re-verifies file hashes at resolution time | managed skills dirs | Files may be edited between commands |
 | Registry contents follow workspace precedence | `.ce-ai/skills/` vs global roots | Depends on current directory and `$HOME` |
 | Timestamps recorded in `state.json` and backups | metadata fields | Wall clock moves |
@@ -70,8 +70,8 @@ None of these corrupt assets — they just mean results reflect *when and where*
 
 Since process determinism is impossible, CE engineering discipline leans on four controls:
 
-1. **Checkpoints & resume** — save progress before context loss; resume re-hydrates the exact stage, task, and OpenSpec feature.
-2. **OpenSpec contracts** — `spec.md` requirements in WHEN/THEN form define what *must* be true regardless of how the agent got there.
+1. **Checkpoints & resume** — save progress before context loss; resume re-hydrates the exact stage, task, and active feature/plan.
+2. **Living architecture contracts** — specification requirements in WHEN/THEN form define what *must* be true regardless of how the agent got there.
 3. **Drift detection & restore** — SHA256 manifests detect any asset tampering; `sync` restores known-good bytes.
 4. **Empirical gates** — `cargo test`, `make e2e`, CI matrices verify outcomes, not intentions.
 
