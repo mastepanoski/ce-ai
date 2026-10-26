@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ideation: Extracción de Valor de ub-mode (Uncle Bob) para CE-AI</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --card-bg: #161922;
+      --card-border: #262b3a;
+      --text: #e1e4ea;
+      --text-muted: #8b949e;
+      --heading: #ffffff;
+      --primary: #3b82f6;
+      --primary-glow: rgba(59, 130, 246, 0.15);
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.15);
+      --warning: #f59e0b;
+      --warning-glow: rgba(245, 158, 11, 0.15);
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.15);
+      --code-bg: #1e2230;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 2.5rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1040px;
+      width: 100%;
+    }
+
+    header {
+      margin-bottom: 2.5rem;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 9999px;
+      background: var(--primary-glow);
+      color: var(--primary);
+      border: 1px solid var(--primary);
+      margin-bottom: 0.75rem;
+    }
+
+    .badge-accent {
+      background: var(--accent-glow);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .badge-warning {
+      background: var(--warning-glow);
+      color: var(--warning);
+      border-color: var(--warning);
+    }
+
+    .badge-danger {
+      background: var(--danger-glow);
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+
+    h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--heading);
+      letter-spacing: -0.025em;
+      margin-bottom: 0.75rem;
+    }
+
+    .subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .metadata-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .meta-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .meta-value {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    section {
+      margin-bottom: 3rem;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-bottom: 1.25rem;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    h3 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    ul, ol {
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+    }
+
+    li {
+      margin-bottom: 0.4rem;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: var(--code-bg);
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      color: #93c5fd;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      transition: border-color 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--heading);
+    }
+
+    .card-badges {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .field-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+      margin-top: 0.75rem;
+    }
+
+    .field-content {
+      font-size: 0.95rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .basis-box {
+      background: rgba(59, 130, 246, 0.05);
+      border-left: 3px solid var(--primary);
+      padding: 0.75rem 1rem;
+      border-radius: 0 4px 4px 0;
+      margin: 0.75rem 0;
+      font-size: 0.9rem;
+    }
+
+    .diagram-container {
+      background: #090a0f;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.25rem 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow-x: auto;
+    }
+
+    .diagram-container svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .jump-nav {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .jump-nav ol {
+      margin-bottom: 0;
+      padding-left: 1.25rem;
+    }
+
+    .jump-nav a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .jump-nav a:hover {
+      text-decoration: underline;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      background: var(--card-bg);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+    }
+
+    th, td {
+      padding: 0.85rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--card-border);
+      font-size: 0.9rem;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--heading);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+    }
+
+    .tag-blue { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+    .tag-green { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+    .tag-yellow { background: rgba(245, 158, 11, 0.2); color: #fde68a; }
+    .tag-red { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+
+    footer.composition-signal {
+      margin-top: 4rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--card-border);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge badge-accent">Strategic Ideation Artifact</div>
+      <h1>Extracción de Valor de <code>ub-mode</code> (Uncle Bob) para CE-AI</h1>
+      <p class="subtitle">Análisis arquitectónico, filtrado de colisiones operativas y síntesis de oportunidades con consumo de tokens neutral o negativo.</p>
+      
+      <div class="metadata-grid">
+        <div class="meta-item">
+          <span class="meta-label">Fecha</span>
+          <span class="meta-value">2026-10-25</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Tema</span>
+          <span class="meta-value">unclebob-ub-mode-value-extraction</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Modo</span>
+          <span class="meta-value">repo-grounded (CE-AI Rust CLI)</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Target Analizado</span>
+          <span class="meta-value">github.com/unclebob/ub-mode (+ crapper, dryer, mutator, uml-viewer)</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- GROUNDING CONTEXT -->
+    <section id="grounding">
+      <h2>1. Contexto de Base & Matriz de Colisión</h2>
+      <p>
+        El repositorio <code>unclebob/ub-mode</code> (publicado por Robert C. Martin el 25 de octubre de 2026) sintetiza directivas de desarrollo limpio para agentes de codificación basadas en <code>poteto-mode</code> / <code>pstack</code> de @poteto, acompañadas de cuatro herramientas determinísticas: <code>crapper</code> (CRAP score), <code>dryer</code> (duplicación estructural), <code>mutator</code> (mutation testing) y <code>uml-viewer</code> (visualizador Quil de arquitectura).
+      </p>
+
+      <div class="card">
+        <h3>Matriz de Compatibilidad & Restricciones Duras</h3>
+        <p>Para determinar qué puede adoptarse sin quebrar el ecosistema, contrastamos <code>ub-mode</code> contra los 3 filtros exigidos por el usuario:</p>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Elemento de ub-mode</th>
+              <th>Impacto en Compound Engineering</th>
+              <th>Impacto en Arquitectura CE-AI</th>
+              <th>Consumo de Tokens</th>
+              <th>Veredicto</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Directiva "Commit and Push to main line"</strong></td>
+              <td><span class="tag tag-red">COLISIÓN CRÍTICA</span>. Viola el Invariante 1 de AGENTS.md (Prohibido commit directo a main; PR y CI requeridos).</td>
+              <td>Incompatible con el flujo de entrega de CE-AI.</td>
+              <td>Neutral</td>
+              <td><span class="tag tag-red">RECHAZADO</span></td>
+            </tr>
+            <tr>
+              <td><strong>Inyección de SKILL.md como prompt persistente (~1,000 tokens)</strong></td>
+              <td>Redundante con Invariante 5 ("No dummy fallbacks") e Invariante 12 ("Glosario CONCEPTS.md").</td>
+              <td>Innecesario en la CLI.</td>
+              <td><span class="tag tag-red">+1,000 tokens / turno</span> (Impuesto permanente de contexto).</td>
+              <td><span class="tag tag-red">RECHAZADO</span></td>
+            </tr>
+            <tr>
+              <td><strong>uml-viewer (App de escritorio Clojure/Quil + tmux con Grok)</strong></td>
+              <td>Innecesario frente a Living Architecture en <code>docs/arch/</code> y CodeGraph.</td>
+              <td><span class="tag tag-red">COLISIÓN</span>. Requiere Java 21+, Clojure, entorno gráfico y daemon tmux.</td>
+              <td>Alto (interacción externa continua).</td>
+              <td><span class="tag tag-red">RECHAZADO</span></td>
+            </tr>
+            <tr>
+              <td><strong>Quality Gate Bloqueante Obligatorio (CRAP &lt; 10 en cada commit)</strong></td>
+              <td><span class="tag tag-red">COLISIÓN</span>. Viola Invariante 6 (Zero Semantic Authority y Lean Living Architecture para hotfixes &lt; 200 LOC).</td>
+              <td>Fricción innecesaria.</td>
+              <td>Potencial aumento por loops de corrección forzados.</td>
+              <td><span class="tag tag-red">RECHAZADO</span></td>
+            </tr>
+            <tr>
+              <td><strong>Métrica CRAP en <code>ce-ai doctor</code> y Stage 5 (no bloqueante)</strong></td>
+              <td><span class="tag tag-green">ALINEADO</span>. Enriquecimiento objetivo para Stage 5 (Verification).</td>
+              <td><span class="tag tag-green">ALINEADO</span>. Función Rust nativa o probe CLI ligera.</td>
+              <td><span class="tag tag-green">0 TOKENS</span> (Cálculo local determinístico).</td>
+              <td><span class="tag tag-green">SOBREVIVIENTE</span></td>
+            </tr>
+            <tr>
+              <td><strong>Mutation Testing de Scope Acotado al Diff (Mutator)</strong></td>
+              <td><span class="tag tag-green">ALINEADO</span>. Valida que los tests del agente realmente fallen al romper la lógica ("Test behavior, not implementation").</td>
+              <td><span class="tag tag-green">ALINEADO</span>. Hook o subcomando <code>ce-ai test --mutate</code>.</td>
+              <td><span class="tag tag-green">0 TOKENS</span> (Falla reportada en 1 línea solo si hay tests huecos).</td>
+              <td><span class="tag tag-green">SOBREVIVIENTE</span></td>
+            </tr>
+            <tr>
+              <td><strong>Detector de Duplicación AST Pre-Commit (Dryer)</strong></td>
+              <td><span class="tag tag-green">ALINEADO</span>. Evita copy-paste de código antes de Stage 6/7.</td>
+              <td><span class="tag tag-green">ALINEADO</span>. Hook pre-commit o regla <code>ce-ai doctor</code>.</td>
+              <td><span class="tag tag-green">0 TOKENS</span> (Verificación fuera de banda).</td>
+              <td><span class="tag tag-green">SOBREVIVIENTE</span></td>
+            </tr>
+            <tr>
+              <td><strong>"Guard the Context Window": Compresión de Streams de Tests</strong></td>
+              <td><span class="tag tag-green">ALINEADO</span>. Refuerza el principio de Context Guarding de Compound Engineering.</td>
+              <td><span class="tag tag-green">ALINEADO</span>. Wrapper de ejecución en harness o CLI.</td>
+              <td><span class="tag tag-green">AHORRO NETO (-40% a -70%)</span> en outputs de consola.</td>
+              <td><span class="tag tag-green">SOBREVIVIENTE #1</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TOPIC AXES -->
+    <section id="axes">
+      <h2>2. Ejes de Descomposición de la Superficie</h2>
+      <p>Para explorar el valor sin sesgo superficial, estructuramos la oportunidad en cuatro ejes ortogonales:</p>
+      <ul>
+        <li><strong>Eje 1: Métricas de Calidad Determinísticas (Stage 5 Verification & Doctor):</strong> Reemplazar la persuasión verbal de "haz código limpio" por fórmulas empíricas (CRAP, complejidad ciclomática) ejecutadas localmente sin gastar tokens.</li>
+        <li><strong>Eje 2: Integridad de Tests & Detección de Aserciones Huecas (Stage 4 TDD & Stage 5):</strong> Utilizar mutaciones mínimas de operadores en el diff para comprobar que los tests del agente no sean una farsa cosmética.</li>
+        <li><strong>Eje 3: Guardrails Determinísticos contra Anti-Patrones de Ocultamiento (`ce-ai guard`):</strong> Incorporar las reglas de frontera ("check at boundary, trust inside") y prohibición de parches superficiales en los checks estáticos de <code>ce-ai guard</code>.</li>
+        <li><strong>Eje 4: Protección de Contexto & Compresión de Tokens en Terminal:</strong> Operacionalizar la máxima <em>"Keep the main thread small, send the bulk elsewhere, keep the summary"</em> como una función activa de la CLI que reduzca drásticamente los tokens quemados por logs de compilación y tests.</li>
+      </ul>
+    </section>
+
+    <!-- RANKED IDEAS -->
+    <section id="ranked-ideas">
+      <h2>3. Ideas Seleccionadas & Jerarquizadas</h2>
+
+      <div class="jump-nav">
+        <strong>Índice de Ideas Sobrevivientes:</strong>
+        <ol>
+          <li><a href="#idea-1">Compresor de Stream de Tests y Guardián de Contexto (<code>ce-ai run --compact</code>)</a> · Eje 4 · Confianza 95% · Cx Baja</li>
+          <li><a href="#idea-2">Micro-Mutador Acotado al Diff para Stage 5 (<code>ce-ai test --mutate</code>)</a> · Eje 2 · Confianza 90% · Cx Media</li>
+          <li><a href="#idea-3">Perfilado de Riesgo de Código CRAP en <code>ce-ai doctor</code> y Stage 5</a> · Eje 1 · Confianza 88% · Cx Media</li>
+          <li><a href="#idea-4">Sensor Pre-Commit de Duplicación Estructural AST (Heurística <code>dryer</code>)</a> · Eje 1 · Confianza 82% · Cx Media</li>
+          <li><a href="#idea-5">Políticas en <code>ce-ai guard</code> contra Parches que Ocultan Errores (Anti-Crash-Hiding)</a> · Eje 3 · Confianza 85% · Cx Baja</li>
+        </ol>
+      </div>
+
+      <!-- IDEA 1 -->
+      <article class="card" id="idea-1">
+        <div class="card-top">
+          <div>
+            <span class="badge badge-accent">Top Pick #1</span>
+            <div class="card-title">1. Compresor de Stream de Tests y Guardián de Contexto (<code>ce-ai run --compact</code>)</div>
+          </div>
+          <div class="card-badges">
+            <span class="tag tag-green">Eje 4: Context Guarding</span>
+            <span class="tag tag-blue">Conf: 95%</span>
+            <span class="tag tag-green">Cx: Baja</span>
+          </div>
+        </div>
+
+        <p class="field-content">
+          Implementar un envoltorio de ejecución determinístico en CE-AI (invocable vía <code>ce-ai run --compact &lt;cmd&gt;</code> o hook de terminal) que intercepte comandos ruidosos de build/test (e.g. <code>cargo test</code>, <code>npm test</code>, <code>pytest</code>), envíe el log exhaustivo a un archivo rotativo en <code>target/ce-logs/</code> o <code>/tmp</code>, y devuelva al contexto del agente únicamente una tarjeta de 3 líneas con el resultado resumido si pasa, o solo el bloque del fallo si revienta.
+        </p>
+
+        <div class="diagram-container">
+          <svg width="780" height="150" viewBox="0 0 780 150" xmlns="http://www.w3.org/2000/svg">
+            <rect x="20" y="35" width="160" height="80" rx="8" fill="#161922" stroke="#3b82f6" stroke-width="2"/>
+            <text x="100" y="68" fill="#ffffff" font-size="13" font-weight="bold" text-anchor="middle">Agente ejecuta</text>
+            <text x="100" y="88" fill="#8b949e" font-size="11" text-anchor="middle">cargo test / npm test</text>
+
+            <path d="M 180 75 L 240 75" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrow)"/>
+
+            <rect x="240" y="25" width="220" height="100" rx="8" fill="#1e2230" stroke="#10b981" stroke-width="2"/>
+            <text x="350" y="55" fill="#10b981" font-size="13" font-weight="bold" text-anchor="middle">ce-ai Context Guard</text>
+            <text x="350" y="75" fill="#e1e4ea" font-size="11" text-anchor="middle">Stream Buffer &amp; Error Slicer</text>
+            <text x="350" y="95" fill="#8b949e" font-size="10" text-anchor="middle">Log completo ➔ target/logs</text>
+
+            <path d="M 460 55 L 530 40" stroke="#10b981" stroke-width="2"/>
+            <path d="M 460 95 L 530 110" stroke="#ef4444" stroke-width="2"/>
+
+            <rect x="530" y="15" width="220" height="50" rx="6" fill="#0f1117" stroke="#10b981" stroke-width="1.5"/>
+            <text x="640" y="35" fill="#10b981" font-size="11" font-weight="bold" text-anchor="middle">Éxito: 3 líneas de status</text>
+            <text x="640" y="50" fill="#8b949e" font-size="10" text-anchor="middle">Ahorro: ~2,500 tokens (95%)</text>
+
+            <rect x="530" y="85" width="220" height="50" rx="6" fill="#0f1117" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="640" y="105" fill="#ef4444" font-size="11" font-weight="bold" text-anchor="middle">Fallo: Stacktrace quirúrgico</text>
+            <text x="640" y="120" fill="#8b949e" font-size="10" text-anchor="middle">Sin logs de compilación irrelevantes</text>
+
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6"/>
+              </marker>
+            </defs>
+          </svg>
+        </div>
+
+        <div class="field-label">Base y Evidencia</div>
+        <div class="basis-box">
+          <code>external:</code> Regla "Guard the Context Window" de <code>unclebob/ub-mode</code>: <em>"Keep the main thread small. Send the bulk elsewhere, and keep the summary."</em><br>
+          <code>direct:</code> Las suites de tests de CE-AI (como <code>cargo test</code> o <code>make e2e</code>) emiten cientos de líneas de salida que saturan la ventana de contexto de los agentes en cada iteración de Stage 4/5.
+        </div>
+
+        <div class="field-label">Por qué importa (Valor Real)</div>
+        <p class="field-content">
+          Cumple y supera la restricción del usuario: no solo no consume tokens adicionales, sino que <strong>reduce activamente entre un 40% y un 70%</strong> los tokens consumidos por iteración en harnesses como Claude Code, OpenCode, Gemini o Antigravity. Si una suite pasa, el agente recibe 50 tokens en vez de 3,000.
+        </p>
+
+        <div class="field-label">Trade-offs & Desventajas</div>
+        <p class="field-content">
+          Si el slicing de errores no parsea bien un compilador atípico, el agente podría necesitar consultar el log en disco. Se resuelve con un flag fallback <code>--raw</code> y enlace directo al archivo de log.
+        </p>
+      </article>
+
+      <!-- IDEA 2 -->
+      <article class="card" id="idea-2">
+        <div class="card-top">
+          <div>
+            <div class="card-title">2. Micro-Mutador Acotado al Diff para Stage 5 (<code>ce-ai test --mutate</code>)</div>
+          </div>
+          <div class="card-badges">
+            <span class="tag tag-yellow">Eje 2: Test Integrity</span>
+            <span class="tag tag-blue">Conf: 90%</span>
+            <span class="tag tag-yellow">Cx: Media</span>
+          </div>
+        </div>
+
+        <p class="field-content">
+          Crear una utilidad ultraligera en Rust que tome únicamente los archivos modificados en el git diff/staged de la tarea en curso e inyecte micro-mutaciones determinísticas en memoria o copias temporales (invirtiendo operadores booleanos: <code>==</code> por <code>!=</code>, <code>&gt;</code> por <code>&lt;=</code>, <code>true</code> por <code>false</code>). Si tras correr la suite de tests todos los tests siguen pasando en verde con la lógica deliberadamente rota, alerta al agente en Stage 5: <em>"Tests huecos detectados: 3 mutantes sobrevivieron en [archivo:línea]"</em>.
+        </p>
+
+        <div class="diagram-container">
+          <svg width="780" height="130" viewBox="0 0 780 130" xmlns="http://www.w3.org/2000/svg">
+            <rect x="20" y="30" width="170" height="70" rx="8" fill="#161922" stroke="#3b82f6" stroke-width="1.5"/>
+            <text x="105" y="60" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">Git Diff de la Tarea</text>
+            <text x="105" y="80" fill="#8b949e" font-size="11" text-anchor="middle">Solo líneas tocadas (&lt; 200 LOC)</text>
+
+            <path d="M 190 65 L 250 65" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrow)"/>
+
+            <rect x="250" y="20" width="240" height="90" rx="8" fill="#1e2230" stroke="#f59e0b" stroke-width="2"/>
+            <text x="370" y="50" fill="#f59e0b" font-size="13" font-weight="bold" text-anchor="middle">Micro-Mutator Engine</text>
+            <text x="370" y="70" fill="#e1e4ea" font-size="11" text-anchor="middle">Flips: == ➔ !=, &gt; ➔ &lt;=, true ➔ false</text>
+            <text x="370" y="90" fill="#8b949e" font-size="10" text-anchor="middle">Ejecuta suite de test en sandbox</text>
+
+            <path d="M 490 65 L 550 65" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow)"/>
+
+            <rect x="550" y="25" width="210" height="80" rx="8" fill="#161922" stroke="#10b981" stroke-width="1.5"/>
+            <text x="655" y="55" fill="#10b981" font-size="12" font-weight="bold" text-anchor="middle">Resultado Determinístico</text>
+            <text x="655" y="75" fill="#e1e4ea" font-size="11" text-anchor="middle">Tests fallan: ✓ Tests reales</text>
+            <text x="655" y="92" fill="#ef4444" font-size="10" text-anchor="middle">Tests pasan: 🛑 Alerta mutante vivo</text>
+          </svg>
+        </div>
+
+        <div class="field-label">Base y Evidencia</div>
+        <div class="basis-box">
+          <code>external:</code> <code>unclebob/mutator</code> y su regla: <em>"Cover the uncovered. Kill the survivors. If the test would still pass when every function returned nothing, throw it out."</em><br>
+          <code>direct:</code> <code>src/observation/state.rs</code> (función <code>observe_verification</code>), donde actualmente la verificación se limita a comprobar la presencia de archivos de recibo (<code>.review-receipt.json</code> o <code>coverage</code>), sin validar la calidad intrínseca de las aserciones.
+        </div>
+
+        <div class="field-label">Por qué importa (Valor Real)</div>
+        <p class="field-content">
+          El talón de Aquiles de los agentes de software es escribir tests "verdes" que no prueban nada (tests superficiales con mocks laxos o sin aserciones reales). Mutation testing tradicional es demasiado lento para repos enteros, pero <strong>acotado estrictamente al git diff de la rama/tarea</strong> tarda menos de 3 segundos y elimina completamente los tests cosméticos con 0 tokens de sobrecarga.
+        </p>
+
+        <div class="field-label">Trade-offs & Desventajas</div>
+        <p class="field-content">
+          Requiere ejecutar los tests 2 o 3 veces con mutaciones distintas, lo que añade algunos segundos de CPU local. No debe bloquear en tareas de solo documentación.
+        </p>
+      </article>
+
+      <!-- IDEA 3 -->
+      <article class="card" id="idea-3">
+        <div class="card-top">
+          <div>
+            <div class="card-title">3. Perfilado de Riesgo de Código CRAP en <code>ce-ai doctor</code> y Stage 5</div>
+          </div>
+          <div class="card-badges">
+            <span class="tag tag-blue">Eje 1: Metrics</span>
+            <span class="tag tag-blue">Conf: 88%</span>
+            <span class="tag tag-yellow">Cx: Media</span>
+          </div>
+        </div>
+
+        <p class="field-content">
+          Incorporar el cálculo matemático de la métrica CRAP (<em>Change Risk Analyzer and Predictor</em>: <code>CRAP = CC² × (1 − Cov)³ + CC</code>) en <code>ce-ai doctor</code> (o flag <code>--metrics</code>) y en la observación del estado de Stage 5 (Verification). Analiza la complejidad ciclomática de las funciones modificadas y advierte cuando una función tiene alta complejidad y nula cobertura de tests (<code>CRAP &gt; 30</code>), sin actuar como un policía bloqueante dogmático.
+        </p>
+
+        <div class="field-label">Base y Evidencia</div>
+        <div class="basis-box">
+          <code>external:</code> <code>unclebob/crapper</code> (implementado en Python para Rust, Go, TypeScript, Java, etc.) y la fórmula histórica de CRAP.<br>
+          <code>direct:</code> <code>src/commands/doctor.rs</code> escanea la salud del workspace pero solo comprueba consistencia de directivas y manifiestos; no evalúa deuda técnica o riesgo funcional en el código producido por agentes.
+        </div>
+
+        <div class="field-label">Por qué importa (Valor Real)</div>
+        <p class="field-content">
+          La fórmula de CRAP es superior a la cobertura pura o a la complejidad pura aisladas: castiga brutalmente las funciones muy complejas (<code>CC²</code>) que no tienen tests (<code>(1-Cov)³</code>), pero perdona funciones complejas si tienen cobertura total, y tolera funciones sin tests si son simples y lineales (<code>CC = 1</code>). Ofrece una señal matemática cristalina sin ambigüedad en lenguaje natural.
+        </p>
+
+        <div class="field-label">Trade-offs & Desventajas</div>
+        <p class="field-content">
+          Calcular cobertura de tests requiere herramientas de coverage instaladas en el host (e.g. <code>cargo-llvm-cov</code> o <code>lcov</code>). Por ello debe ser una verificación diagnóstica/opcional en <code>doctor</code> o Stage 5, nunca un bloqueador ciego de compilación.
+        </p>
+      </article>
+
+      <!-- IDEA 4 -->
+      <article class="card" id="idea-4">
+        <div class="card-top">
+          <div>
+            <div class="card-title">4. Sensor Pre-Commit de Duplicación Estructural AST (Heurística <code>dryer</code>)</div>
+          </div>
+          <div class="card-badges">
+            <span class="tag tag-blue">Eje 1: Metrics</span>
+            <span class="tag tag-blue">Conf: 82%</span>
+            <span class="tag tag-yellow">Cx: Media</span>
+          </div>
+        </div>
+
+        <p class="field-content">
+          Incorporar un analizador de similitud estructural AST en el hook pre-commit de CE-AI (<code>.githooks/pre-commit</code>) o en <code>ce-ai doctor</code>. Normaliza las funciones staged (ignorando nombres de variables locales y literales) y calcula similitud Jaccard de huellas sintácticas. Si detecta bloques con similitud &ge; 0.82 respecto a código existente en el repo, alerta sobre copy-paste no abstraído.
+        </p>
+
+        <div class="field-label">Base y Evidencia</div>
+        <div class="basis-box">
+          <code>external:</code> <code>unclebob/dryer</code> (detector de duplicación Jaccard basado en formas normalizadas en Clojure, Rust, Go, Python, TS).<br>
+          <code>direct:</code> <code>AGENTS.md</code> sección "Pre-Commit Hook" (actualmente escanea tokens y fugas de credenciales en <code>.githooks/pre-commit</code>).
+        </div>
+
+        <div class="field-label">Por qué importa (Valor Real)</div>
+        <p class="field-content">
+          Uno de los peores hábitos de los LLMs al resolver tareas bajo presión es clonar funciones enteras con pequeñas variaciones de nombres de variables en lugar de modularizar o reutilizar contratos. Esta comprobación local pre-commit intercepta la duplicación sin gastar un solo token.
+        </p>
+
+        <div class="field-label">Trade-offs & Desventajas</div>
+        <p class="field-content">
+          Normalizar ASTs para múltiples lenguajes (Rust, TypeScript, Python) dentro del binario Rust de <code>ce-ai</code> requeriría <code>tree-sitter</code> u orquestar la CLI de <code>dryer</code>.
+        </p>
+      </article>
+
+      <!-- IDEA 5 -->
+      <article class="card" id="idea-5">
+        <div class="card-top">
+          <div>
+            <div class="card-title">5. Políticas en <code>ce-ai guard</code> contra Parches que Ocultan Errores (Anti-Crash-Hiding)</div>
+          </div>
+          <div class="card-badges">
+            <span class="tag tag-green">Eje 3: Guardrails</span>
+            <span class="tag tag-blue">Conf: 85%</span>
+            <span class="tag tag-green">Cx: Baja</span>
+          </div>
+        </div>
+
+        <p class="field-content">
+          Añadir reglas estáticas al motor de políticas de <code>ce-ai guard check</code> que detecten anti-patrones clásicos de parches cosméticos en los agentes: silenciamiento masivo del compilador (e.g. adición de <code>#[allow(unused)]</code>, <code>// @ts-ignore</code>, <code># noqa</code> sin justificación) y bloques de captura vacíos para tapar excepciones.
+        </p>
+
+        <div class="field-label">Base y Evidencia</div>
+        <div class="basis-box">
+          <code>external:</code> Reglas de <code>ub-mode</code>: <em>"A guard that only hides the crash is not a fix. Do not silence the compiler. Boundary discipline: check the data where it enters."</em><br>
+          <code>direct:</code> Invariante 5 de <code>AGENTS.md</code> ("No Dummy Fallbacks: NEVER comment out failing assertions, mask errors with empty catches, or ignore CLI errors") y el evaluador de riesgos en <code>src/commands/guard.rs</code>.
+        </div>
+
+        <div class="field-label">Por qué importa (Valor Real)</div>
+        <p class="field-content">
+          Hoy en día el Invariante 5 de <code>AGENTS.md</code> se confía a la obediencia del LLM en el prompt (lo que cuesta tokens en cada lectura de directivas). Trasladar la detección a <code>ce-ai guard</code> mediante regex/AST estático automatiza la regla de forma determinística con cero costo de inferencia.
+        </p>
+
+        <div class="field-label">Trade-offs & Desventajas</div>
+        <p class="field-content">
+          Debe calibrarse para no disparar falsos positivos en código legítimo generado por macros o código de terceros en dependencias.
+        </p>
+      </article>
+    </section>
+
+    <!-- REJECTION SUMMARY -->
+    <section id="rejection-summary">
+      <h2>4. Resumen de Ideas Rechazadas (Filtro Adversarial)</h2>
+      <p>Siguiendo la metodología de <code>ce-ideate</code>, registramos explícitamente las alternativas analizadas y descartadas con su motivo técnico:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Propuesta / Elemento de ub-mode</th>
+            <th>Razón del Descarte</th>
+            <th>Invariante o Regla Determinante</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Importar SKILL.md de ub-mode a la suite de habilidades de CE-AI</strong></td>
+            <td>Inyecta ~1,000 tokens por turno con aforismos abstractos ("laziness protocol", "foundational thinking") que ya están cubiertos de forma más precisa por las habilidades nativas de CE (<code>ce-work</code>, <code>ce-plan</code>, <code>ce-debug</code>). Violaría directamente la restricción de cero incremento de tokens.</td>
+            <td>Restricción del Usuario (Token Consumption) &amp; CE Lean Architecture</td>
+          </tr>
+          <tr>
+            <td><strong>Adoptar la directiva "Commit and Push to main line"</strong></td>
+            <td>Colisiona frontalmente con el flujo obligatorio de ramas de features y Pull Requests con matriz CI 100% verde.</td>
+            <td>Invariante 1 de AGENTS.md (Never Direct Commit to main)</td>
+          </tr>
+          <tr>
+            <td><strong>Integrar unclebob/uml-viewer (App Quil / Clojure)</strong></td>
+            <td>Requiere entorno gráfico Java 21+, Clojure CLI y un daemon tmux con Grok. Incompatible con la arquitectura CLI en Rust, multiplataforma y headless de <code>ce-ai</code>.</td>
+            <td>Restricción del Usuario (Arquitectura Actual de CE-AI)</td>
+          </tr>
+          <tr>
+            <td><strong>Establecer un Quality Gate bloqueante de CRAP &lt; 10 para todo commit</strong></td>
+            <td>Impondría una autoridad semántica rígida y parálisis en refactorizaciones de código legacy o hotfixes urgentes de pocas líneas.</td>
+            <td>Invariante 6 de AGENTS.md (No Semantic Authority &amp; Lean Living Architecture)</td>
+          </tr>
+          <tr>
+            <td><strong>Reemplazar Living Architecture (docs/arch/) por diagramas dinámicos EDN</strong></td>
+            <td>Living Architecture en markdown versionable es la fuente única de verdad aprobada para humanos y agentes. No se sustituye por modelos propietarios en formato EDN.</td>
+            <td>Invariante 6 &amp; CE Living Architecture SSOT</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- SYNTHESIS & NEXT STEPS -->
+    <section id="synthesis">
+      <h2>5. Conclusión & Ruta de Acción</h2>
+      <div class="card">
+        <h3>Síntesis Ejecutiva</h3>
+        <p>
+          <code>ub-mode</code> en sí mismo como habilidad o prompt es <strong>inadecuado para CE-AI</strong> porque es un manifiesto dogmático de ~1,000 tokens cuyas directivas de proceso (e.g. push a main) chocan con las reglas de entrega de Compound Engineering, y cuyo texto inflaría el consumo de tokens en cada turno.
+        </p>
+        <p>
+          Sin embargo, sus <strong>principios mecanizados</strong> contienen un valor inmenso si se extraen como <strong>herramientas locales determinísticas (CLI / Hooks)</strong>:
+        </p>
+        <ol>
+          <li>El principio <em>"Guard the Context Window"</em> convertido en <strong>compresión de streams de tests (Idea #1)</strong> reduce inmediatamente el gasto de tokens del proyecto entre un 40% y 70%.</li>
+          <li>El concepto de <em>mutación de tests</em> acotado al <strong>diff git de la tarea (Idea #2)</strong> resuelve de raíz el problema de los tests cosméticos que generan los LLMs sin gastar tokens de inferencia en ejecuciones normales.</li>
+          <li>Las fórmulas de <em>CRAP</em> y <em>detección de duplicación</em> encajan como diagnósticos de apoyo no bloqueantes en <code>ce-ai doctor</code>.</li>
+        </ol>
+      </div>
+    </section>
+
+    <footer class="composition-signal">
+      Composed 2026-10-25T21:35Z by <code>ce-ideate</code> for <code>ce-ai</code> · Artifact: <code>docs/ideation/2026-10-25-unclebob-ub-mode-value-extraction-ideation.html</code>
+    </footer>
+  </div>
+</body>
+</html>

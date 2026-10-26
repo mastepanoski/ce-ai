@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.8.0] - 2026-10-26
+
+### Added
+- **Deterministic Test Integrity Engine (`ce-ai verify`)**:
+  - Implemented diff-scoped micro-mutator (`src/verification/`) generating deterministic relational (`==` $\leftrightarrow$ `!=`, `>=` $\leftrightarrow$ `<`, `<=` $\leftrightarrow$ `>`, `>` $\leftrightarrow$ `<=`, `<` $\leftrightarrow$ `>=`) and boolean (`true` $\leftrightarrow$ `false`) operator mutations restricted exclusively to touched Git diff lines.
+  - Implemented sandboxed test runner with RAII `FileRestoreGuard` ensuring 100% byte-for-byte source restoration even in the event of test failures, process panics, or timeouts.
+  - Added hollow assertion detection: tests that pass despite inverted logic are flagged as surviving mutants, with `--strict` failing with exit code 6 (`CeError::Verification`) in CI and Stage 5 Verification.
+  - Added `.mutant-receipt.json` persistence for Stage 5 verification auditability.
+- **Code Quality & CRAP Risk Metric (`ce-ai doctor --metrics`)**:
+  - Implemented McCabe Cyclomatic Complexity ($CC$) AST analyzer (`src/quality/complexity.rs`) operating safely on raw byte slices to avoid multi-byte UTF-8 boundary panics.
+  - Implemented CRAP formula evaluator ($\text{CRAP} = CC^2 \times (1 - Cov)^3 + CC$) reading LCOV coverage files (`lcov.info`), flagging functions with $\text{CRAP} > 30$.
+  - Added graceful fallback to pure Cyclomatic Complexity ($CC > 15$) when no coverage data is present on disk.
+  - Added `--metrics` flag to `ce-ai doctor` for detailed function-level risk breakdowns.
+- **Stage 5 Verification & Workflow FSM Integration**:
+  - Extended `VerificationObservation` in `src/observation/state.rs` with `mutant_integrity_passed` and `max_crap_score`, preserving `Eq` on workflow state structures.
+- **Domain Concepts Accretion (`CONCEPTS.md`)**:
+  - Accreted 3 new domain entries: `CRAP Code Risk Metric (Change Risk Analyzer and Predictor)`, `Diff-Scoped Mutation Smoke-Test`, and `Hollow Test Detection (Cosmetic Assertions)`, strictly verified via `scripts/validate-concepts.py`.
+
 ## [3.7.0] - 2026-10-23
 
 ### Added

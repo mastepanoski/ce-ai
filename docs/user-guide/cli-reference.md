@@ -19,7 +19,7 @@ for complete arguments. Commands that mutate configuration support global
 | --- | --- |
 | `init-prj [--tier <tier>] [--all] [--migrate] [--migrate-arch]` | Injects non-destructive `AGENTS.md` rules, session-start hooks, and RTK token compression into the current repository. Use `--migrate` to surgically modernize historical unmanaged CE-AI clauses into decoupled Compound Engineering guidance (with automatic `AGENTS.md.bak` backup). Use `--migrate-arch` to migrate legacy `openspec/` to living architecture in `docs/arch/`. Use `--all` to batch-upgrade or batch-migrate all registered projects. |
 | `deinit-prj` | Safely removes managed blocks and session hooks from the current repository without touching user code or custom rules. |
-| `doctor [--fix] [--migrate-arch] [--all-projects]` | Diagnoses environment readiness, harness health, companion tools, project adoptions, and `system.yaml` manifest integrity. Use `--fix` for automated repair of drifted blocks, missing hooks, and stale adoptions. Use `--migrate-arch` for assisted architecture migration. |
+| `doctor [--fix] [--migrate-arch] [--all-projects] [--metrics]` | Diagnoses environment readiness, harness health, companion tools, project adoptions, `system.yaml` manifest integrity, and code quality risk. Use `--metrics` to display detailed Cyclomatic Complexity ($CC > 15$) and CRAP scores ($\text{CRAP} > 30$). Use `--fix` for automated repair of drifted blocks, missing hooks, and stale adoptions. Use `--migrate-arch` for assisted architecture migration. |
 | `status`, `backups`, `uninstall` | Inspect state, browse/restore pre-mutation configuration snapshots, or remove managed assets. |
 | `install`, `sync`, `upgrade` | *Legacy surfaces*: Emit deprecation notices guiding users to `init-prj` and `fleet pin / sync`. |
 
@@ -28,6 +28,7 @@ for complete arguments. Commands that mutate configuration support global
 | Command | Boundary |
 | --- | --- |
 | `workflow`, `archive` | Persist/recover workflow state, read SSOT progress from `docs/plans/`, and archive completed features into `docs/arch/archive/` (or legacy `openspec/changes/archive/`). |
+| `verify [--strict] [--test-cmd <cmd>]` | Diff-scoped micro-mutator smoke test for Stage 5 Verification. Injects operator mutations exclusively into diff lines to catch hollow assertions. Under `--strict`, exits with code 6 (`Verification`) if mutants survive. |
 | `graduate` (deprecated) | Legacy command for migrating historical `odd/tasks/` briefs to specifications; new work uses `docs/plans/` or living architecture (`docs/arch/`). |
 | `gate check` | Enforces a complete Stage 4 contract by default; `--mode observe` records the decision without blocking. The agile LOC notice is advisory. |
 | `spec`, `doc` | Inspect/promote living specifications (`docs/arch/system/` or `openspec/specs/`) and run documentation hygiene/linting (`doc lint`, `doc refresh`, `doc stats`). |

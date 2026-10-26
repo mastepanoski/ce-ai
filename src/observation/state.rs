@@ -62,6 +62,12 @@ pub struct VerificationObservation {
     pub uncommitted_changes: usize,
     /// Whether a code-review receipt is recorded for the active branch head.
     pub review_receipt_stamped: bool,
+    /// Whether diff-scoped mutant smoke test passed (None if not evaluated).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mutant_integrity_passed: Option<bool>,
+    /// High-risk cyclomatic complexity or CRAP score if calculated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_crap_score: Option<u32>,
 }
 
 /// Observed handoff artifact for inter-agent or session transitions.
@@ -230,14 +236,20 @@ pub fn observe_verification(
         false
     } || repo_root.join(".review-receipt.json").exists();
 
+    let mutant_receipt = crate::verification::runner::read_mutation_receipt(repo_root);
+    let mutant_integrity_passed = mutant_receipt.as_ref().map(|r| r.survived_mutants == 0);
+
     let has_evidence = review_receipt_stamped
         || repo_root.join("target").join("coverage").exists()
-        || repo_root.join(".test-receipt.json").exists();
+        || repo_root.join(".test-receipt.json").exists()
+        || mutant_integrity_passed == Some(true);
 
     VerificationObservation {
         has_evidence,
         uncommitted_changes,
         review_receipt_stamped,
+        mutant_integrity_passed,
+        max_crap_score: None,
     }
 }
 

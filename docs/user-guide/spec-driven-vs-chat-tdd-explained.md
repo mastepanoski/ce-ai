@@ -142,7 +142,7 @@ Each layer preserves a different property:
 ```text
 Living Arch / Deltas (Stage 2) → external behavioral baseline (docs/arch/)
 Bounded unit + local TDD       → Red → Green → Refactor in docs/plans/
-Verification (Stage 5)         → conformance to the contract
+Verification (Stage 5)         → conformance to the contract and test integrity (`ce-ai verify`)
 ```
 
 ### 4.1 Specification as an Execution Baseline (Stage 2: Living Architecture & Contracts)
@@ -197,7 +197,7 @@ Because workflow and repository state live outside the transcript, the conversat
 | **Role of TDD** | Design and feedback discipline | Conversational orchestration protocol | Implementation technique within bounded units |
 | **Cycle cadence** | Minutes-level increments | 1–2 API requests per micro-change | Bounded work units (~200 LOC heuristic in `docs/plans/`) |
 | **Behavioral baseline** | May exist externally (stories, acceptance criteria); executable design evolves incrementally through tests | May be explicit or emerge conversationally; vulnerable to drift if not externalized | Externalized baseline before execution (`docs/arch/`, optional Stage 2) |
-| **Feedback mechanism** | Local test runner in IDE/terminal | Multi-turn conversational round-trips | Local compiler, test suite, and CI |
+| **Feedback mechanism** | Local test runner in IDE/terminal | Multi-turn conversational round-trips | Local compiler, test suite, mutation smoke-test (`ce-ai verify`), and CI |
 | **Context overhead** | Human working memory (~3–5 chunks) | Accumulates in transcript ($O(n^2)$ naive) | Curated durable artifacts ($O(1)$ per unit w.r.t. completed units; $O(n)$ total) |
 | **Epistemic validation** | Human review and runtime feedback | Same model writes test and code in one context | External spec / plan reviewable by humans or independent gates |
 | **Context reset handling** | Developer memory / git status | Transcript recovery or compaction | State recovery from `state.json` and `docs/plans/` |

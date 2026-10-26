@@ -10,8 +10,8 @@ use clap::Subcommand;
 
 use crate::commands::{
     audit, backups, decisions, deinit_prj, doc, doctor, fleet, gate, guard, init_prj, install,
-    report_bug, self_update, skills, status, sync, tools, uninstall, upgrade, usage, workflow,
-    Context,
+    report_bug, self_update, skills, status, sync, tools, uninstall, upgrade, usage, verify,
+    workflow, Context,
 };
 use crate::error::CeError;
 
@@ -110,6 +110,8 @@ pub enum Commands {
     ReportBug(report_bug::Args),
     /// Fleet version governance and synchronization across native AI coding agent harnesses.
     Fleet(fleet::Args),
+    /// Diff-scoped micro-mutator smoke test for test integrity and hollow assertion detection.
+    Verify(verify::Args),
 }
 
 impl CeCommand for Commands {
@@ -162,6 +164,7 @@ impl CeCommand for Commands {
             Commands::Spec(args) => crate::commands::spec::run_spec(ctx, args),
             Commands::Doc(args) => doc::run_doc(ctx, args),
             Commands::ReportBug(args) => report_bug::run(ctx, args),
+            Commands::Verify(args) => verify::run(ctx, args),
         }
     }
 }

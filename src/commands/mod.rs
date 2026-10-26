@@ -24,6 +24,7 @@ pub mod tools;
 pub mod uninstall;
 pub mod upgrade;
 pub mod usage;
+pub mod verify;
 pub mod workflow;
 
 use std::path::PathBuf;

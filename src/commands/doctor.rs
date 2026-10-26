@@ -42,6 +42,10 @@ pub struct Args {
     /// Status to assign when archiving stale changes (e.g. 'superseded').
     #[arg(long)]
     pub status: Option<String>,
+
+    /// Calculate code risk metric (CRAP = CC² × (1 - Cov)³ + CC) and detect high-complexity untested functions.
+    #[arg(long)]
+    pub metrics: bool,
 }
 
 /// Extracts the `OWNER/REPO` slug from a GitHub `origin` remote URL
@@ -514,6 +518,12 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
 
     // Living Architecture System Manifest integrity probe
     probe_system_manifest_integrity(&repo_root);
+
+    // Code Quality and CRAP Risk Probe (Issue #ub-mode)
+    let quality_findings = probe_code_quality_risk(&repo_root, args.metrics);
+    if args.strict {
+        findings.extend(quality_findings);
+    }
 
     let branch = crate::commands::workflow::probe_git_branch(&repo_root);
     let current_wf = state.current_workflow_for_branch(&repo_root, branch.as_deref());
@@ -1356,6 +1366,124 @@ pub fn probe_system_manifest_integrity(repo_root: &std::path::Path) -> Vec<Strin
     }
 
     warnings
+}
+
+/// Probes source files for high-risk functions using CRAP / Cyclomatic Complexity metrics.
+pub fn probe_code_quality_risk(repo_root: &std::path::Path, explicit_metrics: bool) -> Vec<String> {
+    let src_dir = repo_root.join("src");
+    if !src_dir.is_dir() {
+        return Vec::new();
+    }
+
+    // 1. Look for LCOV file in standard locations
+    let lcov_candidates = [
+        repo_root.join("target").join("coverage").join("lcov.info"),
+        repo_root.join("coverage").join("lcov.info"),
+        repo_root.join("target").join("lcov.info"),
+        repo_root.join("lcov.info"),
+    ];
+
+    let coverage_map = lcov_candidates
+        .iter()
+        .find(|p| p.is_file())
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .map(|content| crate::quality::coverage::parse_lcov(&content));
+
+    // 2. Discover .rs files in src/
+    let mut files = Vec::new();
+    collect_rs_files(&src_dir, repo_root, &mut files);
+
+    let mut warnings = Vec::new();
+    let mut total_functions = 0;
+    let mut max_crap = 0.0f64;
+    let mut max_cc = 0usize;
+
+    for (abs_path, rel_path) in files {
+        if let Ok(content) = std::fs::read_to_string(&abs_path) {
+            let fns = crate::quality::complexity::calculate_complexity(&content);
+            total_functions += fns.len();
+
+            for fn_comp in fns {
+                if fn_comp.complexity > max_cc {
+                    max_cc = fn_comp.complexity;
+                }
+
+                // Check coverage match
+                let cov = coverage_map.as_ref().and_then(|m| {
+                    m.get(&rel_path).copied().or_else(|| {
+                        // try matching normalized suffix
+                        m.iter()
+                            .find(|(k, _)| k.ends_with(&rel_path))
+                            .map(|(_, v)| *v)
+                    })
+                });
+
+                let eval = crate::quality::crap::calculate_crap(fn_comp.complexity, cov);
+                if let Some(crap_score) = eval.crap_score {
+                    if crap_score > max_crap {
+                        max_crap = crap_score;
+                    }
+                }
+
+                if eval.is_high_risk {
+                    let msg = if let Some(score) = eval.crap_score {
+                        let cov_pct = eval.coverage.unwrap_or(0.0) * 100.0;
+                        format!(
+                            "quality-crap: {}:{}: function `{}` (CRAP: {:.1}, CC: {}, Cov: {:.1}%) exceeds risk threshold (> 30)",
+                            rel_path, fn_comp.start_line, fn_comp.name, score, fn_comp.complexity, cov_pct
+                        )
+                    } else {
+                        format!(
+                            "quality-complexity: {}:{}: function `{}` (CC: {}) exceeds complexity threshold (> 15)",
+                            rel_path, fn_comp.start_line, fn_comp.name, fn_comp.complexity
+                        )
+                    };
+                    println!("doctor-warn: {msg}");
+                    warnings.push(msg);
+                }
+            }
+        }
+    }
+
+    if explicit_metrics {
+        let cov_status = if coverage_map.is_some() {
+            "LCOV active"
+        } else {
+            "no LCOV, CC fallback"
+        };
+        println!(
+            "doctor-info: code quality metrics ({cov_status}): {total_functions} functions evaluated, max CC: {max_cc}, max CRAP: {max_crap:.1}, high-risk findings: {}",
+            warnings.len()
+        );
+    }
+
+    warnings
+}
+
+fn collect_rs_files(
+    dir: &std::path::Path,
+    base: &std::path::Path,
+    out: &mut Vec<(std::path::PathBuf, String)>,
+) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                // Skip tests directories inside src/ to avoid testing the test code
+                let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if file_name != "tests" {
+                    collect_rs_files(&path, base, out);
+                }
+            } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+                let rel = path
+                    .strip_prefix(base)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                out.push((path, rel));
+            }
+        }
+    }
 }
 
 #[cfg(test)]

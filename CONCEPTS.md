@@ -263,5 +263,15 @@ An automated migration mechanism (`ce-ai init-prj --migrate-arch` and `ce-ai doc
 ### Single Source of Truth (SSOT) Progress
 The operational principle in `ce-ai` establishing markdown implementation plans in `docs/plans/` (or active deltas in `docs/arch/deltas/`) as the definitive, singular source of truth for task progress tracking and FSM lifecycle stage deduction. By inspecting `- [x]` completion directly in agile plans, `ce-ai` eliminates the cognitive overhead and false-positive desync warnings previously caused by dual-tracking tasks in OpenSpec `tasks.md` packages.
 
+### CRAP Code Risk Metric (Change Risk Analyzer and Predictor)
+An empirical code health metric evaluated in `ce-ai doctor` and static analysis (`src/quality/`) that combines McCabe Cyclomatic Complexity ($CC$) and automated test coverage ($Cov$) via the formula $\text{CRAP}(CC, Cov) = CC^2 \times (1 - Cov)^3 + CC$. In repositories where LCOV coverage data is available on disk (`lcov.info`), functions with $\text{CRAP} > 30$ are flagged as high risk. When coverage reports are absent, `ce-ai` falls back gracefully to flagging pure Cyclomatic Complexity ($CC > 15$), providing actionable complexity diagnostics without requiring heavy test instrumentation.
+
+### Diff-Scoped Mutation Smoke-Test
+A sub-second test integrity verification technique implemented in `ce-ai verify` and `src/verification/` that evaluates the quality of test suites by injecting 1–3 targeted operator mutations (`==` $\leftrightarrow$ `!=`, `>=` $\leftrightarrow$ `<`, `<=` $\leftrightarrow$ `>`, `true` $\leftrightarrow$ `false`) exclusively into line ranges modified in the Git diff. By restricting the mutation scope strictly to touched code rather than the entire codebase, `ce-ai` executes mutation checks in under 5 seconds, validating that newly written tests actually fail when implementation logic is altered.
+
+### Hollow Test Detection (Cosmetic Assertions)
+A deterministic quality check that identifies tests written by AI agents or developers that pass unconditionally despite inverted or broken business logic due to superficial assertions, mock over-permissiveness, or absent assertions. When a diff-scoped mutant is executed against the test suite and tests pass (mutant survives), `ce-ai verify` reports a hollow test alert, and with `--strict`, halts Stage 5 Verification with exit code 6 (`CeError::Verification`) to prevent shipping hollow coverage.
+
+
 
 
