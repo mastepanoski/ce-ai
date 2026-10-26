@@ -187,3 +187,56 @@ fn test_observe_plan_computes_progress_without_tasks_md() {
         .expect("should observe active delta");
     assert!(obs_sealed.is_sealed);
 }
+
+#[test]
+fn test_observe_verification_with_mutant_receipt() {
+    let temp_repo = tempdir().expect("tempdir");
+    let temp_config = tempdir().expect("tempdir");
+
+    // Initially no evidence
+    let obs = crate::observation::state::observe_verification(
+        temp_repo.path(),
+        temp_config.path(),
+        None,
+        0,
+    );
+    assert!(!obs.has_evidence);
+    assert_eq!(obs.mutant_integrity_passed, None);
+
+    // Save passing mutant receipt
+    let report = crate::verification::runner::MutationReport {
+        total_mutants: 2,
+        killed_mutants: 2,
+        survived_mutants: 0,
+        results: vec![],
+        duration_ms: 50,
+    };
+    crate::verification::runner::save_mutation_receipt(temp_repo.path(), &report).unwrap();
+
+    let obs_passed = crate::observation::state::observe_verification(
+        temp_repo.path(),
+        temp_config.path(),
+        None,
+        0,
+    );
+    assert!(obs_passed.has_evidence);
+    assert_eq!(obs_passed.mutant_integrity_passed, Some(true));
+
+    // Save failing mutant receipt (1 survived)
+    let report_failed = crate::verification::runner::MutationReport {
+        total_mutants: 2,
+        killed_mutants: 1,
+        survived_mutants: 1,
+        results: vec![],
+        duration_ms: 60,
+    };
+    crate::verification::runner::save_mutation_receipt(temp_repo.path(), &report_failed).unwrap();
+
+    let obs_failed = crate::observation::state::observe_verification(
+        temp_repo.path(),
+        temp_config.path(),
+        None,
+        0,
+    );
+    assert_eq!(obs_failed.mutant_integrity_passed, Some(false));
+}

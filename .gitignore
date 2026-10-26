@@ -4,6 +4,7 @@
 .pi/
 .codegraph/
 .serena/
+.mutant-receipt.json
 tui-screenshots/
 *.png
 *.snap.png

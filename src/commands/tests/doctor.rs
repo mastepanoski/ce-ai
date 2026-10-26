@@ -1232,3 +1232,73 @@ dependencies:
     let warns_clean = probe_system_manifest_integrity(&repo_root);
     assert!(warns_clean.is_empty());
 }
+
+#[test]
+fn test_doctor_probes_code_quality_risk_and_crap() {
+    let tmp = TempDir::new().unwrap();
+    let repo_root = tmp.path().join("workspace");
+    let src_dir = repo_root.join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+
+    // 1. Write a high-complexity function (> 15 branches) without LCOV
+    let complex_source = r#"
+pub fn monster_dispatcher(x: i32) -> i32 {
+    let mut sum = 0;
+    if x == 1 { sum += 1; }
+    if x == 2 { sum += 2; }
+    if x == 3 { sum += 3; }
+    if x == 4 { sum += 4; }
+    if x == 5 { sum += 5; }
+    if x == 6 { sum += 6; }
+    if x == 7 { sum += 7; }
+    if x == 8 { sum += 8; }
+    if x == 9 { sum += 9; }
+    if x == 10 { sum += 10; }
+    if x == 11 { sum += 11; }
+    if x == 12 { sum += 12; }
+    if x == 13 { sum += 13; }
+    if x == 14 { sum += 14; }
+    if x == 15 { sum += 15; }
+    if x == 16 { sum += 16; }
+    sum
+}
+"#;
+    std::fs::write(src_dir.join("complex.rs"), complex_source).unwrap();
+
+    // Probing without LCOV triggers CC fallback (> 15)
+    let warns_cc = probe_code_quality_risk(&repo_root, true);
+    assert_eq!(warns_cc.len(), 1);
+    assert!(warns_cc[0].contains("quality-complexity"));
+    assert!(warns_cc[0].contains("exceeds complexity threshold (> 15)"));
+
+    // 2. Add LCOV with 0% coverage -> CRAP will be 17^2 * 1^3 + 17 = 306 > 30
+    let coverage_dir = repo_root.join("target").join("coverage");
+    std::fs::create_dir_all(&coverage_dir).unwrap();
+    let lcov_content = r#"
+TN:
+SF:src/complex.rs
+DA:2,0
+LF:1
+LH:0
+end_of_record
+"#;
+    std::fs::write(coverage_dir.join("lcov.info"), lcov_content).unwrap();
+
+    let warns_crap = probe_code_quality_risk(&repo_root, true);
+    assert_eq!(warns_crap.len(), 1);
+    assert!(warns_crap[0].contains("quality-crap"));
+    assert!(warns_crap[0].contains("exceeds risk threshold (> 30)"));
+
+    // 3. Add 100% coverage -> CRAP = 17^2 * 0 + 17 = 17 <= 30 (not high risk!)
+    let lcov_100 = r#"
+TN:
+SF:src/complex.rs
+DA:2,10
+LF:1
+LH:1
+end_of_record
+"#;
+    std::fs::write(coverage_dir.join("lcov.info"), lcov_100).unwrap();
+    let warns_covered = probe_code_quality_risk(&repo_root, true);
+    assert!(warns_covered.is_empty());
+}

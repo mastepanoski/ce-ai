@@ -10,5 +10,7 @@ pub mod fleet;
 pub mod harness;
 pub mod observation;
 pub mod opencode;
+pub mod quality;
 pub mod source;
 pub mod state;
+pub mod verification;
