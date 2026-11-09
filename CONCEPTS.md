@@ -272,6 +272,10 @@ A sub-second test integrity verification technique implemented in `ce-ai verify`
 ### Hollow Test Detection (Cosmetic Assertions)
 A deterministic quality check that identifies tests written by AI agents or developers that pass unconditionally despite inverted or broken business logic due to superficial assertions, mock over-permissiveness, or absent assertions. When a diff-scoped mutant is executed against the test suite and tests pass (mutant survives), `ce-ai verify` reports a hollow test alert, and with `--strict`, halts Stage 5 Verification with exit code 6 (`CeError::Verification`) to prevent shipping hollow coverage.
 
+### Single-Step Fleet Update (`ce-ai update`)
+A unified version alignment and synchronization shortcut in `ce-ai` that consolidates multi-step fleet governance into a single command (`ce-ai update` or `ce-ai fleet update`). It automatically resolves the latest release from GitHub (or accepts an explicit semantic version tag), updates the pinned fleet version in `state.json`, and drives host-native package managers across all active coding agent harnesses (`claude`, `opencode`, `pi`, `codex`, `cursor`) with full support for non-destructive dry-run previews (`--dry-run`) and optional companion binary updates (`--bin`).
+
+
 
 
 

@@ -80,6 +80,25 @@ ce-ai fleet sync
 ```
 Executes each driver's planned actions, updates `state.installed_harnesses`, and records synchronization timestamps.
 
+#### Single-Step Update Shortcut (`ce-ai update` / `ce-ai fleet update`)
+For daily workflows, `ce-ai update` (or `ce-ai fleet update`) combines `pin` and `sync` into a single operation:
+
+```bash
+# Update all harnesses to the latest GitHub release:
+ce-ai update
+
+# Update to a specific release tag:
+ce-ai update v3.31.0
+# or with flag:
+ce-ai update --to v3.31.0
+
+# Preview changes without modifying state or configs:
+ce-ai update --dry-run
+
+# Also update the ce-ai CLI binary itself:
+ce-ai update --bin
+```
+
 ---
 
 ## 2. Batch Project Fleet Maintenance (`init-prj --all` & `doctor --fix`)

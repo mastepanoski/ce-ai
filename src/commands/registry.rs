@@ -34,6 +34,8 @@ pub enum Commands {
     /// Update the ce-ai CLI binary itself to the latest release (or specified tag).
     #[command(name = "self-update")]
     SelfUpdate(self_update::Args),
+    /// Update fleet harnesses to the latest (or specified) version in a single step (pin + sync).
+    Update(fleet::UpdateArgs),
     /// Multi-harness skill registry discovery, prompt resolution, and health diagnostics.
     Skills(skills::Args),
     /// Show installed harnesses, versions, and drift.
@@ -119,6 +121,7 @@ impl CeCommand for Commands {
         match self {
             Commands::Decisions(args) => decisions::run(ctx, args),
             Commands::Fleet(args) => fleet::run(ctx, args.clone()),
+            Commands::Update(args) => fleet::handle_update(ctx, args),
             Commands::Install(args) => install::run(ctx, args),
             Commands::Sync(args) => sync::run(ctx, args),
             Commands::Upgrade(args) => upgrade::run(ctx, args),

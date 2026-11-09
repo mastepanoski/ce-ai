@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-11-09
+
+### Added
+- **Fleet Update & Root Shortcut (`ce-ai update` & `ce-ai fleet update`)**:
+  - Implemented single-step update workflow combining `fleet pin` and `fleet sync` into `ce-ai update` and `ce-ai fleet update`.
+  - Supports automatic resolution of the latest GitHub release (`latest`) by default, or an explicit version tag via positional argument (e.g. `ce-ai update v3.31.0`) or `--to <version>`.
+  - Added `--dry-run` support to preview planned pin and harness sync actions without mutating `state.json` or host harness configurations.
+  - Added `--bin` flag to optionally trigger `ce-ai self-update` alongside fleet harness synchronization.
+  - Exposed `update` as a core command in the root CLI (`ce-ai --help`) while keeping full parameter compatibility across `ce-ai update` and `ce-ai fleet update`.
+- **Domain Concepts Accretion (`CONCEPTS.md`)**:
+  - Accreted 1 new domain entry: `Single-Step Fleet Update (ce-ai update)`, strictly verified via `scripts/validate-concepts.py` (89 entries, +1 added, 0 scrubbed).
+
 ## [3.8.0] - 2026-10-26
 
 ### Added

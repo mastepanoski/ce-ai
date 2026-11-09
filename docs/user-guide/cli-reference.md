@@ -10,6 +10,7 @@ for complete arguments. Commands that mutate configuration support global
 | Command | Boundary |
 | --- | --- |
 | `fleet pin <version\|latest>` | Atomically records the target Compound Engineering semantic version in `state.json` (or dynamically resolves `latest` upstream release). |
+| `fleet update [<version>] [--to <version>] [--bin] [--dry-run]` | Updates all fleet harnesses to the latest (or specified) version in a single step (`pin` + `sync`). Root alias: `ce-ai update`. |
 | `fleet status [--json] [--system <id>]` | Audits and reports installed coding agent harnesses, version parity, and fleet alignment status (`aligned`, `divergent`, `missing`). Optionally filters by constellation system identity declared in `docs/arch/system.yaml`. |
 | `fleet sync [--dry-run]` | Drives native host package managers and configuration files across all detected harnesses (`opencode`, `claude`, `pi`, `codex`, `cursor`) to align with the pinned version. |
 
