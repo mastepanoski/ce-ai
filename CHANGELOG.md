@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-11-09
+
+### Added
+- **Fleet Update & Root Shortcut (`ce-ai update` & `ce-ai fleet update`)**:
+  - Implemented single-step update workflow combining `fleet pin` and `fleet sync` into `ce-ai update` and `ce-ai fleet update`.
+  - Supports automatic resolution of the latest GitHub release (`latest`) by default, or an explicit version tag via positional argument (e.g. `ce-ai update v3.31.0`) or `--to <version>`.
+  - Added `--dry-run` support to preview planned pin and harness sync actions without mutating `state.json` or host harness configurations.
+  - Added `--bin` flag to optionally trigger `ce-ai self-update` alongside fleet harness synchronization.
+  - Exposed `update` as a core command in the root CLI (`ce-ai --help`) while keeping full parameter compatibility across `ce-ai update` and `ce-ai fleet update`.
+- **Automated Fleet Scheduling (`ce-ai fleet schedule`)**:
+  - Implemented cross-platform automated scheduling for background fleet updates (`src/fleet/schedule.rs`).
+  - Supports macOS LaunchAgents (`~/Library/LaunchAgents/com.ce-ai.fleet-update.plist`), Linux systemd user units (`~/.config/systemd/user/ce-ai-fleet-update.{service,timer}`), Windows Task Scheduler (`schtasks.exe`), and standard crontab lines (`--cron`).
+  - Added support for `--frequency <daily|weekly>` (default: `daily`) and custom `--time <HH:MM>` (default: `09:00`).
+  - Supports `--print` to view generated daemons/crontab without writing, `--dry-run` for previewing file creation, and `--remove` for clean uninstallation.
+- **Domain Concepts Accretion (`CONCEPTS.md`)**:
+  - Accreted 2 new domain entries: `Single-Step Fleet Update (ce-ai update)` and `Automated Fleet Scheduling (ce-ai fleet schedule)`, strictly verified via `scripts/validate-concepts.py` (90 entries, +2 added, 0 scrubbed).
+
+### Security
+- **Supply Chain Vulnerability Patch**:
+  - Upgraded `zip` from `2.6.1` to `9.5.0`, resolving RUSTSEC-2026-0429 (`ZipArchive::extract` abort on large declared symlink size).
+
 ## [3.8.0] - 2026-10-26
 
 ### Added

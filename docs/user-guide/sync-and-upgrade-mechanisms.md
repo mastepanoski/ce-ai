@@ -80,6 +80,51 @@ ce-ai fleet sync
 ```
 Executes each driver's planned actions, updates `state.installed_harnesses`, and records synchronization timestamps.
 
+#### Single-Step Update Shortcut (`ce-ai update` / `ce-ai fleet update`)
+For daily workflows, `ce-ai update` (or `ce-ai fleet update`) combines `pin` and `sync` into a single operation:
+
+```bash
+# Update all harnesses to the latest GitHub release:
+ce-ai update
+
+# Update to a specific release tag:
+ce-ai update v3.31.0
+# or with flag:
+ce-ai update --to v3.31.0
+
+# Preview changes without modifying state or configs:
+ce-ai update --dry-run
+
+# Also update the ce-ai CLI binary itself:
+ce-ai update --bin
+```
+
+#### Automated Background Scheduling (`ce-ai fleet schedule`)
+To keep harnesses continually updated in the background without manual intervention, `ce-ai fleet schedule` configures native operating system daemons:
+
+```bash
+# Install automated background updates (default: daily at 09:00 AM):
+# - macOS: Registers LaunchAgent at ~/Library/LaunchAgents/com.ce-ai.fleet-update.plist
+# - Linux: Registers systemd user timer & service at ~/.config/systemd/user/
+# - Windows: Registers Task Scheduler task via schtasks
+ce-ai fleet schedule
+
+# Custom frequency and time:
+ce-ai fleet schedule --frequency weekly --time 10:30
+
+# Print the configuration (plist / systemd / cron) without writing:
+ce-ai fleet schedule --print
+
+# Generate traditional crontab line for 'crontab -e':
+ce-ai fleet schedule --cron
+
+# Preview actions:
+ce-ai fleet schedule --dry-run
+
+# Remove / uninstall scheduled background task:
+ce-ai fleet schedule --remove
+```
+
 ---
 
 ## 2. Batch Project Fleet Maintenance (`init-prj --all` & `doctor --fix`)

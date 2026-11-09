@@ -23,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install
 
 # In your project: initialize graph, adopt project, govern fleet, and verify
 cd your-project && codegraph init
-ce-ai init-prj && ce-ai fleet pin latest && ce-ai fleet sync && ce-ai doctor
+ce-ai init-prj && ce-ai update && ce-ai doctor
 ```
 
 Then reopen your coding agent in `your-project` and start with `/ce-brainstorm <outcome>`. For package manager alternatives and detailed steps, see [Getting Started](docs/user-guide/getting-started.md).

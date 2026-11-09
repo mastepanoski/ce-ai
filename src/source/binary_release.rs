@@ -116,9 +116,10 @@ pub fn extract_binary_from_zip(bytes: &[u8]) -> Result<Vec<u8>, CeError> {
         let enclosed = match file.enclosed_name() {
             Some(p) => p.to_path_buf(),
             None => {
+                let name = file.name().unwrap_or_default();
                 return Err(CeError::Runtime(format!(
                     "unsafe archive entry path: {}",
-                    file.name()
+                    name
                 )));
             }
         };

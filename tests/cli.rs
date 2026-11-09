@@ -10815,6 +10815,147 @@ fn test_cli_fleet_pin_status_sync_lifecycle() {
 }
 
 #[test]
+fn test_cli_fleet_update_and_root_update_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let opencode_dir = home.join(".config/opencode");
+    fs::create_dir_all(&opencode_dir).unwrap();
+
+    // 1. ce-ai fleet update 1.76.0 performs pin + sync in a single step
+    let out_fleet_update = ceai(&config_dir, &home)
+        .args(["fleet", "update", "1.76.0"])
+        .output()
+        .unwrap();
+    assert!(out_fleet_update.status.success());
+    let fleet_stdout = String::from_utf8_lossy(&out_fleet_update.stdout);
+    assert!(fleet_stdout.contains("Pinned fleet Compound Engineering version to v1.76.0"));
+    assert!(fleet_stdout.contains("Fleet synchronization complete"));
+
+    // Verify pinned version in state.json
+    let state_raw = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    let state_val: serde_json::Value = serde_json::from_str(&state_raw).unwrap();
+    assert_eq!(state_val["fleet"]["pinned_version"], "v1.76.0");
+
+    // Verify opencode.json updated with pinned version
+    let opencode_json_path = opencode_dir.join("opencode.json");
+    let opencode_raw = fs::read_to_string(&opencode_json_path).unwrap();
+    assert!(opencode_raw.contains("\"compound_engineering_version\": \"v1.76.0\""));
+
+    // 2. ce-ai update --to 1.77.0 --dry-run previews without writing to state or config
+    let out_update_dry = ceai(&config_dir, &home)
+        .args(["update", "--to", "1.77.0", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(out_update_dry.status.success());
+    let dry_stdout = String::from_utf8_lossy(&out_update_dry.stdout);
+    assert!(
+        dry_stdout.contains("[dry-run] would pin fleet Compound Engineering version to v1.77.0")
+    );
+    assert!(dry_stdout.contains("Dry-run complete"));
+
+    // State MUST remain at v1.76.0
+    let state_raw_after_dry = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    let state_val_after_dry: serde_json::Value =
+        serde_json::from_str(&state_raw_after_dry).unwrap();
+    assert_eq!(state_val_after_dry["fleet"]["pinned_version"], "v1.76.0");
+
+    // 3. ce-ai update --to 1.77.0 real execution
+    let out_update = ceai(&config_dir, &home)
+        .args(["update", "--to", "1.77.0"])
+        .output()
+        .unwrap();
+    assert!(out_update.status.success());
+    let update_stdout = String::from_utf8_lossy(&out_update.stdout);
+    assert!(update_stdout.contains("Pinned fleet Compound Engineering version to v1.77.0"));
+    assert!(update_stdout.contains("Fleet synchronization complete"));
+
+    // State updated to v1.77.0
+    let state_raw_updated = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    let state_val_updated: serde_json::Value = serde_json::from_str(&state_raw_updated).unwrap();
+    assert_eq!(state_val_updated["fleet"]["pinned_version"], "v1.77.0");
+
+    // Opencode config updated to v1.77.0
+    let opencode_raw_updated = fs::read_to_string(&opencode_json_path).unwrap();
+    assert!(opencode_raw_updated.contains("\"compound_engineering_version\": \"v1.77.0\""));
+
+    // 4. Positional argument: ce-ai update 1.78.0
+    let out_update_pos = ceai(&config_dir, &home)
+        .args(["update", "1.78.0"])
+        .output()
+        .unwrap();
+    assert!(out_update_pos.status.success());
+    let state_raw_pos = fs::read_to_string(config_dir.join("state.json")).unwrap();
+    let state_val_pos: serde_json::Value = serde_json::from_str(&state_raw_pos).unwrap();
+    assert_eq!(state_val_pos["fleet"]["pinned_version"], "v1.78.0");
+}
+
+#[test]
+fn test_cli_fleet_schedule_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    // 1. fleet schedule --print
+    let out_print = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--print"])
+        .output()
+        .unwrap();
+    assert!(out_print.status.success());
+    let print_stdout = String::from_utf8_lossy(&out_print.stdout);
+    assert!(print_stdout.contains("Fleet Update Schedule Configuration"));
+
+    // 2. fleet schedule --cron
+    let out_cron = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--cron"])
+        .output()
+        .unwrap();
+    assert!(out_cron.status.success());
+    let cron_stdout = String::from_utf8_lossy(&out_cron.stdout);
+    assert!(cron_stdout.contains("0 9 * * *"));
+    assert!(cron_stdout.contains("update -q"));
+
+    // 3. fleet schedule --dry-run
+    let out_dry = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(out_dry.status.success());
+    let dry_stdout = String::from_utf8_lossy(&out_dry.stdout);
+    assert!(dry_stdout.contains("[dry-run]"));
+
+    // 4. fleet schedule invalid time
+    let out_inv_time = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--time", "25:00"])
+        .output()
+        .unwrap();
+    assert_eq!(out_inv_time.status.code(), Some(2));
+
+    // 5. fleet schedule --cron --dry-run
+    let out_cron_dry = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--cron", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(out_cron_dry.status.success());
+    let cron_dry_stdout = String::from_utf8_lossy(&out_cron_dry.stdout);
+    assert!(cron_dry_stdout.contains("[dry-run] would add to crontab"));
+
+    // 6. fleet schedule --cron --remove --dry-run
+    let out_cron_rm_dry = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--cron", "--remove", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(out_cron_rm_dry.status.success());
+    let rm_dry_stdout = String::from_utf8_lossy(&out_cron_rm_dry.stdout);
+    assert!(rm_dry_stdout.contains("[dry-run] would remove 'ce-ai update' entries from crontab"));
+
+    // 7. fleet schedule --uninstall alias for --remove
+    let out_uninstall_dry = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--uninstall", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(out_uninstall_dry.status.success());
+}
+
+#[test]
 fn test_cli_v2_deprecation_notices_emitted_on_legacy_surfaces() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
@@ -11152,6 +11293,7 @@ fn test_cli_help_hides_legacy_commands_while_preserving_invocation() {
         "guard",
         "report-bug",
         "fleet",
+        "update",
     ];
     for cmd in visible_core {
         assert!(

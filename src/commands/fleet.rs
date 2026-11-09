@@ -39,6 +39,29 @@ pub enum FleetActionCommand {
         #[arg(long)]
         system: Option<String>,
     },
+    /// Update fleet harnesses to the latest (or specified) version in a single step (pin + sync).
+    Update(UpdateArgs),
+    /// Configure an automated periodic schedule (launchd/systemd/cron) to run 'ce-ai update'.
+    Schedule(crate::fleet::schedule::ScheduleArgs),
+}
+
+/// Arguments for `ce-ai update` and `ce-ai fleet update`.
+#[derive(ClapArgs, Debug, Clone, PartialEq, Eq)]
+pub struct UpdateArgs {
+    /// Semantic version tag to pin (e.g. v3.31.0 or 3.31.0), defaults to 'latest'.
+    pub version: Option<String>,
+    /// Target version tag (alias for positional version argument).
+    #[arg(long)]
+    pub to: Option<String>,
+    /// Preview planned actions without writing.
+    #[arg(long)]
+    pub dry_run: bool,
+    /// Also update the ce-ai CLI binary itself to the latest release.
+    #[arg(long)]
+    pub bin: bool,
+    /// Filter by repository constellation system identifier.
+    #[arg(long)]
+    pub system: Option<String>,
 }
 
 pub fn run(ctx: &Context, args: Args) -> Result<(), CeError> {
@@ -52,6 +75,8 @@ pub fn run(ctx: &Context, args: Args) -> Result<(), CeError> {
         FleetActionCommand::Sync { dry_run, system } => {
             handle_sync_with_filter(ctx, dry_run, system.as_deref())
         }
+        FleetActionCommand::Update(args) => handle_update(ctx, &args),
+        FleetActionCommand::Schedule(args) => crate::fleet::schedule::handle_schedule(ctx, &args),
     }
 }
 
@@ -181,7 +206,7 @@ fn print_harness_status(h: &FleetHarnessStatus) {
     }
 }
 
-pub fn handle_pin(ctx: &Context, raw_version: &str) -> Result<(), CeError> {
+pub fn resolve_target_version(raw_version: &str) -> Result<String, CeError> {
     let clean = raw_version.trim();
     if clean.is_empty() {
         return Err(CeError::Usage("version tag cannot be empty".to_string()));
@@ -212,6 +237,12 @@ pub fn handle_pin(ctx: &Context, raw_version: &str) -> Result<(), CeError> {
         format!("v{clean}")
     };
 
+    Ok(normalized)
+}
+
+pub fn handle_pin(ctx: &Context, raw_version: &str) -> Result<(), CeError> {
+    let normalized = resolve_target_version(raw_version)?;
+
     let state_file = ctx.state_path();
     let mut state = if state_file.exists() {
         State::load(&state_file)?
@@ -231,15 +262,7 @@ pub fn handle_pin(ctx: &Context, raw_version: &str) -> Result<(), CeError> {
     Ok(())
 }
 
-pub fn handle_sync(ctx: &Context, dry_run: bool) -> Result<(), CeError> {
-    handle_sync_with_filter(ctx, dry_run, None)
-}
-
-pub fn handle_sync_with_filter(
-    ctx: &Context,
-    dry_run: bool,
-    system_filter: Option<&str>,
-) -> Result<(), CeError> {
+pub fn validate_system_filter(ctx: &Context, system_filter: Option<&str>) -> Result<(), CeError> {
     if let Some(target_system) = system_filter {
         let repo_root = ctx.repo_root();
         let current_manifest = crate::compat::arch::load_system_manifest(&repo_root)?;
@@ -263,10 +286,22 @@ pub fn handle_sync_with_filter(
             }
         }
     }
+    Ok(())
+}
 
-    let effective_dry_run = dry_run || ctx.dry_run;
+pub fn handle_sync(ctx: &Context, dry_run: bool) -> Result<(), CeError> {
+    handle_sync_with_filter(ctx, dry_run, None)
+}
+
+pub fn handle_sync_with_filter(
+    ctx: &Context,
+    dry_run: bool,
+    system_filter: Option<&str>,
+) -> Result<(), CeError> {
+    validate_system_filter(ctx, system_filter)?;
+
     let state_file = ctx.state_path();
-    let mut state = if state_file.exists() {
+    let state = if state_file.exists() {
         State::load(&state_file)?
     } else {
         State::new()
@@ -285,6 +320,18 @@ pub fn handle_sync_with_filter(
         }
     };
 
+    let effective_dry_run = dry_run || ctx.dry_run;
+    sync_harnesses_with_version(ctx, &pinned_version, effective_dry_run, None)
+}
+
+pub fn sync_harnesses_with_version(
+    ctx: &Context,
+    pinned_version: &str,
+    effective_dry_run: bool,
+    system_filter: Option<&str>,
+) -> Result<(), CeError> {
+    validate_system_filter(ctx, system_filter)?;
+
     println!("Synchronizing fleet harnesses with pinned version {pinned_version}...");
     let drivers = all_drivers();
     let mut synced_any = false;
@@ -294,7 +341,7 @@ pub fn handle_sync_with_filter(
             continue;
         }
         synced_any = true;
-        let action = driver.plan_sync(ctx, &pinned_version)?;
+        let action = driver.plan_sync(ctx, pinned_version)?;
         let harness_name = driver.harness_kind().as_str();
 
         match &action {
@@ -348,6 +395,13 @@ pub fn handle_sync_with_filter(
     }
 
     if !effective_dry_run {
+        let state_file = ctx.state_path();
+        let mut state = if state_file.exists() {
+            State::load(&state_file)?
+        } else {
+            State::new()
+        };
+
         let mut fleet = state.fleet.unwrap_or_default();
         fleet.last_sync = Some(chrono::Utc::now().to_rfc3339());
         state.fleet = Some(fleet);
@@ -373,6 +427,42 @@ pub fn handle_sync_with_filter(
     }
 
     Ok(())
+}
+
+pub fn handle_update(ctx: &Context, args: &UpdateArgs) -> Result<(), CeError> {
+    let effective_dry_run = args.dry_run || ctx.dry_run;
+
+    if args.bin {
+        if effective_dry_run {
+            println!("[dry-run] would update ce-ai CLI binary to latest release");
+        } else {
+            crate::commands::self_update::run(
+                ctx,
+                &crate::commands::self_update::Args {
+                    check: false,
+                    to: None,
+                    force: false,
+                },
+            )?;
+            println!();
+        }
+    }
+
+    let raw_target = args
+        .to
+        .as_deref()
+        .or(args.version.as_deref())
+        .unwrap_or("latest");
+
+    let normalized = resolve_target_version(raw_target)?;
+
+    if effective_dry_run {
+        println!("[dry-run] would pin fleet Compound Engineering version to {normalized}.");
+    } else {
+        handle_pin(ctx, &normalized)?;
+    }
+
+    sync_harnesses_with_version(ctx, &normalized, effective_dry_run, args.system.as_deref())
 }
 
 #[cfg(test)]
@@ -565,5 +655,114 @@ component: gateway
         assert!(err
             .to_string()
             .contains("does not match requested constellation"));
+    }
+
+    #[test]
+    fn test_resolve_target_version() {
+        assert_eq!(resolve_target_version("3.30.4").unwrap(), "v3.30.4");
+        assert_eq!(resolve_target_version("v3.31.0").unwrap(), "v3.31.0");
+        assert_eq!(
+            resolve_target_version("compound-engineering-v3.32.0").unwrap(),
+            "v3.32.0"
+        );
+
+        let err_empty = resolve_target_version("   ").unwrap_err();
+        assert_eq!(err_empty.exit_code(), 2);
+
+        let err_invalid = resolve_target_version("invalid/version").unwrap_err();
+        assert_eq!(err_invalid.exit_code(), 2);
+    }
+
+    #[test]
+    fn test_handle_update_explicit_version() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().join(".ce-ai"),
+            opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        std::fs::create_dir_all(&ctx.config_dir).unwrap();
+        let pi_dir = ctx.home_dir().join(".pi").join("agent");
+        std::fs::create_dir_all(&pi_dir).unwrap();
+
+        let mut state = State::new();
+        state.installed_harnesses.push(serde_json::json!({
+            "name": "pi",
+            "scope": "global",
+            "version": "compound-engineering-v3.30.4",
+            "installed_at": "2026-09-08T00:50:40+00:00"
+        }));
+        state.save(&ctx.state_path()).unwrap();
+
+        let update_args = UpdateArgs {
+            version: Some("3.31.5".to_string()),
+            to: None,
+            dry_run: false,
+            bin: false,
+            system: None,
+        };
+
+        handle_update(&ctx, &update_args).unwrap();
+
+        let reloaded = State::load(&ctx.state_path()).unwrap();
+        assert_eq!(
+            reloaded.fleet.unwrap().pinned_version,
+            Some("v3.31.5".to_string())
+        );
+        assert_eq!(
+            reloaded.installed_harnesses[0]["version"],
+            serde_json::json!("v3.31.5")
+        );
+
+        let settings_path = pi_dir.join("settings.json");
+        assert!(settings_path.exists());
+        let settings_val: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&settings_path).unwrap()).unwrap();
+        assert_eq!(
+            settings_val["compound_engineering_version"],
+            serde_json::json!("v3.31.5")
+        );
+    }
+
+    #[test]
+    fn test_handle_update_dry_run_does_not_mutate_state() {
+        let temp = tempdir().unwrap();
+        let ctx = Context {
+            config_dir: temp.path().join(".ce-ai"),
+            opencode_config_dir: temp.path().join(".config/opencode"),
+            workspace_root: None,
+            dry_run: false,
+            verbose: false,
+            quiet: false,
+        };
+
+        std::fs::create_dir_all(&ctx.config_dir).unwrap();
+        let mut state = State::new();
+        state.fleet = Some(crate::state::state::FleetState {
+            pinned_version: Some("v3.30.0".to_string()),
+            last_sync: None,
+        });
+        state.save(&ctx.state_path()).unwrap();
+
+        let update_args = UpdateArgs {
+            version: None,
+            to: Some("3.32.0".to_string()),
+            dry_run: true,
+            bin: false,
+            system: None,
+        };
+
+        handle_update(&ctx, &update_args).unwrap();
+
+        let reloaded = State::load(&ctx.state_path()).unwrap();
+        // Pinned version in state MUST remain unchanged during dry-run
+        assert_eq!(
+            reloaded.fleet.unwrap().pinned_version,
+            Some("v3.30.0".to_string())
+        );
     }
 }
