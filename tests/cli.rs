@@ -10928,6 +10928,31 @@ fn test_cli_fleet_schedule_lifecycle() {
         .output()
         .unwrap();
     assert_eq!(out_inv_time.status.code(), Some(2));
+
+    // 5. fleet schedule --cron --dry-run
+    let out_cron_dry = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--cron", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(out_cron_dry.status.success());
+    let cron_dry_stdout = String::from_utf8_lossy(&out_cron_dry.stdout);
+    assert!(cron_dry_stdout.contains("[dry-run] would add to crontab"));
+
+    // 6. fleet schedule --cron --remove --dry-run
+    let out_cron_rm_dry = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--cron", "--remove", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(out_cron_rm_dry.status.success());
+    let rm_dry_stdout = String::from_utf8_lossy(&out_cron_rm_dry.stdout);
+    assert!(rm_dry_stdout.contains("[dry-run] would remove 'ce-ai update' entries from crontab"));
+
+    // 7. fleet schedule --uninstall alias for --remove
+    let out_uninstall_dry = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--uninstall", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(out_uninstall_dry.status.success());
 }
 
 #[test]

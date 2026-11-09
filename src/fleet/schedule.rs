@@ -221,6 +221,166 @@ pub fn linux_systemd_paths(home_dir: &Path) -> (PathBuf, PathBuf) {
     )
 }
 
+/// Detects if a crontab line corresponds to ce-ai fleet update.
+pub fn is_ce_ai_cron_line(line: &str) -> bool {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    trimmed.contains("ce-ai-fleet-update")
+        || (trimmed.contains("ce-ai") && trimmed.contains("update"))
+}
+
+/// Filters out ce-ai update lines from a list of crontab lines.
+/// Returns (filtered_lines, did_remove).
+pub fn filter_crontab_lines(lines: &[String]) -> (Vec<String>, bool) {
+    let mut filtered = Vec::new();
+    let mut removed = false;
+    for line in lines {
+        if is_ce_ai_cron_line(line) {
+            removed = true;
+        } else {
+            filtered.push(line.clone());
+        }
+    }
+    (filtered, removed)
+}
+
+/// Reads existing crontab lines for the current user.
+/// Returns `Ok(lines)` if successful or an empty vec if no crontab exists.
+pub fn read_crontab() -> Result<Vec<String>, CeError> {
+    let output = std::process::Command::new("crontab")
+        .arg("-l")
+        .output()
+        .map_err(|e| {
+            CeError::Io(std::io::Error::new(
+                e.kind(),
+                format!("failed to execute 'crontab -l': {e}"),
+            ))
+        })?;
+
+    if output.status.success() {
+        let text = String::from_utf8_lossy(&output.stdout);
+        Ok(text.lines().map(|s| s.to_string()).collect())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("no crontab for") {
+            Ok(Vec::new())
+        } else {
+            Err(CeError::Runtime(format!(
+                "crontab -l failed with exit code {:?}: {}",
+                output.status.code(),
+                stderr.trim()
+            )))
+        }
+    }
+}
+
+/// Writes crontab lines via a temp file, or runs `crontab -r` if empty.
+pub fn write_crontab(lines: &[String]) -> Result<(), CeError> {
+    if lines.is_empty() {
+        let _ = std::process::Command::new("crontab").arg("-r").status();
+        return Ok(());
+    }
+
+    let mut temp = tempfile::NamedTempFile::new().map_err(CeError::Io)?;
+    use std::io::Write;
+    for line in lines {
+        writeln!(temp, "{line}").map_err(CeError::Io)?;
+    }
+    temp.flush().map_err(CeError::Io)?;
+
+    let status = std::process::Command::new("crontab")
+        .arg(temp.path())
+        .status()
+        .map_err(CeError::Io)?;
+
+    if !status.success() {
+        return Err(CeError::Runtime(format!(
+            "'crontab {}' exited with non-zero code {:?}",
+            temp.path().display(),
+            status.code()
+        )));
+    }
+    Ok(())
+}
+
+/// Installs or updates a crontab entry for ce-ai update.
+pub fn install_crontab_entry(config: &ScheduleConfig, dry_run: bool) -> Result<(), CeError> {
+    let new_entry = format!("{} # ce-ai-fleet-update", generate_cron_line(config));
+    if dry_run {
+        println!("[dry-run] would add to crontab:\n  {new_entry}");
+        return Ok(());
+    }
+
+    match read_crontab() {
+        Ok(lines) => {
+            let (mut filtered, _) = filter_crontab_lines(&lines);
+            filtered.push(new_entry.clone());
+
+            match write_crontab(&filtered) {
+                Ok(()) => {
+                    println!("Installed crontab schedule entry successfully:");
+                    println!("  Entry:    {new_entry}");
+                    println!(
+                        "  Schedule: {} at {:02}:{:02}",
+                        config.frequency.as_str(),
+                        config.hour,
+                        config.minute
+                    );
+                    println!("  Logs:     {}", config.log_path.display());
+                    Ok(())
+                }
+                Err(err) => {
+                    println!("Notice: automated crontab install failed ({err}). Add manually via 'crontab -e':");
+                    println!("  {new_entry}");
+                    Ok(())
+                }
+            }
+        }
+        Err(err) => {
+            println!(
+                "Notice: automated crontab read failed ({err}). Add manually via 'crontab -e':"
+            );
+            println!("  {new_entry}");
+            Ok(())
+        }
+    }
+}
+
+/// Removes ce-ai update entries from crontab.
+pub fn remove_crontab_entry(dry_run: bool) -> Result<(), CeError> {
+    if dry_run {
+        println!("[dry-run] would remove 'ce-ai update' entries from crontab");
+        return Ok(());
+    }
+
+    match read_crontab() {
+        Ok(lines) => {
+            let (filtered, did_remove) = filter_crontab_lines(&lines);
+            if did_remove {
+                match write_crontab(&filtered) {
+                    Ok(()) => {
+                        println!("Removed 'ce-ai update' entry from crontab successfully.");
+                        Ok(())
+                    }
+                    Err(err) => {
+                        println!("Notice: failed to write crontab ({err}). Edit manually via 'crontab -e'.");
+                        Ok(())
+                    }
+                }
+            } else {
+                println!("No 'ce-ai update' entry found in crontab.");
+                Ok(())
+            }
+        }
+        Err(err) => {
+            println!("Notice: could not read crontab ({err}). Check manually via 'crontab -e'.");
+            Ok(())
+        }
+    }
+}
+
 /// CLI arguments for `ce-ai fleet schedule`.
 #[derive(clap::Args, Debug, Clone, PartialEq, Eq)]
 pub struct ScheduleArgs {
@@ -228,9 +388,9 @@ pub struct ScheduleArgs {
     #[arg(long)]
     pub print: bool,
     /// Remove/uninstall the scheduled background update task.
-    #[arg(long)]
+    #[arg(long, alias = "uninstall")]
     pub remove: bool,
-    /// Prefer traditional cron line instead of native OS daemon (launchd/systemd).
+    /// Target traditional crontab instead of native OS daemon (launchd/systemd).
     #[arg(long)]
     pub cron: bool,
     /// Frequency for the scheduled update (daily, weekly; default: daily).
@@ -286,6 +446,11 @@ pub fn handle_schedule(ctx: &Context, args: &ScheduleArgs) -> Result<(), CeError
 
     // 2. Remove scheduled task
     if args.remove {
+        if args.cron {
+            remove_crontab_entry(effective_dry_run)?;
+            return Ok(());
+        }
+
         if cfg!(target_os = "macos") {
             let plist_path = macos_launch_agent_path(&ctx.home_dir());
             if plist_path.exists() {
@@ -341,24 +506,14 @@ pub fn handle_schedule(ctx: &Context, args: &ScheduleArgs) -> Result<(), CeError
             }
         }
 
-        if args.cron {
-            println!("Note: If using crontab, edit your crontab via 'crontab -e' and remove the 'ce-ai update' line.");
-        }
+        // Also clean up any crontab entries if present
+        let _ = remove_crontab_entry(effective_dry_run);
         return Ok(());
     }
 
     // 3. Install / configure schedule
     if args.cron {
-        let cron_line = generate_cron_line(&config);
-        println!(
-            "Crontab schedule entry generated ({} at {:02}:{:02}):\n",
-            config.frequency.as_str(),
-            config.hour,
-            config.minute
-        );
-        println!("  {cron_line}\n");
-        println!("To activate, run 'crontab -e' and paste the line above.");
-        return Ok(());
+        return install_crontab_entry(&config, effective_dry_run);
     }
 
     if cfg!(target_os = "macos") {
@@ -605,5 +760,40 @@ mod tests {
         assert!(cmd.contains("schtasks /create /f /tn \"ce-ai-fleet-update\""));
         assert!(cmd.contains("/sc WEEKLY"));
         assert!(cmd.contains("/st 10:30"));
+    }
+
+    #[test]
+    fn test_is_ce_ai_cron_line() {
+        assert!(is_ce_ai_cron_line("0 9 * * * /usr/bin/ce-ai update -q"));
+        assert!(is_ce_ai_cron_line(
+            "30 8 * * 1 \"/path/ce-ai\" update -q >> log 2>&1 # ce-ai-fleet-update"
+        ));
+        assert!(is_ce_ai_cron_line(
+            "0 0 * * * /bin/custom # ce-ai-fleet-update"
+        ));
+        assert!(!is_ce_ai_cron_line("0 2 * * * /usr/bin/backup.sh"));
+        assert!(!is_ce_ai_cron_line("# daily backup comment"));
+        assert!(!is_ce_ai_cron_line(""));
+    }
+
+    #[test]
+    fn test_filter_crontab_lines() {
+        let lines = vec![
+            "# crontab header".to_string(),
+            "0 2 * * * /usr/bin/backup.sh".to_string(),
+            "0 9 * * * /usr/local/bin/ce-ai update -q >> log 2>&1 # ce-ai-fleet-update".to_string(),
+            "# footer".to_string(),
+        ];
+        let (filtered, did_remove) = filter_crontab_lines(&lines);
+        assert!(did_remove);
+        assert_eq!(filtered.len(), 3);
+        assert_eq!(filtered[0], "# crontab header");
+        assert_eq!(filtered[1], "0 2 * * * /usr/bin/backup.sh");
+        assert_eq!(filtered[2], "# footer");
+
+        let no_match = vec!["0 2 * * * /usr/bin/backup.sh".to_string()];
+        let (filtered2, did_remove2) = filter_crontab_lines(&no_match);
+        assert!(!did_remove2);
+        assert_eq!(filtered2.len(), 1);
     }
 }
