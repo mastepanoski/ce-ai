@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Domain Concepts Accretion (`CONCEPTS.md`)**:
   - Accreted 2 new domain entries: `Single-Step Fleet Update (ce-ai update)` and `Automated Fleet Scheduling (ce-ai fleet schedule)`, strictly verified via `scripts/validate-concepts.py` (90 entries, +2 added, 0 scrubbed).
 
+### Security
+- **Supply Chain Vulnerability Patch**:
+  - Upgraded `zip` from `2.6.1` to `9.5.0`, resolving RUSTSEC-2026-0429 (`ZipArchive::extract` abort on large declared symlink size).
+
 ## [3.8.0] - 2026-10-26
 
 ### Added
