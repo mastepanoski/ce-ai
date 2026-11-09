@@ -3,6 +3,7 @@
 
 pub mod driver;
 pub mod drivers;
+pub mod schedule;
 pub mod status;
 
 pub use driver::{

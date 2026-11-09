@@ -16,8 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `--dry-run` support to preview planned pin and harness sync actions without mutating `state.json` or host harness configurations.
   - Added `--bin` flag to optionally trigger `ce-ai self-update` alongside fleet harness synchronization.
   - Exposed `update` as a core command in the root CLI (`ce-ai --help`) while keeping full parameter compatibility across `ce-ai update` and `ce-ai fleet update`.
+- **Automated Fleet Scheduling (`ce-ai fleet schedule`)**:
+  - Implemented cross-platform automated scheduling for background fleet updates (`src/fleet/schedule.rs`).
+  - Supports macOS LaunchAgents (`~/Library/LaunchAgents/com.ce-ai.fleet-update.plist`), Linux systemd user units (`~/.config/systemd/user/ce-ai-fleet-update.{service,timer}`), Windows Task Scheduler (`schtasks.exe`), and standard crontab lines (`--cron`).
+  - Added support for `--frequency <daily|weekly>` (default: `daily`) and custom `--time <HH:MM>` (default: `09:00`).
+  - Supports `--print` to view generated daemons/crontab without writing, `--dry-run` for previewing file creation, and `--remove` for clean uninstallation.
 - **Domain Concepts Accretion (`CONCEPTS.md`)**:
-  - Accreted 1 new domain entry: `Single-Step Fleet Update (ce-ai update)`, strictly verified via `scripts/validate-concepts.py` (89 entries, +1 added, 0 scrubbed).
+  - Accreted 2 new domain entries: `Single-Step Fleet Update (ce-ai update)` and `Automated Fleet Scheduling (ce-ai fleet schedule)`, strictly verified via `scripts/validate-concepts.py` (90 entries, +2 added, 0 scrubbed).
 
 ## [3.8.0] - 2026-10-26
 

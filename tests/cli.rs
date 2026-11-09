@@ -10890,6 +10890,47 @@ fn test_cli_fleet_update_and_root_update_lifecycle() {
 }
 
 #[test]
+fn test_cli_fleet_schedule_lifecycle() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+
+    // 1. fleet schedule --print
+    let out_print = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--print"])
+        .output()
+        .unwrap();
+    assert!(out_print.status.success());
+    let print_stdout = String::from_utf8_lossy(&out_print.stdout);
+    assert!(print_stdout.contains("Fleet Update Schedule Configuration"));
+
+    // 2. fleet schedule --cron
+    let out_cron = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--cron"])
+        .output()
+        .unwrap();
+    assert!(out_cron.status.success());
+    let cron_stdout = String::from_utf8_lossy(&out_cron.stdout);
+    assert!(cron_stdout.contains("0 9 * * *"));
+    assert!(cron_stdout.contains("update -q"));
+
+    // 3. fleet schedule --dry-run
+    let out_dry = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(out_dry.status.success());
+    let dry_stdout = String::from_utf8_lossy(&out_dry.stdout);
+    assert!(dry_stdout.contains("[dry-run]"));
+
+    // 4. fleet schedule invalid time
+    let out_inv_time = ceai(&config_dir, &home)
+        .args(["fleet", "schedule", "--time", "25:00"])
+        .output()
+        .unwrap();
+    assert_eq!(out_inv_time.status.code(), Some(2));
+}
+
+#[test]
 fn test_cli_v2_deprecation_notices_emitted_on_legacy_surfaces() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));

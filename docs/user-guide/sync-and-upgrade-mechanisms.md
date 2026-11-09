@@ -99,6 +99,32 @@ ce-ai update --dry-run
 ce-ai update --bin
 ```
 
+#### Automated Background Scheduling (`ce-ai fleet schedule`)
+To keep harnesses continually updated in the background without manual intervention, `ce-ai fleet schedule` configures native operating system daemons:
+
+```bash
+# Install automated background updates (default: daily at 09:00 AM):
+# - macOS: Registers LaunchAgent at ~/Library/LaunchAgents/com.ce-ai.fleet-update.plist
+# - Linux: Registers systemd user timer & service at ~/.config/systemd/user/
+# - Windows: Registers Task Scheduler task via schtasks
+ce-ai fleet schedule
+
+# Custom frequency and time:
+ce-ai fleet schedule --frequency weekly --time 10:30
+
+# Print the configuration (plist / systemd / cron) without writing:
+ce-ai fleet schedule --print
+
+# Generate traditional crontab line for 'crontab -e':
+ce-ai fleet schedule --cron
+
+# Preview actions:
+ce-ai fleet schedule --dry-run
+
+# Remove / uninstall scheduled background task:
+ce-ai fleet schedule --remove
+```
+
 ---
 
 ## 2. Batch Project Fleet Maintenance (`init-prj --all` & `doctor --fix`)

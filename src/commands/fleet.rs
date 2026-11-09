@@ -41,6 +41,8 @@ pub enum FleetActionCommand {
     },
     /// Update fleet harnesses to the latest (or specified) version in a single step (pin + sync).
     Update(UpdateArgs),
+    /// Configure an automated periodic schedule (launchd/systemd/cron) to run 'ce-ai update'.
+    Schedule(crate::fleet::schedule::ScheduleArgs),
 }
 
 /// Arguments for `ce-ai update` and `ce-ai fleet update`.
@@ -74,6 +76,7 @@ pub fn run(ctx: &Context, args: Args) -> Result<(), CeError> {
             handle_sync_with_filter(ctx, dry_run, system.as_deref())
         }
         FleetActionCommand::Update(args) => handle_update(ctx, &args),
+        FleetActionCommand::Schedule(args) => crate::fleet::schedule::handle_schedule(ctx, &args),
     }
 }
 
