@@ -1031,6 +1031,38 @@ fn doctor_clean_install_reports_ok() {
 }
 
 #[test]
+fn doctor_surfaces_qa_skills_heuristics_for_playwright_and_exits_zero() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let source = ce_source(tmp.path());
+    install(&config_dir, &home, &source);
+
+    // Create a project directory with playwright.config.ts and adopt it
+    let prj_dir = tmp.path().join("web-app");
+    std::fs::create_dir_all(&prj_dir).unwrap();
+    std::fs::write(prj_dir.join("playwright.config.ts"), "export default {};").unwrap();
+
+    ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .arg("init-prj")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "hint: detected Playwright (playwright.config.ts)",
+        ));
+
+    // Run doctor inside project — must succeed and report doctor-info
+    ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "doctor-info: qa-skills: detected Playwright (playwright.config.ts)",
+        ));
+}
+
+#[test]
 fn doctor_reports_documentation_debt_advisories_and_exits_zero() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));

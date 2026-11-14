@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.0] - 2026-11-14
+
+### Added
+- **Contextual QA Skills Heuristics (`ce-ai doctor` & `ce-ai init-prj`)**:
+  - Implemented non-blocking heuristic framework detection for Playwright and Cypress test suites in projects (`src/source/tools_registry.rs`).
+  - Detects `playwright.config.{ts,js,mjs,cjs}`, `cypress.config.{ts,js,mjs,cjs}`, `cypress.json`, as well as `package.json` test framework dependencies (`@playwright/test`, `cypress`).
+  - Evaluates local skill existence (`.skills/`, `skills/`, `.agent/skills/`, `.ce-ai/skills-registry.json`) to automatically suppress duplicate recommendations once installed.
+  - Surfaces actionable `doctor-info:` notices in `ce-ai doctor` and adoption hints in `ce-ai init-prj` suggesting tactical QA skills (e.g. `npx skills add petrkindlmann/qa-skills playwright-pom`) to counteract common LLM test generation anti-patterns (arbitrary timeouts, fragile selectors, missing fixtures).
+
+## [3.10.0] - 2026-11-14
+
 ### Added
 - **Legacy Gentle-AI Directive Detection & Auto-Repair (`ce-ai doctor` & `ce-ai init-prj`)**:
   - Added `probe_legacy_harness_directives` in `src/commands/doctor.rs` to detect and repair stale `gentle-ai` residual blocks (e.g. `<!-- gentle-ai:codegraph-guidance -->` and `gentle-ai codegraph init`) across all global harness instruction files (`~/.gemini/GEMINI.md`, `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`, `~/.kimi-code/AGENTS.md`, `~/.pi/agent/AGENTS.md`, `~/.fx/AGENTS.md`) and project root rule files.

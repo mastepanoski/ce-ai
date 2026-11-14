@@ -383,6 +383,141 @@ pub fn detect_tool_freshness(
     FreshnessStatus::Missing
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QaFrameworkSuggestion {
+    pub framework: &'static str,
+    pub indicator: String,
+    pub suggested_skill: &'static str,
+    pub install_cmd: &'static str,
+}
+
+pub const PLAYWRIGHT_CONFIGS: &[&str] = &[
+    "playwright.config.ts",
+    "playwright.config.js",
+    "playwright.config.mjs",
+    "playwright.config.cjs",
+];
+
+pub const CYPRESS_CONFIGS: &[&str] = &[
+    "cypress.config.ts",
+    "cypress.config.js",
+    "cypress.config.mjs",
+    "cypress.config.cjs",
+    "cypress.json",
+];
+
+/// Checks if an Agent Skill matching `keyword` is already present in project-level skill directories.
+pub fn is_qa_skill_present(project_dir: &std::path::Path, keyword: &str) -> bool {
+    let lower_kw = keyword.to_lowercase();
+    let skill_roots = [
+        project_dir.join(".skills"),
+        project_dir.join("skills"),
+        project_dir.join(".agent").join("skills"),
+    ];
+
+    for root in &skill_roots {
+        if let Ok(entries) = std::fs::read_dir(root) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_lowercase();
+                if name.contains(&lower_kw) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // Also check local .ce-ai/skills-registry.json if present
+    let reg_path = project_dir.join(".ce-ai").join("skills-registry.json");
+    if let Ok(reg) = crate::source::registry::SkillRegistry::load(&reg_path) {
+        if reg
+            .skills
+            .iter()
+            .any(|s| s.name.to_lowercase().contains(&lower_kw))
+        {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Checks whether package.json in `project_dir` contains `dep` under dependencies, devDependencies, or peerDependencies.
+pub fn package_json_contains_dep(project_dir: &std::path::Path, dep: &str) -> bool {
+    let pkg_file = project_dir.join("package.json");
+    if !pkg_file.exists() {
+        return false;
+    }
+    let Ok(content) = std::fs::read_to_string(&pkg_file) else {
+        return false;
+    };
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+        let has_in_obj = |key: &str| -> bool {
+            val.get(key)
+                .and_then(|obj| obj.as_object())
+                .map(|map| map.contains_key(dep))
+                .unwrap_or(false)
+        };
+        has_in_obj("dependencies")
+            || has_in_obj("devDependencies")
+            || has_in_obj("peerDependencies")
+    } else {
+        content.contains(&format!("\"{dep}\""))
+    }
+}
+
+/// Detects opportunities to recommend tactical QA skills for web test suites (Playwright, Cypress).
+pub fn detect_qa_framework_suggestions(
+    project_dir: &std::path::Path,
+) -> Vec<QaFrameworkSuggestion> {
+    let mut suggestions = Vec::new();
+
+    // 1. Playwright detection
+    if !is_qa_skill_present(project_dir, "playwright") {
+        let mut indicator = None;
+        for cfg in PLAYWRIGHT_CONFIGS {
+            if project_dir.join(cfg).exists() {
+                indicator = Some((*cfg).to_string());
+                break;
+            }
+        }
+        if indicator.is_none() && package_json_contains_dep(project_dir, "@playwright/test") {
+            indicator = Some("package.json (@playwright/test)".to_string());
+        }
+        if let Some(ind) = indicator {
+            suggestions.push(QaFrameworkSuggestion {
+                framework: "Playwright",
+                indicator: ind,
+                suggested_skill: "playwright-pom",
+                install_cmd: "npx skills add petrkindlmann/qa-skills playwright-pom",
+            });
+        }
+    }
+
+    // 2. Cypress detection
+    if !is_qa_skill_present(project_dir, "cypress") {
+        let mut indicator = None;
+        for cfg in CYPRESS_CONFIGS {
+            if project_dir.join(cfg).exists() {
+                indicator = Some((*cfg).to_string());
+                break;
+            }
+        }
+        if indicator.is_none() && package_json_contains_dep(project_dir, "cypress") {
+            indicator = Some("package.json (cypress)".to_string());
+        }
+        if let Some(ind) = indicator {
+            suggestions.push(QaFrameworkSuggestion {
+                framework: "Cypress",
+                indicator: ind,
+                suggested_skill: "cypress-commands",
+                install_cmd: "npx skills add petrkindlmann/qa-skills cypress-commands",
+            });
+        }
+    }
+
+    suggestions
+}
+
 #[cfg(test)]
 #[path = "tests/tools_registry.rs"]
 mod tests;

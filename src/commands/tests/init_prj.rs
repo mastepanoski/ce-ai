@@ -758,3 +758,43 @@ fn test_migrate_arch_aborts_on_dirty_working_tree() {
         .join("core.md")
         .exists());
 }
+
+#[test]
+fn test_adopt_project_emits_qa_skills_hint_for_playwright() {
+    let tmp = TempDir::new().unwrap();
+    let config_dir = tmp.path().join("config");
+    let prj_dir = tmp.path().join("web-app");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    let ctx = Context {
+        config_dir,
+        opencode_config_dir: tmp.path().join("opencode"),
+        workspace_root: None,
+        dry_run: false,
+        quiet: true,
+        verbose: false,
+    };
+
+    // Add playwright.config.ts to project
+    fs::write(
+        prj_dir.join("playwright.config.ts"),
+        "import { defineConfig } from '@playwright/test'; export default defineConfig({});",
+    )
+    .unwrap();
+
+    // Adoption must succeed cleanly
+    let res = adopt_project(&ctx, &prj_dir, AdoptionTier::Full, false, false, true, true);
+    assert!(res.is_ok());
+
+    // Verify detection finds the Playwright framework opportunity
+    let suggestions = crate::source::tools_registry::detect_qa_framework_suggestions(&prj_dir);
+    assert_eq!(suggestions.len(), 1);
+    assert_eq!(suggestions[0].framework, "Playwright");
+    assert_eq!(suggestions[0].indicator, "playwright.config.ts");
+    assert_eq!(suggestions[0].suggested_skill, "playwright-pom");
+
+    // Also verify emit_qa_skills_hint_if_applicable runs without error
+    emit_qa_skills_hint_if_applicable(&prj_dir, false);
+    emit_qa_skills_hint_if_applicable(&prj_dir, true);
+}

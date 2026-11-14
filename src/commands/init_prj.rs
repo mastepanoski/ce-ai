@@ -635,6 +635,7 @@ pub fn adopt_project(
                 &body_sha256[..8]
             );
         }
+        emit_qa_skills_hint_if_applicable(target_dir, ctx.quiet);
         return Ok(());
     }
 
@@ -669,7 +670,21 @@ pub fn adopt_project(
         );
     }
 
+    emit_qa_skills_hint_if_applicable(target_dir, ctx.quiet);
+
     Ok(())
+}
+
+fn emit_qa_skills_hint_if_applicable(target_dir: &Path, quiet: bool) {
+    if quiet {
+        return;
+    }
+    for sugg in crate::source::tools_registry::detect_qa_framework_suggestions(target_dir) {
+        println!(
+            "hint: detected {} ({}) in '{}' — consider adding tactical QA skills to avoid LLM test anti-patterns (e.g. '{}')",
+            sugg.framework, sugg.indicator, target_dir.display(), sugg.install_cmd
+        );
+    }
 }
 
 /// Checks if the git working tree in `repo_root` is clean.
