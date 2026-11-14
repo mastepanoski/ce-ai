@@ -216,10 +216,68 @@ pub fn scan_legacy_directives(content: &str) -> Vec<LegacyPatternFinding> {
                 description: "Rigid FSM 100% Ready gate in post-merge lifecycle",
                 line: line_num,
             });
+        } else if line.contains("<!-- gentle-ai:")
+            || line.contains("gentle-ai codegraph")
+            || line.contains("<!-- /gentle-ai:")
+        {
+            findings.push(LegacyPatternFinding {
+                pattern_id: "PAT-GENTLE-AI",
+                description: "Legacy 'gentle-ai' residual directive or guidance block",
+                line: line_num,
+            });
         }
     }
 
     findings
+}
+
+/// Strips obsolete Gentle-AI directive blocks (e.g. `<!-- gentle-ai:codegraph-guidance -->` ... `<!-- /gentle-ai:codegraph-guidance -->`)
+/// and stray gentle-ai invocation directives from markdown content.
+pub fn strip_legacy_gentle_ai_blocks(content: &str) -> (String, bool) {
+    let mut out = String::with_capacity(content.len());
+    let mut modified = false;
+    let mut lines = content.lines().peekable();
+    let mut in_block = false;
+
+    while let Some(line) = lines.next() {
+        if !in_block && line.contains("<!-- gentle-ai:") {
+            in_block = true;
+            modified = true;
+            continue;
+        }
+
+        if in_block {
+            if line.contains("<!-- /gentle-ai:")
+                || (line.contains("-->") && line.contains("gentle-ai"))
+            {
+                in_block = false;
+                // Peek and skip one trailing empty line if present
+                if let Some(next) = lines.peek() {
+                    if next.trim().is_empty() {
+                        lines.next();
+                    }
+                }
+            }
+            continue;
+        }
+
+        if line.contains("gentle-ai codegraph init") {
+            let replaced = line.replace("gentle-ai codegraph init", "codegraph init");
+            out.push_str(&replaced);
+            out.push('\n');
+            modified = true;
+            continue;
+        }
+
+        out.push_str(line);
+        out.push('\n');
+    }
+
+    if !content.ends_with('\n') && out.ends_with('\n') {
+        out.pop();
+    }
+
+    (out, modified)
 }
 
 /// Surgically modernizes legacy directives in the unmanaged portion of an AGENTS.md file.
@@ -246,8 +304,9 @@ pub fn migrate_legacy_directives(content: &str) -> (String, Vec<LegacyPatternFin
     };
 
     let transform_slice = |text: &str| -> String {
-        let mut out = String::with_capacity(text.len());
-        let mut lines = text.lines().peekable();
+        let (stripped_text, _) = strip_legacy_gentle_ai_blocks(text);
+        let mut out = String::with_capacity(stripped_text.len());
+        let mut lines = stripped_text.lines().peekable();
 
         while let Some(line) = lines.next() {
             // PAT-INV-6
