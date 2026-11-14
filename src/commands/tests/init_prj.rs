@@ -798,3 +798,25 @@ fn test_adopt_project_emits_qa_skills_hint_for_playwright() {
     emit_qa_skills_hint_if_applicable(&prj_dir, false);
     emit_qa_skills_hint_if_applicable(&prj_dir, true);
 }
+
+#[test]
+fn test_adopt_project_emits_privacy_pii_hint() {
+    let tmp = TempDir::new().unwrap();
+    let prj_dir = tmp.path().join("finance-app");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    fs::write(
+        prj_dir.join("schema.prisma"),
+        "model Account {\n  id Int @id\n  iban String\n  ssn String\n}",
+    )
+    .unwrap();
+
+    let sugg = crate::security::heuristics::detect_pii_schema_opportunity(&prj_dir)
+        .expect("expected PII schema suggestion");
+    assert!(sugg.matched_fields.contains(&"iban".to_string()));
+    assert!(sugg.matched_fields.contains(&"ssn".to_string()));
+
+    // Verify emit_privacy_pii_hint_if_applicable runs cleanly
+    emit_privacy_pii_hint_if_applicable(&prj_dir, false);
+    emit_privacy_pii_hint_if_applicable(&prj_dir, true);
+}

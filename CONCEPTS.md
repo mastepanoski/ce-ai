@@ -281,6 +281,13 @@ A cross-platform task automation facility in `ce-ai` that registers periodic bac
 ### Contextual QA Skills Heuristics
 A non-blocking recommendation subsystem in `ce-ai doctor` and `ce-ai init-prj` that dynamically inspects host projects for web and E2E test suites (such as Playwright and Cypress configuration files or package dependencies). When relevant testing frameworks are detected and specialized agent skills are not yet present in the project's local skill registries (`.skills/`, `skills/`, `.agent/skills/`), `ce-ai` surfaces actionable, non-failing advisory hints (`doctor-info:`) suggesting focused Agent Skills (e.g. `playwright-pom`, `cypress-commands`). This prevents common LLM test generation defects (arbitrary timeouts, fragile selectors, missing fixtures) without incurring prompt bloat or global tool coupling across non-web codebases.
 
+### Native PII Redaction Engine
+A high-performance, zero-Python, sub-millisecond redaction and credential anonymization engine implemented in Rust (`src/security/pii.rs`) that enforces ISO/IEC 27001 data confidentiality, GDPR/CCPA data privacy, and HIPAA compliance. It incorporates mathematical checksum algorithms (the Luhn mod 10 check for 13–19 digit payment cards and ISO 13616 / ISO 7064 mod 97-10 check for International Bank Account Numbers) to eliminate false positives on arbitrary integers. The engine unifies sensitive data masking across tool execution risk evaluation (`src/decisions/risk.rs`), upstream diagnostic bug reporting (`src/source/bug_reporter.rs`), and log capture, stripping credit cards, IBANs, RFC 5322 emails, E.164 phone numbers, AWS access keys, GitHub PATs, API keys (`sk-`), JWT tokens, PEM private keys, and cross-platform filesystem paths without external inference tokens or runtime dependencies.
+
+### Contextual Privacy Schema Heuristics
+A non-blocking compliance heuristic probe in `ce-ai doctor` and `ce-ai init-prj` (`src/security/heuristics.rs`) that detects database schemas, ORM models, and migration files (`schema.prisma`, `db/schema.rb`, `migrations/`, `src/models/`, `entities/`) containing sensitive Personally Identifiable Information (PII) or regulated data fields (e.g. SSN, credit card, patient ID, diagnosis, date of birth, IBAN, passport). When sensitive schemas are detected, `ce-ai` surfaces non-failing advisory guidance (`doctor-info: privacy:`) recommending local PII redaction or deploying an enterprise AI Privacy Gateway (such as Microsoft Presidio or LiteLLM) to prevent proprietary or regulated data leakage before LLM inference.
+
+
 
 
 

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.12.0] - 2026-11-14
+
+### Added
+- **Native PII & Secrets Redaction Engine (`src/security/pii.rs`)**:
+  - Implemented a zero-dependency, sub-millisecond Rust native redaction engine supporting ISO/IEC 27001, GDPR, and HIPAA data confidentiality.
+  - Added mathematical checksum validation:
+    - **Payment Cards**: Luhn mod 10 check for 13–19 digit cards (Visa, Mastercard, Amex, Diners, Discover, JCB) to eliminate false positives on arbitrary integers.
+    - **Bank Accounts**: ISO 13616 / ISO 7064 mod 97-10 check for International Bank Account Numbers (IBAN).
+  - High-performance, single-pass pattern masking for RFC 5322 emails, E.164 / formatted national phone numbers, GitHub PATs (`ghp_`, `github_pat_`), OpenAI/Anthropic API keys (`sk-`), AWS access keys (`AKIA...`), Bearer/JWT tokens, multi-line PEM private keys, and cross-platform filesystem paths (`~` and `<project-root>`).
+  - Unified sensitive data redaction across tool execution risk evaluation (`src/decisions/risk.rs`), upstream bug reporting (`src/source/bug_reporter.rs`), and diagnostic logging.
+- **Contextual Privacy Schema Heuristics (`ce-ai doctor` & `ce-ai init-prj`)**:
+  - Added non-blocking heuristic scanner in `src/security/heuristics.rs` inspecting database schemas, ORM models, and migration files (`schema.prisma`, `db/schema.rb`, `migrations/`, `src/models/`, `entities/`, `types/`).
+  - Detects sensitive fields (SSN, credit card, patient ID, diagnosis, date of birth, IBAN, tax ID, passport).
+  - Surfaces actionable `doctor-info: privacy:` advisories and adoption hints recommending local PII redaction or enterprise AI Privacy Gateways (e.g. Microsoft Presidio / LiteLLM) before LLM prompt submission.
+- **Domain Concepts Accretion (`CONCEPTS.md`)**:
+  - Accreted `Native PII Redaction Engine` and `Contextual Privacy Schema Heuristics`, verified via `scripts/validate-concepts.py` (93 entries, +2 added, 0 scrubbed).
+
 ## [3.11.0] - 2026-11-14
 
 ### Added
