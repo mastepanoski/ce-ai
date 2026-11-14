@@ -1302,3 +1302,64 @@ end_of_record
     let warns_covered = probe_code_quality_risk(&repo_root, true);
     assert!(warns_covered.is_empty());
 }
+
+#[test]
+fn test_probe_legacy_harness_directives_detection_and_fix() {
+    let tmp = TempDir::new().unwrap();
+    let home_dir = tmp.path().join("home");
+    let repo_root = tmp.path().join("repo");
+    let gemini_dir = home_dir.join(".gemini");
+    let claude_dir = home_dir.join(".claude");
+    std::fs::create_dir_all(&gemini_dir).unwrap();
+    std::fs::create_dir_all(&claude_dir).unwrap();
+    std::fs::create_dir_all(&repo_root).unwrap();
+
+    let legacy_gemini = r#"<!-- gentle-ai:codegraph-guidance -->
+## CodeGraph
+run gentle-ai codegraph init
+<!-- /gentle-ai:codegraph-guidance -->
+
+## Custom Rules
+Keep it clean.
+"#;
+
+    let legacy_claude = r#"@RTK.md
+run 'gentle-ai codegraph init'
+"#;
+
+    let gemini_file = gemini_dir.join("GEMINI.md");
+    let claude_file = claude_dir.join("CLAUDE.md");
+    std::fs::write(&gemini_file, legacy_gemini).unwrap();
+    std::fs::write(&claude_file, legacy_claude).unwrap();
+
+    // 1. Detection without fix (strict=true should collect findings)
+    let mut findings = Vec::new();
+    let warns = probe_legacy_harness_directives(&home_dir, &repo_root, false, true, &mut findings);
+    assert_eq!(warns.len(), 2);
+    assert_eq!(findings.len(), 2);
+    assert!(warns[0].contains("legacy 'gentle-ai' directive detected"));
+
+    // 2. Fix enabled
+    let mut findings_fix = Vec::new();
+    let warns_fix =
+        probe_legacy_harness_directives(&home_dir, &repo_root, true, true, &mut findings_fix);
+    assert!(warns_fix.is_empty());
+    assert!(findings_fix.is_empty());
+
+    // 3. Verify disk content after fix
+    let gemini_after = std::fs::read_to_string(&gemini_file).unwrap();
+    assert!(!gemini_after.contains("gentle-ai"));
+    assert!(gemini_after.contains("## Custom Rules"));
+
+    let claude_after = std::fs::read_to_string(&claude_file).unwrap();
+    assert!(!claude_after.contains("gentle-ai"));
+    assert!(claude_after.contains("@RTK.md"));
+    assert!(claude_after.contains("codegraph init"));
+
+    // 4. Running probe again reports zero warnings
+    let mut findings_clean = Vec::new();
+    let warns_clean =
+        probe_legacy_harness_directives(&home_dir, &repo_root, false, true, &mut findings_clean);
+    assert!(warns_clean.is_empty());
+    assert!(findings_clean.is_empty());
+}

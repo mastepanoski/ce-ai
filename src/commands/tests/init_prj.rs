@@ -417,6 +417,33 @@ Run `npm test` before committing.
 }
 
 #[test]
+fn test_scan_and_migrate_legacy_gentle_ai_blocks() {
+    let text = r#"# Instructions
+@RTK.md
+
+<!-- gentle-ai:codegraph-guidance -->
+## CodeGraph
+4. If .codegraph/ is missing and CodeGraph is enabled/available, immediately run gentle-ai codegraph init --cwd <project-root> once.
+<!-- /gentle-ai:codegraph-guidance -->
+
+<!-- CODEGRAPH_START -->
+## CodeGraph
+If there is no .codegraph/ directory, skip CodeGraph entirely.
+<!-- CODEGRAPH_END -->
+"#;
+
+    let findings = scan_legacy_directives(text);
+    assert!(findings.iter().any(|f| f.pattern_id == "PAT-GENTLE-AI"));
+
+    let (migrated, findings) = migrate_legacy_directives(text);
+    assert!(!findings.is_empty());
+    assert!(!migrated.contains("gentle-ai:codegraph-guidance"));
+    assert!(!migrated.contains("gentle-ai codegraph init"));
+    assert!(migrated.contains("@RTK.md"));
+    assert!(migrated.contains("<!-- CODEGRAPH_START -->"));
+}
+
+#[test]
 fn test_adopt_project_with_migrate_creates_backup_and_upgrades() {
     let tmp = TempDir::new().unwrap();
     let prj_dir = tmp.path().join("legacy-project");

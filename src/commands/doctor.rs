@@ -519,6 +519,9 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
     // Living Architecture System Manifest integrity probe
     probe_system_manifest_integrity(&repo_root);
 
+    // Legacy gentle-ai residual directives probe
+    probe_legacy_harness_directives(&home_dir, &repo_root, args.fix, args.strict, &mut findings);
+
     // Code Quality and CRAP Risk Probe (Issue #ub-mode)
     let quality_findings = probe_code_quality_risk(&repo_root, args.metrics);
     if args.strict {
@@ -1455,6 +1458,85 @@ pub fn probe_code_quality_risk(repo_root: &std::path::Path, explicit_metrics: bo
             "doctor-info: code quality metrics ({cov_status}): {total_functions} functions evaluated, max CC: {max_cc}, max CRAP: {max_crap:.1}, high-risk findings: {}",
             warnings.len()
         );
+    }
+
+    warnings
+}
+
+/// Probes global harness instruction files and project files for legacy gentle-ai residual directives.
+pub fn probe_legacy_harness_directives(
+    home_dir: &std::path::Path,
+    repo_root: &std::path::Path,
+    fix: bool,
+    strict: bool,
+    findings: &mut Vec<String>,
+) -> Vec<String> {
+    let mut warnings = Vec::new();
+
+    let candidates = [
+        home_dir.join(".gemini").join("GEMINI.md"),
+        home_dir.join(".claude").join("CLAUDE.md"),
+        home_dir.join(".codex").join("AGENTS.md"),
+        home_dir.join(".config").join("opencode").join("AGENTS.md"),
+        home_dir.join(".opencode").join("AGENTS.md"),
+        home_dir.join(".kimi-code").join("AGENTS.md"),
+        home_dir.join(".pi").join("agent").join("AGENTS.md"),
+        home_dir.join(".fx").join("AGENTS.md"),
+        repo_root.join("AGENTS.md"),
+        repo_root.join("CLAUDE.md"),
+        repo_root.join("GEMINI.md"),
+    ];
+
+    let mut seen = std::collections::HashSet::new();
+
+    for file in candidates {
+        let canonical = file.canonicalize().unwrap_or_else(|_| file.clone());
+        if !seen.insert(canonical) || !file.is_file() {
+            continue;
+        }
+
+        let content = match std::fs::read_to_string(&file) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        if content.contains("<!-- gentle-ai:")
+            || content.contains("gentle-ai codegraph")
+            || content.contains("<!-- /gentle-ai:")
+        {
+            if fix {
+                let (cleaned, modified) =
+                    crate::commands::init_prj::strip_legacy_gentle_ai_blocks(&content);
+                if modified {
+                    if let Err(e) = crate::state::write_atomic(&file, cleaned.as_bytes()) {
+                        let msg = format!(
+                            "failed to remove legacy gentle-ai directives in '{}': {e}",
+                            file.display()
+                        );
+                        println!("doctor-warn: {msg}");
+                        warnings.push(msg.clone());
+                        if strict {
+                            findings.push(msg);
+                        }
+                    } else {
+                        println!(
+                            "doctor-fix: removed legacy 'gentle-ai' residual directive in '{}'",
+                            file.display()
+                        );
+                    }
+                }
+            } else {
+                let msg = format!(
+                    "legacy 'gentle-ai' directive detected in '{}' (run 'ce-ai doctor --fix' to remove obsolete block)",
+                    file.display()
+                );
+                println!("doctor-warn: {msg}");
+                warnings.push(msg.clone());
+                if strict {
+                    findings.push(msg);
+                }
+            }
+        }
     }
 
     warnings

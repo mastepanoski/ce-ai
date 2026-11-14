@@ -2825,6 +2825,52 @@ fn doctor_reports_legacy_unmanaged_directives_warning() {
 }
 
 #[test]
+fn doctor_reports_and_fixes_legacy_gentle_ai_harness_directives() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("test-prj");
+    let gemini_dir = home.join(".gemini");
+    fs::create_dir_all(&gemini_dir).unwrap();
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    let legacy_gemini = r#"<!-- gentle-ai:codegraph-guidance -->
+## CodeGraph
+run gentle-ai codegraph init
+<!-- /gentle-ai:codegraph-guidance -->
+
+## Custom Rules
+Hello world.
+"#;
+    fs::write(gemini_dir.join("GEMINI.md"), legacy_gemini).unwrap();
+
+    // 1. Doctor reports legacy gentle-ai warning
+    ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .arg("doctor")
+        .assert()
+        .stdout(predicate::str::contains(
+            "doctor-warn: legacy 'gentle-ai' directive detected",
+        ))
+        .stdout(predicate::str::contains(
+            "run 'ce-ai doctor --fix' to remove obsolete block",
+        ));
+
+    // 2. Doctor --fix removes the legacy block
+    ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args(["doctor", "--fix"])
+        .assert()
+        .stdout(predicate::str::contains(
+            "doctor-fix: removed legacy 'gentle-ai' residual directive",
+        ));
+
+    let cleaned = fs::read_to_string(gemini_dir.join("GEMINI.md")).unwrap();
+    assert!(!cleaned.contains("gentle-ai"));
+    assert!(cleaned.contains("## Custom Rules"));
+    assert!(cleaned.contains("Hello world."));
+}
+
+#[test]
 fn doctor_classifies_byte_identical_minimal_v2_body_as_healthy() {
     let tmp = TempDir::new().unwrap();
     let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));

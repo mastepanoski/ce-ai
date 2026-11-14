@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Legacy Gentle-AI Directive Detection & Auto-Repair (`ce-ai doctor` & `ce-ai init-prj`)**:
+  - Added `probe_legacy_harness_directives` in `src/commands/doctor.rs` to detect and repair stale `gentle-ai` residual blocks (e.g. `<!-- gentle-ai:codegraph-guidance -->` and `gentle-ai codegraph init`) across all global harness instruction files (`~/.gemini/GEMINI.md`, `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`, `~/.kimi-code/AGENTS.md`, `~/.pi/agent/AGENTS.md`, `~/.fx/AGENTS.md`) and project root rule files.
+  - Supports automated surgical removal with atomic writes via `ce-ai doctor --fix`.
+  - Added pattern `PAT-GENTLE-AI` to `scan_legacy_directives` and surgical stripping in `migrate_legacy_directives` (`src/commands/init_prj.rs`) to ensure newly adopted or migrated projects cleanly eliminate legacy `gentle-ai` residual directives.
+
 ## [3.9.0] - 2026-11-09
 
 ### Added
