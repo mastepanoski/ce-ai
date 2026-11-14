@@ -383,6 +383,10 @@ pub fn run(ctx: &Context, args: &Args) -> Result<(), CeError> {
                 println!("doctor-info: codegraph index (.codegraph/) not initialized (suggested: 'ce-ai tools init codegraph')");
             }
 
+            if current_adopted_project.is_none() {
+                probe_qa_skills_suggestions(root_path);
+            }
+
             let githooks_dir = root_path.join(".githooks");
             let uses_githooks_convention = githooks_dir.exists();
 
@@ -1077,6 +1081,23 @@ pub(crate) fn check_project_adoption_health(
                 report(hook_msg);
             }
         }
+    }
+
+    // Contextual QA Skills Heuristics (#qa-skills)
+    if treat_as_finding {
+        probe_qa_skills_suggestions(&p.path);
+    }
+}
+
+pub(crate) fn probe_qa_skills_suggestions(project_dir: &std::path::Path) {
+    for sugg in crate::source::tools_registry::detect_qa_framework_suggestions(project_dir) {
+        println!(
+            "doctor-info: qa-skills: detected {} ({}) in '{}' — consider adding tactical QA skills to avoid LLM test anti-patterns (run '{}')",
+            sugg.framework,
+            sugg.indicator,
+            project_dir.display(),
+            sugg.install_cmd
+        );
     }
 }
 

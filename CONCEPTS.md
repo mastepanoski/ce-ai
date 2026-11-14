@@ -278,6 +278,10 @@ A unified version alignment and synchronization shortcut in `ce-ai` that consoli
 ### Automated Fleet Scheduling (`ce-ai fleet schedule`)
 A cross-platform task automation facility in `ce-ai` that registers periodic background updates (`ce-ai update -q`) via native operating system service managers: macOS LaunchAgents (`launchd`), Linux user timers (`systemd`), Windows Task Scheduler (`schtasks`), or standard crontab lines (`--cron`). It ensures coding agent harnesses maintain aligned versions automatically, handles asleep-device recovery on macOS/Linux via persistent calendar intervals, and supports non-destructive previewing (`--dry-run`, `--print`) and clean uninstallation (`--remove`).
 
+### Contextual QA Skills Heuristics
+A non-blocking recommendation subsystem in `ce-ai doctor` and `ce-ai init-prj` that dynamically inspects host projects for web and E2E test suites (such as Playwright and Cypress configuration files or package dependencies). When relevant testing frameworks are detected and specialized agent skills are not yet present in the project's local skill registries (`.skills/`, `skills/`, `.agent/skills/`), `ce-ai` surfaces actionable, non-failing advisory hints (`doctor-info:`) suggesting focused Agent Skills (e.g. `playwright-pom`, `cypress-commands`). This prevents common LLM test generation defects (arbitrary timeouts, fragile selectors, missing fixtures) without incurring prompt bloat or global tool coupling across non-web codebases.
+
+
 
 
 

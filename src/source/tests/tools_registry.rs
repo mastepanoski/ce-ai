@@ -105,3 +105,69 @@ fn test_mcp_and_skill_detection() {
         }
     );
 }
+
+#[test]
+fn test_detect_qa_framework_suggestions_playwright_and_cypress() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+
+    // 1. Empty directory -> No suggestions
+    assert!(detect_qa_framework_suggestions(root).is_empty());
+
+    // 2. Playwright config present
+    std::fs::write(root.join("playwright.config.ts"), "// config").unwrap();
+    let suggestions = detect_qa_framework_suggestions(root);
+    assert_eq!(suggestions.len(), 1);
+    assert_eq!(suggestions[0].framework, "Playwright");
+    assert_eq!(suggestions[0].indicator, "playwright.config.ts");
+    assert_eq!(suggestions[0].suggested_skill, "playwright-pom");
+    assert_eq!(
+        suggestions[0].install_cmd,
+        "npx skills add petrkindlmann/qa-skills playwright-pom"
+    );
+
+    // 3. Cypress config also present -> Both suggested
+    std::fs::write(root.join("cypress.config.js"), "// cypress").unwrap();
+    let suggestions = detect_qa_framework_suggestions(root);
+    assert_eq!(suggestions.len(), 2);
+    assert_eq!(suggestions[0].framework, "Playwright");
+    assert_eq!(suggestions[1].framework, "Cypress");
+    assert_eq!(suggestions[1].indicator, "cypress.config.js");
+    assert_eq!(suggestions[1].suggested_skill, "cypress-commands");
+
+    // 4. Suppress Playwright when skill directory exists in .skills/
+    let dot_skills = root.join(".skills").join("playwright-pom");
+    std::fs::create_dir_all(&dot_skills).unwrap();
+    let suggestions_after_pw_skill = detect_qa_framework_suggestions(root);
+    assert_eq!(suggestions_after_pw_skill.len(), 1);
+    assert_eq!(suggestions_after_pw_skill[0].framework, "Cypress");
+
+    // 5. Suppress Cypress when skill directory exists in skills/
+    let skills_dir = root.join("skills").join("cypress-commands");
+    std::fs::create_dir_all(&skills_dir).unwrap();
+    assert!(detect_qa_framework_suggestions(root).is_empty());
+}
+
+#[test]
+fn test_detect_qa_framework_suggestions_package_json() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+
+    // package.json with @playwright/test in devDependencies
+    let pkg = serde_json::json!({
+        "name": "my-app",
+        "devDependencies": {
+            "@playwright/test": "^1.40.0"
+        }
+    });
+    std::fs::write(
+        root.join("package.json"),
+        serde_json::to_string_pretty(&pkg).unwrap(),
+    )
+    .unwrap();
+
+    let suggestions = detect_qa_framework_suggestions(root);
+    assert_eq!(suggestions.len(), 1);
+    assert_eq!(suggestions[0].framework, "Playwright");
+    assert_eq!(suggestions[0].indicator, "package.json (@playwright/test)");
+}

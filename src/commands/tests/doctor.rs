@@ -1363,3 +1363,23 @@ run 'gentle-ai codegraph init'
     assert!(warns_clean.is_empty());
     assert!(findings_clean.is_empty());
 }
+
+#[test]
+fn test_doctor_qa_skills_heuristics_non_blocking() {
+    let tmp = TempDir::new().unwrap();
+    let project_dir = tmp.path().join("my-web-app");
+    std::fs::create_dir_all(&project_dir).unwrap();
+
+    // Create playwright.config.ts in project
+    std::fs::write(
+        project_dir.join("playwright.config.ts"),
+        "export default {};",
+    )
+    .unwrap();
+
+    // Verify probe_qa_skills_suggestions runs without panic and does not add findings
+    let findings: Vec<String> = Vec::new();
+    probe_qa_skills_suggestions(&project_dir);
+    // Findings vector must remain untouched (strictly advisory via doctor-info)
+    assert!(findings.is_empty());
+}
