@@ -11,6 +11,7 @@ pub mod harness;
 pub mod observation;
 pub mod opencode;
 pub mod quality;
+pub mod security;
 pub mod source;
 pub mod state;
 pub mod verification;

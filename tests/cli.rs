@@ -11446,3 +11446,40 @@ fn test_cli_workflow_guide_and_openspec_onboarding_guidance() {
     ));
     assert!(status_stdout.contains("💡 Architecture Guidance:"));
 }
+
+#[test]
+fn test_cli_privacy_pii_heuristics_and_doctor() {
+    let tmp = TempDir::new().unwrap();
+    let (config_dir, home) = (tmp.path().join("ce-ai"), tmp.path().join("home"));
+    let prj_dir = tmp.path().join("med-app");
+    fs::create_dir_all(&prj_dir).unwrap();
+
+    // Create schema.prisma with sensitive fields
+    fs::write(
+        prj_dir.join("schema.prisma"),
+        "model Patient {\n  id Int @id\n  patient_id String\n  credit_card String\n  date_of_birth String\n}\n",
+    )
+    .unwrap();
+
+    // 1. ce-ai init-prj outputs privacy advisory hint
+    let out_init = ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args(["init-prj", "--tier", "full"])
+        .output()
+        .unwrap();
+    assert!(out_init.status.success());
+    let init_stdout = String::from_utf8_lossy(&out_init.stdout);
+    assert!(init_stdout.contains("hint: detected sensitive PII schema fields"));
+    assert!(init_stdout.contains("schema.prisma"));
+
+    // 2. ce-ai doctor outputs non-blocking doctor-info
+    let out_doctor = ceai(&config_dir, &home)
+        .current_dir(&prj_dir)
+        .args(["doctor"])
+        .output()
+        .unwrap();
+    assert!(out_doctor.status.success());
+    let doctor_stdout = String::from_utf8_lossy(&out_doctor.stdout);
+    assert!(doctor_stdout.contains("doctor-info: privacy: detected sensitive PII schema fields"));
+    assert!(doctor_stdout.contains("Presidio"));
+}

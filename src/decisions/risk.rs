@@ -149,89 +149,9 @@ pub struct RiskEvaluationResult {
     pub latency_ms: u64,
 }
 
-/// Sanitizes sensitive secrets (API keys, private keys, passwords) from text.
+/// Sanitizes sensitive secrets (API keys, private keys, passwords) and PII from text.
 pub fn redact_sensitive_content(content: &str) -> String {
-    let mut result = String::new();
-    let mut in_private_key = false;
-
-    for line in content.lines() {
-        if line.contains("-----BEGIN") && line.contains("PRIVATE KEY-----") {
-            in_private_key = true;
-            result.push_str("[REDACTED_PRIVATE_KEY]\n");
-            continue;
-        }
-        if in_private_key {
-            if line.contains("-----END") && line.contains("PRIVATE KEY-----") {
-                in_private_key = false;
-            }
-            continue;
-        }
-
-        let mut redacted_line = line.to_string();
-
-        for sensitive_keyword in [
-            "password",
-            "token",
-            "secret",
-            "api_key",
-            "apikey",
-            "auth_token",
-        ] {
-            for delim in [':', '='] {
-                let lower = redacted_line.to_lowercase();
-                let pattern = format!("{sensitive_keyword}{delim}");
-                let mut start_search = 0;
-                while let Some(idx) = lower[start_search..].find(&pattern) {
-                    let actual_idx = start_search + idx;
-                    let val_start = actual_idx + pattern.len();
-                    let val_end = redacted_line[val_start..]
-                        .find(|c: char| c.is_whitespace() || c == ',' || c == '\'' || c == '"')
-                        .map(|i| val_start + i)
-                        .unwrap_or(redacted_line.len());
-                    if val_end > val_start {
-                        let prefix = &redacted_line[..val_start];
-                        let suffix = &redacted_line[val_end..];
-                        redacted_line = format!("{prefix}[REDACTED]{suffix}");
-                        start_search = val_start + "[REDACTED]".len();
-                    } else {
-                        break;
-                    }
-                }
-            }
-        }
-
-        for prefix in ["sk-", "ghp_", "ts_"] {
-            let mut start_search = 0;
-            while let Some(idx) = redacted_line[start_search..].find(prefix) {
-                let actual_idx = start_search + idx;
-                let val_end = redacted_line[actual_idx..]
-                    .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
-                    .map(|i| actual_idx + i)
-                    .unwrap_or(redacted_line.len());
-                let token = &redacted_line[actual_idx..val_end];
-                if token.len() > 8 {
-                    redacted_line = format!(
-                        "{}[REDACTED]{}",
-                        &redacted_line[..actual_idx],
-                        &redacted_line[val_end..]
-                    );
-                    start_search = actual_idx + "[REDACTED]".len();
-                } else if val_end > actual_idx {
-                    start_search = val_end;
-                } else {
-                    break;
-                }
-            }
-        }
-
-        result.push_str(&redacted_line);
-        result.push('\n');
-    }
-
-    if !content.ends_with('\n') && result.ends_with('\n') {
-        result.pop();
-    }
-    result
+    crate::security::pii::redact_pii_and_secrets(content)
 }
 
 /// Evaluates deterministic security rules that categorically deny execution.

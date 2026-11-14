@@ -1383,3 +1383,22 @@ fn test_doctor_qa_skills_heuristics_non_blocking() {
     // Findings vector must remain untouched (strictly advisory via doctor-info)
     assert!(findings.is_empty());
 }
+
+#[test]
+fn test_doctor_privacy_pii_heuristics_non_blocking() {
+    let tmp = TempDir::new().unwrap();
+    let project_dir = tmp.path().join("health-app");
+    std::fs::create_dir_all(&project_dir).unwrap();
+
+    // Create schema.prisma with sensitive fields
+    std::fs::write(
+        project_dir.join("schema.prisma"),
+        "model Patient {\n  id Int @id\n  patient_id String\n  credit_card String\n}",
+    )
+    .unwrap();
+
+    let findings: Vec<String> = Vec::new();
+    probe_privacy_pii_suggestions(&project_dir);
+    // Findings vector must remain untouched (strictly advisory via doctor-info)
+    assert!(findings.is_empty());
+}

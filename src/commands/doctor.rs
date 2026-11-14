@@ -1086,6 +1086,18 @@ pub(crate) fn check_project_adoption_health(
     // Contextual QA Skills Heuristics (#qa-skills)
     if treat_as_finding {
         probe_qa_skills_suggestions(&p.path);
+        probe_privacy_pii_suggestions(&p.path);
+    }
+}
+
+pub(crate) fn probe_privacy_pii_suggestions(project_dir: &std::path::Path) {
+    if let Some(sugg) = crate::security::heuristics::detect_pii_schema_opportunity(project_dir) {
+        println!(
+            "doctor-info: privacy: detected sensitive PII schema fields {:?} in '{}' ({}) — consider local PII redaction or deploying an AI Privacy Gateway (Presidio/LiteLLM) for ISO 27001 / GDPR compliance",
+            sugg.matched_fields,
+            sugg.relative_path,
+            project_dir.display()
+        );
     }
 }
 

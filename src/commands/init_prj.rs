@@ -636,6 +636,7 @@ pub fn adopt_project(
             );
         }
         emit_qa_skills_hint_if_applicable(target_dir, ctx.quiet);
+        emit_privacy_pii_hint_if_applicable(target_dir, ctx.quiet);
         return Ok(());
     }
 
@@ -671,6 +672,7 @@ pub fn adopt_project(
     }
 
     emit_qa_skills_hint_if_applicable(target_dir, ctx.quiet);
+    emit_privacy_pii_hint_if_applicable(target_dir, ctx.quiet);
 
     Ok(())
 }
@@ -683,6 +685,20 @@ fn emit_qa_skills_hint_if_applicable(target_dir: &Path, quiet: bool) {
         println!(
             "hint: detected {} ({}) in '{}' — consider adding tactical QA skills to avoid LLM test anti-patterns (e.g. '{}')",
             sugg.framework, sugg.indicator, target_dir.display(), sugg.install_cmd
+        );
+    }
+}
+
+fn emit_privacy_pii_hint_if_applicable(target_dir: &Path, quiet: bool) {
+    if quiet {
+        return;
+    }
+    if let Some(sugg) = crate::security::heuristics::detect_pii_schema_opportunity(target_dir) {
+        println!(
+            "hint: detected sensitive PII schema fields {:?} in '{}' ({}) — consider local PII redaction or deploying an AI Privacy Gateway (Presidio/LiteLLM) for ISO 27001 / GDPR compliance",
+            sugg.matched_fields,
+            sugg.relative_path,
+            target_dir.display()
         );
     }
 }

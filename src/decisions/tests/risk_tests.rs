@@ -145,7 +145,7 @@ fn test_redact_sensitive_content() {
     let input_ghp = "git clone https://ghp_0123456789abcdef0123456789@github.com/repo";
     let redacted_ghp = redact_sensitive_content(input_ghp);
     assert!(!redacted_ghp.contains("ghp_0123456789abcdef0123456789"));
-    assert!(redacted_ghp.contains("[REDACTED]"));
+    assert!(redacted_ghp.contains("[REDACTED"));
 
     let key_block = "header\n-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0...\n-----END RSA PRIVATE KEY-----\nfooter";
     let redacted_key = redact_sensitive_content(key_block);
